@@ -1,0 +1,19 @@
+info:
+  name: Get Document Details
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/documents/{{documentId}}"
+  headers:
+    - name: Authorization
+      value: "Bearer {{accessToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Fetches detailed metadata and individual text chunks/vectors for a specific document.

@@ -1,0 +1,20 @@
+info:
+  name: Evaluate Feature Flag
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/internal/features/{{flagName}}"
+  params:
+    - name: tenant_id
+      value: "{{tenantId}}"
+      type: query
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Internal route to evaluate a feature flag configuration for a specific tenant during request routing at the Gateway.

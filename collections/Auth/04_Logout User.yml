@@ -1,0 +1,19 @@
+info:
+  name: Logout User
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/auth/logout"
+  headers:
+    - name: Authorization
+      value: "Bearer {{accessToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Deletes the session entry in Redis, revoking the refresh token immediately and invalidating subsequent refreshes.

@@ -1,0 +1,19 @@
+info:
+  name: Delete Webhook
+  type: http
+  seq: 4
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/webhooks/{{webhookId}}"
+  headers:
+    - name: Authorization
+      value: "Bearer {{accessToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Removes a webhook registration, stopping subsequent delivery events.

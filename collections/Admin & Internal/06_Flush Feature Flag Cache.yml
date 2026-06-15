@@ -1,0 +1,27 @@
+info:
+  name: Flush Feature Flag Cache
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/admin/feature-flags/cache-flush"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+    - name: Authorization
+      value: "Bearer {{accessToken}}"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "rag_enabled"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Admin endpoint to flush cached evaluation results inside Redis database immediately.

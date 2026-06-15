@@ -1,0 +1,30 @@
+info:
+  name: Save Document Metadata
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/documents"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+    - name: Authorization
+      value: "Bearer {{accessToken}}"
+  body:
+    type: json
+    data: |-
+      {
+        "filename": "architecture.pdf",
+        "storagePath": "tenants/tenant_abc/docs/architecture.pdf",
+        "mimeType": "application/pdf",
+        "fileSize": 1245000
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Saves metadata for the uploaded document in the database and enqueues a background BullMQ job to start chunking and embedding.

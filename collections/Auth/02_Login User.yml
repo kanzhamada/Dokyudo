@@ -1,0 +1,43 @@
+info:
+  name: Login User
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/auth/login"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "tenant@example.com",
+        "password": "SecurePassword123"
+      }
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: accessToken
+        method: jsonq
+      variable:
+        name: accessToken
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: refreshToken
+        method: jsonq
+      variable:
+        name: refreshToken
+        scope: runtime
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Logs in a tenant and returns a short-lived access JWT (15-min) and a refresh token (24-hour stored in Redis). Tokens are auto-captured as runtime variables for subsequent requests.

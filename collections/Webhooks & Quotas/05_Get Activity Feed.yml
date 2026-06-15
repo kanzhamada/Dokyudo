@@ -1,0 +1,23 @@
+info:
+  name: Get Activity Feed
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/activities"
+  headers:
+    - name: Authorization
+      value: "Bearer {{accessToken}}"
+  params:
+    - name: limit
+      value: "10"
+      type: query
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Retrieves the tenant's latest activity feed (ingestions, searches, chat turns, webhook deliveries) using cursor-based pagination.

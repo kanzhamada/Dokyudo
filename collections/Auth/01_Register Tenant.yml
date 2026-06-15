@@ -1,0 +1,26 @@
+info:
+  name: Register Tenant
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/auth/register"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "tenant@example.com",
+        "password": "SecurePassword123"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Registers a new tenant and user mapping (1:1 relation) in the database. Passwords are hashed with bcrypt (min cost 12) on registration.
