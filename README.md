@@ -66,100 +66,36 @@ Dokyudo/
 ├── apps/
 │   ├── backend/                      # Deno — API Gateway + all backend services
 │   │   ├── deno.jsonc                # Workspace member config, tasks, imports
-│   │   ├── .env                      # Encrypted env vars (envcrypt)
-│   │   ├── main.ts                   # Entry point — boots Hono, mounts routers
-│   │   ├── src/
-│   │   │   ├── gateway/              # API Gateway layer
-│   │   │   │   ├── app.ts            # Hono app factory, global middleware
-│   │   │   │   ├── middleware/
-│   │   │   │   │   ├── auth.ts       # JWT validation + Redis session refresh
-│   │   │   │   │   ├── rate-limiter.ts
-│   │   │   │   │   ├── tenant-context.ts
-│   │   │   │   │   ├── feature-flag.ts
-│   │   │   │   │   ├── error-handler.ts
-│   │   │   │   │   └── request-id.ts
-│   │   │   │   └── routes/
-│   │   │   │       └── proxy.ts      # Route mapping to services
-│   │   │   │
-│   │   │   ├── services/             # Domain services
-│   │   │   │   ├── auth/
-│   │   │   │   │   ├── router.ts     # register, login, refresh, logout
-│   │   │   │   │   ├── oauth/
-│   │   │   │   │   │   ├── router.ts # OAuth redirect + callback
-│   │   │   │   │   │   ├── google.ts # Google OIDC strategy
-│   │   │   │   │   │   └── github.ts # GitHub OAuth strategy
-│   │   │   │   │   ├── service.ts    # Auth business logic
-│   │   │   │   │   ├── session.ts    # Redis session CRUD
-│   │   │   │   │   └── schemas.ts    # Zod schemas
-│   │   │   │   ├── tenants/
-│   │   │   │   │   ├── router.ts
-│   │   │   │   │   ├── service.ts
-│   │   │   │   │   └── schemas.ts
-│   │   │   │   ├── documents/
-│   │   │   │   │   ├── router.ts     # presigned URL, metadata, status
-│   │   │   │   │   ├── service.ts
-│   │   │   │   │   ├── storage.ts    # Supabase Storage S3 client
-│   │   │   │   │   └── schemas.ts
-│   │   │   │   ├── search/
-│   │   │   │   │   ├── router.ts     # POST /search
-│   │   │   │   │   ├── service.ts    # Embed → hybrid → RRF merge
-│   │   │   │   │   ├── hybrid.ts     # Vector + full-text queries
-│   │   │   │   │   └── schemas.ts
-│   │   │   │   ├── rag/
-│   │   │   │   │   ├── router.ts     # POST /chat (SSE)
-│   │   │   │   │   ├── service.ts    # Retrieval → prompt → stream
-│   │   │   │   │   ├── prompt.ts     # Prompt templates
-│   │   │   │   │   └── schemas.ts
-│   │   │   │   ├── feature-flags/
-│   │   │   │   │   ├── router.ts     # Internal evaluation
-│   │   │   │   │   ├── admin-router.ts
-│   │   │   │   │   ├── service.ts
-│   │   │   │   │   └── schemas.ts
-│   │   │   │   ├── webhooks/
-│   │   │   │   │   ├── router.ts
-│   │   │   │   │   ├── service.ts
-│   │   │   │   │   └── schemas.ts
-│   │   │   │   ├── activities/
-│   │   │   │   │   ├── router.ts     # Cursor-based pagination
-│   │   │   │   │   ├── service.ts
-│   │   │   │   │   └── schemas.ts
-│   │   │   │   ├── metrics/
-│   │   │   │   │   ├── router.ts
-│   │   │   │   │   └── service.ts
-│   │   │   │   └── notifications/
-│   │   │   │       └── templates.ts  # Email templates
-│   │   │   │
-│   │   │   ├── workers/              # Background job workers
-│   │   │   │   ├── entry.ts          # Worker process entry point
-│   │   │   │   ├── embedding.worker.ts
-│   │   │   │   ├── webhook.worker.ts
-│   │   │   │   ├── notification.worker.ts
-│   │   │   │   └── cron/
-│   │   │   │       ├── quota-reset.ts
-│   │   │   │       └── activity-purge.ts
-│   │   │   │
-│   │   │   ├── infra/                # Infrastructure abstractions
-│   │   │   │   ├── db.ts             # Drizzle client factory
-│   │   │   │   ├── redis.ts          # ioredis client factory
-│   │   │   │   ├── queue.ts          # BullMQ factory
-│   │   │   │   ├── circuit-breaker.ts
-│   │   │   │   ├── logger.ts         # Structured JSON logger
-│   │   │   │   └── embedding-client.ts
-│   │   │   │
-│   │   │   └── lib/                  # Pure utility functions
-│   │   │       ├── chunker.ts        # Sliding-window tokenizer
-│   │   │       ├── rrf.ts            # Reciprocal Rank Fusion
-│   │   │       ├── hmac.ts           # HMAC-SHA256 for webhooks
-│   │   │       ├── idempotency.ts
-│   │   │       └── text-extractor.ts # PDF/DOCX/TXT extraction
-│   │   │
-│   │   └── tests/
-│   │       ├── unit/
-│   │       │   ├── services/
-│   │       │   ├── workers/
-│   │       │   └── lib/
-│   │       └── integration/
-│   │
+│   │   ├── .env                      # Encrypted env vars
+│   │   └── src/
+│   │       ├── main.ts               # Application entry point
+│   │       ├── config/
+│   │       │   ├── drizzle.ts        # Drizzle client & RLS wrappers
+│   │       │   ├── env.ts            # Environment variable validation
+│   │       │   ├── hono.ts           # Hono types
+│   │       │   └── supabase.ts       # Supabase Admin & Auth clients
+│   │       ├── controllers/
+│   │       │   └── auth.controller.ts
+│   │       ├── middlewares/
+│   │       │   ├── error.middleware.ts
+│   │       │   └── request.middleware.ts
+│   │       ├── models/
+│   │       │   └── schema.ts         # Drizzle ORM schemas
+│   │       ├── routes/
+│   │       │   ├── auth.routes.ts
+│   │       │   └── index.ts          # Main router aggregator
+│   │       ├── schemas/
+│   │       │   ├── auth.schema.ts
+│   │       │   └── shared.schema.ts
+│   │       ├── services/
+│   │       │   └── auth.service.ts   # Core business logic
+│   │       ├── tests/
+│   │       │   └── auth.api.test.ts
+│   │       ├── types/
+│   │       │   └── auth.types.ts
+│   │       └── utils/
+│   │           ├── errors.util.ts
+│   │           └── recaptcha.util.ts
 │   ├── ai-gateway/                   # Separate Deno service (AI API Gateway)
 │   │   ├── deno.jsonc
 │   │   ├── .env
@@ -183,8 +119,11 @@ Dokyudo/
 │       ├── .env
 │       └── src/
 │           ├── app.html
-│           ├── hooks.server.ts       # envcrypt init
+│           ├── hooks.server.ts       
 │           ├── lib/
+│           │   ├── api/
+│           │   │   ├── auth.ts       # Auth endpoints
+│           │   │   └── client.ts     # Base API client
 │           │   ├── components/
 │           │   │   ├── ui/           # shadcn-svelte primitives
 │           │   │   ├── layout/       # Shell, Sidebar, TopNav
@@ -192,10 +131,16 @@ Dokyudo/
 │           │   │   ├── chat/         # ChatWindow, SSEStream
 │           │   │   ├── documents/    # UploadDropzone, DocList
 │           │   │   └── dashboard/    # StatsCard, QuotaBar
+│           │   ├── hooks/
+│           │   ├── schemas/
 │           │   ├── stores/           # Svelte reactive stores
-│           │   ├── api/              # API client functions
-│           │   ├── utils/
-│           │   └── styles/
+│           │   ├── styles/
+│           │   ├── types/
+│           │   │   ├── api.types.ts
+│           │   │   ├── auth.types.ts
+│           │   │   └── recaptcha.types.ts
+│           │   └── utils/
+│           │       └── recaptcha.util.ts
 │           └── routes/
 │               ├── +layout.svelte
 │               ├── +page.svelte      # Landing page
@@ -345,8 +290,6 @@ AI_GATEWAY_PORT=8001
 INTERNAL_API_GATEWAY_URL=http://localhost:8000
 PUBLIC_API_URL=http://localhost:8000/api
 ```
-
-> **Security note:** All sensitive values should be encrypted using `envcrypt` before committing. See the [envcrypt docs](https://github.com/nicholasgasior/envcrypt) for encrypting values with the `encrypted:` prefix.
 
 ---
 

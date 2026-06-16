@@ -4,7 +4,7 @@
 
 ## 1. Project Overview
 **Dokyudo** is a *SaaS platform* that allows users to upload documents (PDF, DOCX, TXT), then search and ask semantically about their content.  
-The platform is built with **SvelteKit** on the frontend and **Deno + Hono** on the backend, designed to demonstrate modern distributed system patterns.
+The platform is built with **SvelteKit** on the frontend (deployed to Vercel) and **Deno + Hono** on the backend (deployed to Deno Deploy), designed to demonstrate modern distributed system patterns.
 
 ---
 
@@ -65,17 +65,11 @@ The platform is built with **SvelteKit** on the frontend and **Deno + Hono** on 
 
 ### 5.2 Document Ingestion
 - Upload files (max 25 MB) via *presigned URL* directly to object storage (Supabase Storage S3) → saves backend bandwidth.
-- Backend records metadata and enqueues an embedding job into the **job queue**.
-- **Job payload**: `{ docId, storagePath, mimeType }` – no chunk data is sent through the queue.
-- **Worker**:
-  1. Download file from object storage.
-  2. Extract text (PDF/DOCX/TXT).
-  3. **Chunking strategy**: sliding‑window chunking by token count (e.g., 512 tokens) with **10‑20% overlap** (51–102 tokens reused from previous chunk). Paragraph boundaries are used as preferred split points but are not mandatory.
-  4. Call **Embedding API** (Gemini `gemini-embedding-2`) for each chunk.
-  5. Store chunk + embedding into **PostgreSQL + pgvector** using an upsert (`INSERT … ON CONFLICT (doc_id, chunk_index) DO UPDATE`) to prevent duplicate embeddings on retry.
-  6. Update document status to `ready` **directly in the database**.
-  7. Publish a `document.ready` event to the job queue (for webhook and notification workers).
-  8. If the entire job fails, *retry* automatically (max 3×) then move to **DLQ** with the last error preserved.
+- Backend records metadata and inserts the extracted text and chunks into the PostgreSQL database.
+- **Automatic Embeddings**: 
+  1. A Postgres trigger automatically queues an embedding generation job into `pgmq` whenever a new chunk is inserted.
+  2. A scheduled `pg_cron` job processes the queue using `pg_net` to call a Supabase Edge Function.
+  3. The Edge Function calls the **Embedding API** (Gemini) and updates the vector column in the database directly.
 - **Retry note**: The worker always re‑runs all steps from the beginning; the upsert strategy prevents duplicate data.
 - **Embedding Dimension Lock (MVP)**: The vector column is fixed at **768 dimensions**, matching Gemini `gemini-embedding-2`. If Ollama is used as a local model fallback, it must be configured with a model that natively produces 768‑dimensional vectors (e.g., `mxbai-embed-large`). Zero‑padding vectors of a different dimension is explicitly forbidden as it corrupts cosine similarity scores.
 
@@ -92,7 +86,7 @@ The platform is built with **SvelteKit** on the frontend and **Deno + Hono** on 
   4. Return snippets and scores.
 - The search is protected by a **circuit breaker** when accessing the vector database (see §5.12).
 - The Search Service depends on the same Embedding API used during ingestion; if it is unavailable, the hybrid search **degrades to full‑text only** (configurable behavior).
-- **`ts_content` Population Strategy**: The `ts_content` column on the `chunks` table MUST be implemented as a **PostgreSQL Generated Column**: `GENERATED ALWAYS AS (to_tsvector('english', content)) STORED`. The database engine automatically recomputes and indexes the tsvector whenever `content` changes. The Embedding Worker writes only `content` and `embedding` — it never manually computes or writes `ts_content`. The GIN index on this generated column enables fast `@@` operator queries.
+- **`ts_content` Population Strategy**: The `ts_content` column on the `chunks` table MUST be implemented as a **PostgreSQL Generated Column**: `GENERATED ALWAYS AS (to_tsvector('english', content)) STORED`. The database engine automatically recomputes and indexes the tsvector whenever `content` changes. The Supabase DB Triggers & Edge Function writes only `content` and `embedding` — it never manually computes or writes `ts_content`. The GIN index on this generated column enables fast `@@` operator queries.
 
 ### 5.4 RAG Q&A (Chat)
 - Endpoint `POST /api/chat` accepts a question in JSON, responds with **Server‑Sent Events (SSE)**.
@@ -291,7 +285,7 @@ All values can be overridden per service via environment variables.
 ┌───────────────────────────────────────────────┐
 │            JOB QUEUE & WORKERS                │
 │  ┌──────────────┐  ┌──────────────────────┐   │
-│  │  Redis/BullMQ│  │  Embedding Worker    │   │
+│  │  Redis/Supabase pg_cron│  │  Supabase DB Triggers & Edge Function    │   │
 │  │  + DLQ       │  │  Notification Worker │   │
 │  │              │  │  Webhook Worker      │   │
 │  └──────────────┘  └──────────────────────┘   │
@@ -326,7 +320,7 @@ All values can be overridden per service via environment variables.
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | **API Gateway**              | Auth (JWT + Redis session), rate limiting, tenant context injection, **feature flag enforcement** (single point)                                            | Redis, Feature Flag Service         |
 | **Ingestion Service**        | Accept upload metadata (presigned URL), enqueue job with `{docId, storagePath, mimeType}`, track document status                                            | Object Storage, Job Queue            |
-| **Embedding Worker**         | Consumer: download, extract, chunk (sliding‑window 512 tokens, 10‑20% overlap), embed, upsert into pgvector, update DB status, publish `document.ready`     | Object Storage, Embedding API, pgvector, Job Queue |
+| **Supabase DB Triggers & Edge Function**         | Consumer: download, extract, chunk (sliding‑window 512 tokens, 10‑20% overlap), embed, upsert into pgvector, update DB status, publish `document.ready`     | Object Storage, Embedding API, pgvector, Job Queue |
 | **Search Service**           | Embed query, execute tenant‑safe hybrid search (pgvector + full‑text with RRF), circuit breaker on pgvector calls                                           | Embedding API, pgvector              |
 | **RAG Service**              | Retrieve context via Search Service, build prompt, stream via SSE using AI API Gateway, save conversation history                                           | Search Service, AI API Gateway       |
 | **AI API Gateway**           | Separate HTTP service: route to LLM providers (Gemini → Ollama), circuit breaker per provider, structured logging                              | LLM providers                        |
@@ -347,7 +341,7 @@ sequenceDiagram
     participant IS as Ingestion Service
     participant Supabase Storage S3 as Object Storage
     participant Q as Job Queue (Redis)
-    participant EW as Embedding Worker
+    participant EW as Supabase DB Triggers & Edge Function
     participant VDB as PostgreSQL+pgvector
     participant WH as Webhook/Notif
 
@@ -440,16 +434,17 @@ graph TD
 | **Frontend** | SvelteKit (SSR/CSR), TailwindCSS, shadcn-svelte | Reactive, small bundle, fast |
 | **Backend Runtime** | Deno 2.x + TypeScript | Native TS, Web API, npm compatible |
 | **HTTP Framework** | Hono | Lightweight, middleware-friendly, first-class Deno support |
-| **Database** | PostgreSQL + pgvector | Relational data + vectors in one DB, no extra infrastructure |
+| **Database** | Supabase (PostgreSQL + pgvector) | Relational data + vectors in one DB, no extra infrastructure |
 | **Object Storage** | Supabase Storage S3 (development) / Supabase Storage S3 (production) | Self-hosted, S3-compatible, signed URL |
-| **Cache & Queue** | Redis (ioredis) + BullMQ (npm:bullmq, tested on Deno 2.1+) | Rate limiting, sessions, job queue, DLQ |
-| **Job Queue (async)** | BullMQ on Redis (local & cloud Deno Deploy); Deno KV Queue can be a lightweight fallback for serverless tasks | Embedding, notification, webhook jobs |
+| **Cache & Queue** | Upstash Redis + Supabase pg_cron (npm:bullmq, tested on Deno 2.1+) | Rate limiting, sessions, job queue, DLQ |
+| **Job Queue (async)** | Supabase pg_cron; Supabase pg_cron can be a lightweight fallback for serverless tasks | Embedding, notification, webhook jobs |
 | **LLM Providers** | Gemini, Ollama (local) | Flexibility via AI API Gateway |
 | **Embedding Model** | Gemini `gemini-embedding-2` / Ollama | Lightweight, accurate |
 | **Monitoring** | JSON logs + Grafana Loki (opt) | Centralized observability |
-| **Auth** | JWT (15min) + bcrypt, Redis session (24h) for refresh & revocation | Stateless with revocation capability |
-| **OAuth** | Google OpenID Connect (`npm:googleapis`), GitHub OAuth Apps (`npm:@octokit/auth-oauth-app`) | Social login; converges to the same JWT+Redis session post-handshake |
+| **Auth** | Supabase Auth for refresh & revocation | Stateless with revocation capability |
+| **OAuth** | Supabase Auth (Google, GitHub) | Social login; converges to the same JWT+Redis session post-handshake |
 | **ORM** | Drizzle ORM | Type-safe, suitable for Deno, query builder |
+| **Validation** | Zod | Frontend & Backend schema validation |
 
 ---
 
@@ -461,12 +456,12 @@ graph TD
 
 | Service | Local (Docker Compose) | Cloud (Production) |
 |---|---|---|
-| API Gateway, Ingestion, Search, RAG, Feature Flag, Activity/Metrics | Deno (self-hosted) | Deno Deploy |
-| Embedding Worker, Webhook Worker, Notification Worker | Deno (self-hosted process) | Deno Deploy |
-| AI API Gateway | Deno (self-hosted) | Deno Deploy |
+| API Gateway, Ingestion, Search, RAG, Feature Flag, Activity/Metrics | Deno Deploy | Deno Deploy |
+| Supabase DB Triggers & Edge Function, Webhook Worker, Notification Worker | Supabase Edge Functions / pg_cron | Deno Deploy |
+| AI API Gateway | Deno Deploy | Deno Deploy |
 
-- **Note**: Workers are not deployable to Deno Deploy because it lacks long-running background process support. Use Deno Deploy for workers. For lightweight tasks on Deno Deploy, Deno KV Queue can be a fallback, but for production queue semantics, BullMQ on Redis (hosted on Deno Deploy) is the primary path.
-- **Production**: Managed PostgreSQL (Supabase), Redis (Upstash), Object storage (Supabase Storage).
+- **Note**: Workers are not deployable to Deno Deploy because it lacks long-running background process support. Use Deno Deploy for workers. For lightweight tasks on Deno Deploy, Supabase pg_cron can be a fallback, but for production queue semantics, Supabase pg_cron on Redis (hosted on Deno Deploy) is the primary path.
+- **Production**: Serverless: Deno Deploy (Backend), Vercel (Frontend), Upstash (Redis), Supabase (Postgres, Auth, Storage).
 
 ---
 
@@ -476,17 +471,17 @@ graph TD
 |--------------------|-------------------|
 | Distributed Rate Limiter (Redis + sliding window) | API Gateway middleware |
 | Scalable URL Shortener (base62 + DB sharding) | *(Optional, can be added for sharing links; not integrated into tenant management)* |
-| Distributed Job Queue (workers + retry + DLQ) | BullMQ/Deno KV Queue, Embedding/Notification/Webhook Workers |
+| Distributed Job Queue (workers + retry + DLQ) | Supabase pg_cron, Embedding/Notification/Webhook Workers |
 | Webhook Delivery System (retry, idempotency, signatures) | Webhook & Notification Service |
 | API Gateway (auth, routing, rate limiting) | Hono API Gateway |
 | Multi-tenant SaaS Backend (tenant isolation, billing logic) | Tenant & User Management, database row-level |
 | Feature Flag Service (dynamic config rollout) | Feature Flag Service (enforced at gateway) |
 | Session Store (distributed, TTL-based) | Redis via API Gateway (combined with JWT refresh) |
-| Search Service (ElasticSearch + indexing pipeline) | Replaced by PostgreSQL + pgvector hybrid search |
+| Search Service (ElasticSearch + indexing pipeline) | Replaced by Supabase (PostgreSQL + pgvector) hybrid search |
 | Log Aggregation System (ingestion + storage + query) | JSON logging + Grafana Loki (optional) |
 | Metrics Backend (time-series DB + dashboards API) | Metrics Service + PostgreSQL |
 | Event Ingestion Pipeline (Kafka + consumers) | Replaced by Redis Streams / Job Queue |
-| ETL Pipeline (batch + streaming) | Ingestion Service + Embedding Worker |
+| ETL Pipeline (batch + streaming) | Ingestion Service + Supabase DB Triggers & Edge Function |
 | Circuit Breaker Service (failure handling) | Embedded in Search, AI API Gateway, Webhook services |
 | File Storage Backend (S3-like, signed URLs) | Supabase Storage S3, Ingestion Service |
 | RAG Backend (document ingestion + retrieval + LLM) | RAG Service |

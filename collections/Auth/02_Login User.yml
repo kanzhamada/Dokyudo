@@ -8,31 +8,20 @@ http:
   url: "{{baseUrl}}/api/auth/login"
   headers:
     - name: Content-Type
-      value: "application/json"
+      value: application/json
   body:
     type: json
     data: |-
       {
         "email": "tenant@example.com",
-        "password": "SecurePassword123"
+        "password": "SecurePassword123",
+        "recaptchaToken": "{{recaptchaToken}}"
       }
-  actions:
-    - type: set-variable
-      phase: after-response
-      selector:
-        expression: accessToken
-        method: jsonq
-      variable:
-        name: accessToken
-        scope: runtime
-    - type: set-variable
-      phase: after-response
-      selector:
-        expression: refreshToken
-        method: jsonq
-      variable:
-        name: refreshToken
-        scope: runtime
+
+runtime:
+  variables:
+    - name: recaptchaToken
+      value: ff
 
 settings:
   encodeUrl: true
@@ -40,4 +29,4 @@ settings:
   followRedirects: true
   maxRedirects: 5
 
-docs: Logs in a tenant and returns a short-lived access JWT (15-min) and a refresh token (24-hour stored in Redis). Tokens are auto-captured as runtime variables for subsequent requests.
+docs: Logs in a tenant via Supabase Auth after reCAPTCHA v3 validation, lockout check, and anti-bruteforce rate limiting. Returns short-lived access JWT and refresh token. Failed attempts are logged to public.login_attempts. After 5 failures (same email+IP in 15 min), account locks for 15 minutes. Tokens are auto-captured as runtime variables.

@@ -22,7 +22,6 @@ This skill teaches the **wide events** pattern (also known as canonical log line
 logging-best-practices/
 ├── SKILL.md              # Agent instructions
 ├── README.md             # This file
-├── metadata.json         # Version and references
 └── resources/
     ├── wide-events.md    # Core pattern (CRITICAL)
     ├── context.md        # Cardinality, business & environment context (CRITICAL)

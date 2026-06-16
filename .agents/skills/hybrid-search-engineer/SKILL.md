@@ -1,157 +1,135 @@
 ---
 name: hybrid-search-engineer
-description: Delegates to this agent when implementing or optimizing the hybrid semantic search pipeline — pgvector similarity, PostgreSQL full-text (tsvector), Reciprocal Rank Fusion (RRF) merge, and circuit breaker degradation.
+description: Delegates to this agent when implementing or optimizing the native Postgres hybrid semantic search pipeline — combining pgvector similarity, PostgreSQL full-text (tsvector), and Reciprocal Rank Fusion (RRF) natively inside the database.
 ---
 
 # Hybrid Search Engineer Skill
 
-Use this skill when building or optimizing the Search Service (PRD §5.3, Sprint 6 tasks F4.1–F4.6).
+Use this skill when building or optimizing the Search Service (PRD §5.3, Sprint 6 tasks).
 
 ## When to Use
 - Implementing tenant-safe vector search with pgvector.
 - Implementing tenant-safe full-text search with `tsvector` / `tsquery`.
-- Building the RRF merge algorithm.
-- Configuring circuit breaker degradation (hybrid → full-text only).
-- Tuning search relevance or query performance.
+- Building the RRF merge algorithm **natively in Postgres SQL**.
+- Configuring circuit breaker degradation inside the Deno API Gateway.
 
 ---
 
-## 1. Tenant-Safe Vector Search
+## 1. Native Hybrid Search via Postgres RPC (RRF)
 
-All vector queries **must** filter by `tenant_id` inside the SQL, not post-retrieval:
+We merge keyword and semantic search natively inside Postgres using Reciprocal Rank Fusion (RRF). **Do not perform RRF in the application backend.**
+
+Create a Postgres RPC function that performs both searches and fuses them.
+**Crucially, enforce the Tenant ID inside the WHERE clauses** to prevent data leakage.
 
 ```sql
-SELECT id, doc_id, content, chunk_index,
-       1 - (embedding <=> $2) AS vector_score
-FROM chunks
-WHERE tenant_id = $1
-ORDER BY embedding <=> $2
-LIMIT $3;
-```
-
-In Drizzle ORM:
-```typescript
-const vectorResults = await db
-  .select({ id: chunks.id, docId: chunks.docId, content: chunks.content, score: sql`1 - (${chunks.embedding} <=> ${queryEmbedding})` })
-  .from(chunks)
-  .where(eq(chunks.tenantId, tenantId))
-  .orderBy(sql`${chunks.embedding} <=> ${queryEmbedding}`)
-  .limit(topK);
-```
-
----
-
-## 2. Tenant-Safe Full-Text Search
-
-The `ts_content` column is a **generated column** — never write to it manually:
-
-```sql
--- Schema definition (Drizzle migration)
-ts_content tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
-```
-
-Query pattern:
-```sql
-SELECT id, doc_id, content, chunk_index,
-       ts_rank(ts_content, to_tsquery('english', $2)) AS fts_score
-FROM chunks
-WHERE tenant_id = $1
-  AND ts_content @@ to_tsquery('english', $2)
-ORDER BY fts_score DESC
-LIMIT $3;
-```
-
----
-
-## 3. Reciprocal Rank Fusion (RRF)
-
-Merge vector and full-text results using RRF with constant `k = 60`:
-
-```typescript
-interface SearchResult {
-  id: string;
-  docId: string;
-  content: string;
-  score: number;
-}
-
-interface RRFConfig {
-  k: number;  // Default: 60
-}
-
-function reciprocalRankFusion(
-  vectorResults: SearchResult[],
-  ftsResults: SearchResult[],
-  config: RRFConfig = { k: 60 }
-): SearchResult[] {
-  const scores = new Map<string, { result: SearchResult; rrfScore: number }>();
-
-  const len1 = vectorResults.length;
-  for (let i = 0; i < len1; i++) {
-    const r = vectorResults[i];
-    const rrfScore = 1 / (config.k + i + 1);
-    scores.set(r.id, { result: r, rrfScore });
-  }
-
-  const len2 = ftsResults.length;
-  for (let i = 0; i < len2; i++) {
-    const r = ftsResults[i];
-    const rrfScore = 1 / (config.k + i + 1);
-    const existing = scores.get(r.id);
-    if (existing) {
-      existing.rrfScore += rrfScore;
-    } else {
-      scores.set(r.id, { result: r, rrfScore });
-    }
-  }
-
-  return Array.from(scores.values())
-    .sort((a, b) => b.rrfScore - a.rrfScore)
-    .map(({ result, rrfScore }) => ({ ...result, score: rrfScore }));
-}
+create or replace function hybrid_search(
+  p_tenant_id text,
+  p_query_text text,
+  p_query_embedding extensions.vector(768), -- Change dimensions based on Gemini model
+  p_match_count int,
+  p_full_text_weight float = 1,
+  p_semantic_weight float = 1,
+  p_rrf_k int = 60
+)
+returns setof chunks
+language sql
+as $$
+with full_text as (
+  select
+    id,
+    row_number() over(order by ts_rank_cd(ts_content, websearch_to_tsquery('english', p_query_text)) desc) as rank_ix
+  from
+    chunks
+  where
+    tenant_id = p_tenant_id -- STRICT TENANT ISOLATION
+    and ts_content @@ websearch_to_tsquery('english', p_query_text)
+  order by rank_ix
+  limit least(p_match_count, 30) * 2
+),
+semantic as (
+  select
+    id,
+    row_number() over (order by embedding <=> p_query_embedding) as rank_ix
+  from
+    chunks
+  where
+    tenant_id = p_tenant_id -- STRICT TENANT ISOLATION
+  order by rank_ix
+  limit least(p_match_count, 30) * 2
+)
+select
+  chunks.*
+from
+  full_text
+  full outer join semantic
+    on full_text.id = semantic.id
+  join chunks
+    on coalesce(full_text.id, semantic.id) = chunks.id
+order by
+  coalesce(1.0 / (p_rrf_k + full_text.rank_ix), 0.0) * p_full_text_weight +
+  coalesce(1.0 / (p_rrf_k + semantic.rank_ix), 0.0) * p_semantic_weight
+  desc
+limit
+  least(p_match_count, 30)
+$$;
 ```
 
 ---
 
-## 4. Circuit Breaker Degradation
+## 2. API Gateway Consumption (Deno)
 
-The Search Service wraps pgvector calls in a circuit breaker. When the circuit is **open**:
-
-1. **Skip** the vector search entirely (do not queue it, do not wait).
-2. Execute **full-text search only** as the degraded path.
-3. Log a wide event: `{ degradation: "full-text-only", reason: "circuit_breaker_open" }`.
-4. Return results normally — the client does not need to know about degradation.
-
-If the **Embedding API** is unavailable (cannot embed the query), the same degradation applies: fall back to full-text only.
+In the Deno API Gateway, use the Supabase JS client to invoke the RPC function.
 
 ```typescript
-async function hybridSearch(tenantId: string, query: string, topK: number) {
-  let vectorResults: SearchResult[] = [];
+const { data: chunks, error } = await supabase.rpc('hybrid_search', {
+  p_tenant_id: tenantContext.tenantId,
+  p_query_text: query,
+  p_query_embedding: embedding,
+  p_match_count: 10
+});
+```
+
+---
+
+## 3. Circuit Breaker Degradation
+
+The Deno API Gateway wraps the **Embedding API** call (e.g. Gemini) in a circuit breaker. If the circuit is **open** or the Embedding API fails, we must degrade gracefully to full-text search ONLY.
+
+```typescript
+async function executeSearch(tenantId: string, query: string, topK: number) {
   let queryEmbedding: number[] | null = null;
 
-  // Attempt embedding + vector search (circuit breaker protected)
   try {
-    queryEmbedding = await embeddingClient.embed(query);
-    vectorResults = await pgvectorCircuitBreaker.execute(() =>
-      executeVectorSearch(tenantId, queryEmbedding!, topK)
-    );
-  } catch {
-    // Degradation: proceed with full-text only
+    // Attempt to embed query (Circuit breaker protected)
+    queryEmbedding = await embeddingCircuitBreaker.execute(() => embeddingClient.embed(query));
+  } catch (err) {
     logger.warn({ event: "search_degradation", mode: "full-text-only", tenantId });
+    // Execute fallback Postgres RPC that only does full-text search
+    return await executeFullTextSearch(tenantId, query, topK);
   }
 
-  const ftsResults = await executeFullTextSearch(tenantId, query, topK);
+  // Execute Native Hybrid Search
+  const { data } = await supabase.rpc('hybrid_search', {
+    p_tenant_id: tenantId,
+    p_query_text: query,
+    p_query_embedding: queryEmbedding,
+    p_match_count: topK
+  });
 
-  if (vectorResults.length === 0) return ftsResults;
-  return reciprocalRankFusion(vectorResults, ftsResults);
+  return data;
 }
 ```
 
 ---
 
-## 5. Performance Targets
+## 4. Full-Text Search Configuration
 
-From PRD §6 Non-Functional Requirements:
-- Hybrid search end-to-end (gateway → embedding → DB → response): **< 500ms at P95**
-- If embedding API adds > 200ms, target becomes **< 700ms**
-- Always parallelize vector + full-text queries with `Promise.all` when both are available
+The `ts_content` column must be a **generated column** configured via a migration:
+
+```sql
+ALTER TABLE chunks
+ADD COLUMN ts_content tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
+
+CREATE INDEX on chunks USING gin(ts_content);
+```

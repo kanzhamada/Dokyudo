@@ -64,7 +64,7 @@ Knowledge workers spend excessive time manually searching through large document
 - Full-text search (Phase 1) + hybrid semantic search with RRF (Phase 2)
 - RAG Q&A with SSE streaming
 - API Gateway: auth, rate limiting, feature flag enforcement
-- Distributed job queue with retry and DLQ (BullMQ + Redis)
+- Distributed job queue with retry and DLQ (Supabase pg_cron + Redis)
 - Webhook delivery with HMAC signing, idempotency, exponential backoff
 - Feature Flag Service (CRUD, Redis cache, admin flush)
 - Email notifications via job queue
@@ -131,10 +131,10 @@ Knowledge workers spend excessive time manually searching through large document
 | Feature | Description | Dependencies | Complexity |
 |---------|-------------|-------------|------------|
 | F2.1 Presigned URL Generation | Generate Supabase Storage S3 presigned PUT URL for direct client upload | Supabase Storage S3 | S |
-| F2.2 Document Metadata Persistence | Accept POST after upload; store doc metadata; enqueue job | PostgreSQL, BullMQ | S |
+| F2.2 Document Metadata Persistence | Accept POST after upload; store doc metadata; enqueue job | PostgreSQL, Supabase pg_cron | S |
 | F2.3 Embedding Worker | Download file, extract text, sliding-window chunk (512 tok, 10-20% overlap), embed, upsert to pgvector | Supabase Storage S3, Embedding API, pgvector | XL |
 | F2.4 Status Tracking | Update document status: pending → processing → ready / failed | PostgreSQL | S |
-| F2.5 DLQ Handling | After 3 retries, move job to DLQ with last error | BullMQ | M |
+| F2.5 DLQ Handling | After 3 retries, move job to DLQ with last error | Supabase pg_cron | M |
 
 #### E3 — Full-Text Search
 
@@ -180,17 +180,17 @@ Knowledge workers spend excessive time manually searching through large document
 
 | Feature | Description | Dependencies | Complexity |
 |---------|-------------|-------------|------------|
-| F7.1 BullMQ Setup | Configure BullMQ on Redis; define queue names | Redis | S |
-| F7.2 Embedding Worker | Consumer for ingestion jobs (see F2.3) | BullMQ | XL |
-| F7.3 Dead Letter Queue | Capture failed jobs after max retries | BullMQ | M |
-| F7.4 Job Retry Logic | Automatic retry up to 3× with backoff | BullMQ | S |
+| F7.1 Supabase pg_cron Setup | Configure Supabase pg_cron on Redis; define queue names | Redis | S |
+| F7.2 Embedding Worker | Consumer for ingestion jobs (see F2.3) | Supabase pg_cron | XL |
+| F7.3 Dead Letter Queue | Capture failed jobs after max retries | Supabase pg_cron | M |
+| F7.4 Job Retry Logic | Automatic retry up to 3× with backoff | Supabase pg_cron | S |
 
 #### E8 — Webhook Delivery System
 
 | Feature | Description | Dependencies | Complexity |
 |---------|-------------|-------------|------------|
 | F8.1 Webhook URL Registration | Tenant CRUD for webhook URL via API | PostgreSQL | S |
-| F8.2 Webhook Worker | Consume `document.ready` event; sign + deliver POST | BullMQ, HMAC | L |
+| F8.2 Webhook Worker | Consume `document.ready` event; sign + deliver POST | Supabase pg_cron, HMAC | L |
 | F8.3 Idempotency Key | SHA-256 key per `event+docId+tenantId+attempt` | F8.2 | S |
 | F8.4 Exponential Backoff Retry | Up to 5 delivery attempts with backoff | F8.2 | M |
 | F8.5 Delivery Log | `webhook_logs` table with all attempt details | PostgreSQL | S |
@@ -218,9 +218,9 @@ Knowledge workers spend excessive time manually searching through large document
 
 | Feature | Description | Dependencies | Complexity |
 |---------|-------------|-------------|------------|
-| F11.1 Notification Worker | Consume job; send email via SendGrid/Mailgun | BullMQ, Email API | M |
+| F11.1 Notification Worker | Consume job; send email via SendGrid/Mailgun | Supabase pg_cron, Email API | M |
 | F11.2 Email Templates | "Document ready" email template | F11.1 | S |
-| F11.3 Failed Delivery DLQ | Failed email jobs routed to DLQ | BullMQ | S |
+| F11.3 Failed Delivery DLQ | Failed email jobs routed to DLQ | Supabase pg_cron | S |
 
 #### E12 — Activity Feed & Metrics
 
@@ -228,7 +228,7 @@ Knowledge workers spend excessive time manually searching through large document
 |---------|-------------|-------------|------------|
 | F12.1 Activity Log Writes | Insert activity_log row on every key action | PostgreSQL | S |
 | F12.2 Activity Feed API | `GET /api/activities` with cursor-based pagination | F12.1 | M |
-| F12.3 90-Day Retention Cron | Scheduled job to purge old activity entries | BullMQ/cron | M |
+| F12.3 90-Day Retention Cron | Scheduled job to purge old activity entries | Supabase pg_cron/cron | M |
 | F12.4 Metrics Aggregation | Counters and latency histograms per service | PostgreSQL | M |
 | F12.5 Metrics API | Expose aggregated data for admin dashboard | F12.4 | S |
 
@@ -297,7 +297,7 @@ Knowledge workers spend excessive time manually searching through large document
 #### F2.3 Embedding Worker
 - **Story:** As the system, I want to automatically process uploaded documents into searchable vector chunks so users can search them semantically.
 - **Acceptance Criteria:**
-  - Worker consumes job from BullMQ queue.
+  - Worker consumes job from Supabase pg_cron queue.
   - Downloads file from Supabase Storage S3; extracts text from PDF/DOCX/TXT.
   - Chunks using sliding-window (512 tokens, 10-20% overlap).
   - Calls embedding API; upserts chunk+embedding into pgvector.
@@ -363,17 +363,17 @@ Knowledge workers spend excessive time manually searching through large document
 ### Sprint 1 — Discovery, Architecture & Environment Setup
 
 #### Goal
-Establish the technical foundation: monorepo, Docker Compose local environment, database schema draft, and architecture decisions documented.
+Establish the technical foundation: monorepo, Supabase local development, database schema draft, and architecture decisions documented.
 
 #### Tasks
 - Initialize Deno monorepo with `deno.jsonc` workspace configuration
 - Set up `apps/`: gateway, ingestion, search, rag, ai-gateway, workers, shared, frontend, admin
-- Configure Docker Compose: PostgreSQL + pgvector, Redis, Supabase Storage S3, Ollama (optional)
+- Configure Docker Compose: Supabase (PostgreSQL + pgvector), Redis, Supabase Storage S3, Ollama (optional)
 - Draft complete PostgreSQL schema: tenants, users, documents, chunks, conversations, conversation_turns, activity_log, webhook_logs, feature_flags, metrics
 - Set up Drizzle ORM with schema files and migration tooling
 - Configure ESLint, Prettier, TypeScript strict mode across workspace
 - Set up Git repository with branch strategy (main, develop, feature/*)
-- Write ADRs (Architecture Decision Records) for key choices: Deno vs Node, BullMQ vs Deno KV Queue, pgvector vs dedicated vector DB
+- Write ADRs (Architecture Decision Records) for key choices: Deno vs Node, Supabase pg_cron vs Supabase pg_cron, pgvector vs dedicated vector DB
 - Configure `.env.example` with all required environment variables
 - Validate Docker Compose stack runs end-to-end
 
@@ -398,7 +398,7 @@ Establish the technical foundation: monorepo, Docker Compose local environment, 
 
 #### Risks
 - pgvector Docker image compatibility issues → mitigate: pin exact version `ankane/pgvector`
-- Deno + BullMQ compatibility issues → mitigate: test `npm:bullmq` on Deno 2.1+ early
+- Deno + Supabase pg_cron compatibility issues → mitigate: test `npm:bullmq` on Deno 2.1+ early
 
 #### Expected Outcome
 A fully functional local development environment where all services can be started with `docker-compose up`. Schema migrated. Developer can run `deno task dev` from any package.
@@ -472,7 +472,7 @@ Enable document upload via presigned URL, basic text extraction + storage, and f
 - Implement text extraction for PDF (pdf-parse / pdfjs), DOCX (mammoth), TXT (raw read)
 - Implement Phase 1 chunking: raw text split by paragraph (no embeddings yet)
 - Store chunks with `tsvector` column for full-text indexing
-- Enqueue BullMQ job after metadata creation
+- Enqueue Supabase pg_cron job after metadata creation
 - Build Phase 1 worker: download → extract → chunk → store (no embeddings)
 - Update document status: `pending → processing → ready`
 - Build `POST /api/search` (full-text only, tenant-safe)
@@ -482,14 +482,14 @@ Enable document upload via presigned URL, basic text extraction + storage, and f
 #### Deliverables
 - Upload flow working end-to-end (presigned URL → Supabase Storage S3 → worker → search)
 - Full-text search returning results filtered by `tenant_id`
-- BullMQ worker running as separate Deno process
+- Supabase pg_cron worker running as separate Deno process
 - API endpoints: presigned, POST documents, GET documents, POST search
 
 #### Estimated Effort
 - Presigned URL + Supabase Storage S3: 5h
 - Text extraction (PDF/DOCX/TXT): 8h
 - Chunking + DB storage: 5h
-- BullMQ setup + worker: 6h
+- Supabase pg_cron setup + worker: 6h
 - Full-text search endpoint: 5h
 - Tests: 5h
 - **Total: ~34h**
@@ -497,7 +497,7 @@ Enable document upload via presigned URL, basic text extraction + storage, and f
 #### Dependencies
 - Sprint 2 complete (auth middleware works)
 - Supabase Storage S3 running in Docker Compose
-- BullMQ tested on Deno 2.x
+- Supabase pg_cron tested on Deno 2.x
 
 #### Risks
 - PDF extraction libraries in Deno — npm compatibility may be inconsistent → mitigate: test pdf-parse and pdfjs early; fallback to spawning `pdftotext` as subprocess
@@ -611,10 +611,11 @@ Upgrade the ingestion pipeline to generate embeddings and store them in pgvector
 - Enable pgvector extension in PostgreSQL; add `embedding vector(768)` column to chunks table
 - Write and apply Drizzle migration for embedding column + HNSW index
 - Implement embedding API client (Gemini `gemini-embedding-2` + Ollama fallback)
-- Upgrade embedding worker: add sliding-window chunking (512 tokens, 10-20% overlap, paragraph-boundary preference)
-- Implement upsert strategy: `INSERT … ON CONFLICT (doc_id, chunk_index) DO UPDATE`
-- Implement vector similarity search: `ORDER BY embedding <=> $query WHERE tenant_id=$1`
-- Implement RRF merge of vector + full-text result sets
+- Enable extensions: pgvector, pgmq, pg_net, pg_cron, hstore
+- Create triggers to automatically queue chunks into pgmq upon insert
+- Create a Supabase Edge Function to securely call the Gemini API and generate embeddings
+- Configure pg_cron to asynchronously process pgmq embedding jobs via the Edge Function
+- Implement native Postgres RPC function `hybrid_search` that performs full-text and vector search, fusing them with RRF
 - Add circuit breaker for pgvector calls (5 failures / 10s window, 30s open)
 - Implement search degradation: fall back to full-text if embedding API unavailable
 - Write Phase 1→Phase 2 migration script (re-queue all existing documents for embedding)
@@ -743,7 +744,7 @@ Build the Feature Flag Service and the full Webhook Delivery System with HMAC si
 
 #### Dependencies
 - Sprint 7 complete (job queue workers infrastructure)
-- BullMQ event publication from embedding worker
+- Supabase pg_cron event publication from embedding worker
 
 #### Risks
 - HMAC secret rotation strategy not defined → document as future work; generate per-tenant secret at registration
@@ -760,14 +761,14 @@ Complete Phase 3 with email notifications, activity feed with cursor pagination,
 
 #### Tasks
 - **Notification Worker:**
-  - Consume notification jobs from BullMQ
+  - Consume notification jobs from Supabase pg_cron
   - Send email via SendGrid (or Mailgun) using template system
   - "Document ready" email template
   - Failed deliveries to DLQ
 - **Activity Feed:**
   - Instrument all key actions with `activity_log` inserts (upload, index complete, search, Q&A, webhook error)
   - `GET /api/activities` with cursor-based pagination (using `id` as cursor)
-  - Retention cron job: delete entries older than 90 days (BullMQ scheduled job)
+  - Retention cron job: delete entries older than 90 days (Supabase pg_cron scheduled job)
 - **Metrics:**
   - Counter increments per action type per tenant
   - Latency histogram storage (P50/P95/P99 aggregates stored hourly)
@@ -1230,7 +1231,7 @@ CREATE INDEX idx_turns_conversation ON conversation_turns(conversation_id, turn_
 | AI API Gateway | Docker Compose | Deno Deploy |
 | SvelteKit Frontend | `vite dev` | Vercel |
 | Admin Frontend | `vite dev` | Vercel |
-| PostgreSQL + pgvector | Docker Compose | Supabase |
+| Supabase (PostgreSQL + pgvector) | Docker Compose | Supabase |
 | Redis | Docker Compose | Upstash |
 | Object Storage | Supabase Storage S3 (local/Docker) | Supabase Storage S3 |
 
@@ -1257,7 +1258,7 @@ CREATE INDEX idx_turns_conversation ON conversation_turns(conversation_id, turn_
 
 #### Backup Strategy
 - PostgreSQL: daily automated backups via managed provider (Supabase point-in-time recovery or RDS automated snapshots)
-- Redis: persistence via AOF on Upstash; BullMQ DLQ captured in PostgreSQL for durability
+- Redis: persistence via AOF on Upstash; Supabase pg_cron DLQ captured in PostgreSQL for durability
 - Supabase Storage S3: versioning enabled on production bucket; cross-region replication for critical data
 - Code: GitHub repository (primary) + daily export to secondary location
 
@@ -1313,7 +1314,7 @@ CREATE INDEX idx_turns_conversation ON conversation_turns(conversation_id, turn_
 | pgvector migration + embedding column | Critical | 3h | PostgreSQL |
 | Embedding API client (Gemini + Ollama) | Critical | 4h | API keys |
 | Sliding-window chunker (512 tok, overlap) | Critical | 6h | tiktoken |
-| Upsert embedding worker | Critical | 5h | pgvector, BullMQ |
+| Upsert embedding worker | Critical | 5h | pgvector, Supabase pg_cron |
 | Vector search + RRF merge | Critical | 6h | pgvector |
 | Circuit breaker (pgvector) | High | 4h | Search Service |
 | AI API Gateway (Deno HTTP service) | Critical | 6h | LLM APIs |
@@ -1324,12 +1325,12 @@ CREATE INDEX idx_turns_conversation ON conversation_turns(conversation_id, turn_
 | Feature Flag Service (CRUD + Redis cache) | High | 6h | PostgreSQL, Redis |
 | Feature flag gateway enforcement | High | 3h | Feature Flag Service |
 | Webhook registration API | High | 3h | PostgreSQL |
-| Webhook Worker (HMAC, retry, idempotency) | High | 8h | BullMQ |
+| Webhook Worker (HMAC, retry, idempotency) | High | 8h | Supabase pg_cron |
 | Per-URL circuit breaker (webhooks) | High | 4h | Webhook Worker |
-| Notification Worker (email) | Medium | 5h | BullMQ, Email API |
+| Notification Worker (email) | Medium | 5h | Supabase pg_cron, Email API |
 | Activity log writes (instrumentation) | Medium | 4h | PostgreSQL |
 | Activity feed API (cursor pagination) | Medium | 4h | activity_log |
-| 90-day retention cron | Medium | 3h | BullMQ scheduler |
+| 90-day retention cron | Medium | 3h | Supabase pg_cron scheduler |
 | Metrics aggregation service | Medium | 5h | PostgreSQL |
 | Admin API (tenants, flags, logs, metrics) | High | 6h | All services |
 | `/health` endpoints (all services) | High | 3h | Each service |
@@ -1536,7 +1537,7 @@ CREATE INDEX idx_turns_conversation ON conversation_turns(conversation_id, turn_
 - [ ] Alert on: 5xx rate > 1%, search P95 > 1s, queue depth > 100 jobs, DLQ > 0
 - [ ] Log aggregation ingesting structured JSON from all services
 - [ ] Admin dashboard metrics charts showing live data
-- [ ] BullMQ dashboard (or Bull Board) accessible for queue inspection
+- [ ] Supabase pg_cron dashboard (or Bull Board) accessible for queue inspection
 
 ---
 
@@ -1544,7 +1545,7 @@ CREATE INDEX idx_turns_conversation ON conversation_turns(conversation_id, turn_
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
-| **Deno + BullMQ incompatibility** (npm:bullmq on Deno 2.x) | Medium | High | Test `npm:bullmq` on Deno 2.1+ in Sprint 1; have Deno KV Queue as fallback |
+| **Deno + Supabase pg_cron incompatibility** (npm:bullmq on Deno 2.x) | Medium | High | Test `npm:bullmq` on Deno 2.1+ in Sprint 1; have Supabase pg_cron as fallback |
 | **pgvector index performance** (slow HNSW under large vector count) | Low | High | Benchmark early (Sprint 6); use HNSW with `ef_construction=128`; limit chunks per tenant |
 | **LLM provider rate limits** (Gemini embedding API) | Medium | High | Implement per-chunk delay; batch embedding calls; local Ollama fallback |
 | **Embedding API cost overrun** (high volume in beta) | Medium | Medium | Set quota limits early; use `gemini-embedding-2` (cheapest Gemini model); Ollama for dev |
@@ -1635,7 +1636,7 @@ CREATE INDEX idx_turns_conversation ON conversation_turns(conversation_id, turn_
 - [ ] Request ID propagated across all service calls
 - [ ] All internal service calls use `X-Request-ID` header
 - [ ] No secrets hardcoded in source code
-- [ ] All BullMQ jobs have retry + DLQ configured
+- [ ] All Supabase pg_cron jobs have retry + DLQ configured
 - [ ] All circuit breakers configured with correct defaults
 - [ ] Worker processes restart automatically on crash (Deno Deploy restart policy)
 
@@ -1694,7 +1695,7 @@ CREATE INDEX idx_turns_conversation ON conversation_turns(conversation_id, turn_
 - [ ] Log aggregation ingesting structured JSON logs
 - [ ] Admin metrics dashboard showing live data
 - [ ] Alerts configured: 5xx rate > 1%, search P95 > 1s, DLQ > 0
-- [ ] BullMQ queue depth visible in admin dashboard
+- [ ] Supabase pg_cron queue depth visible in admin dashboard
 
 ---
 
@@ -1733,7 +1734,7 @@ CREATE INDEX idx_turns_conversation ON conversation_turns(conversation_id, turn_
 ### Month 2-3 Post-Launch: Growth Features
 
 **Technical Debt Management:**
-- Audit BullMQ job schema — add schema versioning for backward compatibility
+- Audit Supabase pg_cron job schema — add schema versioning for backward compatibility
 - Refactor circuit breaker into shared library with configurable defaults per service
 - Add database query profiling (slow query log on PostgreSQL)
 - Review Redis memory usage; add key TTL hygiene

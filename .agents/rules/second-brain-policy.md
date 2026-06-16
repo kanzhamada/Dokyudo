@@ -19,6 +19,8 @@ Immediately upon completing any feature, bug fix, or vertical slice task, you **
 * **Target Location**: Create or update a markdown file inside the `@ai/docs` directory.
 * **Content Required**: 
   - **Core Logic**: Briefly explain what the feature does.
+  - **Flow Diagram**: Always include a flow diagram using Mermaid format (especially if the logic is complex).
+  - **Completion Timestamp**: Show the exact date and time when you finish developing the feature.
   - **File Mapping**: List the exact files created or modified.
   - **Connections**: Detail how the database, server, and frontend connect for this feature.
   - **Architectural Decisions**: Document *why* things were built this way (e.g., specific library choices, tokens used).
