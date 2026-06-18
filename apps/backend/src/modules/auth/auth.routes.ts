@@ -51,7 +51,7 @@ authRoutes.openapi(createRoute({
             },
         },
     },
-}), authController.handleRegister);
+}), authController.handleRegister as any);
 
 authRoutes.openapi(createRoute({
     method: "post",
@@ -122,4 +122,4 @@ authRoutes.openapi(createRoute({
             },
         },
     },
-}), authController.handleLogin);
+}), authController.handleLogin as any);

@@ -62,8 +62,6 @@ export async function registerUser(params: RegisterParams) {
     );
 }
 
-
-
 export async function loginUser(params: LoginParams) {
     const supabase = getSupabaseAdmin();
 

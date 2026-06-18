@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "allowJs": true,
+        "checkJs": false,
+        "noEmit": true,
+        "strict": false,
+        "noImplicitAny": false,
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "skipLibCheck": true
+    },
+    "include": [
+        "**/*.ts",
+        "dummy.d.ts"
+    ]
+}

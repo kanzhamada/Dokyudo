@@ -6,7 +6,7 @@ export function createApp(): OpenAPIHono<AppEnv> {
         defaultHook: (result, c) => {
             if (!result.success) {
                 const requestId = c.get("requestId") ?? crypto.randomUUID();
-                const firstIssue = result.error.issues[0];
+                const firstIssue = (result as any).error.issues[0];
                 const message = firstIssue
                     ? `${firstIssue.path.join(".")}: ${firstIssue.message}`
                     : "Validation failed";

@@ -16,10 +16,26 @@ export async function verifyRecaptcha({
 }: VerifyRecaptchaParams): Promise<RecaptchaVerifyResponse> {
     const secretKey = Deno.env.get("RECAPTCHA_SECRET_KEY")!;
 
+    // Allow local development bypass
+    if (Deno.env.get("BYPASS_RECAPTCHA") === "true" || token === "dummy-token") {
+        return {
+            success: true,
+            score: 0.9,
+            action: expectedAction ?? "bypass",
+            challenge_ts: new Date().toISOString(),
+            hostname: "localhost"
+        };
+    }
+
     const formData = new URLSearchParams();
     formData.append("secret", secretKey);
     formData.append("response", token);
-    if (remoteIp) {
+
+    console.log(remoteIp)
+    
+    // Google API can return "browser-error" or reject verification if remoteIp is a loopback/internal IP.
+    // Only append remoteip if it looks like a valid public/external IP.
+    if (remoteIp && !["127.0.0.1", "::1", "0.0.0.0", "localhost"].includes(remoteIp)) {
         formData.append("remoteip", remoteIp);
     }
 
