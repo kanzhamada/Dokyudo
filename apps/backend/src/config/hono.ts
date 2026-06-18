@@ -1,5 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { AppEnv } from "../types/app.types.ts";
+import { AppEnv } from "../shared/types/app.types.ts";
 
 export function createApp(): OpenAPIHono<AppEnv> {
     return new OpenAPIHono<AppEnv>({

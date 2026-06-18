@@ -1,8 +1,8 @@
-import { createApp } from "../config/hono.ts";
+import { createApp } from "../../config/hono.ts";
 import { createRoute } from "@hono/zod-openapi";
-import * as authController from "../controllers/auth.controller.ts";
-import { ErrorResponseSchema } from "../schemas/shared.schema.ts";
-import { LoginBodySchema, LoginResponseSchema, RegisterBodySchema, RegisterResponseSchema } from "../schemas/auth.schema.ts";
+import * as authController from "./auth.controller.ts";
+import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
+import { LoginBodySchema, LoginResponseSchema, RegisterBodySchema, RegisterResponseSchema } from "./auth.schema.ts";
 
 export const authRoutes = createApp();
 

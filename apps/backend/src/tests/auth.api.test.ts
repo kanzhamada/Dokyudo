@@ -264,7 +264,7 @@ Deno.test("GET /reference — returns Scalar API Reference HTML", async () => {
 // IP Extraction Unit Tests (direct function tests)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { extractClientIp } from "../middlewares/request.middleware.ts";
+import { extractClientIp } from "../shared/middlewares/request.middleware.ts";
 
 Deno.test("extractClientIp — X-Forwarded-For takes priority", () => {
     const headers = new Headers({

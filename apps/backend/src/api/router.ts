@@ -1,5 +1,5 @@
 import { createApp } from "../config/hono.ts";
-import { authRoutes } from "./auth.routes.ts";
+import { authRoutes } from "../modules/auth/auth.routes.ts";
 
 const router = createApp();
 

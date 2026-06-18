@@ -246,7 +246,9 @@ All values can be overridden per service via environment variables.
 
 ---
 
-## 7. Architecture Overview (High‑Level) — Revised
+## 7. Architecture Overview (Modular Monolith) — Revised
+
+*Note: The backend system is currently implemented as a **Modular Monolith**. Feature-driven logic (e.g., Auth, Ingestion, Search) is isolated into separate modules under a single Deno + Hono deployment. This ensures clean boundaries while making it trivial to split into separate microservices in the future.*
 
 ```
 ┌────────────────────────────────────────────────────────────────┐

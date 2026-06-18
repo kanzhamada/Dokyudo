@@ -1,5 +1,5 @@
-import { extractClientIp } from "../middlewares/request.middleware.ts";
-import * as authService from "../services/auth.service.ts";
+import { extractClientIp } from "../../shared/middlewares/request.middleware.ts";
+import * as authService from "./auth.service.ts";
 import { type Context } from "hono";
 
 export async function handleRegister(c: Context) {

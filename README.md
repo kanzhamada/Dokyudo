@@ -33,7 +33,9 @@ Built with **SvelteKit** (frontend) and **Deno + Hono** (backend), it demonstrat
 
 ---
 
-## Architecture Overview
+## Architecture Overview (Modular Monolith)
+
+*Note: The backend application is architected as a **Modular Monolith**. Features are isolated into domain-specific modules (`src/modules/*`), sharing common utilities and configurations via a `shared` layer (`src/shared/*`). This provides the simplicity of a single deployment unit while maintaining the strict boundaries needed for a future migration to microservices.*
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -69,33 +71,33 @@ Dokyudo/
 │   │   ├── .env                      # Encrypted env vars
 │   │   └── src/
 │   │       ├── main.ts               # Application entry point
+│   │       ├── api/
+│   │       │   └── router.ts         # Main router aggregator
 │   │       ├── config/
 │   │       │   ├── drizzle.ts        # Drizzle client & RLS wrappers
 │   │       │   ├── env.ts            # Environment variable validation
 │   │       │   ├── hono.ts           # Hono types
 │   │       │   └── supabase.ts       # Supabase Admin & Auth clients
-│   │       ├── controllers/
-│   │       │   └── auth.controller.ts
-│   │       ├── middlewares/
-│   │       │   ├── error.middleware.ts
-│   │       │   └── request.middleware.ts
-│   │       ├── models/
-│   │       │   └── schema.ts         # Drizzle ORM schemas
-│   │       ├── routes/
-│   │       │   ├── auth.routes.ts
-│   │       │   └── index.ts          # Main router aggregator
-│   │       ├── schemas/
-│   │       │   ├── auth.schema.ts
-│   │       │   └── shared.schema.ts
-│   │       ├── services/
-│   │       │   └── auth.service.ts   # Core business logic
-│   │       ├── tests/
-│   │       │   └── auth.api.test.ts
-│   │       ├── types/
-│   │       │   └── auth.types.ts
-│   │       └── utils/
-│   │           ├── errors.util.ts
-│   │           └── recaptcha.util.ts
+│   │       ├── modules/
+│   │       │   └── auth/             # Feature-specific module
+│   │       │       ├── auth.controller.ts
+│   │       │       ├── auth.routes.ts
+│   │       │       ├── auth.schema.ts
+│   │       │       └── auth.service.ts
+│   │       ├── shared/               # Cross-cutting shared layer
+│   │       │   ├── middlewares/
+│   │       │   │   └── request.middleware.ts
+│   │       │   ├── models/
+│   │       │   │   └── db.model.ts   # Drizzle ORM schemas
+│   │       │   ├── schemas/
+│   │       │   │   └── shared.schema.ts
+│   │       │   ├── types/
+│   │       │   │   └── auth.types.ts
+│   │       │   └── utils/
+│   │       │       ├── errors.util.ts
+│   │       │       └── recaptcha.util.ts
+│   │       └── tests/
+│   │           └── auth.api.test.ts
 │   ├── ai-gateway/                   # Separate Deno service (AI API Gateway)
 │   │   ├── deno.jsonc
 │   │   ├── .env

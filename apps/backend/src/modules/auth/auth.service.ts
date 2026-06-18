@@ -1,9 +1,9 @@
-import { AppError } from "../utils/errors.util.ts";
-import { getSupabaseAdmin, getSupabaseAuth } from "../config/supabase.ts";
-import { db } from "../config/drizzle.ts";
-import { loginAttempts } from "../models/db.model..ts";
-import { verifyRecaptcha } from "../utils/recaptcha.util.ts";
-import { LoginAttemptParams, LoginParams, RegisterParams } from "../types/auth.types.ts";
+import { AppError } from "../../shared/utils/errors.util.ts";
+import { getSupabaseAdmin, getSupabaseAuth } from "../../config/supabase.ts";
+import { db } from "../../config/drizzle.ts";
+import { loginAttempts } from "../../shared/models/db.model.ts";
+import { verifyRecaptcha } from "../../shared/utils/recaptcha.util.ts";
+import { LoginAttemptParams, LoginParams, RegisterParams } from "../../shared/types/auth.types.ts";
 
 const LOCKOUT_WINDOW_MINUTES = 15;
 const MAX_FAILED_ATTEMPTS = 5;

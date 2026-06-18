@@ -1,9 +1,9 @@
 import { apiReference } from "@scalar/hono-api-reference";
 import { cors } from "hono/cors";
-import { AppError } from "./utils/errors.util.ts";
-import { requestIdMiddleware } from "./middlewares/request.middleware.ts";
+import { AppError } from "./shared/utils/errors.util.ts";
+import { requestIdMiddleware } from "./shared/middlewares/request.middleware.ts";
 import { validateEnvironment } from "./config/env.ts";
-import rootRouter from "./routes/index.ts";
+import rootRouter from "./api/router.ts";
 import { createApp } from "./config/hono.ts";
 
 const app = createApp();
@@ -55,6 +55,7 @@ app.get("/health", (c) => {
     });
 });
 
+// Main API
 app.route("/api", rootRouter);
 
 // OpenAPI Documentation

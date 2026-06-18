@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { sql } from "drizzle-orm";
-import * as schema from "../models/db.model..ts";
+import * as schema from "../shared/models/db.model.ts";
 
 /**
  * Super User Connection.
