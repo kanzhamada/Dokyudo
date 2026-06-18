@@ -15,7 +15,18 @@ description: Forces the AI to consult the curated reference library in `ai/learn
 
 When you are **unsure, confused, or need to verify** how a library, framework, or pattern works before writing code, you **must** follow this strict priority order:
 
-### Priority 1 — `ai/learn/` (Local Curated References)
+### Priority 1 — Best Practice Skills (`.agents/skills/`)
+
+Always consult your injected best practice skills before checking general documentation. These skills contain the project's strict architectural constraints and optimal usage patterns.
+
+**Mandatory Skills to Follow:**
+- **`drizzle-best-practices`**: Drizzle ORM schema design, identity columns, indexing, and timestamp formats.
+- **`tailwind-best-practices`**: Tailwind CSS v4 usage, `@theme` configuration, and utility class organization.
+- **`svelte-core-bestpractices`**: Svelte 5 runes (`$state`, `$derived`), snippets, and performance tuning.
+- **`deno-best-practices`**: Deno style guide, file naming (`mod.ts`), error messages, and API design.
+- **`shadcn-svelte-best-practices`**: shadcn-svelte component structuring, design tokens, and abstractions.
+
+### Priority 2 — `ai/learn/` (Local Curated References)
 
 Search the `ai/learn/` directory **first**. These files contain the **exact documentation versions** adopted by this project. They are the single source of truth for API surfaces and patterns.
 
@@ -45,14 +56,14 @@ Example: Unsure how Hono handles SSE streaming?
 → Then implement
 ```
 
-### Priority 2 — External URL References
+### Priority 3 — External URL References
 
 If a reference URL is available and accessible (e.g., from a `ai/learn/` file's YAML frontmatter `url:` field, or from a PRD reference), you **may** open it using `read_url_content` or `browser_subagent` to verify current API details. This is especially useful for:
 - Checking if an API has changed since the local docs were saved.
 - Finding examples not covered in the local docs.
 - Verifying npm package compatibility with Deno.
 
-### Priority 3 — AI Internal Knowledge
+### Priority 4 — AI Internal Knowledge
 
 If `ai/learn/` does **not** contain documentation for the specific topic (e.g., BullMQ internals, Drizzle ORM API, pgvector SQL syntax), use your internal training knowledge. Clearly note when you are relying on internal knowledge rather than local references.
 

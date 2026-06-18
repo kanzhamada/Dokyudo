@@ -7,16 +7,19 @@ export async function handleRegister(c: Context) {
     const body = c.req.valid("json" as never) as any;
     const clientIp = extractClientIp(c.req.raw.headers);
 
+    const logContext = c.get("logContext");
+
     await authService.registerUser({
         email: body.email,
         password: body.password,
         recaptchaToken: body.recaptchaToken,
         clientIp,
         requestId,
+        logContext,
     });
 
     return c.json(
-        { message: "Registration successful. Please check your email for verification." },
+        { message: "Registration successful, please check your email for verification" },
         201
     );
 }
@@ -27,6 +30,8 @@ export async function handleLogin(c: Context) {
     const clientIp = extractClientIp(c.req.raw.headers);
     const userAgent = c.req.header("user-agent") ?? "unknown";
 
+    const logContext = c.get("logContext");
+
     const authData = await authService.loginUser({
         email: body.email,
         password: body.password,
@@ -34,6 +39,7 @@ export async function handleLogin(c: Context) {
         clientIp,
         userAgent,
         requestId,
+        logContext,
     });
 
     return c.json(

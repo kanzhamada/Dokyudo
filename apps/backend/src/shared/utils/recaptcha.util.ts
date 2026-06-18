@@ -30,8 +30,6 @@ export async function verifyRecaptcha({
     const formData = new URLSearchParams();
     formData.append("secret", secretKey);
     formData.append("response", token);
-
-    console.log(remoteIp)
     
     // Google API can return "browser-error" or reject verification if remoteIp is a loopback/internal IP.
     // Only append remoteip if it looks like a valid public/external IP.

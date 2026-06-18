@@ -42,14 +42,16 @@ sequenceDiagram
 ```
 
 ## File Mapping
-- `apps/backend/main.ts`: App boot, env validation, OpenAPI config.
-- `apps/backend/src/auth/auth.routes.ts`: Core handlers for register and login.
-- `apps/backend/src/auth/auth.schemas.ts`: Zod schema definitions (`@hono/zod-openapi`).
-- `apps/backend/src/recaptcha.ts`: Google reCAPTCHA v3 verification logic.
-- `apps/backend/src/supabase.ts`: Supabase admin and auth clients.
-- `apps/backend/src/errors.ts`: Standard `AppError` envelope.
-- `apps/backend/src/middleware.ts`: Request ID and IP extraction.
-- `apps/backend/src/types.ts`: Hono context types and app factory.
+- `apps/backend/src/main.ts`: App boot, env validation, OpenAPI config.
+- `apps/backend/src/modules/auth/auth.routes.ts`: Core route definitions.
+- `apps/backend/src/modules/auth/auth.controller.ts`: Core handlers for register and login.
+- `apps/backend/src/modules/auth/auth.service.ts`: Business logic for auth, lockouts, and reCAPTCHA.
+- `apps/backend/src/modules/auth/auth.schema.ts`: Zod schema definitions (`@hono/zod-openapi`).
+- `apps/backend/src/shared/utils/recaptcha.util.ts`: Google reCAPTCHA v3 verification logic.
+- `apps/backend/src/config/supabase.ts`: Supabase admin and auth clients.
+- `apps/backend/src/shared/utils/errors.util.ts`: Standard `AppError` envelope.
+- `apps/backend/src/shared/middlewares/request.middleware.ts`: Request ID and IP extraction.
+- `apps/backend/src/shared/types/app.types.ts` & `apps/backend/src/config/hono.ts`: Hono context types and app factory.
 
 ## Connections
 - **Frontend/Client**: Calls endpoints with `recaptchaToken` obtained via `grecaptcha.execute`.

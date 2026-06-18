@@ -13,8 +13,8 @@ http:
     type: json
     data: |-
       {
-        "email": "tenant@example.com",
-        "password": "SecurePassword123",
+        "email": "kaitoukid818@gmail.com",
+        "password": "kaitoukid818@gmai.com",
         "recaptchaToken": "{{recaptchaToken}}"
       }
 

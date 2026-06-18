@@ -1,13 +1,15 @@
 ---
 title: Frontend Auth UI
 description: Implementation details for the SvelteKit frontend authentication flows (Sign In / Sign Up)
-completed_at: 2026-06-16T18:10:00+07:00
+completed_at: 2026-06-18T22:55:00+07:00
 ---
 
 # Frontend Auth UI
 
 ## Core Logic
 The frontend authentication system handles user sign-in and registration using SvelteKit, `superforms`, and Zod v4 validation. It implements a premium visual aesthetic matching the design specs (vintage floral background, translucent overlays, bespoke fonts) and integrates Google reCAPTCHA v3 on the client side before delegating form submission to the Deno API Gateway.
+
+Recently refactored to fully comply with Svelte 5 runes (`$state`, `$props`), Tailwind CSS v4 `@theme inline` variables, and strictly enforced `shadcn-svelte` variant encapsulation for cleaner CSS structure.
 
 ## Flow Diagram
 
@@ -37,29 +39,31 @@ sequenceDiagram
 ```
 
 ## Completion Timestamp
-**Date**: June 16, 2026, 18:10:00 UTC+7
+**Date**: June 18, 2026, 22:55:00 UTC+7
 
 ## File Mapping
 
-**New Files:**
+**Core UI Files:**
 - `apps/frontend/src/routes/(auth)/+layout.svelte` - Shared structural layout for auth routes with styling.
 - `apps/frontend/src/routes/(auth)/login/+page.svelte` - Sign-in component.
-- `apps/frontend/src/routes/(auth)/login/+page.ts` - Login `superforms` initialization.
-- `apps/frontend/src/routes/(auth)/signup/+page.svelte` - Sign-up component.
-- `apps/frontend/src/routes/(auth)/signup/+page.ts` - Signup `superforms` initialization.
-- `apps/frontend/src/lib/schemas/auth.ts` - Zod validation schemas for forms.
-- `apps/frontend/src/lib/recaptcha.ts` - Client-side reCAPTCHA wrapper.
-- `apps/frontend/src/lib/api.ts` - Unified API Gateway client utility.
+- `apps/frontend/src/routes/(auth)/register/+page.svelte` - Sign-up component.
+- `apps/frontend/src/routes/layout.css` - Injected custom font stacks (Playfair Display) and Tailwind v4 OKLCH color variables (`--color-auth-*`). Retains generic layout/spacing utilities (`.auth-error-box`).
 
-**Modified Files:**
-- `apps/frontend/src/routes/layout.css` - Injected custom font stacks (Playfair Display) and Tailwind color tokens (`#E8DEC8`, `#1C1B1B`).
+**Component Variants (Shadcn-Svelte):**
+- `apps/frontend/src/lib/components/ui/button/button.svelte` - Added `authPrimary` and `authOauth` variants.
+- `apps/frontend/src/lib/components/ui/input/input.svelte` - Migrated to `tailwind-variants` (tv) and added `auth` variant.
+
+**Logic & Utilities:**
+- `apps/frontend/src/lib/schemas/auth.schema.ts` - Zod validation schemas for forms.
+- `apps/frontend/src/lib/utils/recaptcha.util.ts` - Client-side reCAPTCHA wrapper.
+- `apps/frontend/src/lib/types/api.types.ts` - Shared types for API communication.
 
 ## Connections
-- **Backend API Gateway**: The frontend communicates via `fetch` inside `apps/frontend/src/lib/api.ts` directly targeting the `PUBLIC_API_URL` specified in `.env`.
+- **Backend API Gateway**: The frontend communicates via `fetch` directly targeting the backend API routes.
 - **Google API**: Uses `https://www.google.com/recaptcha/api.js` to execute reCAPTCHA silently.
 
 ## Architectural Decisions
-- **`sveltekit-superforms` & Zod v4**: Chosen for robust state management. Note that `zod4` adapters are explicitly imported from `sveltekit-superforms/adapters` because Zod v4 is used in this repository.
-- **Client-Side SPA Forms**: The forms use `SPA: true` and a custom `onUpdate` handler instead of standard SvelteKit actions. This is to cleanly integrate client-side reCAPTCHA execution *before* hitting the API backend, as standard actions would require a round-trip to the SvelteKit `+page.server.ts` before pinging Deno.
-- **`shadcn-svelte`**: Handled via `npx shadcn-svelte@latest`. Svelte 5 `#snippet child({ props })` overrides are used inside component wrappers like `Tooltip.Trigger`.
-- **Aesthetics**: Avoided standard generic borders; utilized shadow drops and exact hex codes to match high-end visual design rules.
+- **`sveltekit-superforms` & Zod v4**: Chosen for robust state management. Note that `superForm(data.form)` is used without closures to preserve `sveltekit-superforms` TypeScript static types, intentionally bypassing a minor Svelte 5 AST warning for stability.
+- **Client-Side SPA Forms**: The forms use `SPA: true` and a custom `onUpdate` handler to cleanly integrate client-side reCAPTCHA execution *before* hitting the API backend.
+- **Tailwind CSS v4 Engine**: Hardcoded hex values inside `@apply` were problematic due to the strict JIT compilation in CSS files. The architecture was refactored to define semantic `--color-auth-*` variables mapped to precise `oklch()` formats within the `@theme inline` block to guarantee native CSS compilation and support for automatic opacity modifiers (e.g. `/40`).
+- **Shadcn-Svelte Variant Encapsulation**: Component stylings (colors, borders, shadows) are safely encapsulated inside their respective `shadcn-svelte` files via `tailwind-variants` (`tv`), leaving `layout.css` to solely handle layout dimensions, typography, and utility structures. This perfectly honors separation of concerns.

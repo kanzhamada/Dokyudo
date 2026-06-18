@@ -1,7 +1,7 @@
 import { apiReference } from "@scalar/hono-api-reference";
 import { cors } from "hono/cors";
 import { AppError } from "./shared/utils/errors.util.ts";
-import { requestIdMiddleware } from "./shared/middlewares/request.middleware.ts";
+import { requestIdMiddleware, loggerMiddleware } from "./shared/middlewares/request.middleware.ts";
 import { validateEnvironment } from "./config/env.ts";
 import rootRouter from "./api/router.ts";
 import { createApp } from "./config/hono.ts";
@@ -16,8 +16,9 @@ app.use("/*", cors({
     exposeHeaders: ["X-Request-ID"],
 }));
 
-// Global middleware: Request ID propagation
+// Global middleware: Request ID propagation & Logging
 app.use("/*", requestIdMiddleware);
+app.use("/*", loggerMiddleware);
 
 // Global Error Handler
 app.onError((err, c) => {
@@ -26,14 +27,6 @@ app.onError((err, c) => {
     if (err instanceof AppError) {
         return c.json(err.toJSON(requestId), err.status as 400);
     }
-
-    console.error(
-        JSON.stringify({
-            requestId,
-            error: err.message,
-            stack: err.stack,
-        })
-    );
 
     return c.json(
         {
@@ -68,8 +61,8 @@ app.doc("/doc", {
     },
     servers: [
         {
-            url: "http://localhost:8000",
-            description: "Local development",
+            url: Deno.env.get("API_URL") ?? `http://${Deno.env.get("HOSTNAME") ?? "localhost"}:${Deno.env.get("PORT") ?? "8000"}`,
+            description: "API Environment",
         },
     ],
 });
@@ -92,6 +85,8 @@ app.get(
 
 // Server Startup
 const PORT = parseInt(Deno.env.get("PORT") ?? "8000", 10);
+const HOSTNAME = Deno.env.get("HOSTNAME") ?? "localhost";
+const API_URL = Deno.env.get("API_URL") ?? `http://${HOSTNAME}:${PORT}`;
 
 if (import.meta.main) {
     validateEnvironment();
@@ -100,10 +95,10 @@ if (import.meta.main) {
     console.log(`
 🔥 Dokyudo API Gateway is running!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-API:        http://localhost:${PORT}
-Health:     http://localhost:${PORT}/health
-OpenAPI:    http://localhost:${PORT}/doc
-Scalar UI:  http://localhost:${PORT}/reference
+API:        ${API_URL}/api
+Health:     ${API_URL}/health
+OpenAPI:    ${API_URL}/doc
+Scalar UI:  ${API_URL}/reference
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   `);
 }

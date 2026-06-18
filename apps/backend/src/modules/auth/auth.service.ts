@@ -36,30 +36,22 @@ export async function registerUser(params: RegisterParams) {
             });
         }
 
-        console.error(
-            JSON.stringify({
-                requestId: params.requestId,
-                event: "registration_failed",
-                email: params.email,
-                error: signUpError.message,
-            })
-        );
+        if (params.logContext) {
+            params.logContext.authEvent = "registration_failed";
+            params.logContext.authError = signUpError.message;
+        }
 
         throw new AppError({
             code: "INTERNAL_ERROR",
-            message: "Registration failed. Please try again later.",
+            message: "Registration failed, please try again later",
             status: 500,
         });
     }
 
-    console.log(
-        JSON.stringify({
-            requestId: params.requestId,
-            event: "user_registered",
-            email: params.email,
-            ip: params.clientIp,
-        })
-    );
+    if (params.logContext) {
+        params.logContext.authEvent = "user_registered";
+        params.logContext.authEmail = params.email;
+    }
 }
 
 export async function loginUser(params: LoginParams) {
@@ -80,14 +72,10 @@ export async function loginUser(params: LoginParams) {
         .maybeSingle();
 
     if (lockCheckError) {
-        console.error(
-            JSON.stringify({
-                requestId: params.requestId,
-                event: "lockout_check_failed",
-                email: params.email,
-                error: lockCheckError.message,
-            })
-        );
+        if (params.logContext) {
+            params.logContext.authEvent = "lockout_check_failed";
+            params.logContext.authError = lockCheckError.message;
+        }
     }
 
     if (lockedUser) {
@@ -107,7 +95,7 @@ export async function loginUser(params: LoginParams) {
 
             throw new AppError({
                 code: "FORBIDDEN",
-                message: "Account is temporarily locked due to too many failed login attempts. Please try again later.",
+                message: "Account is temporarily locked due to too many failed login attempts, please try again later",
                 status: 403,
             });
         }
@@ -132,14 +120,10 @@ export async function loginUser(params: LoginParams) {
         .gte("attempted_at", windowStart);
 
     if (countError) {
-        console.error(
-            JSON.stringify({
-                requestId: params.requestId,
-                event: "rate_limit_check_failed",
-                email: params.email,
-                error: countError.message,
-            })
-        );
+        if (params.logContext) {
+            params.logContext.authEvent = "rate_limit_check_failed";
+            params.logContext.authError = countError.message;
+        }
     }
 
     if (failedCount !== null && failedCount >= MAX_FAILED_ATTEMPTS) {
@@ -157,20 +141,16 @@ export async function loginUser(params: LoginParams) {
             isSuccess: false,
         });
 
-        console.warn(
-            JSON.stringify({
-                requestId: params.requestId,
-                event: "account_locked",
-                email: params.email,
-                ip: params.clientIp,
-                failedAttempts: failedCount,
-                lockedUntil: lockUntil,
-            })
-        );
+        if (params.logContext) {
+            params.logContext.authEvent = "account_locked";
+            params.logContext.authEmail = params.email;
+            params.logContext.failedAttempts = failedCount;
+            params.logContext.lockedUntil = lockUntil;
+        }
 
         throw new AppError({
             code: "RATE_LIMIT_EXCEEDED",
-            message: "Too many failed login attempts. Account has been locked for 15 minutes.",
+            message: "Too many failed login attempts, account has been locked for 15 minutes",
             status: 429,
             retryAfter: LOCKOUT_DURATION_MINUTES * 60,
         });
@@ -193,15 +173,11 @@ export async function loginUser(params: LoginParams) {
     });
 
     if (authError || !authData?.session) {
-        console.log(
-            JSON.stringify({
-                requestId: params.requestId,
-                event: "login_failed",
-                email: params.email,
-                ip: params.clientIp,
-                reason: authError?.message ?? "no session returned",
-            })
-        );
+        if (params.logContext) {
+            params.logContext.authEvent = "login_failed";
+            params.logContext.authEmail = params.email;
+            params.logContext.authError = authError?.message ?? "no session returned";
+        }
 
         throw new AppError({
             code: "UNAUTHORIZED",
@@ -210,20 +186,14 @@ export async function loginUser(params: LoginParams) {
         });
     }
 
-    console.log(
-        JSON.stringify({
-            requestId: params.requestId,
-            event: "login_success",
-            email: params.email,
-            ip: params.clientIp,
-            userId: authData.user.id,
-        })
-    );
+    if (params.logContext) {
+        params.logContext.authEvent = "login_success";
+        params.logContext.authEmail = params.email;
+        params.logContext.userId = authData.user.id;
+    }
 
     return authData;
 }
-
-
 
 async function logLoginAttempt(
     params : LoginAttemptParams
@@ -237,12 +207,8 @@ async function logLoginAttempt(
             authProvider: "email",
         });
     } catch (error: any) {
-        console.error(
-            JSON.stringify({
-                event: "login_attempt_log_failed",
-                email: params.email,
-                error: error.message,
-            })
-        );
+        // For background logging tasks, we just silently fail or log locally
+        // since we may not have the request context here.
+        console.error(`Failed to log login attempt for ${params.email}: ${error.message}`);
     }
 }

@@ -23,12 +23,19 @@
 	const form = superForm(data.form, {
 		validators: zodClient(registerSchema),
 		SPA: true,
-		resetForm: false, 
+		resetForm: false,
 		onUpdate: async ({ form: f }) => {
 			if (!f.valid) return;
 
 			isSubmitting = true;
 			apiError = '';
+
+			// Debug Log: Frontend State BEFORE hitting backend
+			console.log('[Auth Register] Form Submitted:', { 
+				email: f.data.email, 
+				password: f.data.password,
+				confirmPassword: f.data.confirmPassword
+			});
 
 			try {
 				const token = await executeRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY, 'register');
@@ -39,13 +46,17 @@
 					recaptchaToken: token
 				});
 
+				// Debug Log: Raw response AFTER hitting backend
+				console.log(`[Auth Register] Backend Response (POST /api/auth/register):`, result);
+
 				if (result.ok) {
 					registrationSuccess = true;
 				} else {
 					apiError = result.error.message;
 				}
-			} catch {
+			} catch (err: any) {
 				apiError = 'Something went wrong. Please try again.';
+				console.error('[Auth Register] Catch Error:', err);
 			} finally {
 				isSubmitting = false;
 				f.data.password = '';
@@ -111,41 +122,17 @@
 				stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg
 			>
 		</div>
-		<h1
-			class="text-center text-3xl text-white md:text-4xl"
-			style="font-family: 'Playfair Display', serif; font-weight: 500; font-style: italic;"
-		>
-			Check your email.
-		</h1>
-		<p
-			class="text-center text-base text-white/80"
-			style="font-family: 'Inter Variable', sans-serif;"
-		>
+		<h1 class="auth-heading text-3xl md:text-4xl">Check your email.</h1>
+		<p class="auth-subheading text-white/80">
 			We've sent a verification link to your email address. Please verify to complete registration.
 		</p>
-		<a
-			href="/login"
-			class="mt-4 inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-[4px] bg-[#E8DEC8] text-base font-medium text-[#1C1B1B] transition-all hover:bg-[#d9ccb0]"
-			style="font-family: 'Inter Variable', sans-serif;"
-		>
-			Go to Sign In
-		</a>
+		<a href="/login" class="auth-btn-primary"> Go to Sign In </a>
 	</div>
 {:else}
 	<!-- Header -->
 	<div class="mt-4 mb-8 md:mt-0">
-		<h1
-			class="text-center text-4xl text-white md:text-5xl"
-			style="font-family: 'Playfair Display', serif; font-weight: 500; font-style: italic;"
-		>
-			Create Account.
-		</h1>
-		<p
-			class="mt-2 text-center text-base text-white"
-			style="font-family: 'Inter Variable', sans-serif;"
-		>
-			Join us today.
-		</p>
+		<h1 class="auth-heading">Create Account.</h1>
+		<p class="auth-subheading">Join us today.</p>
 	</div>
 
 	<!-- Form -->
@@ -160,7 +147,8 @@
 						placeholder="Email"
 						autofocus
 						bind:value={$formData.email}
-						class="h-12 rounded-[4px] border-none bg-[#242424] px-4 text-white placeholder:text-[#5D5D5D] focus-visible:ring-1 focus-visible:ring-[#E8DEC8]/40"
+						variant="auth"
+						class="auth-input"
 					/>
 				{/snippet}
 			</Form.Control>
@@ -177,7 +165,8 @@
 							type={showPassword ? 'text' : 'password'}
 							placeholder="Password"
 							bind:value={$formData.password}
-							class="h-12 rounded-[4px] border-none bg-[#242424] px-4 pr-12 text-white placeholder:text-[#5D5D5D] focus-visible:ring-1 focus-visible:ring-[#E8DEC8]/40"
+							variant="auth"
+							class="auth-input pr-12"
 						/>
 						<Tooltip.Provider>
 							<Tooltip.Root>
@@ -246,7 +235,8 @@
 							type={showPassword ? 'text' : 'password'}
 							placeholder="Confirm Password"
 							bind:value={$formData.confirmPassword}
-							class="h-12 rounded-[4px] border-none bg-[#242424] px-4 pr-12 text-white placeholder:text-[#5D5D5D] focus-visible:ring-1 focus-visible:ring-[#E8DEC8]/40"
+							variant="auth"
+							class="auth-input pr-12"
 						/>
 						<Tooltip.Provider>
 							<Tooltip.Root>
@@ -306,12 +296,7 @@
 		</Form.Field>
 
 		<!-- Submit button -->
-		<Button
-			type="submit"
-			disabled={isSubmitting}
-			class="mt-1 h-12 w-full cursor-pointer rounded-[4px] bg-[#E8DEC8] text-base font-medium text-[#1C1B1B] transition-all hover:bg-[#d9ccb0] disabled:opacity-60"
-			style="font-family: 'Inter Variable', sans-serif;"
-		>
+		<Button type="submit" disabled={isSubmitting} variant="authPrimary" class="auth-btn-primary">
 			{#if isSubmitting}
 				<Spinner class="mr-2 size-4" />
 				Creating account...
@@ -322,10 +307,7 @@
 
 		<!-- Error box -->
 		{#if apiError}
-			<div
-				class="mt-1 rounded-[4px] border border-[#FB6363] bg-[#242424] px-4 py-3 text-center text-sm text-[#FB6363]"
-				style="font-family: 'Inter Variable', sans-serif;"
-			>
+			<div class="auth-error-box">
 				{apiError}
 			</div>
 		{/if}
@@ -348,9 +330,8 @@
 					{#snippet child({ props })}
 						<Button
 							{...props}
-							variant="outline"
-							class="h-12 w-full cursor-pointer rounded-[4px] border-none bg-white text-base font-medium text-[#1C1B1B] shadow-[0_0_4.8px_2px_rgba(255,255,255,0.19)] transition-all hover:bg-gray-50"
-							style="font-family: 'Inter Variable', sans-serif;"
+							variant="authOauth"
+							class="auth-btn-oauth"
 							onclick={() => console.log('Google OAuth not yet implemented')}
 						>
 							<svg class="mr-2" width="20" height="20" viewBox="0 0 24 24">
@@ -385,9 +366,8 @@
 					{#snippet child({ props })}
 						<Button
 							{...props}
-							variant="outline"
-							class="h-12 w-full cursor-pointer rounded-[4px] border-none bg-white text-base font-medium text-[#1C1B1B] shadow-[0_0_4.8px_2px_rgba(255,255,255,0.19)] transition-all hover:bg-gray-50"
-							style="font-family: 'Inter Variable', sans-serif;"
+							variant="authOauth"
+							class="auth-btn-oauth"
 							onclick={() => console.log('GitHub OAuth not yet implemented')}
 						>
 							<svg class="mr-2" width="20" height="20" viewBox="0 0 24 24" fill="#1C1B1B">
