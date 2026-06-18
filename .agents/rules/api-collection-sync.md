@@ -13,9 +13,14 @@ description: This rule guarantees that our API documentation and request collect
 
 ## 1. Synchronization Requirement
 
-Whenever you add, modify, or delete an HTTP endpoint in the Deno backend (`apps/backend/`), you **must** perform a parallel modification inside the `collections/` directory. 
+Whenever you add, modify, or delete an HTTP endpoint in the Deno backend (`apps/backend/`), you are **strictly forbidden** from performing parallel modifications inside the `collections/` directory automatically.
 
-Do not complete a task until both the backend code and the collection specs match.
+Instead, at the end of your task, you **must prompt the user** with a numbered checklist of post-task actions:
+1. Sync API Collection
+2. Write Backend Tests
+3. Update Second Brain Docs
+
+Wait for the user to input the corresponding number (e.g., "1, 2") before executing the synchronization. Do not execute this rule without explicit permission.
 
 ## 2. Directory Mapping Rules
 

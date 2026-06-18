@@ -14,7 +14,16 @@ This rule enforces a strict "Closing the Loop" documentation habit and applies a
 
 ## 1. Post-Feature Documentation (Building the Second Brain)
 
-Immediately upon completing any feature, bug fix, or vertical slice task, you **must** document the changes before declaring the task finished.
+Immediately upon completing any feature, bug fix, or vertical slice task, you are **strictly forbidden** from updating the documentation automatically.
+
+Instead, at the end of your task, you **must prompt the user** with a numbered checklist of post-task actions:
+1. Sync API Collection
+2. Write Backend Tests
+3. Update Second Brain Docs
+
+Wait for the user to input the corresponding number (e.g., "1, 2") before executing the documentation update. Do not execute this rule without explicit permission.
+
+Once permission is granted, you **must** document the changes before declaring the task fully closed:
 
 * **Target Location**: Create or update a markdown file inside the `@ai/docs` directory.
 * **Content Required**: 

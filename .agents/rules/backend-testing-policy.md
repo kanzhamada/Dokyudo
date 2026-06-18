@@ -16,7 +16,16 @@ No backend task is considered "complete" until its corresponding test suite pass
 
 ## 1. Core Testing Mandate
 
-Whenever you write, fix, or modify backend code:
+Whenever you write, fix, or modify backend code, you are **strictly forbidden** from automatically generating or updating test files right away.
+
+Instead, at the end of your task, you **must prompt the user** with a numbered checklist of post-task actions:
+1. Sync API Collection
+2. Write Backend Tests
+3. Update Second Brain Docs
+
+Wait for the user to input the corresponding number (e.g., "1, 2") before writing tests. Do not execute this rule without explicit permission.
+
+Once permission is granted:
 1. **Locate or Create the Test File**: Tests must live adjacent to the source code or follow the naming convention `[filename]_test.ts`.
 2. **Use Native Tooling**: Write tests using Deno's native `Deno.test()` runner and assertions from the standard library (`jsr:@std/assert`).
 3. **Run Pre-Flight**: Execute or simulate the execution of `deno test` before declaring code ready.
