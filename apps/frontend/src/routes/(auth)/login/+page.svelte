@@ -259,6 +259,16 @@
 		{/if}
 	</Button>
 
+	<!-- Forgot Password Link -->
+	<div class="mt-1 mb-2 flex justify-end">
+		<a
+			href="/forget-password"
+			class="cursor-pointer text-xs text-white/70 transition-colors hover:text-white"
+		>
+			Forgot Password?
+		</a>
+	</div>
+
 	<!-- Error box -->
 	{#if apiError || lockoutEndTime !== null}
 		<div class="auth-error-box flex flex-col items-center justify-center text-center">

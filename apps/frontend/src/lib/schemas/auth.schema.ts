@@ -18,3 +18,8 @@ export const registerSchema = z
 
 export type LoginSchema = typeof loginSchema;
 export type RegisterSchema = typeof registerSchema;
+
+export const forgotPasswordSchema = z.object({
+	email: z.string().email('Invalid email address')
+});
+export type ForgotPasswordSchema = typeof forgotPasswordSchema;
