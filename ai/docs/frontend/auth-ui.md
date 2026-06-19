@@ -11,6 +11,13 @@ The frontend authentication system handles user sign-in and registration using S
 
 Recently refactored to fully comply with Svelte 5 runes (`$state`, `$props`), Tailwind CSS v4 `@theme inline` variables, and strictly enforced `shadcn-svelte` variant encapsulation for cleaner CSS structure.
 
+### Reactive Security Lockout (Anti-Bruteforce UI)
+The frontend implements a secure client-side UX for backend rate limiting. When the backend returns a `429 RATE_LIMIT_EXCEEDED` or `403 FORBIDDEN` with a `retryAfter` value:
+- The UI calculates the absolute unlock time and persists it to `localStorage`.
+- Svelte 5 Runes (`$effect` and `$state`) drive a live countdown timer embedded in the form's error box.
+- All form inputs (email, password) and the submit button are natively `disabled` while the timer is active. To protect accessibility, `autofocus` on inputs is also disabled during a lockout.
+- *Security Note*: This is purely a UI convenience. If an attacker bypasses `localStorage`, the Deno backend still enforces the true cryptographic lock and rejects the request.
+
 ## Flow Diagram
 
 ```mermaid
@@ -29,17 +36,20 @@ sequenceDiagram
         Frontend->>reCAPTCHA: executeRecaptcha(siteKey, action)
         reCAPTCHA-->>Frontend: returns recaptchaToken
         Frontend->>Backend: POST /api/auth/login OR /register (email, password, recaptchaToken)
-        Backend-->>Frontend: 200 OK (JWT) or 4XX (Error)
+        Backend-->>Frontend: 200 OK (JWT) or 429/403 (Lockout)
         alt Success
             Frontend->>User: Redirects to Dashboard "/"
-        else Error
+        else Rate Limit Exceeded
+            Frontend->>Frontend: Save 'retryAfter' to localStorage
+            Frontend-->>User: Display Reactive Countdown & Disable Form
+        else Other Error
             Frontend-->>User: Displays error envelope message
         end
     end
 ```
 
 ## Completion Timestamp
-**Date**: June 18, 2026, 22:55:00 UTC+7
+**Date**: 2026-06-19 23:00 (Local Time)
 
 ## File Mapping
 

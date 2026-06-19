@@ -29,4 +29,4 @@ settings:
   followRedirects: true
   maxRedirects: 5
 
-docs: Logs in a tenant via Supabase Auth after reCAPTCHA v3 validation, lockout check, and anti-bruteforce rate limiting. Returns short-lived access JWT and refresh token. Failed attempts are logged to public.login_attempts. After 5 failures (same email+IP in 15 min), account locks for 15 minutes. Tokens are auto-captured as runtime variables.
+docs: Logs in a tenant via Supabase Auth after reCAPTCHA v3 validation, lockout check, and anti-bruteforce rate limiting. Returns short-lived access JWT and refresh token. Failed attempts are logged to public.login_attempts. After 5 failures per email (password spraying) or 20 failures per IP (dropped to 3 if bot User-Agent anomaly detected), the account/IP is locked for 15 minutes. Tokens are auto-captured as runtime variables.

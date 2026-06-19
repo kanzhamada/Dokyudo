@@ -8,7 +8,7 @@ This rule enforces a strict "Closing the Loop" documentation habit and applies a
 
 ## Activation
 - **Method**: Always On
-- **Context Items**: @ai/docs 
+- **Context Items**: ai/docs 
 
 ---
 
@@ -25,7 +25,7 @@ Wait for the user to input the corresponding number (e.g., "1, 2") before execut
 
 Once permission is granted, you **must** document the changes before declaring the task fully closed:
 
-* **Target Location**: Create or update a markdown file inside the `@ai/docs` directory.
+* **Target Location**: Create or update a markdown file inside the `ai/docs` directory.
 * **Content Required**: 
   - **Core Logic**: Briefly explain what the feature does.
   - **Flow Diagram**: Always include a flow diagram using Mermaid format (especially if the logic is complex).
@@ -39,7 +39,7 @@ Once permission is granted, you **must** document the changes before declaring t
 ## 2. Pre-Flight Check (Consulting the Second Brain)
 
 Before writing *any* new code or suggesting modifications in a chat session:
-1. **Scan the Directory**: You must read the existing documentation files inside `@ai/docs`.
+1. **Scan the Directory**: You must read the existing documentation files inside `ai/docs`.
 2. **Analyze Dependencies**: Check if your new task conflicts with or relies on an already documented feature.
 
 ---

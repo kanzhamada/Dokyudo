@@ -29,4 +29,4 @@ settings:
   followRedirects: true
   maxRedirects: 5
 
-docs: Registers a new tenant and user mapping (1:1 relation) via Supabase Auth Admin API. Validates Google reCAPTCHA v3 token first (score >= 0.5). User must verify email before login. Database trigger auto-creates public.users + public.tenants upon verification.
+docs: Registers a new tenant and user mapping (1:1 relation) via Supabase Auth Admin API. Validates Google reCAPTCHA v3 token first (score >= 0.5). Protected by Per-IP rate limiting (Max 20 attempts/15m, Max 5 successful signups/15m, limit drops to 3 if >3 distinct User-Agents are used). User must verify email before login. Database trigger auto-creates public.users + public.tenants upon verification.

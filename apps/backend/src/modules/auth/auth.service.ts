@@ -17,12 +17,63 @@ export async function registerUser(params: RegisterParams) {
         expectedAction: "register",
     });
 
-    // Step B: Create user via Supabase Auth Admin API
     const supabase = getSupabaseAdmin();
+    const windowStart = new Date(Date.now() - LOCKOUT_WINDOW_MINUTES * 60 * 1000).toISOString();
+
+    // Step B: Per-IP Rate Limiting & User-Agent Anomaly Detection
+    const { data: ipRegData, error: ipCountError } = await supabase
+        .from("login_attempts")
+        .select("user_agent, is_success")
+        .eq("ip_address", params.clientIp)
+        .eq("auth_provider", "register")
+        .gte("attempted_at", windowStart)
+        .limit(21);
+
+    if (ipCountError) {
+        if (params.logContext) {
+            params.logContext.authEvent = "ip_rate_limit_check_failed";
+            params.logContext.authError = ipCountError.message;
+        }
+    }
+
+    if (ipRegData) {
+        const distinctUAs = new Set(ipRegData.map((row) => row.user_agent)).size;
+        const successCount = ipRegData.filter((row) => row.is_success).length;
+        
+        const isBotAnomaly = distinctUAs > 3;
+        const ipLimit = isBotAnomaly ? 3 : 20;
+
+        if (ipRegData.length >= ipLimit || successCount >= 5) {
+            if (params.logContext) {
+                params.logContext.authEvent = "ip_blocked";
+                params.logContext.totalAttempts = ipRegData.length;
+                params.logContext.successCount = successCount;
+                params.logContext.anomalyDetected = isBotAnomaly;
+            }
+
+            throw new AppError({
+                code: "RATE_LIMIT_EXCEEDED",
+                message: "Too many registration attempts from this IP address, please try again later",
+                status: 429,
+                retryAfter: LOCKOUT_DURATION_MINUTES * 60,
+            });
+        }
+    }
+
+    // Step C: Create user via Supabase Auth Admin API
     const { error: signUpError } = await supabase.auth.admin.createUser({
         email: params.email,
         password: params.password,
         email_confirm: false, // User must verify via email link
+    });
+
+    // Step D: Log registration attempt (success or failure) for rate-limiting calculations
+    await logLoginAttempt({
+        email: params.email,
+        ipAddress: params.clientIp,
+        userAgent: params.userAgent,
+        isSuccess: !signUpError,
+        authProvider: "register",
     });
 
     if (signUpError) {
@@ -86,12 +137,6 @@ export async function loginUser(params: LoginParams) {
         const now = new Date();
 
         if (isLocked && lockExpiry && lockExpiry > now) {
-            await logLoginAttempt({
-                email: params.email,
-                ipAddress: params.clientIp,
-                userAgent: params.userAgent,
-                isSuccess: false,
-            });
 
             throw new AppError({
                 code: "FORBIDDEN",
@@ -108,25 +153,63 @@ export async function loginUser(params: LoginParams) {
         }
     }
 
-    // Step C: Rate limiting
+    // Step C: Advanced Anti-Bruteforce & Correlation Logic
     const windowStart = new Date(Date.now() - LOCKOUT_WINDOW_MINUTES * 60 * 1000).toISOString();
 
-    const { count: failedCount, error: countError } = await supabase
+    // 1. Per-IP Rate Limiting & User-Agent Anomaly Detection
+    const { data: ipFailData, error: ipCountError } = await supabase
         .from("login_attempts")
-        .select("*", { count: "exact", head: true })
-        .eq("email_attempted", params.email)
+        .select("user_agent")
         .eq("ip_address", params.clientIp)
         .eq("is_success", false)
-        .gte("attempted_at", windowStart);
+        .gte("attempted_at", windowStart)
+        .limit(21);
 
-    if (countError) {
+    if (ipCountError) {
         if (params.logContext) {
-            params.logContext.authEvent = "rate_limit_check_failed";
-            params.logContext.authError = countError.message;
+            params.logContext.authEvent = "ip_rate_limit_check_failed";
+            params.logContext.authError = ipCountError.message;
         }
     }
 
-    if (failedCount !== null && failedCount >= MAX_FAILED_ATTEMPTS) {
+    if (ipFailData) {
+        const distinctUAs = new Set(ipFailData.map((row) => row.user_agent)).size;
+        // If an IP rotates > 3 User-Agents, it's highly indicative of a botnet/script
+        const isBotAnomaly = distinctUAs > 3;
+        const ipLimit = isBotAnomaly ? 3 : 20;
+
+        if (ipFailData.length >= ipLimit) {
+            if (params.logContext) {
+                params.logContext.authEvent = "ip_blocked";
+                params.logContext.failedAttempts = ipFailData.length;
+                params.logContext.anomalyDetected = isBotAnomaly;
+            }
+
+            throw new AppError({
+                code: "RATE_LIMIT_EXCEEDED",
+                message: "Too many login attempts from this IP address, please try again later",
+                status: 429,
+                retryAfter: LOCKOUT_DURATION_MINUTES * 60,
+            });
+        }
+    }
+
+    // 2. Per-Email Distributed Attack Lockout (Password Spraying)
+    const { count: emailFailCount, error: emailCountError } = await supabase
+        .from("login_attempts")
+        .select("*", { count: "exact", head: true })
+        .eq("email_attempted", params.email)
+        .eq("is_success", false)
+        .gte("attempted_at", windowStart);
+
+    if (emailCountError) {
+        if (params.logContext) {
+            params.logContext.authEvent = "email_rate_limit_check_failed";
+            params.logContext.authError = emailCountError.message;
+        }
+    }
+
+    if (emailFailCount !== null && emailFailCount >= MAX_FAILED_ATTEMPTS) {
         const lockUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000).toISOString();
 
         await supabase
@@ -134,17 +217,10 @@ export async function loginUser(params: LoginParams) {
             .update({ is_locked: true, locked_until: lockUntil })
             .eq("email", params.email);
 
-        await logLoginAttempt({
-            email: params.email,
-            ipAddress: params.clientIp,
-            userAgent: params.userAgent,
-            isSuccess: false,
-        });
-
         if (params.logContext) {
             params.logContext.authEvent = "account_locked";
             params.logContext.authEmail = params.email;
-            params.logContext.failedAttempts = failedCount;
+            params.logContext.failedAttempts = emailFailCount;
             params.logContext.lockedUntil = lockUntil;
         }
 
@@ -204,7 +280,7 @@ async function logLoginAttempt(
             ipAddress: params.ipAddress,
             userAgent: params.userAgent,
             isSuccess: params.isSuccess,
-            authProvider: "email",
+            authProvider: params.authProvider ?? "email",
         });
     } catch (error: any) {
         // For background logging tasks, we just silently fail or log locally

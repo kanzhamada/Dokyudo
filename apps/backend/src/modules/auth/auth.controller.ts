@@ -7,6 +7,7 @@ export async function handleRegister(c: Context) {
     const requestId = c.get("requestId") ?? crypto.randomUUID();
     const body = c.req.valid("json" as never) as any;
     const clientIp = extractClientIp(c.req.raw.headers);
+    const userAgent = c.req.header("user-agent") ?? "unknown";
 
     const logContext = c.get("logContext");
 
@@ -15,6 +16,7 @@ export async function handleRegister(c: Context) {
         password: body.password,
         recaptchaToken: body.recaptchaToken,
         clientIp,
+        userAgent,
         requestId,
         logContext,
     });

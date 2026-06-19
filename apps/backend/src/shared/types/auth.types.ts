@@ -3,6 +3,7 @@ export interface RegisterParams {
     password: string;
     recaptchaToken: string;
     clientIp: string;
+    userAgent: string;
     requestId: string;
     logContext?: Record<string, any>;
 }
@@ -22,6 +23,7 @@ export interface LoginAttemptParams {
     ipAddress: string;
     userAgent: string;
     isSuccess: boolean;
+    authProvider?: string;
 }
 
 export interface LogoutParams {

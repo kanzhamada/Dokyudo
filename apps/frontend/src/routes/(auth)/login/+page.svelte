@@ -20,6 +20,32 @@
 	let apiError = $state('');
 	let isSubmitting = $state(false);
 
+	let lockoutEndTime = $state<number | null>(null);
+	let countdownText = $state<string>('');
+
+	$effect(() => {
+		if (lockoutEndTime !== null) {
+			// Run immediately once
+			const updateTimer = () => {
+				const now = Date.now();
+				if (now >= lockoutEndTime!) {
+					lockoutEndTime = null;
+					countdownText = '';
+					localStorage.removeItem('dokyudo_login_lockout');
+				} else {
+					const diffSeconds = Math.ceil((lockoutEndTime! - now) / 1000);
+					const minutes = Math.floor(diffSeconds / 60);
+					const seconds = diffSeconds % 60;
+					countdownText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+				}
+			};
+
+			updateTimer(); // Initial call to avoid 1s delay
+			const interval = setInterval(updateTimer, 1000);
+			return () => clearInterval(interval);
+		}
+	});
+
 	const form = superForm(data.form, {
 		validators: zodClient(loginSchema),
 		SPA: true,
@@ -31,9 +57,9 @@
 			apiError = '';
 
 			// Debug Log: Frontend State BEFORE hitting backend
-			console.log('[Auth Login] Form Submitted:', { 
-				email: f.data.email, 
-				password: f.data.password 
+			console.log('[Auth Login] Form Submitted:', {
+				email: f.data.email,
+				password: f.data.password
 			});
 
 			try {
@@ -49,9 +75,16 @@
 				console.log(`[Auth Login] Backend Response (POST /api/auth/login):`, result);
 
 				if (result.ok) {
+					localStorage.removeItem('dokyudo_login_lockout');
 					await goto('/');
 				} else {
-					apiError = result.error.message;
+					if (result.error.code === 'RATE_LIMIT_EXCEEDED' && result.error.retryAfter) {
+						const endTime = Date.now() + result.error.retryAfter * 1000;
+						localStorage.setItem('dokyudo_login_lockout', endTime.toString());
+						lockoutEndTime = endTime;
+					} else {
+						apiError = result.error.message;
+					}
 				}
 			} catch (err: any) {
 				apiError = 'Something went wrong. Please try again.';
@@ -67,6 +100,16 @@
 
 	onMount(() => {
 		loadRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY);
+
+		const storedLockout = localStorage.getItem('dokyudo_login_lockout');
+		if (storedLockout) {
+			const end = parseInt(storedLockout, 10);
+			if (end > Date.now()) {
+				lockoutEndTime = end;
+			} else {
+				localStorage.removeItem('dokyudo_login_lockout');
+			}
+		}
 	});
 </script>
 
@@ -120,7 +163,8 @@
 					{...props}
 					type="email"
 					placeholder="Email"
-					autofocus
+					autofocus={lockoutEndTime === null}
+					disabled={isSubmitting || lockoutEndTime !== null}
 					bind:value={$formData.email}
 					variant="auth"
 					class="auth-input"
@@ -139,6 +183,7 @@
 						{...props}
 						type={showPassword ? 'text' : 'password'}
 						placeholder="Password"
+						disabled={isSubmitting || lockoutEndTime !== null}
 						bind:value={$formData.password}
 						variant="auth"
 						class="auth-input pr-12"
@@ -200,7 +245,12 @@
 	</Form.Field>
 
 	<!-- Submit button -->
-	<Button type="submit" disabled={isSubmitting} variant="authPrimary" class="auth-btn-primary">
+	<Button
+		type="submit"
+		disabled={isSubmitting || lockoutEndTime !== null}
+		variant="authPrimary"
+		class="auth-btn-primary"
+	>
 		{#if isSubmitting}
 			<Spinner class="mr-2 size-4" />
 			Signing in...
@@ -210,9 +260,18 @@
 	</Button>
 
 	<!-- Error box -->
-	{#if apiError}
-		<div class="auth-error-box">
-			{apiError}
+	{#if apiError || lockoutEndTime !== null}
+		<div class="auth-error-box flex flex-col items-center justify-center text-center">
+			{#if lockoutEndTime !== null}
+				<span class="font-semibold text-[#FB6363]">Temporarily Locked</span>
+				<span class="mt-1 text-sm text-white/80">
+					Too many requests. Try again in <span class="font-mono font-bold text-white"
+						>{countdownText}</span
+					>
+				</span>
+			{:else}
+				{apiError}
+			{/if}
 		</div>
 	{/if}
 </form>
