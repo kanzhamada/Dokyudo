@@ -1,7 +1,8 @@
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { getSupabaseAdmin, getSupabaseAuth } from "../../config/supabase.ts";
 import { db } from "../../config/drizzle.ts";
-import { loginAttempts } from "../../shared/models/db.model.ts";
+import { loginAttempts, users } from "../../shared/models/db.model.ts";
+import { eq, and, gte, count } from "drizzle-orm";
 import { verifyRecaptcha } from "../../shared/utils/recaptcha.util.ts";
 import { LoginAttemptParams, LoginParams, RegisterParams, LogoutParams } from "../../shared/types/auth.types.ts";
 
@@ -21,24 +22,29 @@ export async function registerUser(params: RegisterParams) {
     const windowStart = new Date(Date.now() - LOCKOUT_WINDOW_MINUTES * 60 * 1000).toISOString();
 
     // Step B: Per-IP Rate Limiting & User-Agent Anomaly Detection
-    const { data: ipRegData, error: ipCountError } = await supabase
-        .from("login_attempts")
-        .select("user_agent, is_success")
-        .eq("ip_address", params.clientIp)
-        .eq("auth_provider", "register")
-        .gte("attempted_at", windowStart)
-        .limit(21);
-
-    if (ipCountError) {
+    let ipRegData: any[] = [];
+    try {
+        ipRegData = await db
+            .select({ userAgent: loginAttempts.userAgent, isSuccess: loginAttempts.isSuccess })
+            .from(loginAttempts)
+            .where(
+                and(
+                    eq(loginAttempts.ipAddress, params.clientIp),
+                    eq(loginAttempts.authProvider, "register"),
+                    gte(loginAttempts.attemptedAt, new Date(windowStart))
+                )
+            )
+            .limit(21);
+    } catch (ipCountError: any) {
         if (params.logContext) {
             params.logContext.authEvent = "ip_rate_limit_check_failed";
             params.logContext.authError = ipCountError.message;
         }
     }
 
-    if (ipRegData) {
-        const distinctUAs = new Set(ipRegData.map((row) => row.user_agent)).size;
-        const successCount = ipRegData.filter((row) => row.is_success).length;
+    if (ipRegData && ipRegData.length > 0) {
+        const distinctUAs = new Set(ipRegData.map((row) => row.userAgent)).size;
+        const successCount = ipRegData.filter((row) => row.isSuccess).length;
         
         const isBotAnomaly = distinctUAs > 3;
         const ipLimit = isBotAnomaly ? 3 : 20;
@@ -116,13 +122,17 @@ export async function loginUser(params: LoginParams) {
     });
 
     // Step B: Lockout check
-    const { data: lockedUser, error: lockCheckError } = await supabase
-        .from("users")
-        .select("is_locked, locked_until")
-        .eq("email", params.email)
-        .maybeSingle();
-
-    if (lockCheckError) {
+    let lockedUser = null;
+    try {
+        const result = await db
+            .select({ isLocked: users.isLocked, lockedUntil: users.lockedUntil })
+            .from(users)
+            .where(eq(users.email, params.email))
+            .limit(1);
+        if (result.length > 0) {
+            lockedUser = result[0];
+        }
+    } catch (lockCheckError: any) {
         if (params.logContext) {
             params.logContext.authEvent = "lockout_check_failed";
             params.logContext.authError = lockCheckError.message;
@@ -130,9 +140,9 @@ export async function loginUser(params: LoginParams) {
     }
 
     if (lockedUser) {
-        const isLocked = lockedUser.is_locked === true;
-        const lockExpiry = lockedUser.locked_until
-            ? new Date(lockedUser.locked_until)
+        const isLocked = lockedUser.isLocked === true;
+        const lockExpiry = lockedUser.lockedUntil
+            ? new Date(lockedUser.lockedUntil)
             : null;
         const now = new Date();
 
@@ -146,10 +156,10 @@ export async function loginUser(params: LoginParams) {
         }
 
         if (isLocked && lockExpiry && lockExpiry <= now) {
-            await supabase
-                .from("users")
-                .update({ is_locked: false, locked_until: null })
-                .eq("email", params.email);
+            await db
+                .update(users)
+                .set({ isLocked: false, lockedUntil: null })
+                .where(eq(users.email, params.email));
         }
     }
 
@@ -157,23 +167,28 @@ export async function loginUser(params: LoginParams) {
     const windowStart = new Date(Date.now() - LOCKOUT_WINDOW_MINUTES * 60 * 1000).toISOString();
 
     // 1. Per-IP Rate Limiting & User-Agent Anomaly Detection
-    const { data: ipFailData, error: ipCountError } = await supabase
-        .from("login_attempts")
-        .select("user_agent")
-        .eq("ip_address", params.clientIp)
-        .eq("is_success", false)
-        .gte("attempted_at", windowStart)
-        .limit(21);
-
-    if (ipCountError) {
+    let ipFailData: any[] = [];
+    try {
+        ipFailData = await db
+            .select({ userAgent: loginAttempts.userAgent })
+            .from(loginAttempts)
+            .where(
+                and(
+                    eq(loginAttempts.ipAddress, params.clientIp),
+                    eq(loginAttempts.isSuccess, false),
+                    gte(loginAttempts.attemptedAt, new Date(windowStart))
+                )
+            )
+            .limit(21);
+    } catch (ipCountError: any) {
         if (params.logContext) {
             params.logContext.authEvent = "ip_rate_limit_check_failed";
             params.logContext.authError = ipCountError.message;
         }
     }
 
-    if (ipFailData) {
-        const distinctUAs = new Set(ipFailData.map((row) => row.user_agent)).size;
+    if (ipFailData && ipFailData.length > 0) {
+        const distinctUAs = new Set(ipFailData.map((row) => row.userAgent)).size;
         // If an IP rotates > 3 User-Agents, it's highly indicative of a botnet/script
         const isBotAnomaly = distinctUAs > 3;
         const ipLimit = isBotAnomaly ? 3 : 20;
@@ -195,27 +210,34 @@ export async function loginUser(params: LoginParams) {
     }
 
     // 2. Per-Email Distributed Attack Lockout (Password Spraying)
-    const { count: emailFailCount, error: emailCountError } = await supabase
-        .from("login_attempts")
-        .select("*", { count: "exact", head: true })
-        .eq("email_attempted", params.email)
-        .eq("is_success", false)
-        .gte("attempted_at", windowStart);
-
-    if (emailCountError) {
+    let emailFailCount = 0;
+    try {
+        const result = await db
+            .select({ count: count() })
+            .from(loginAttempts)
+            .where(
+                and(
+                    eq(loginAttempts.emailAttempted, params.email),
+                    eq(loginAttempts.isSuccess, false),
+                    gte(loginAttempts.attemptedAt, new Date(windowStart))
+                )
+            );
+        emailFailCount = result[0].count;
+    } catch (emailCountError: any) {
         if (params.logContext) {
             params.logContext.authEvent = "email_rate_limit_check_failed";
             params.logContext.authError = emailCountError.message;
         }
     }
 
-    if (emailFailCount !== null && emailFailCount >= MAX_FAILED_ATTEMPTS) {
-        const lockUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000).toISOString();
+    if (emailFailCount >= MAX_FAILED_ATTEMPTS) {
+        const lockUntilDate = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000);
+        const lockUntil = lockUntilDate.toISOString();
 
-        await supabase
-            .from("users")
-            .update({ is_locked: true, locked_until: lockUntil })
-            .eq("email", params.email);
+        await db
+            .update(users)
+            .set({ isLocked: true, lockedUntil: lockUntilDate })
+            .where(eq(users.email, params.email));
 
         if (params.logContext) {
             params.logContext.authEvent = "account_locked";

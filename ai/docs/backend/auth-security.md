@@ -43,20 +43,23 @@ flowchart TD
 ```
 
 ## Completion Timestamp
-**Date**: 2026-06-19 22:00 (Local Time)
+**Date**: 2026-06-20 00:21 (Local Time)
 
 ## File Mapping
-- **`apps/backend/src/modules/auth/auth.service.ts`**: Contains the core correlation queries, anomaly detection, and DB locking logic.
+- **`apps/backend/src/modules/auth/auth.service.ts`**: Contains the core correlation queries (using Drizzle ORM), anomaly detection, and DB locking logic.
 - **`apps/backend/src/modules/auth/auth.controller.ts`**: Handles routing and graceful error handling.
+- **`apps/backend/src/modules/auth/auth.schema.ts`**: Zod schemas ensuring passwords meet strong complexity requirements (regex for lowercase, uppercase, number, and symbol).
 - **`apps/backend/src/shared/utils/recaptcha.util.ts`**: Enforces the 0.5 score threshold and validates Google `siteverify` payload.
 - **`apps/backend/src/tests/api/auth.api.test.ts`**: Houses the unit and integration tests verifying User-Agent anomalies and distributed password spraying.
 
 ## Connections
 - **Frontend Layer**: Must provide the `recaptchaToken` securely retrieved via Google's `grecaptcha.execute()`.
-- **Database Layer**: Uses `public.login_attempts` to aggregate failures. Uses an index `idx_login_attempts_email_ip` to quickly query by `emailAttempted` and `ipAddress` without full table scans.
-- **Supabase Layer**: Uses `supabase.auth.admin.signOut` for token revocation and `signInWithPassword` for underlying authentication.
+- **Database Layer (Drizzle ORM)**: Uses `db.select()` and `db.update()` mapped to `public.login_attempts` to aggregate failures. Uses an index `idx_login_attempts_email_ip` to quickly query by `emailAttempted` and `ipAddress` without full table scans.
+- **Supabase Layer (Identity only)**: Uses `supabase.auth.admin.signOut` for token revocation and `signInWithPassword` for underlying authentication, decoupled from raw table access.
 
 ## Architectural Decisions
+- **Database Boundary (Drizzle vs Supabase)**: Supabase clients (`getSupabaseAdmin`, `getSupabaseAuth`) are strictly reserved for Identity Operations (`createUser`, `signInWithPassword`). All direct table queries (like counting `login_attempts` or locking `users`) were refactored to use Drizzle ORM (`db.select`, `db.update`). This prevents framework leakage and ensures strong type safety against `apps/backend/src/shared/models/db.model.ts`.
 - **Relying on reCAPTCHA vs. Custom Fingerprinting**: We opted to strictly rely on Google reCAPTCHA v3's client-side checks for hardware/browser fingerprinting (fonts, screen size, Playwright defaults). Building a custom fingerprinting script creates massive GDPR liabilities and performs worse than Google's existing ML models.
 - **No User-Agent Blocking**: We do not block requests globally based purely on the `User-Agent` string, as standard UAs are shared by millions of legitimate users. We only use `User-Agent` as an anomaly modifier for a *specific IP*.
 - **Graceful Failure**: Non-critical background logs use `try/catch` wrappers to prevent breaking the happy path for users. Rejection paths bypass `logLoginAttempt` inserts to prevent DB bloating during a DDoS.
+- **Compact Regex Validation**: Password validation strictly enforces lowercase, uppercase, numbers, and symbols through a single, compact regex `/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/` to unify error output to the user.

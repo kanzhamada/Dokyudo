@@ -13,7 +13,8 @@ export const RegisterBodySchema = z
         password: z
             .string()
             .min(8, "Password must be at least 8 characters")
-            .openapi({ description: "User password (min 8 chars)", example: "SecurePassword123!" }),
+            .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/, "Must contain uppercase, lowercase, number, and symbol (e.g. Secure@123)")
+            .openapi({ description: "User password (min 8 chars, strong)", example: "Secure@123" }),
         recaptchaToken: z
             .string()
             .min(1, "reCAPTCHA token is required")

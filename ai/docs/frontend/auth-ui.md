@@ -1,7 +1,7 @@
 ---
 title: Frontend Auth UI
-description: Implementation details for the SvelteKit frontend authentication flows (Sign In / Sign Up)
-completed_at: 2026-06-18T22:55:00+07:00
+description: Implementation details for the SvelteKit frontend authentication flows (Sign In, Sign Up, Password Reset, OAuth)
+completed_at: 2026-06-20T00:03:00+07:00
 ---
 
 # Frontend Auth UI
@@ -49,15 +49,25 @@ sequenceDiagram
 ```
 
 ## Completion Timestamp
-**Date**: 2026-06-19 23:00 (Local Time)
+**Date**: 2026-06-20 00:03 (Local Time)
 
 ## File Mapping
 
-**Core UI Files:**
-- `apps/frontend/src/routes/(auth)/+layout.svelte` - Shared structural layout for auth routes with styling.
+**Core UI Files (Pages):**
+- `apps/frontend/src/routes/(auth)/+layout.svelte` - Shared structural layout (vintage floral background, glassmorphism) for auth routes.
 - `apps/frontend/src/routes/(auth)/login/+page.svelte` - Sign-in component.
 - `apps/frontend/src/routes/(auth)/register/+page.svelte` - Sign-up component.
+- `apps/frontend/src/routes/(auth)/forget-password/+page.svelte` - Password reset request form.
+- `apps/frontend/src/routes/(auth)/forget-password/update-password/+page.svelte` - New password submission form.
+- `apps/frontend/src/routes/(auth)/oauth-callback/+page.svelte` - Loading state and error handler for OAuth redirects.
 - `apps/frontend/src/routes/layout.css` - Injected custom font stacks (Playfair Display) and Tailwind v4 OKLCH color variables (`--color-auth-*`). Retains generic layout/spacing utilities (`.auth-error-box`).
+
+**Reusable Auth Components (`src/lib/components/auth/`):**
+- `AuthPasswordInput.svelte` - Encapsulates `superforms` password bindings with an absolute-positioned toggleable eye icon.
+- `AuthOAuthGroup.svelte` - Extracts the "OR" separator and bulk SVG definitions for Google/GitHub sign-in buttons.
+- `AuthErrorBox.svelte` - Houses the reactive countdown (`$effect`) logic and lockout state UI.
+- `AuthSuccessState.svelte` - A checkmark success screen for post-registration or post-reset confirmations.
+- `AuthBackButton.svelte` - The floating top-left arrow button and tooltip.
 
 **Component Variants (Shadcn-Svelte):**
 - `apps/frontend/src/lib/components/ui/button/button.svelte` - Added `authPrimary` and `authOauth` variants.
@@ -73,6 +83,7 @@ sequenceDiagram
 - **Google API**: Uses `https://www.google.com/recaptcha/api.js` to execute reCAPTCHA silently.
 
 ## Architectural Decisions
+- **Component Extraction**: To reduce duplication across 5+ authentication pages, all redundant structures (password eye-toggles, error boxes, OAuth SVGs) were aggressively extracted into `/src/lib/components/auth/`. The pages themselves now function cleanly as layout controllers and `superforms` orchestrators.
 - **`sveltekit-superforms` & Zod v4**: Chosen for robust state management. Note that `superForm(data.form)` is used without closures to preserve `sveltekit-superforms` TypeScript static types, intentionally bypassing a minor Svelte 5 AST warning for stability.
 - **Client-Side SPA Forms**: The forms use `SPA: true` and a custom `onUpdate` handler to cleanly integrate client-side reCAPTCHA execution *before* hitting the API backend.
 - **Tailwind CSS v4 Engine**: Hardcoded hex values inside `@apply` were problematic due to the strict JIT compilation in CSS files. The architecture was refactored to define semantic `--color-auth-*` variables mapped to precise `oklch()` formats within the `@theme inline` block to guarantee native CSS compilation and support for automatic opacity modifiers (e.g. `/40`).
