@@ -23,3 +23,8 @@ export interface LoginAttemptParams {
     userAgent: string;
     isSuccess: boolean;
 }
+
+export interface LogoutParams {
+    accessToken: string;
+    logContext?: Record<string, any>;
+}

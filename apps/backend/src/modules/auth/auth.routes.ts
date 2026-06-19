@@ -1,8 +1,8 @@
 import { createApp } from "../../config/hono.ts";
-import { createRoute } from "@hono/zod-openapi";
+import { createRoute, z } from "@hono/zod-openapi";
 import * as authController from "./auth.controller.ts";
 import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
-import { LoginBodySchema, LoginResponseSchema, RegisterBodySchema, RegisterResponseSchema } from "./auth.schema.ts";
+import { LoginBodySchema, LoginResponseSchema, RegisterBodySchema, RegisterResponseSchema, LogoutResponseSchema } from "./auth.schema.ts";
 
 export const authRoutes = createApp();
 
@@ -123,3 +123,42 @@ authRoutes.openapi(createRoute({
         },
     },
 }), authController.handleLogin as any);
+
+authRoutes.openapi(createRoute({
+    method: "post",
+    path: "/logout",
+    tags: ["Auth"],
+    summary: "Logout the current user",
+    description: "Invalidates the user's session globally using the Supabase Admin API. Expects a Bearer token in the Authorization header.",
+    request: {
+        headers: z.object({
+            authorization: z.string().optional().openapi({ description: "Bearer <token>", example: "Bearer eyJhb..." }),
+        }),
+    },
+    responses: {
+        200: {
+            description: "Logout successful",
+            content: {
+                "application/json": {
+                    schema: LogoutResponseSchema,
+                },
+            },
+        },
+        401: {
+            description: "Missing or invalid authorization token",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+        500: {
+            description: "Internal server error",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+    },
+}), authController.handleLogout as any);

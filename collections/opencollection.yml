@@ -26,17 +26,17 @@ request:
     - name: refreshToken
       value: ""
     - name: documentId
-      value: "123e4567-e89b-12d3-a456-426614174000"
+      value: 123e4567-e89b-12d3-a456-426614174000
     - name: conversationId
-      value: "321e4567-e89b-12d3-a456-426614174000"
+      value: 321e4567-e89b-12d3-a456-426614174000
     - name: webhookId
-      value: "542e4567-e89b-12d3-a456-426614174000"
+      value: 542e4567-e89b-12d3-a456-426614174000
     - name: flagId
-      value: "642e4567-e89b-12d3-a456-426614174000"
+      value: 642e4567-e89b-12d3-a456-426614174000
     - name: flagName
-      value: "rag_enabled"
+      value: rag_enabled
     - name: tenantId
-      value: "tenant_abc123"
+      value: tenant_abc123
 
 docs:
   content: |

@@ -20,7 +20,7 @@ The platform is built with **SvelteKit** on the frontend (deployed to Vercel) an
 2. **Ingestion Pipeline** – Upload → text extraction → chunking → embedding → vector index.
 3. **Semantic Search** – Vector search + full‑text (*hybrid*) with tenant filtering done inside the database queries (not post‑retrieval).
 4. **RAG Q&A** – Retrieve relevant context, build prompt, and stream the LLM answer.
-5. **API Gateway** – Authentication, *routing*, *rate limiting* (sliding window), distributed *session store*, and **feature‑flag enforcement**.
+5. **API Gateway** – Authentication, *routing*, *rate limiting* (sliding window), and **feature‑flag enforcement**.
 6. **Distributed Job Queue** – Asynchronous embedding and notification processing, with *retry* and *Dead Letter Queue*.
 7. **Webhook Delivery** – Notification to tenant URL when document processing is complete (idempotency, *signature verification*).
 8. **Feature Flag Service** – Enable/disable features (e.g., Q&A) dynamically per tenant. Enforced at the API Gateway.
@@ -132,30 +132,22 @@ The platform is built with **SvelteKit** on the frontend (deployed to Vercel) an
 - All external requests go through the **Hono** API Gateway.
 - Middleware:
   - **Auth & Session**:  
-    - JWTs are **short‑lived** (15‑minute expiry).  
-    - The Redis session store holds a `refresh_token` reference with a **24‑hour TTL**.  
-    - On each request, the gateway validates the JWT signature and expiry. If the JWT is expired, it checks Redis for a valid session and silently issues a new JWT (using the stored refresh token).  
-    - To immediately revoke access (logout, account suspension), delete the Redis session entry; the user’s next token refresh will fail.
-  - **JWT Payload Specification**: Every issued JWT must contain exactly the following claims:
-    - `sub` — User UUID (from `users.id`)
-    - `tenantId` — Tenant UUID (from `tenants.id`)
-    - `role` — `"tenant"` or `"admin"`
-    - `jti` — Unique JWT ID (UUID v4), generated fresh on every issuance, for future replay-detection support
-    - `iat` — Issued-at timestamp (Unix seconds)
-    - `exp` — Expiry timestamp (Unix seconds; `iat + 900` for 15 minutes)
+    - Authentication is entirely managed natively by **Supabase Auth**.
+    - On each request, the gateway validates the Supabase-issued JWT signature.
+    - Token refresh and revocation are handled via Supabase Auth's native APIs and stored in Supabase's `auth` schema, eliminating the need for Redis-based sessions.
+    - To immediately revoke access (logout, account suspension), use the Supabase Admin API to invalidate the user's session globally.
+  - **JWT Payload Specification**: Relies on Supabase Auth's standard JWT payload, which includes `sub` (User UUID), `email`, and custom claims for `tenantId` and `role` (if injected via Supabase hooks or handled within Dokyudo's logic).
   - **Redis Key Schema** (canonical; all services must use these exact key formats):
-    - Sessions: `session:{sha256(refreshToken)}` → JSON `{userId, tenantId, exp}` with 24h TTL
     - Rate limiting: `rate_limit:{tenantId}:{endpoint}` → Redis sorted set (sliding window ZSET)
     - OAuth CSRF state: `oauth:{state}` → `{provider}` string with 5-min TTL (single-use: deleted immediately after validation)
     - Feature flag cache: `flag:{flagName}:{tenantId}` → `"true"` or `"false"` string with 30s TTL
   - **OAuth Callback Handling**:
     - `GET /api/auth/oauth/:provider` — redirects to the provider’s authorization URL with `oauth:{state}` stored in Redis (5-min TTL, single-use, CSRF protection).
-    - `GET /api/auth/oauth/:provider/callback` — validates `state` (delete from Redis immediately after reading), exchanges code for tokens, applies email-verification gate (see §5.1), upserts user + tenant, issues JWT + Redis session, redirects to `/app/dashboard`.
-    - Provider access tokens are **not** stored beyond the callback; only the Dokyudo JWT/refresh session is retained.
+    - `GET /api/auth/oauth/:provider/callback` — validates `state` (delete from Redis immediately after reading), exchanges code for tokens, applies email-verification gate (see §5.1), upserts user + tenant, redirects to `/app/dashboard`.
+    - Provider access tokens are **not** stored beyond the callback; only the Supabase session is retained.
   - **Rate Limiter**: *Sliding window* based on Redis sorted sets per `rate_limit:{tenantId}:{endpoint}` key.
   - **Tenant Context**: Injects `tenant_id` into the request.
   - **Feature Flag Enforcement**: The gateway evaluates feature flags for tenant‑facing endpoints. If a required flag is disabled, it returns `403 FEATURE_DISABLED`. Internal service‑to‑service calls bypass the gateway and are trusted.
-- Session TTL: 24 hours, renewable on each active JWT refresh.
 
 ### 5.6 Webhook Delivery
 - Tenant can register a webhook URL via API. The only supported event type for MVP is `document.ready`. The `POST /api/webhooks` request body contains only `{ url }` — no event type selection is required.
@@ -320,7 +312,7 @@ All values can be overridden per service via environment variables.
 
 | Service                      | Responsibilities                                                                                                                                           | Dependencies                         |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| **API Gateway**              | Auth (JWT + Redis session), rate limiting, tenant context injection, **feature flag enforcement** (single point)                                            | Redis, Feature Flag Service         |
+| **API Gateway**              | Auth (Supabase JWT), rate limiting, tenant context injection, **feature flag enforcement** (single point)                                            | Redis, Feature Flag Service         |
 | **Ingestion Service**        | Accept upload metadata (presigned URL), enqueue job with `{docId, storagePath, mimeType}`, track document status                                            | Object Storage, Job Queue            |
 | **Supabase DB Triggers & Edge Function**         | Consumer: download, extract, chunk (sliding‑window 512 tokens, 10‑20% overlap), embed, upsert into pgvector, update DB status, publish `document.ready`     | Object Storage, Embedding API, pgvector, Job Queue |
 | **Search Service**           | Embed query, execute tenant‑safe hybrid search (pgvector + full‑text with RRF), circuit breaker on pgvector calls                                           | Embedding API, pgvector              |
@@ -329,7 +321,7 @@ All values can be overridden per service via environment variables.
 | **Webhook & Notification**   | Consume `document.ready` events, send signed webhooks (idempotency, HMAC) with retry & CB, send email notifications via queue                               | Job Queue, email provider            |
 | **Feature Flag Service**     | CRUD flags, evaluation API, values cached in Redis (30s TTL), admin cache flush                                                                             | Redis                                |
 | **Activity & Metrics**       | Log activity feed (cursor pagination, 90‑day retention), collect counters & histograms                                                                      | PostgreSQL                           |
-| **Tenant & User Management** | Registration, login, quota storage, 1:1 user‑tenant mapping                                                                                                  | PostgreSQL, Redis (session)          |
+| **Tenant & User Management** | Registration, login, quota storage, 1:1 user‑tenant mapping                                                                                                  | PostgreSQL          |
 
 ---
 
@@ -438,13 +430,13 @@ graph TD
 | **HTTP Framework** | Hono | Lightweight, middleware-friendly, first-class Deno support |
 | **Database** | Supabase (PostgreSQL + pgvector) | Relational data + vectors in one DB, no extra infrastructure |
 | **Object Storage** | Supabase Storage S3 (development) / Supabase Storage S3 (production) | Self-hosted, S3-compatible, signed URL |
-| **Cache & Queue** | Upstash Redis + Supabase pg_cron (npm:bullmq, tested on Deno 2.1+) | Rate limiting, sessions, job queue, DLQ |
+| **Cache & Queue** | Upstash Redis + Supabase pg_cron (npm:bullmq, tested on Deno 2.1+) | Rate limiting, job queue, DLQ |
 | **Job Queue (async)** | Supabase pg_cron; Supabase pg_cron can be a lightweight fallback for serverless tasks | Embedding, notification, webhook jobs |
 | **LLM Providers** | Gemini, Ollama (local) | Flexibility via AI API Gateway |
 | **Embedding Model** | Gemini `gemini-embedding-2` / Ollama | Lightweight, accurate |
 | **Monitoring** | JSON logs + Grafana Loki (opt) | Centralized observability |
-| **Auth** | Supabase Auth for refresh & revocation | Stateless with revocation capability |
-| **OAuth** | Supabase Auth (Google, GitHub) | Social login; converges to the same JWT+Redis session post-handshake |
+| **Auth** | Supabase Auth for refresh & revocation | Native session management, JWT issuance, and revocation |
+| **OAuth** | Supabase Auth (Google, GitHub) | Social login; managed entirely by Supabase Auth post-handshake |
 | **ORM** | Drizzle ORM | Type-safe, suitable for Deno, query builder |
 | **Validation** | Zod | Frontend & Backend schema validation |
 
@@ -478,7 +470,7 @@ graph TD
 | API Gateway (auth, routing, rate limiting) | Hono API Gateway |
 | Multi-tenant SaaS Backend (tenant isolation, billing logic) | Tenant & User Management, database row-level |
 | Feature Flag Service (dynamic config rollout) | Feature Flag Service (enforced at gateway) |
-| Session Store (distributed, TTL-based) | Redis via API Gateway (combined with JWT refresh) |
+| Session Store (distributed, TTL-based) | Replaced by Supabase Auth (native session management) |
 | Search Service (ElasticSearch + indexing pipeline) | Replaced by Supabase (PostgreSQL + pgvector) hybrid search |
 | Log Aggregation System (ingestion + storage + query) | JSON logging + Grafana Loki (optional) |
 | Metrics Backend (time-series DB + dashboards API) | Metrics Service + PostgreSQL |
@@ -497,7 +489,7 @@ graph TD
 ## 13. Development Phases
 
 ### Phase 1 – Core Search MVP
-- Multi‑tenant auth, session store with JWT + Redis.
+- Multi‑tenant auth, session store managed via Supabase Auth.
 - **OAuth social login** (Google + GitHub): callback endpoints, state/CSRF validation, provider account linking.
 - Upload file → simple text chunking (raw text storage, no embeddings).
 - Full‑text search only (PostgreSQL `tsvector`).

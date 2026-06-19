@@ -1,4 +1,5 @@
 import { extractClientIp } from "../../shared/middlewares/request.middleware.ts";
+import { AppError } from "../../shared/utils/errors.util.ts";
 import * as authService from "./auth.service.ts";
 import { type Context } from "hono";
 
@@ -51,6 +52,35 @@ export async function handleLogin(c: Context) {
                 email: authData.user.email!,
             },
         },
+        200
+    );
+}
+
+export async function handleLogout(c: Context) {
+    const authHeader = c.req.header("Authorization");
+    const logContext = c.get("logContext");
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        if (logContext) {
+            logContext.authEvent = "logout_failed";
+            logContext.authError = "Missing or invalid authorization token";
+        }
+        throw new AppError({
+            code: "UNAUTHORIZED",
+            message: "Missing or invalid authorization token",
+            status: 401,
+        });
+    }
+
+    const accessToken = authHeader.split(" ")[1];
+
+    await authService.logoutUser({
+        accessToken,
+        logContext,
+    });
+
+    return c.json(
+        { message: "Successfully logged out" },
         200
     );
 }

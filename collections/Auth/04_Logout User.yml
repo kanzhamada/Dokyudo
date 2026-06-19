@@ -16,4 +16,4 @@ settings:
   followRedirects: true
   maxRedirects: 5
 
-docs: Deletes the session entry in Redis, revoking the refresh token immediately and invalidating subsequent refreshes.
+docs: Invalidates the user's session globally using the Supabase Admin API.

@@ -3,7 +3,7 @@ import { getSupabaseAdmin, getSupabaseAuth } from "../../config/supabase.ts";
 import { db } from "../../config/drizzle.ts";
 import { loginAttempts } from "../../shared/models/db.model.ts";
 import { verifyRecaptcha } from "../../shared/utils/recaptcha.util.ts";
-import { LoginAttemptParams, LoginParams, RegisterParams } from "../../shared/types/auth.types.ts";
+import { LoginAttemptParams, LoginParams, RegisterParams, LogoutParams } from "../../shared/types/auth.types.ts";
 
 const LOCKOUT_WINDOW_MINUTES = 15;
 const MAX_FAILED_ATTEMPTS = 5;
@@ -210,5 +210,26 @@ async function logLoginAttempt(
         // For background logging tasks, we just silently fail or log locally
         // since we may not have the request context here.
         console.error(`Failed to log login attempt for ${params.email}: ${error.message}`);
+    }
+}
+
+export async function logoutUser(params: LogoutParams) {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase.auth.admin.signOut(params.accessToken, "global");
+
+    if (error) {
+        if (params.logContext) {
+            params.logContext.authEvent = "logout_failed";
+            params.logContext.authError = error.message;
+        }
+        throw new AppError({
+            code: "INTERNAL_ERROR",
+            message: "Failed to sign out",
+            status: 500,
+        });
+    }
+
+    if (params.logContext) {
+        params.logContext.authEvent = "logout_success";
     }
 }

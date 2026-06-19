@@ -67,3 +67,15 @@ export const LoginResponseSchema = z
         }),
     })
     .openapi("LoginResponse");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Logout Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const LogoutResponseSchema = z
+    .object({
+        message: z
+            .string()
+            .openapi({ description: "Success message", example: "Successfully logged out" }),
+    })
+    .openapi("LogoutResponse");
