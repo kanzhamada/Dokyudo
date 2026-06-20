@@ -12,3 +12,17 @@ export interface LoginResponse {
 export interface RegisterResponse {
 	message: string;
 }
+
+/** Login request payload */
+export interface LoginRequestPayload {
+	email: string;
+	password: string;
+	recaptchaToken: string;
+}
+
+/** Register request payload */
+export interface RegisterRequestPayload {
+	email: string;
+	password: string;
+	recaptchaToken: string;
+}

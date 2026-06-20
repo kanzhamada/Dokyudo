@@ -239,13 +239,6 @@ export async function loginUser(params: LoginParams) {
             .set({ isLocked: true, lockedUntil: lockUntilDate })
             .where(eq(users.email, params.email));
 
-        if (params.logContext) {
-            params.logContext.authEvent = "account_locked";
-            params.logContext.authEmail = params.email;
-            params.logContext.failedAttempts = emailFailCount;
-            params.logContext.lockedUntil = lockUntil;
-        }
-
         throw new AppError({
             code: "RATE_LIMIT_EXCEEDED",
             message: "Too many failed login attempts, account has been locked for 15 minutes",
