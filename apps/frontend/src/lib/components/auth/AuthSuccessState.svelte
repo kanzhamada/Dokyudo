@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Button from '../ui/button/button.svelte';
+
 	let {
 		heading,
 		description,
@@ -32,7 +34,7 @@
 	<p class="auth-subheading text-center text-white/80">
 		{description}
 	</p>
-	<a href={buttonHref} class="auth-btn-primary mt-4 block w-full max-w-sm text-center">
+	<Button href={buttonHref} class="auth-btn-primary" variant="authPrimary">
 		{buttonText}
-	</a>
+	</Button>
 </div>

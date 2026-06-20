@@ -14,15 +14,15 @@ export interface RegisterResponse {
 }
 
 /** Login request payload */
-export interface LoginRequestPayload {
+export type LoginRequestPayload = {
 	email: string;
 	password: string;
 	recaptchaToken: string;
-}
+};
 
 /** Register request payload */
-export interface RegisterRequestPayload {
+export type RegisterRequestPayload = {
 	email: string;
 	password: string;
 	recaptchaToken: string;
-}
+};
