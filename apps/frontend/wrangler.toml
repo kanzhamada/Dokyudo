@@ -1,0 +1,7 @@
+name = "dokyudo-frontend"
+compatibility_date = "2024-03-20"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".svelte-kit/cloudflare"
+binding = "ASSETS"
