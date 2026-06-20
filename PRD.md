@@ -3,32 +3,34 @@
 ---
 
 ## 1. Project Overview
-**Dokyudo** is a *SaaS platform* that allows users to upload documents (PDF, DOCX, TXT), then search and ask semantically about their content.  
-The platform is built with **SvelteKit** on the frontend (deployed to Vercel) and **Deno + Hono** on the backend (deployed to Deno Deploy), designed to demonstrate modern distributed system patterns.
+**Dokyudo** is a _SaaS platform_ that allows users to upload documents (PDF, DOCX, TXT), then search and ask semantically about their content.
+
+The platform is built with **SvelteKit** on the frontend (deployed to Vercel) and **Deno + Hono** on the backend (deployed to Deno Deploy). It is designed to demonstrate modern distributed system patterns, comprehensive SaaS monetization architectures, and extreme cost-optimization strategies for serverless environments.
 
 ---
 
 ## 2. Goals & Objectives
 - Provide fast and accurate semantic document search.
-- Enable contextual question‑answering on documents using RAG (*Retrieval‑Augmented Generation*).
-- Implement *multi‑tenancy*, *rate limiting*, *job queue*, *webhook*, *feature flag*, and *observability* in one integrated project.
+- Enable contextual question‑answering on documents using RAG (_Retrieval‑Augmented Generation_).
+- Implement _multi‑tenancy_, _rate limiting_, _job queue_, _webhook_, _feature flag_, and _observability_ in one integrated project.
+- **Showcase scalable SaaS architecture** while maintaining a strict $0/month operational footprint for portfolio purposes.
 
 ---
 
 ## 3. Core Features
-1. **Multi‑Tenant SaaS** – Data isolation per user/tenant, storage & search quotas.
-2. **Ingestion Pipeline** – Upload → text extraction → chunking → embedding → vector index.
-3. **Semantic Search** – Vector search + full‑text (*hybrid*) with tenant filtering done inside the database queries (not post‑retrieval).
-4. **RAG Q&A** – Retrieve relevant context, build prompt, and stream the LLM answer.
-5. **API Gateway** – Authentication, *routing*, *rate limiting* (sliding window), and **feature‑flag enforcement**.
-6. **Distributed Job Queue** – Asynchronous embedding and notification processing, with *retry* and *Dead Letter Queue*.
-7. **Webhook Delivery** – Notification to tenant URL when document processing is complete (idempotency, *signature verification*).
-8. **Feature Flag Service** – Enable/disable features (e.g., Q&A) dynamically per tenant. Enforced at the API Gateway.
-9. **Notification System** – Send email (or push) when document is ready, using *job queue*.
-10. **AI API Gateway** – A **separate service** that routes LLM requests to multiple providers (Gemini, Gemini, local) with automatic *fallback* and circuit breaker.
-11. **Activity Feed & Metrics** – Log activity per tenant and aggregate latency/request count metrics.
-12. **Circuit Breaker** – Protect calls to Vector DB, LLM providers, and external webhook URLs from cascading failures.
-13. **Observability** – Centralized logging, metrics, and *admin dashboard* (Svelte).
+1. **Multi‑Tenant SaaS & Tier Management** – Data isolation per user/tenant, with a dynamic 4-tier system (Free, Simulate, Investor, Real) to showcase role-based access and quota enforcement.
+2. **Sandbox Payment Gateway Integration** – Integration with Midtrans/Xendit (Sandbox mode) to demonstrate webhook handling, subscription lifecycle, and multi-seat license provisioning.
+3. **Cost-Optimized Ingestion Pipeline** – Upload → text extraction → optimized chunking (256 tokens) → rate-limited embedding → HNSW vector index, specifically designed to bypass LLM free-tier rate limits.
+4. **Self-Destructing Data & Teardown** – Automated cron jobs that wipe physical storage and database records for expired simulation accounts and aged portfolio data to permanently maintain a $0 cloud bill.
+5. **Semantic Search** – Vector search + full‑text (_hybrid_) with tenant filtering done inside the database queries.
+6. **RAG Q&A & Streaming Optimization** – Retrieve relevant context, build prompt, and stream the LLM answer using the native Web Streams API to minimize serverless CPU time consumption.
+7. **API Gateway** – Authentication, _routing_, _rate limiting_ (sliding window via Redis Pipelining), and **feature‑flag enforcement**.
+8. **Distributed Job Queue** – Asynchronous embedding and notification processing, with _retry_ and _Dead Letter Queue_.
+9. **Webhook Delivery** – Notification to tenant URL when document processing is complete (idempotency, _signature verification_).
+10. **Feature Flag Service** – Enable/disable features (e.g., Q&A) dynamically per tenant. Enforced at the API Gateway.
+11. **AI API Gateway** – A dedicated module within the backend monolith that routes LLM requests to multiple providers with automatic _fallback_ and circuit breaker.
+12. **Observability** – Centralized logging, metrics, and _admin dashboard_ (Svelte).
+    
 
 ---
 
@@ -40,83 +42,82 @@ The platform is built with **SvelteKit** on the frontend (deployed to Vercel) an
 
 ## 5. Functional Requirements
 
-### 5.1 Multi‑Tenancy, Quotas & Registration Methods
-- Each registered user becomes their own *tenant*. (MVP: 1‑to‑1, multi‑user tenants not supported.)
-- Data (documents, chunks, feed) is isolated with `tenant_id` in every query.
+### 5.1 Multi‑Tenancy, Subscription Tiers & Quotas
+
+- Each registered user becomes their own _tenant_.
+    
+- Data (documents, chunks, feed) is isolated with the tenant's unique identifier in every query.
+- The following tables **MUST** have a `tenant_id` column: `documents`, `document_chunks`, `conversations`, `conversation_turns`, `webhook_registrations`, `webhook_logs`, and `activity_log`. The `users` table also links to a tenant (1 User = 1 Tenant). Note: Global infrastructure tables like `login_attempts` are exempt from this requirement as they handle pre-authentication security.
+    
 - **Supported registration methods:**
-  - Email + password (bcrypt, cost 12).
-  - **OAuth via Google** (OpenID Connect, `googleapis` / `google-auth-library`).
-  - **OAuth via GitHub** (GitHub OAuth Apps, `octokit/auth-oauth-app`).
-  - On first OAuth login, a user + tenant record is auto‑created (email from provider profile). If the email already exists (registered via password), the OAuth provider is linked to the existing account.
-  - The `users` table has an optional `password_hash` column (NULL for OAuth-only accounts) and an `oauth_providers` join table to support multiple linked providers.
-  - **OAuth Email Verification Gate**: The backend MUST only proceed with account creation or linking if the email returned by the provider carries `email_verified: true`. If `email_verified` is false or absent, authentication is rejected with `401 UNAUTHORIZED`. This applies to both Google and GitHub (for GitHub, if the primary email is unverified, fall back to `GET /user/emails` — use the first email with `verified: true`; if none exist, reject).
-- Quotas per tier (configurable defaults):
+    
+    - Email + password (bcrypt, cost 12).
+        
+    - **OAuth via Google & GitHub**.
+        
+    - **OAuth Email Verification Gate**: OAuth login MUST be implemented using the **Server-Side PKCE** flow via the Deno Hono backend (e.g., `GET /api/auth/google` and `GET /api/auth/callback`). After the provider redirects back to the backend callback, the backend exchanges the code for a session and explicitly checks the `email_verified` status or `email_confirmed_at` timestamp. The backend MUST only proceed with returning the session to the frontend if the email is verified. Unverified emails trigger an immediate session deletion and a `401 UNAUTHORIZED` response.
+        
+- **Tier Configuration & Quotas:**
+    
+| Tier | Max File Size | Uploads / month | Searches / month | Q&A / month | Storage Limit | |------|---------------|----------------|-----------|---------------| | **FREE** (Default) | 2 MB | 5 documents | 50 queries | 10 queries | 10 MB | | **PRO (SIMULATE)** | 5 MB | 20 documents | 200 queries | 50 queries | 50 MB | | **PRO (INVESTOR)** | 25 MB | Unlimited | Unlimited | Unlimited | 40 GB _or_ 4x10 GB | | **PRO (REAL)** | 25 MB | Unlimited | Unlimited | 5000 queries | 10 GB |
 
-| Tier | Uploads/month | Searches/month | Q&A/month | Storage (MB) |
-|------|---------------|----------------|-----------|---------------|
-| Free | 10            | 100            | 20        | 500           |
-| Pro  | 100           | 1000           | 200       | 5000          |
+- **Tier Mechanics & Resets:**
+    
+    - Counters for **Uploads, Searches, and Q&A** are reset to `0` on the **1st day of each calendar month** at 00:00 UTC via a Cron Job.
+        
+    - **Storage quota** is cumulative and never reset.
+        
+    - **The "Investor Unlock" Mechanic:** The `PRO (REAL)` plan is visible on the pricing page but strictly disabled/locked by default as a UI placeholder. It unlocks globally for all users _only_ after at least one user successfully purchases the `PRO (INVESTOR)` plan.
 
-- **Quota Reset Policy:**
-  - Counters for **Uploads, Searches, and Q&A** are reset to `0` on the **1st day of each calendar month** at 00:00 UTC. This is handled by a Deno Cron Job (implemented in Phase 4).
-  - **Storage quota** (`storage_bytes`) is **cumulative and never reset** — it reflects total bytes currently stored in object storage for the tenant. It decreases only when documents are deleted.
-  - The `quota_usage.period_start` column records the start of the current billing period (always the 1st of the month).
-- Exceeding a quota results in a `QUOTA_EXCEEDED` error (HTTP 429). Billing / payment processing is out of scope for MVP.
+### 5.2 Document Ingestion (Cost-Optimized)
 
-### 5.2 Document Ingestion
-- Upload files (max 25 MB) via *presigned URL* directly to object storage (Supabase Storage S3) → saves backend bandwidth.
-- Backend records metadata and inserts the extracted text and chunks into the PostgreSQL database.
-- **Automatic Embeddings**: 
-  1. A Postgres trigger automatically queues an embedding generation job into `pgmq` whenever a new chunk is inserted.
-  2. A scheduled `pg_cron` job processes the queue using `pg_net` to call a Supabase Edge Function.
-  3. The Edge Function calls the **Embedding API** (Gemini) and updates the vector column in the database directly.
-- **Retry note**: The worker always re‑runs all steps from the beginning; the upsert strategy prevents duplicate data.
-- **Embedding Dimension Lock (MVP)**: The vector column is fixed at **768 dimensions**, matching Gemini `gemini-embedding-2`. If Ollama is used as a local model fallback, it must be configured with a model that natively produces 768‑dimensional vectors (e.g., `mxbai-embed-large`). Zero‑padding vectors of a different dimension is explicitly forbidden as it corrupts cosine similarity scores.
+- Upload files via _presigned URL_ directly to object storage (Supabase Storage S3) to save backend bandwidth.
+    - **Orphan File Handling**: When a presigned URL is generated, a record is created in the `documents` table with `status = 'pending'`. A daily cron job automatically deletes any `pending` documents (and their corresponding S3 files) older than 24 hours to prevent orphaned files from consuming storage if the user abandons the upload.
+    
+- **Internal Endpoint Security**: The Deno backend internal endpoint for processing embeddings (called by `pg_net`) MUST be protected by a middleware that verifies a `Service-Role-Key` or custom secret token in the `Authorization` header, preventing unauthorized public access.
+    
+- **Chunking Strategy**: To conserve RAM in Edge Functions and speed up processing, text extraction utilizes a smaller sliding window of **256 tokens with a 10% overlap**.
+    
+- **Embedding Job Throttling**: The job queue worker processing the embeddings will implement a mandatory **4-second sleep interval** between API calls to the Gemini Free Tier. This prevents `429 Too Many Requests` errors. If a rate limit is hit, the worker applies exponential backoff.
+    
+- **Index Strategy**: The database utilizes an **HNSW (Hierarchical Navigable Small World)** index for vectors instead of exact KNN to drastically reduce database CPU load during searches.
+    
+- **Embedding Dimension Lock**: The vector column is fixed at **768 dimensions**, matching Gemini models.
 
 ### 5.3 Semantic Search (Hybrid) – Tenant‑Safe
+
 - Endpoint `POST /api/search` accepts a text query.
-- Backend:
-  1. Create query embedding.
-  2. Execute **hybrid search** **within the tenant's scope**:
-     - Vector similarity (cosine) via pgvector:  
-       `SELECT … FROM chunks WHERE tenant_id = $1 ORDER BY embedding <=> $2 LIMIT n`
-     - Full‑text search via PostgreSQL `tsvector`:  
-       `SELECT … FROM chunks WHERE tenant_id = $1 AND ts_content @@ to_tsquery('english', $2) LIMIT n`
-  3. Merge the two pre‑filtered result sets with **Reciprocal Rank Fusion (RRF)**.
-  4. Return snippets and scores.
-- The search is protected by a **circuit breaker** when accessing the vector database (see §5.12).
-- The Search Service depends on the same Embedding API used during ingestion; if it is unavailable, the hybrid search **degrades to full‑text only** (configurable behavior).
-- **`ts_content` Population Strategy**: The `ts_content` column on the `chunks` table MUST be implemented as a **PostgreSQL Generated Column**: `GENERATED ALWAYS AS (to_tsvector('english', content)) STORED`. The database engine automatically recomputes and indexes the tsvector whenever `content` changes. The Supabase DB Triggers & Edge Function writes only `content` and `embedding` — it never manually computes or writes `ts_content`. The GIN index on this generated column enables fast `@@` operator queries.
+    
+- Backend Flow:
+    
+    1. Create query embedding.
+        
+    2. Execute **hybrid search** strictly within the tenant's scope.
+        - **Mandatory RRF Logic**: The Vector similarity search, Full-text search (tsquery), and the merging of result sets via **Reciprocal Rank Fusion (RRF)** MUST be executed natively inside the database using a PostgreSQL RPC Function (e.g., `create function hybrid_search(query_text, query_embedding, tenant_id)`). The Deno backend MUST NOT fetch raw vectors and text results separately to merge them in application code.
+        
+- **Vector Search Limiter**: When querying the Vector DB for context, strictly limit the retrieved chunks to a maximum of **3 (Top-K = 3)**. This ensures the generated prompt remains small, conserving LLM token limits and preventing timeouts.
 
 ### 5.4 RAG Q&A (Chat)
+
 - Endpoint `POST /api/chat` accepts a question in JSON, responds with **Server‑Sent Events (SSE)**.
+    
 - Flow:
-  1. The RAG Service calls the **Search Service** with the raw text question; the Search Service embeds it and returns the top‑K chunks (by default 5).
-  2. Build system prompt + context from the retrieved chunks.
-  3. Call the **AI API Gateway** (a separate HTTP service) to stream the LLM response.
-  4. Each token is forwarded as an SSE event to the frontend.
-  5. Save conversation history to the database (see data model below).
-- **Feature flag** `rag_enabled` must be active for the tenant; enforcement is done at the **API Gateway** (not re‑checked in the RAG service).
-- **Conversation Scope**: Conversations are scoped at the **`tenant_id` level**, not per document. The AI can answer questions drawing from the combined content of all documents belonging to the tenant simultaneously. There is no per-document conversation isolation in MVP.
-- Conversation data model:
-  ```sql
-  CREATE TABLE conversations (
-    id UUID PRIMARY KEY,
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    created_at TIMESTAMPTZ DEFAULT now()
-  );
-  CREATE TABLE conversation_turns (
-    id UUID PRIMARY KEY,
-    conversation_id UUID NOT NULL REFERENCES conversations(id),
-    turn_index INT NOT NULL,
-    question TEXT NOT NULL,
-    answer TEXT,
-    context_chunk_ids UUID[],
-    model_used TEXT,
-    latency_ms INT,
-    created_at TIMESTAMPTZ DEFAULT now()
-  );
-  ```
+    
+    1. The RAG Service fetches top-K chunks from the Search Service.
+        
+    2. Build system prompt + context.
+        
+    3. Call the **AI API Gateway** to stream the LLM response.
+        
+- **Streaming Optimization**: The Deno API Gateway and RAG Service MUST utilize the native **Web Streams API** for SSE. Buffering large text chunks in memory is strictly prohibited to ensure Deno Deploy CPU time stays well below the 15-hour monthly free tier limit.
+    
+- **Conversation Scope**: Conversations are scoped at the tenant level, allowing questions across multiple documents simultaneously.
+    
+- **Conversation Data Model (Logical)**:
+    
+    - `conversations` entity: Tracks unique conversation IDs linked to a specific tenant.
+        
+    - `conversation_turns` entity: Tracks the question, answer, context chunks used, model used, and latency for each back-and-forth exchange within a conversation.
 - The request body may include an optional `conversation_id` to continue a thread; if absent, a new conversation is created and its ID returned.
 - **SSE Streaming Policy (Hono Gateway)**:
   - The API Gateway MUST NOT buffer SSE responses from the RAG Service.
@@ -129,25 +130,18 @@ The platform is built with **SvelteKit** on the frontend (deployed to Vercel) an
   - `Transfer-Encoding: chunked` is handled automatically by Deno when a `ReadableStream` body is returned.
 
 ### 5.5 API Gateway & Session Management
+
 - All external requests go through the **Hono** API Gateway.
-- Middleware:
-  - **Auth & Session**:  
-    - Authentication is entirely managed natively by **Supabase Auth**.
-    - On each request, the gateway validates the Supabase-issued JWT signature.
-    - Token refresh and revocation are handled via Supabase Auth's native APIs and stored in Supabase's `auth` schema, eliminating the need for Redis-based sessions.
-    - To immediately revoke access (logout, account suspension), use the Supabase Admin API to invalidate the user's session globally.
-  - **JWT Payload Specification**: Relies on Supabase Auth's standard JWT payload, which includes `sub` (User UUID), `email`, and custom claims for `tenantId` and `role` (if injected via Supabase hooks or handled within Dokyudo's logic).
-  - **Redis Key Schema** (canonical; all services must use these exact key formats):
-    - Rate limiting: `rate_limit:{tenantId}:{endpoint}` → Redis sorted set (sliding window ZSET)
-    - OAuth CSRF state: `oauth:{state}` → `{provider}` string with 5-min TTL (single-use: deleted immediately after validation)
-    - Feature flag cache: `flag:{flagName}:{tenantId}` → `"true"` or `"false"` string with 30s TTL
-  - **OAuth Callback Handling**:
-    - `GET /api/auth/oauth/:provider` — redirects to the provider’s authorization URL with `oauth:{state}` stored in Redis (5-min TTL, single-use, CSRF protection).
-    - `GET /api/auth/oauth/:provider/callback` — validates `state` (delete from Redis immediately after reading), exchanges code for tokens, applies email-verification gate (see §5.1), upserts user + tenant, redirects to `/app/dashboard`.
-    - Provider access tokens are **not** stored beyond the callback; only the Supabase session is retained.
-  - **Rate Limiter**: *Sliding window* based on Redis sorted sets per `rate_limit:{tenantId}:{endpoint}` key.
-  - **Tenant Context**: Injects `tenant_id` into the request.
-  - **Feature Flag Enforcement**: The gateway evaluates feature flags for tenant‑facing endpoints. If a required flag is disabled, it returns `403 FEATURE_DISABLED`. Internal service‑to‑service calls bypass the gateway and are trusted.
+    
+- **Auth**: Managed natively by Supabase Auth (JWT validation at the gateway).
+    
+- **Redis Pipelining**: To protect the Upstash Free Tier limit (500k monthly commands), the API Gateway MUST use **Redis Pipelining or Lua Scripts** to batch Rate Limiting and Session Validation checks into a single network request per API call. This cuts Redis command usage by at least 50%.
+    
+- **Rate Limiter**: _Sliding window_ based on Redis sorted sets.
+
+- **Tenant Context**: Injects `tenant_id` into the request.
+
+- **Feature Flag Enforcement**: The gateway evaluates feature flags for tenant‑facing endpoints. If a required flag is disabled, it returns `403 FEATURE_DISABLED`. Internal service‑to‑service calls bypass the gateway and are trusted.
 
 ### 5.6 Webhook Delivery
 - Tenant can register a webhook URL via API. The only supported event type for MVP is `document.ready`. The `POST /api/webhooks` request body contains only `{ url }` — no event type selection is required.
@@ -182,14 +176,14 @@ The platform is built with **SvelteKit** on the frontend (deployed to Vercel) an
 - API `GET /api/activities` returns the tenant’s latest feed, supporting **cursor‑based pagination**.
 - **Retention**: Raw activity logs are kept for **90 days**. A distributed cron job (Phase 4) purges older entries. Aggregated metrics derived from the logs are retained indefinitely at hourly/daily resolution.
 
-### 5.10 AI API Gateway (Model Routing) – Separate Service
-- A **separate Deno HTTP service** that acts as a reverse proxy to multiple LLM providers.
+### 5.10 AI API Gateway (Model Routing)
+- A module integrated within the **Hono API Gateway** monolith that acts as a reverse proxy to multiple LLM providers.
 - Routing configuration:
   - Default: Gemini.
   - Fallback order: local model (Ollama).
 - Implements a **circuit breaker** per provider (see §5.12).
 - Logs all calls (latency, token usage, provider, status) to structured stdout.
-- The RAG Service communicates with the AI API Gateway via HTTP (e.g., `POST http://ai-gateway/v1/chat/completions`).
+- The RAG Service communicates with the AI API Gateway module internally.
 
 ### 5.11 Observability & Admin Dashboard
 - **Metrics Service**: Collects counters (requests, searches, Q&A, webhook success/failure) and latency histograms.
@@ -219,92 +213,82 @@ A reusable circuit breaker configuration is applied to external dependencies:
 - **Failure threshold**: 5 failures in a 10‑second sliding window.
 - **Open duration**: 30 seconds, then transitions to half‑open.
 - **Half‑open probe count**: 1 successful probe to close the circuit.
+- **State Storage**: The Circuit Breaker state (failure counts, open/closed status, timestamps) MUST be stored centrally in **Redis (Upstash)** using keys with TTLs, ensuring the state is synchronized across all serverless Deno Deploy instances globally. In-memory state arrays/objects are strictly prohibited.
 - Applies to:
   - pgvector calls inside Search Service.
   - Each LLM provider in the AI API Gateway.
   - Each tenant’s webhook URL in the Webhook Service.
 All values can be overridden per service via environment variables.
 
+### 5.14 Subscription Lifecycle & Payment Gateway Integration
+
+This module serves as a technical showcase of monetization architecture, utilizing Sandbox environments (Midtrans/Xendit) to demonstrate payment flows without real financial transactions.
+
+**A. PRO (SIMULATE) — Admin-Generated Access**
+
+- **Purpose**: Allows recruiters or evaluators to test Pro features safely for a limited duration (e.g., 24 hours).
+    
+- **Flow**: Super Admin generates an 8-character code from the dashboard. Code is emailed to the target user. User inputs the code to temporarily upgrade their tier.
+    
+- **Automated Teardown**: An hourly backend cron job checks for expired simulation accounts. Once expired, a worker triggers a cascade deletion: it wipes all associated physical files from S3 Object Storage, deletes all vector database records, resets usage counters, and downgrades the user back to the `FREE` tier.
+    
+
+**B. PRO (INVESTOR) — The Portfolio Showcase Tier**
+
+- **Purpose**: A "meme/flex" tier priced at Rp 1,440,000 (representing the exact Break-Even Point of the theoretical production server costs). It acts as the trigger for the entire payment gateway logic.
+    
+- **Payment Flow**: When a user clicks this tier, they are redirected to a Sandbox checkout. The UI explicitly instructs the user to use dummy credit card/QRIS credentials.
+    
+- **Bulk Provisioning Logic (Seat Management)**: Upon checkout, the user chooses between two allocation methods:
+    
+    - _Option A (Single Seat)_: The system upgrades the buyer's account to a single 40 GB storage limit.
+        
+    - _Option B (Multi-Seat)_: The system upgrades the buyer to 10 GB and automatically generates three unique activation vouchers. These vouchers are emailed to the buyer, allowing them to invite colleagues to claim the remaining 10 GB accounts.
+        
+- **Global Event Trigger**: Upon the first successful verification of an Investor webhook, a global feature flag flips, permanently enabling the `PRO (REAL)` tier for all future visitors.
+    
+
+**C. PRO (REAL) — B2B Standard**
+
+- **Purpose**: Represents the actual commercial tier. Once unlocked, users can "purchase" this tier via the Sandbox Payment Gateway. Successful webhooks update the tenant's tier and expand their quotas to standard B2B levels.
+    
+
+### 5.15 Portfolio 0-Cost Protection Policies
+
+To guarantee the infrastructure remains within the strict bounds of Free Tiers (Supabase 500MB DB / 1GB S3, Upstash 500k commands, Deno Deploy 1M requests / 15 CPU hours), the following hard limits are enforced at the architectural level:
+
+- **Data Retention Cleanup**: A daily cron job automatically hard-deletes all tenant data (documents, chunks, vectors, and S3 files) that is older than **7 days**. Admin accounts are exempt.
+    
+- **Resource Throttling**: Embedded into the ingestion pipeline (4-sec sleep) and API Gateway (Web Streams, Top-K=3 limit, Redis Pipelining) as defined in preceding sections.
+    
+
+
+
 ---
 
 ## 6. Non‑Functional Requirements
 - **Scalability**: Stateless components scale horizontally. PostgreSQL max connections: 100 (enforced via PgBouncer in transaction mode). Redis: single connection pool per service instance, max 20 connections.
 - **Resilience**: Circuit breakers on all external dependencies. Job queue guarantees at‑least‑once processing with upserts.
-- **Security**: All endpoints authenticated with JWT (short‑lived) plus session invalidation. OAuth state parameter validated (CSRF protection). Webhooks signed with HMAC‑SHA256. Strict input validation.
+- **Security**: All endpoints authenticated with JWT (short‑lived) plus session invalidation. Webhooks signed with HMAC‑SHA256. Strict input validation.
 - **Observability**: Each service exposes a `/health` endpoint. Logs are structured JSON.
 - **Performance**:
-  - Hybrid search end‑to‑end (gateway→embedding→DB→response) **<500ms** at P95 under normal load. If embedding API adds >200ms, target becomes <700ms.
-  - RAG first‑token latency (gateway receipt to first SSE event) **<3 seconds** at P95, including query embedding (~150ms), vector search (~100ms), prompt build (~50ms), and LLM TTFT (<2.5s).
+    - Hybrid search end‑to‑end **<500ms** at P95 under normal load.
+    - RAG first‑token latency **<3 seconds** at P95 (greatly assisted by the Top-K=3 constraint).
 
 ---
 
 ## 7. Architecture Overview (Modular Monolith) — Revised
+_The backend system is implemented as a Modular Monolith inside Deno + Hono, allowing easy future separation into microservices._
 
-*Note: The backend system is currently implemented as a **Modular Monolith**. Feature-driven logic (e.g., Auth, Ingestion, Search) is isolated into separate modules under a single Deno + Hono deployment. This ensures clean boundaries while making it trivial to split into separate microservices in the future.*
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│ CLIENT LAYER (SvelteKit — SSR + CSR)                           │
-│  ┌──────────────────────┐   ┌────────────────────────────────┐ │
-│  │ Tenant UI  (/app/*)  │   │ Admin UI  (/admin/*)           │ │
-│  │ (SvelteKit app)      │   │ (separate SvelteKit app/build) │ │
-│  └──────────────────────┘   └────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────────┐
-│                      API GATEWAY (Deno + Hono)                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
-│  │ Auth (JWT+   │  │ Rate Limit   │  │ Tenant Context       │ │
-│  │ Redis sess)  │  │ (Sliding W)  │  │ + Feature Flag Enf.  │ │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘ │
-└────────────────────────────────────────────────────────────────┘
-          │                │                │
-          ▼                ▼                ▼
-┌───────────────┐ ┌───────────────┐ ┌──────────────────────┐
-│  Ingestion    │ │  Search Svc   │ │  RAG Service         │
-│  Service      │ │  (Hybrid)     │ │  (Streaming SSE)     │
-│  - Upload     │ │  - Embed+RRF  │ │  - Retrieval+Prompt  │
-│  - Queue Job  │ │  - Circuit    │ │  - Calls AI API GW   │
-└───────┬───────┘ │    Breaker    │ └──────────┬───────────┘
-        │         └───────┬───────┘            │
-        │                 │                    │
-        │                 ▼                    │
-        │          ┌──────────────┐            │
-        │          │ Vector DB    │◄───────────┘
-        │          │ PostgreSQL   │
-        │          │ + pgvector   │
-        │          └──────────────┘
-        ▼
-┌───────────────────────────────────────────────┐
-│            JOB QUEUE & WORKERS                │
-│  ┌──────────────┐  ┌──────────────────────┐   │
-│  │  Redis/Supabase pg_cron│  │  Supabase DB Triggers & Edge Function    │   │
-│  │  + DLQ       │  │  Notification Worker │   │
-│  │              │  │  Webhook Worker      │   │
-│  └──────────────┘  └──────────────────────┘   │
-└───────────────────────────────────────────────┘
-        │                 │
-        ▼                 ▼
-┌───────────────────────────────────────────────┐
-│          INFRASTRUCTURE & STORAGE             │
-│  ┌──────────────┐  ┌──────────────┐          │
-│  │  Redis       │  │  Supabase Storage S3    │          │
-│  │  (cache,     │  │  (Object     │          │
-│  │   sessions,  │  │   Storage)   │          │
-│  │   rate lim)  │  │              │          │
-│  └──────────────┘  └──────────────┘          │
-│  ┌──────────────┐  ┌──────────────────────┐   │
-│  │  PostgreSQL  │  │  LLM & Embedding API │   │
-│  │  + pgvector  │  │  (Gemini/  │   │
-│  │  (data+vec)  │  │   Ollama)            │   │
-│  └──────────────┘  └──────────────────────┘   │
-│  ┌──────────────────────────────────────┐     │
-│  │ AI API Gateway (separate service)    │     │
-│  │ - model routing, fallback, CB        │     │
-│  └──────────────────────────────────────┘     │
-└───────────────────────────────────────────────┘
-```
+- **Client Layer**: SvelteKit (Tenant UI, Admin UI).
+    
+- **API Gateway**: Hono (Auth, Rate Limiting, Tenant Context).
+    
+- **Services**: Ingestion, Search, RAG, Webhook, Feature Flags, Metrics.
+    
+- **Background Workers**: Embedding workers are triggered via Supabase Postgres Triggers -> `pgmq` -> `pg_cron` -> `pg_net` (calling an internal endpoint on our Deno backend). Notification & Webhook workers run within the Deno monolith using a standard queue (e.g., BullMQ).
+    
+- **Infrastructure**: Supabase (PostgreSQL, pgvector, Storage, Auth), Upstash (Redis), Deno Deploy (Compute).
 
 ---
 
@@ -314,10 +298,10 @@ All values can be overridden per service via environment variables.
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | **API Gateway**              | Auth (Supabase JWT), rate limiting, tenant context injection, **feature flag enforcement** (single point)                                            | Redis, Feature Flag Service         |
 | **Ingestion Service**        | Accept upload metadata (presigned URL), enqueue job with `{docId, storagePath, mimeType}`, track document status                                            | Object Storage, Job Queue            |
-| **Supabase DB Triggers & Edge Function**         | Consumer: download, extract, chunk (sliding‑window 512 tokens, 10‑20% overlap), embed, upsert into pgvector, update DB status, publish `document.ready`     | Object Storage, Embedding API, pgvector, Job Queue |
+| **Automatic Embedding Pipeline**         | Postgres Trigger -> pgmq -> pg_cron -> pg_net calls an **internal endpoint** in the Deno Backend. The Deno endpoint downloads, extracts, chunks (sliding‑window 512 tokens, 10‑20% overlap), embeds, upserts into pgvector, updates DB status, and publishes document.ready event.     | Object Storage, Embedding API, pgvector, Job Queue |
 | **Search Service**           | Embed query, execute tenant‑safe hybrid search (pgvector + full‑text with RRF), circuit breaker on pgvector calls                                           | Embedding API, pgvector              |
 | **RAG Service**              | Retrieve context via Search Service, build prompt, stream via SSE using AI API Gateway, save conversation history                                           | Search Service, AI API Gateway       |
-| **AI API Gateway**           | Separate HTTP service: route to LLM providers (Gemini → Ollama), circuit breaker per provider, structured logging                              | LLM providers                        |
+| **AI API Gateway**           | Integrated module: routes to LLM providers (Gemini → Ollama), circuit breaker per provider, structured logging                              | LLM providers                        |
 | **Webhook & Notification**   | Consume `document.ready` events, send signed webhooks (idempotency, HMAC) with retry & CB, send email notifications via queue                               | Job Queue, email provider            |
 | **Feature Flag Service**     | CRUD flags, evaluation API, values cached in Redis (30s TTL), admin cache flush                                                                             | Redis                                |
 | **Activity & Metrics**       | Log activity feed (cursor pagination, 90‑day retention), collect counters & histograms                                                                      | PostgreSQL                           |
@@ -334,8 +318,8 @@ sequenceDiagram
     participant GW as API Gateway
     participant IS as Ingestion Service
     participant Supabase Storage S3 as Object Storage
-    participant Q as Job Queue (Redis)
-    participant EW as Supabase DB Triggers & Edge Function
+    participant Q as Job Queue (Redis/BullMQ)
+    participant EW as Automatic Embedding Pipeline (pg_net -> Deno)
     participant VDB as PostgreSQL+pgvector
     participant WH as Webhook/Notif
 
@@ -388,7 +372,7 @@ sequenceDiagram
     participant GW as API Gateway
     participant RS as RAG Service
     participant SS as Search Service
-    participant AI_GW as AI API Gateway (separate HTTP)
+    participant AI_GW as AI API Gateway (internal module)
     participant LLM as LLM Provider
 
     U->>GW: POST /api/chat {question}
@@ -430,8 +414,8 @@ graph TD
 | **HTTP Framework** | Hono | Lightweight, middleware-friendly, first-class Deno support |
 | **Database** | Supabase (PostgreSQL + pgvector) | Relational data + vectors in one DB, no extra infrastructure |
 | **Object Storage** | Supabase Storage S3 (development) / Supabase Storage S3 (production) | Self-hosted, S3-compatible, signed URL |
-| **Cache & Queue** | Upstash Redis + Supabase pg_cron (npm:bullmq, tested on Deno 2.1+) | Rate limiting, job queue, DLQ |
-| **Job Queue (async)** | Supabase pg_cron; Supabase pg_cron can be a lightweight fallback for serverless tasks | Embedding, notification, webhook jobs |
+| **Cache & Queue** | Upstash Redis + BullMQ (tested on Deno 2.1+) | Rate limiting, standard background jobs (webhook, notification) |
+| **Job Queue (async)** | pgmq + pg_cron (for embeddings), BullMQ (for webhooks/notifications) | Native queue for embeddings; BullMQ for standard tasks |
 | **LLM Providers** | Gemini, Ollama (local) | Flexibility via AI API Gateway |
 | **Embedding Model** | Gemini `gemini-embedding-2` / Ollama | Lightweight, accurate |
 | **Monitoring** | JSON logs + Grafana Loki (opt) | Centralized observability |
@@ -450,11 +434,11 @@ graph TD
 
 | Service | Local (Docker Compose) | Cloud (Production) |
 |---|---|---|
-| API Gateway, Ingestion, Search, RAG, Feature Flag, Activity/Metrics | Deno Deploy | Deno Deploy |
-| Supabase DB Triggers & Edge Function, Webhook Worker, Notification Worker | Supabase Edge Functions / pg_cron | Deno Deploy |
-| AI API Gateway | Deno Deploy | Deno Deploy |
+| API Gateway, Ingestion, Search, RAG, Feature Flag, Activity/Metrics, AI API Gateway | Deno Deploy | Deno Deploy |
+| Automatic Embedding Pipeline (DB logic) | Supabase Cloud (pgmq/pg_cron/pg_net) | Supabase Cloud |
+| Internal Endpoint for Embeddings, Webhook Worker, Notification Worker | Deno Deploy | Deno Deploy |
 
-- **Note**: Workers are not deployable to Deno Deploy because it lacks long-running background process support. Use Deno Deploy for workers. For lightweight tasks on Deno Deploy, Supabase pg_cron can be a fallback, but for production queue semantics, Supabase pg_cron on Redis (hosted on Deno Deploy) is the primary path.
+- **Note**: The automatic embedding pipeline uses Supabase Cloud's native `pgmq`, `pg_cron`, and `pg_net` to trigger an internal endpoint on the Deno backend. This allows heavy asynchronous work without needing long-running background polling loops on Deno Deploy. Standard tasks (like sending emails/webhooks) can use a queue like BullMQ within the Deno monolith.
 - **Production**: Serverless: Deno Deploy (Backend), Vercel (Frontend), Upstash (Redis), Supabase (Postgres, Auth, Storage).
 
 ---
@@ -480,7 +464,7 @@ graph TD
 | File Storage Backend (S3-like, signed URLs) | Supabase Storage S3, Ingestion Service |
 | RAG Backend (document ingestion + retrieval + LLM) | RAG Service |
 | Vector Search Backend (embeddings + similarity search) | Search Service + pgvector |
-| AI API Gateway (model routing + fallback) | AI API Gateway (separate service) |
+| AI API Gateway (model routing + fallback) | AI API Gateway (integrated module) |
 | Prompt Logging & Evaluation Backend | Stored in RAG Service (history & logging) |
 | Semantic Search Engine Backend | Search Service |
 
@@ -489,30 +473,39 @@ graph TD
 ## 13. Development Phases
 
 ### Phase 1 – Core Search MVP
-- Multi‑tenant auth, session store managed via Supabase Auth.
-- **OAuth social login** (Google + GitHub): callback endpoints, state/CSRF validation, provider account linking.
-- Upload file → simple text chunking (raw text storage, no embeddings).
-- Full‑text search only (PostgreSQL `tsvector`).
-- API Gateway with rate limiter.
-- Basic admin tenant management.
+- Multi‑tenant auth via Supabase.
+    
+- OAuth social login (Google + GitHub) with verified-email gating.
+    
+- Upload file → simple text chunking (256 tokens).
+    
+- Full‑text search only.
+    
+- API Gateway with pipelined rate limiter.
 
-### Phase 2 – Semantic & RAG
-- Integrate pgvector, embedding worker with sliding‑window chunking, job queue + DLQ.
-- Hybrid semantic search (tenant‑safe) with circuit breaker on pgvector.
-- RAG Q&A with streaming (SSE) via Search Service.
-- AI API Gateway as a separate service with circuit breaker per LLM provider.
-- Feature flag for RAG (enforced at gateway).
-- **Migration**: Re‑queue all Phase 1 documents for embedding (a one‑time script).
+### Phase 2 – Semantic, RAG & Cost Protection
+- Integrate pgvector (HNSW), embedding worker with 4-second throttling.
+    
+- Hybrid semantic search (Top-K=3 limit).
+    
+- RAG Q&A with Web Streams API (SSE) to protect CPU time.
+    
+- Implement the 7-day data retention cleanup cron job.
 
-### Phase 3 – Enterprise Features
-- Webhook delivery system with retry, idempotency, HMAC signature, and per‑URL circuit breakers.
-- Email notifications via job queue.
-- Activity feed with cursor pagination & retention policy.
-- Metrics service and admin dashboard (charts).
-- Circuit breakers for Vector DB (already in Phase 2, hardened) and for webhook URLs.
+### Phase 3 – Subscriptions & Enterprise Features
+
+- **Sandbox Payment Gateway Integration**: Midtrans/Xendit implementation.
+    
+- Implement the 4-tier model, the "Investor" dummy checkout, and multi-seat voucher provisioning.
+    
+- Automated simulation teardown worker.
+    
+- Webhook delivery system with HMAC signatures.
 
 ### Phase 4 – Production Hardening
-- AI API Gateway full fallback logic and prompt logging dashboard.
-- Distributed cron (clean up expired activity logs, weekly reports).
-- Scalability testing & optimization (connection pooling, caching).
-- Complete error response standardization across all services.
+
+- Admin dashboard for metrics and tier management.
+    
+- Complete error response standardization.
+    
+- AI API Gateway full fallback logic.
