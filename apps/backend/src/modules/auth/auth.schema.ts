@@ -9,10 +9,12 @@ export const RegisterBodySchema = z
         email: z
             .string()
             .email()
+            .max(255, "Email is too long")
             .openapi({ description: "User email address", example: "user@example.com" }),
         password: z
             .string()
             .min(8, "Password must be at least 8 characters")
+            .max(72, "Password is too long")
             .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/, "Must contain uppercase, lowercase, number, and symbol (e.g. Secure@123)")
             .openapi({ description: "User password (min 8 chars, strong)", example: "Secure@123" }),
         recaptchaToken: z
@@ -42,10 +44,12 @@ export const LoginBodySchema = z
         email: z
             .string()
             .email()
+            .max(255, "Email is too long")
             .openapi({ description: "User email address", example: "user@example.com" }),
         password: z
             .string()
             .min(1, "Password is required")
+            .max(72, "Password is too long")
             .openapi({ description: "User password" }),
         recaptchaToken: z
             .string()
@@ -64,7 +68,7 @@ export const LoginResponseSchema = z
             .openapi({ description: "Refresh token for obtaining new access tokens" }),
         user: z.object({
             id: z.string().uuid().openapi({ description: "User UUID" }),
-            email: z.string().email().openapi({ description: "User email" }),
+            email: z.string().email().max(255, "Email is too long").openapi({ description: "User email" }),
         }),
     })
     .openapi("LoginResponse");

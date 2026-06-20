@@ -116,6 +116,66 @@ Deno.test("POST /api/auth/register — negative: short password returns 400", as
     assertEquals(json.error.code, "VALIDATION_ERROR");
 });
 
+Deno.test("POST /api/auth/register — negative: password too long returns 400", async () => {
+    const res = await makeRequest("/api/auth/register", {
+        email: testEmail,
+        password: "A1!" + "a".repeat(70), // length 73
+        recaptchaToken: "dummy-token",
+    });
+
+    assertEquals(res.status, 400);
+    const json = await res.json();
+    assertEquals(json.error.code, "VALIDATION_ERROR");
+});
+
+Deno.test("POST /api/auth/register — negative: password missing uppercase returns 400", async () => {
+    const res = await makeRequest("/api/auth/register", {
+        email: testEmail,
+        password: "securepassword123!",
+        recaptchaToken: "dummy-token",
+    });
+
+    assertEquals(res.status, 400);
+    const json = await res.json();
+    assertEquals(json.error.code, "VALIDATION_ERROR");
+});
+
+Deno.test("POST /api/auth/register — negative: password missing lowercase returns 400", async () => {
+    const res = await makeRequest("/api/auth/register", {
+        email: testEmail,
+        password: "SECUREPASSWORD123!",
+        recaptchaToken: "dummy-token",
+    });
+
+    assertEquals(res.status, 400);
+    const json = await res.json();
+    assertEquals(json.error.code, "VALIDATION_ERROR");
+});
+
+Deno.test("POST /api/auth/register — negative: password missing number returns 400", async () => {
+    const res = await makeRequest("/api/auth/register", {
+        email: testEmail,
+        password: "SecurePassword!",
+        recaptchaToken: "dummy-token",
+    });
+
+    assertEquals(res.status, 400);
+    const json = await res.json();
+    assertEquals(json.error.code, "VALIDATION_ERROR");
+});
+
+Deno.test("POST /api/auth/register — negative: password missing symbol returns 400", async () => {
+    const res = await makeRequest("/api/auth/register", {
+        email: testEmail,
+        password: "SecurePassword123",
+        recaptchaToken: "dummy-token",
+    });
+
+    assertEquals(res.status, 400);
+    const json = await res.json();
+    assertEquals(json.error.code, "VALIDATION_ERROR");
+});
+
 Deno.test("POST /api/auth/register — negative: missing recaptchaToken returns 400", async () => {
     const res = await makeRequest("/api/auth/register", {
         email: testEmail,
