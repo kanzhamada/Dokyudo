@@ -54,24 +54,24 @@
 			<div class="flex items-center gap-1">
 				<!-- Brand Logo -->
 				<div
-					class="flex size-8 items-center justify-center [&_path]:fill-[#C5937B] [&_svg]:h-9 [&_svg]:w-auto"
+					class="flex size-8 items-center justify-center [&_path]:fill-sidebar-brand [&_svg]:h-9 [&_svg]:w-auto"
 				>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html favicon}
 				</div>
 				<!-- Brand Text (Hidden when collapsed) -->
 				<span
-					class="font-sans text-xl font-medium tracking-tight text-[#C5937B] group-data-[collapsible=icon]:hidden"
+					class="font-sans text-xl font-medium tracking-tight text-sidebar-brand group-data-[collapsible=icon]:hidden"
 				>
 					okyudo
 				</span>
 			</div>
 			<!-- Internal Trigger (Hidden when collapsed, revealed on hover) -->
 			<div
-				class="transition-opacity group-hover/header:pointer-events-auto group-hover/header:opacity-100 group-data-[collapsible=icon]:hidden"
+				class="transition-opacity group-hover/header:pointer-events-auto group-hover/header:opacity-100 group-data-[collapsible=icon]:hidden "
 			>
 				<Sidebar.Trigger
-					class="size-6 shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+					class="cursor-pointer size-6 shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
 				/>
 			</div>
 		</div>
@@ -85,7 +85,7 @@
 				<Sidebar.Menu class="gap-2">
 					<!-- Collapsed mode logo injected directly into the menu structure -->
 					<Sidebar.MenuItem class="hidden group-data-[collapsible=icon]:block">
-						<Sidebar.MenuButton class="h-10 px-3 font-geist text-[15px]">
+						<Sidebar.MenuButton class="h-10 px-3 font-geist text-[15px]" tooltipContent="Expand Sidebar (Ctrl + B)">
 							{#snippet child({ props })}
 								<a
 									href="##"
@@ -99,7 +99,7 @@
 									<div class="flex size-[18px] items-center justify-center">
 										<!-- Logo (Hidden on hover) -->
 										<div
-											class="flex items-center justify-center [&_path]:fill-[#C5937B] [&_svg]:h-4 [&_svg]:w-auto group-hover/logo:hidden"
+											class="flex items-center justify-center [&_path]:fill-sidebar-brand [&_svg]:h-4 [&_svg]:w-auto group-hover/logo:hidden"
 										>
 											<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 											{@html favicon}
@@ -113,16 +113,7 @@
 					</Sidebar.MenuItem>
 
 					{#each navItems as item}
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton isActive={item.active} class="h-10 px-3 font-geist text-[15px]">
-								{#snippet child({ props })}
-									<a href="##" {...props}>
-										<item.icon class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
-										<span class="group-data-[collapsible=icon]:hidden">{item.label}</span>
-									</a>
-								{/snippet}
-							</Sidebar.MenuButton>
-						</Sidebar.MenuItem>
+						{@render navItem(item)}
 					{/each}
 				</Sidebar.Menu>
 			</Sidebar.Group>
@@ -130,72 +121,13 @@
 			<!-- Recent Chats -->
 			<!-- Hide entire group when collapsed -->
 			<Sidebar.Group class=" flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
-				<Sidebar.GroupLabel class="mb-2 px-3 font-geist text-xs font-medium text-[#676767]">
+				<Sidebar.GroupLabel class="mb-2 px-3 font-geist text-xs font-medium text-sidebar-muted">
 					Recent Chats
 				</Sidebar.GroupLabel>
 
 				<Sidebar.Menu class="gap-[2px] ">
 					{#each recentChats as chat}
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton class="h-8 cursor-pointer px-3 font-geist text-sm text-[#989595]">
-								{#snippet child({ props })}
-									<button {...props} class={(props.class as string) + ' w-full text-left overflow-hidden'}>
-										{#if chat.length > 25}
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													{#snippet child({ props: tooltipProps })}
-														<span {...tooltipProps} class="block w-full truncate text-left">{chat}</span>
-													{/snippet}
-												</Tooltip.Trigger>
-												<Tooltip.Content side="right" class="max-w-xs break-words bg-white text-black">
-													<p>{chat}</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										{:else}
-											<span class="block w-full truncate">{chat}</span>
-										{/if}
-									</button>
-								{/snippet}
-							</Sidebar.MenuButton>
-
-							<!-- Action Menu visible on hover -->
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger class="cursor-pointer">
-									{#snippet child({ props })}
-										<Sidebar.MenuAction showOnHover {...props}>
-											<MoreHorizontal />
-										</Sidebar.MenuAction>
-									{/snippet}
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Content class="w-48 border-white/10 bg-[#1C1B1B] text-[#C7C4D8]">
-									<DropdownMenu.Item
-										class="cursor-pointer text-white hover:bg-[#33281D] hover:text-white focus:bg-[#33281D] focus:text-white"
-									>
-										<Share class="mr-2 size-4" />
-										<span>Share</span>
-									</DropdownMenu.Item>
-									<DropdownMenu.Item
-										class="cursor-pointer text-white hover:bg-[#33281D] hover:text-white focus:bg-[#33281D] focus:text-white"
-									>
-										<Edit class="mr-2 size-4" />
-										<span>Edit</span>
-									</DropdownMenu.Item>
-									<DropdownMenu.Item
-										class="cursor-pointer text-white hover:bg-[#33281D] hover:text-white focus:bg-[#33281D] focus:text-white"
-									>
-										<Pin class="mr-2 size-4" />
-										<span>Pin</span>
-									</DropdownMenu.Item>
-									<DropdownMenu.Separator class="bg-white/10" />
-									<DropdownMenu.Item
-										class="cursor-pointer text-red-400 hover:bg-red-400 hover:text-red-300 focus:bg-red-400 focus:text-red-300"
-									>
-										<Trash2 class="mr-2 size-4" />
-										<span>Delete</span>
-									</DropdownMenu.Item>
-								</DropdownMenu.Content>
-							</DropdownMenu.Root>
-						</Sidebar.MenuItem>
+						{@render recentChatItem(chat)}
 					{/each}
 				</Sidebar.Menu>
 			</Sidebar.Group>
@@ -214,11 +146,12 @@
 							<Sidebar.MenuButton
 								{...props}
 								size="lg"
-								class="w-full cursor-pointer p-2 hover:bg-[#FF954B]/[0.06] data-[state=open]:bg-[#FF954B]/[0.06]"
+								tooltipContent="Profile"
+								class="w-full cursor-pointer p-2 hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
 							>
-								<AvatarPrimitive.Root class="size-8 shrink-0 rounded-md border-none bg-[#D9D9D9]">
+								<AvatarPrimitive.Root class="size-8 shrink-0 rounded-md border-none bg-sidebar-avatar">
 									<AvatarPrimitive.Fallback
-										class="rounded-md bg-[#D9D9D9] font-geist text-sm font-medium text-[#1C1B1B]"
+										class="rounded-md bg-sidebar-avatar font-geist text-sm font-medium text-sidebar"
 										>KH</AvatarPrimitive.Fallback
 									>
 								</AvatarPrimitive.Root>
@@ -227,7 +160,7 @@
 								>
 									<span class="truncate font-geist text-sm font-medium text-white">Kanz Hamada</span
 									>
-									<span class="truncate font-geist text-xs text-[#989595]">Free</span>
+									<span class="truncate font-geist text-xs text-sidebar-muted-foreground">Free</span>
 								</div>
 								<ChevronsUpDown
 									class="size-4 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
@@ -238,27 +171,27 @@
 					<DropdownMenu.Content
 						side="right"
 						align="end"
-						class="mb-2 w-56 min-w-56 rounded-lg border-white/10 bg-[#1C1B1B] text-[#C7C4D8]"
+						class="mb-2 w-56 min-w-56 rounded-lg border-white/10 bg-sidebar text-sidebar-foreground"
 					>
-						<DropdownMenu.Label class="p-2 font-geist text-xs font-medium text-[#989595]"
+						<DropdownMenu.Label class="p-2 font-geist text-xs font-medium text-sidebar-muted-foreground"
 							>My Account</DropdownMenu.Label
 						>
 						<DropdownMenu.Separator class="bg-white/10" />
 						<DropdownMenu.Group>
 							<DropdownMenu.Item
-								class="cursor-pointer text-white hover:bg-[#33281D] hover:text-white focus:bg-[#33281D] focus:text-white"
+								class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
 							>
 								<span>Settings</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item
-								class="cursor-pointer text-white hover:bg-[#33281D] hover:text-white focus:bg-[#33281D] focus:text-white"
+								class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
 							>
 								<span>Billing</span>
 							</DropdownMenu.Item>
 						</DropdownMenu.Group>
 						<DropdownMenu.Separator class="bg-white/10" />
 						<DropdownMenu.Item
-							class="cursor-pointer text-white hover:bg-[#33281D] hover:text-white focus:bg-[#33281D] focus:text-white"
+							class="cursor-pointer text-red-400 hover:bg-red-400 hover:text-red-400 focus:bg-red-400 focus:text-red-400"
 						>
 							<span>Log out</span>
 						</DropdownMenu.Item>
@@ -268,3 +201,86 @@
 		</Sidebar.Menu>
 	</Sidebar.Footer>
 </Sidebar.Root>
+
+
+{#snippet navItem(item: typeof navItems[0])}
+	<Sidebar.MenuItem>
+		<Sidebar.MenuButton
+			isActive={item.active}
+			tooltipContent={item.label}
+			class="h-10 px-3 font-geist text-[15px]"
+		>
+			{#snippet child({ props })}
+				<a href="##" {...props}>
+					<item.icon class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
+					<span class="group-data-[collapsible=icon]:hidden">{item.label}</span>
+				</a>
+			{/snippet}
+		</Sidebar.MenuButton>
+	</Sidebar.MenuItem>
+{/snippet}
+
+
+{#snippet recentChatItem(chat: string)}
+	<Sidebar.MenuItem>
+		<Sidebar.MenuButton class="h-8 cursor-pointer px-3 font-geist text-sm text-sidebar-muted-foreground">
+			{#snippet child({ props })}
+				<button {...props} class={(props.class as string) + ' w-full text-left overflow-hidden'}>
+					{#if chat.length > 25}
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props: tooltipProps })}
+									<span {...tooltipProps} class="block w-full truncate text-left">{chat}</span>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content side="right" class="max-w-xs break-words text-black">
+								<p>{chat}</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					{:else}
+						<span class="block w-full truncate">{chat}</span>
+					{/if}
+				</button>
+			{/snippet}
+		</Sidebar.MenuButton>
+
+		<!-- Action Menu visible on hover -->
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger class="cursor-pointer">
+				{#snippet child({ props })}
+					<Sidebar.MenuAction showOnHover {...props}>
+						<MoreHorizontal />
+					</Sidebar.MenuAction>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content class="w-48 border-white/10 bg-sidebar text-sidebar-foreground">
+				<DropdownMenu.Item
+					class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+				>
+					<Share class="mr-2 size-4" />
+					<span>Share</span>
+				</DropdownMenu.Item>
+				<DropdownMenu.Item
+					class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+				>
+					<Edit class="mr-2 size-4" />
+					<span>Edit</span>
+				</DropdownMenu.Item>
+				<DropdownMenu.Item
+					class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+				>
+					<Pin class="mr-2 size-4" />
+					<span>Pin</span>
+				</DropdownMenu.Item>
+				<DropdownMenu.Separator class="bg-white/10" />
+				<DropdownMenu.Item
+					class="cursor-pointer text-red-400 hover:bg-red-400 hover:text-red-400 focus:bg-red-400 focus:text-red-400"
+				>
+					<Trash2 class="mr-2 size-4" />
+					<span>Delete</span>
+				</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
+	</Sidebar.MenuItem>
+{/snippet}
+

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import AppSidebar from '$lib/components/app/AppSidebar.svelte';
+	import MobileHeader from '$lib/components/app/MobileHeader.svelte';
 
 	// Background image
 	import vintageBg from '$lib/assets/images/vintage_floral_bg.webp';
@@ -12,6 +13,7 @@
 	<AppSidebar />
 	<main class="relative flex min-h-svh flex-1 flex-col overflow-hidden ">
 		
+		<MobileHeader />
 
 		<!-- Main Content Layer -->
 		<div class="relative z-10 flex-1">
