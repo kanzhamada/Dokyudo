@@ -17,7 +17,7 @@ export async function verifyRecaptcha({
     const secretKey = Deno.env.get("RECAPTCHA_SECRET_KEY")!;
 
     // Allow local development bypass
-    if (Deno.env.get("BYPASS_RECAPTCHA") === "true") {
+    if (Deno.env.get("NODE_ENV") === "dev") {
         return {
             success: true,
             score: 0.9,

@@ -25,8 +25,8 @@
 			isSubmitting = true;
 
 			// Simulate API call for now (just frontend implementation as requested)
-			await new Promise(r => setTimeout(r, 1000));
-			
+			await new Promise((r) => setTimeout(r, 1000));
+
 			successMessage = 'If an account exists, a reset link has been sent to that email.';
 			isSubmitting = false;
 		}
@@ -45,11 +45,11 @@
 
 {#if successMessage}
 	<!-- Success state -->
-	<AuthSuccessState 
-		heading="Check your email." 
-		description={successMessage} 
-		buttonHref="/login" 
-		buttonText="Back to Sign In" 
+	<AuthSuccessState
+		heading="Check your email."
+		description={successMessage}
+		buttonHref="/login"
+		buttonText="Back to Sign In"
 	/>
 {:else}
 	<!-- Header -->
@@ -80,7 +80,12 @@
 		</Form.Field>
 
 		<!-- Submit button -->
-		<Button type="submit" disabled={isSubmitting} variant="authPrimary" class="auth-btn-primary mt-2">
+		<Button
+			type="submit"
+			disabled={isSubmitting}
+			variant="authPrimary"
+			class="auth-btn-primary mt-2"
+		>
 			{#if isSubmitting}
 				<Spinner class="mr-2 size-4" />
 				Sending link...
@@ -106,7 +111,9 @@
 						</a>
 					{/snippet}
 				</Tooltip.Trigger>
-				<Tooltip.Content>Login to your account</Tooltip.Content>
+				<Tooltip.Content class="bg-[#232323]" arrowClasses="bg-[#232323]"
+					>Login to your account</Tooltip.Content
+				>
 			</Tooltip.Root>
 		</Tooltip.Provider>
 	</p>

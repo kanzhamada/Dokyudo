@@ -121,7 +121,7 @@
 						</a>
 					{/snippet}
 				</Tooltip.Trigger>
-				<Tooltip.Content>Login to your account</Tooltip.Content>
+				<Tooltip.Content class="bg-[#232323]" arrowClasses="bg-[#232323]">Login to your account</Tooltip.Content>
 			</Tooltip.Root>
 		</Tooltip.Provider>
 	</p>

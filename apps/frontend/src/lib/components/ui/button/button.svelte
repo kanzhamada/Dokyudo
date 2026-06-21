@@ -20,7 +20,7 @@
 				authPrimary:
 					'bg-auth-primary text-auth-text transition-all hover:bg-auth-primary-hover disabled:opacity-60',
 				authOauth:
-					'border-none bg-white text-auth-text shadow-[0_0_4.8px_2px_rgba(255,255,255,0.19)] transition-all hover:bg-gray-50'
+					'border-none bg-white text-auth-text hover:bg-gray-50'
 			},
 			size: {
 				default:

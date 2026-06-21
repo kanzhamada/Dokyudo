@@ -184,13 +184,13 @@
 					<a
 						{...props}
 						href="/register"
-						class="cursor-pointer font-semibold text-white underline underline-offset-2 transition-colors hover:text-[#E8DEC8]"
+						class="cursor-pointer font-semibold  text-white underline underline-offset-2 transition-colors hover:text-[#E8DEC8]"
 					>
 						Register
 					</a>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Create a new account</Tooltip.Content>
+			<Tooltip.Content class="bg-[#232323]" arrowClasses="bg-[#232323]">Create a new account</Tooltip.Content>
 		</Tooltip.Root>
 	</Tooltip.Provider>
 </p>
