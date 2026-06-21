@@ -79,7 +79,11 @@
 					</button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>{showPassword ? 'Hide Password' : 'Show Password'}</Tooltip.Content>
+			<Tooltip.Content
+				class="border-white/[0.16] bg-[#232323] text-white"
+				arrowClasses="bg-[#232323] border-none"
+				>{showPassword ? 'Hide Password' : 'Show Password'}</Tooltip.Content
+			>
 		</Tooltip.Root>
 	</Tooltip.Provider>
 </div>

@@ -45,7 +45,10 @@
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Sign in with Google</Tooltip.Content>
+			<Tooltip.Content
+				class="border-white/[0.16] bg-[#232323] text-white"
+				arrowClasses="bg-[#232323] border-none">Sign in / Register with Google</Tooltip.Content
+			>
 		</Tooltip.Root>
 	</Tooltip.Provider>
 
@@ -68,7 +71,10 @@
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content>Sign in with GitHub</Tooltip.Content>
+			<Tooltip.Content
+				class="border-white/[0.16] bg-[#232323] text-white"
+				arrowClasses="bg-[#232323] border-none"
+			>Sign in / Register with GitHub</Tooltip.Content>
 		</Tooltip.Root>
 	</Tooltip.Provider>
 </div>

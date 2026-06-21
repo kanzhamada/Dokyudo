@@ -31,6 +31,11 @@
 				</a>
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>{tooltipText}</Tooltip.Content>
+		<Tooltip.Content
+			class="border-white/[0.16] bg-[#232323] text-white"
+			arrowClasses="bg-[#232323] border-none"
+		>
+			{tooltipText}</Tooltip.Content
+		>
 	</Tooltip.Root>
 </Tooltip.Provider>
