@@ -16,6 +16,9 @@
 	import Edit from '@lucide/svelte/icons/pen';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Pin from '@lucide/svelte/icons/pin';
+	import Settings from '@lucide/svelte/icons/settings';
+	import CreditCard from '@lucide/svelte/icons/credit-card';
+	import LogOut from '@lucide/svelte/icons/log-out';
 
 	// Brand Logo
 	import favicon from '$lib/assets/favicon.svg?raw';
@@ -169,8 +172,8 @@
 						{/snippet}
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content
-						side="right"
-						align="end"
+						side="top"
+						align="center"
 						class="mb-2 w-56 min-w-56 rounded-lg border-white/10 bg-sidebar text-sidebar-foreground"
 					>
 						<DropdownMenu.Label class="p-2 font-geist text-xs font-medium text-sidebar-muted-foreground"
@@ -181,11 +184,13 @@
 							<DropdownMenu.Item
 								class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
 							>
+								<Settings class="mr-2 size-4" />
 								<span>Settings</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item
 								class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
 							>
+								<CreditCard class="mr-2 size-4" />
 								<span>Billing</span>
 							</DropdownMenu.Item>
 						</DropdownMenu.Group>
@@ -193,6 +198,7 @@
 						<DropdownMenu.Item
 							class="cursor-pointer text-red-400 hover:bg-red-400 hover:text-red-400 focus:bg-red-400 focus:text-red-400"
 						>
+							<LogOut class="mr-2 size-4" />
 							<span>Log out</span>
 						</DropdownMenu.Item>
 					</DropdownMenu.Content>

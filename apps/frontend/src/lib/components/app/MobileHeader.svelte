@@ -7,11 +7,11 @@
 	const sidebar = useSidebar();
 </script>
 
-<header class="flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-sidebar px-4 md:hidden">
+<header class="fixed inset-x-4 top-4 z-50 flex h-14 shrink-0 animate-slide-down items-center justify-between rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.40] px-4 shadow-lg backdrop-blur-[42px] md:hidden">
 	<Button
 		variant="ghost"
 		size="icon"
-		class="text-white hover:bg-white/10 hover:text-white"
+		class="text-white hover:bg-white/10 hover:text-white cursor-pointer"
 		onclick={() => sidebar.toggle()}
 	>
 		<Menu class="size-6" />

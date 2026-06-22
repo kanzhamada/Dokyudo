@@ -145,6 +145,19 @@
     --color-auth-primary-hover: oklch(0.835 0.042 86.8);
     --color-auth-text: oklch(0.226 0 0);
     --color-auth-error: oklch(0.672 0.164 26.5);
+
+    --animate-slide-down: slide-down 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slide-down {
+    from {
+        transform: translateY(-150%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 @layer base {
