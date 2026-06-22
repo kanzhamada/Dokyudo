@@ -3,23 +3,28 @@
 	import AppSidebar from '$lib/components/app/AppSidebar.svelte';
 	import MobileHeader from '$lib/components/app/MobileHeader.svelte';
 
-	// Background image
-	import vintageBg from '$lib/assets/images/vintage_floral_bg.webp';
-
 	let { children } = $props();
 </script>
 
 <Sidebar.Provider>
 	<AppSidebar />
-	<main class="relative flex min-h-svh flex-1 flex-col overflow-hidden ">
+	<main class="relative flex min-h-svh flex-1 flex-col overflow-hidden bg-[#1F1E1D]">
 		
-		<MobileHeader />
+		<!-- Decorative Background Circle -->
+		<div 
+			class="absolute rounded-full pointer-events-none z-0 opacity-7"
+			style="width: 1190px; height: 1190px; left: -295px; top: -318px; background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
+		></div>
 
-		<!-- Main Content Layer -->
-		<div class="relative z-10 flex-1">
-			<!-- Note: We intentionally do not place the SidebarTrigger here
-			     as it is housed within the AppSidebar header per design requirements -->
-			{@render children()}
+		<div class="relative z-10 flex flex-col flex-1">
+			<MobileHeader />
+
+			<!-- Main Content Layer -->
+			<div class="relative z-10 flex-1">
+				<!-- Note: We intentionally do not place the SidebarTrigger here
+				     as it is housed within the AppSidebar header per design requirements -->
+				{@render children()}
+			</div>
 		</div>
 	</main>
 </Sidebar.Provider>

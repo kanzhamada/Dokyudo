@@ -19,6 +19,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { toast } from 'svelte-sonner';
 	import { onMount } from 'svelte';
+	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
 	import cohereIcon from '$lib/assets/llm/cohere.svg';
@@ -76,6 +77,14 @@
 		if (fileInput) fileInput.click();
 	}
 
+	function showError(msg: string) {
+		if (window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showError(msg);
+		} else {
+			toast.error('Error', { description: msg });
+		}
+	}
+
 	function handleFileChange(e: Event) {
 		const target = e.target as HTMLInputElement;
 		if (target.files && target.files.length > 0) {
@@ -85,25 +94,32 @@
 			for (let i = 0; i < target.files.length; i++) {
 				const file = target.files[i];
 
+				// 0. Extension validation
+				const allowedExtensions = ['.pdf', '.docx', '.txt'];
+				const lowerName = file.name.toLowerCase();
+				if (!allowedExtensions.some(ext => lowerName.endsWith(ext))) {
+					showError(`File "${file.name}" has an invalid extension. Only PDF, DOCX, and TXT are allowed.`);
+					continue;
+				}
+
 				// 1. Individual 25MB check
 				if (file.size > maxFileSize) {
-					toast.error(`File "${file.name}" exceeds the 25MB limit and was rejected.`);
+					showError(`File "${file.name}" exceeds the 25MB limit and was rejected.`);
 					continue;
 				}
 
 				// 2. Global count check
 				if (attachedFiles.length + validFiles.length + 1 > maxUploads - baseUploads) {
-					toast.error(
+					showError(
 						`Cannot attach "${file.name}": Exceeds maximum upload limit of ${maxUploads}.`
 					);
 					continue;
 				}
 
-				// 3. Global storage check
-				const upcomingStorage =
-					currentStorageBytes + validFiles.reduce((acc, f) => acc + f.size, 0) + file.size;
-				if (upcomingStorage > maxStorage) {
-					toast.error(`Cannot attach "${file.name}": Exceeds 5GB storage limit.`);
+				// 3. Global size check
+				const upcomingSize = currentStorageBytes + validFiles.reduce((acc, f) => acc + f.size, 0) + file.size;
+				if (upcomingSize > maxStorage) {
+					showError(`Cannot attach "${file.name}": Exceeds 5GB storage limit.`);
 					continue;
 				}
 

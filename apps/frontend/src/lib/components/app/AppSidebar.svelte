@@ -27,12 +27,34 @@
 	import PanelLeft from '@lucide/svelte/icons/panel-left';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 
-	const navItems = [
-		{ label: 'Dashboard', icon: LayoutGrid, active: false },
-		{ label: 'Document Library', icon: FileText, active: false },
-		{ label: 'Chat Assistant', icon: MessageSquare, active: true },
-		{ label: 'Activity Feed', icon: Clock, active: false }
-	];
+	import { page } from '$app/stores';
+
+	const navItems = $derived([
+		{
+			label: 'Dashboard',
+			icon: LayoutGrid,
+			active: $page.url.pathname.startsWith('/app/dashboard'),
+			href: '/app/dashboard'
+		},
+		{
+			label: 'Document Library',
+			icon: FileText,
+			active: $page.url.pathname.startsWith('/app/documents'),
+			href: '/app/documents'
+		},
+		{
+			label: 'Chat Assistant',
+			icon: MessageSquare,
+			active: $page.url.pathname.startsWith('/app/chat'),
+			href: '/app/chat'
+		},
+		{
+			label: 'Activity Feed',
+			icon: Clock,
+			active: $page.url.pathname.startsWith('/app/activity'),
+			href: '/app/activity'
+		}
+	]);
 
 	const recentChats = [
 		'beatae vitae dicta',
@@ -71,10 +93,10 @@
 			</div>
 			<!-- Internal Trigger (Hidden when collapsed, revealed on hover) -->
 			<div
-				class="transition-opacity group-hover/header:pointer-events-auto group-hover/header:opacity-100 group-data-[collapsible=icon]:hidden "
+				class="transition-opacity group-hover/header:pointer-events-auto group-hover/header:opacity-100 group-data-[collapsible=icon]:hidden"
 			>
 				<Sidebar.Trigger
-					class="cursor-pointer size-6 shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+					class="size-6 shrink-0 cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
 				/>
 			</div>
 		</div>
@@ -88,7 +110,10 @@
 				<Sidebar.Menu class="gap-2">
 					<!-- Collapsed mode logo injected directly into the menu structure -->
 					<Sidebar.MenuItem class="hidden group-data-[collapsible=icon]:block">
-						<Sidebar.MenuButton class="h-10 px-3 font-geist text-[15px]" tooltipContent="Expand Sidebar (Ctrl + B)">
+						<Sidebar.MenuButton
+							class="h-10 px-3 font-geist text-[15px]"
+							tooltipContent="Expand Sidebar (Ctrl + B)"
+						>
 							{#snippet child({ props })}
 								<a
 									href="##"
@@ -102,7 +127,7 @@
 									<div class="flex size-[18px] items-center justify-center">
 										<!-- Logo (Hidden on hover) -->
 										<div
-											class="flex items-center justify-center [&_path]:fill-sidebar-brand [&_svg]:h-4 [&_svg]:w-auto group-hover/logo:hidden"
+											class="flex items-center justify-center group-hover/logo:hidden [&_path]:fill-sidebar-brand [&_svg]:h-4 [&_svg]:w-auto"
 										>
 											<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 											{@html favicon}
@@ -152,7 +177,9 @@
 								tooltipContent="Profile"
 								class="w-full cursor-pointer p-2 hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
 							>
-								<AvatarPrimitive.Root class="size-8 shrink-0 rounded-md border-none bg-sidebar-avatar">
+								<AvatarPrimitive.Root
+									class="size-8 shrink-0 rounded-md border-none bg-sidebar-avatar"
+								>
 									<AvatarPrimitive.Fallback
 										class="rounded-md bg-sidebar-avatar font-geist text-sm font-medium text-sidebar"
 										>KH</AvatarPrimitive.Fallback
@@ -163,7 +190,8 @@
 								>
 									<span class="truncate font-geist text-sm font-medium text-white">Kanz Hamada</span
 									>
-									<span class="truncate font-geist text-xs text-sidebar-muted-foreground">Free</span>
+									<span class="truncate font-geist text-xs text-sidebar-muted-foreground">Free</span
+									>
 								</div>
 								<ChevronsUpDown
 									class="size-4 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
@@ -176,7 +204,8 @@
 						align="center"
 						class="mb-2 w-56 min-w-56 rounded-lg border-white/10 bg-sidebar text-sidebar-foreground"
 					>
-						<DropdownMenu.Label class="p-2 font-geist text-xs font-medium text-sidebar-muted-foreground"
+						<DropdownMenu.Label
+							class="p-2 font-geist text-xs font-medium text-sidebar-muted-foreground"
 							>My Account</DropdownMenu.Label
 						>
 						<DropdownMenu.Separator class="bg-white/10" />
@@ -208,8 +237,7 @@
 	</Sidebar.Footer>
 </Sidebar.Root>
 
-
-{#snippet navItem(item: typeof navItems[0])}
+{#snippet navItem(item: (typeof navItems)[0])}
 	<Sidebar.MenuItem>
 		<Sidebar.MenuButton
 			isActive={item.active}
@@ -217,7 +245,7 @@
 			class="h-10 px-3 font-geist text-[15px]"
 		>
 			{#snippet child({ props })}
-				<a href="##" {...props}>
+				<a href={item.href} {...props}>
 					<item.icon class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
 					<span class="group-data-[collapsible=icon]:hidden">{item.label}</span>
 				</a>
@@ -226,12 +254,13 @@
 	</Sidebar.MenuItem>
 {/snippet}
 
-
 {#snippet recentChatItem(chat: string)}
 	<Sidebar.MenuItem>
-		<Sidebar.MenuButton class="h-8 cursor-pointer px-3 font-geist text-sm text-sidebar-muted-foreground">
+		<Sidebar.MenuButton
+			class="h-8 cursor-pointer px-3 font-geist text-sm text-sidebar-muted-foreground"
+		>
 			{#snippet child({ props })}
-				<button {...props} class={(props.class as string) + ' w-full text-left overflow-hidden'}>
+				<button {...props} class={(props.class as string) + ' w-full overflow-hidden text-left'}>
 					{#if chat.length > 25}
 						<Tooltip.Root>
 							<Tooltip.Trigger>
@@ -289,4 +318,3 @@
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>
 {/snippet}
-
