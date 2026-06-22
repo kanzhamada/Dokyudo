@@ -1,3 +1,5 @@
+apps/frontend/static/documents
+
 # Node
 node_modules/
 npm-debug.log*

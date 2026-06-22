@@ -40,6 +40,21 @@ export const columns: ColumnDef<Document>[] = [
 		accessorKey: 'size',
 		header: 'Size',
 		enableSorting: true,
-		enableColumnFilter: false
+		enableColumnFilter: false,
+		sortingFn: (rowA, rowB, columnId) => {
+			const parseSize = (sizeStr: string) => {
+				const match = sizeStr.match(/([\d.]+)\s*(KB|MB|GB|B)/i);
+				if (!match) return 0;
+				const val = parseFloat(match[1]);
+				const unit = match[2].toUpperCase();
+				if (unit === 'GB') return val * 1024 * 1024 * 1024;
+				if (unit === 'MB') return val * 1024 * 1024;
+				if (unit === 'KB') return val * 1024;
+				return val;
+			};
+			const sizeA = parseSize(rowA.getValue<string>(columnId));
+			const sizeB = parseSize(rowB.getValue<string>(columnId));
+			return sizeA > sizeB ? 1 : sizeA < sizeB ? -1 : 0;
+		}
 	}
 ];

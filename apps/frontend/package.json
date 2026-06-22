@@ -54,6 +54,7 @@
 		"wrangler": "^4.103.0"
 	},
 	"dependencies": {
+		"@embedpdf/svelte-pdf-viewer": "^2.14.4",
 		"@fontsource/geist-mono": "^5.2.8",
 		"@fontsource/geist-sans": "^5.2.5",
 		"@fontsource/jetbrains-mono": "^5.2.8",

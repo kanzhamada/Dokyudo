@@ -6,7 +6,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	let { id }: { id: string } = $props();
+	let { id, onPreview }: { id: string; onPreview?: () => void } = $props();
 </script>
 
 <DropdownMenu.Root>
@@ -16,7 +16,7 @@
 				{...props}
 				variant="ghost"
 				size="icon"
-				class="relative size-8 rounded-full text-white/60 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white data-[state=open]:bg-white/10"
+				class="relative size-8 cursor-pointer rounded-full text-white/60 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white data-[state=open]:bg-white/10"
 			>
 				<span class="sr-only">Open menu</span>
 				<EllipsisVerticalIcon />
@@ -29,20 +29,21 @@
 	>
 		<DropdownMenu.Group>
 			<DropdownMenu.Item
-				class="gap-2 text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+				class="cursor-pointer gap-2 text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+				onclick={onPreview}
 			>
 				<EyeIcon data-icon="inline-start" />
 				Preview
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
-				class="gap-2 text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+				class="cursor-pointer gap-2 text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
 			>
 				<DownloadIcon data-icon="inline-start" />
 				Download
 			</DropdownMenu.Item>
 			<DropdownMenu.Separator class="bg-white/10" />
 			<DropdownMenu.Item
-				class="gap-2 text-red-400 hover:text-white focus:text-white focus:bg-red-400"
+				class="cursor-pointer gap-2 text-red-400 hover:text-white focus:bg-red-400 focus:text-white"
 			>
 				<Trash2Icon data-icon="inline-start" />
 				Delete
