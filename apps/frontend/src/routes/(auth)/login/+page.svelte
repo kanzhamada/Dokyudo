@@ -38,10 +38,10 @@
 			apiError = '';
 
 			// Debug Log: Frontend State BEFORE hitting backend
-			console.log('[Auth Login] Form Submitted:', {
-				email: f.data.email,
-				password: f.data.password
-			});
+			// console.log('[Auth Login] Form Submitted:', {
+			// 	email: f.data.email,
+			// 	password: f.data.password
+			// });
 
 			try {
 				const token = await executeRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY, 'login');
