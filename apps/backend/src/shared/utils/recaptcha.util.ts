@@ -1,4 +1,7 @@
-import { RecaptchaVerifyResponse, VerifyRecaptchaParams } from "../types/recaptcha.types.ts";
+import {
+    RecaptchaVerifyResponse,
+    VerifyRecaptchaParams,
+} from "../types/recaptcha.types.ts";
 import { AppError } from "./errors.util.ts";
 
 const RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
@@ -23,17 +26,20 @@ export async function verifyRecaptcha({
             score: 0.9,
             action: expectedAction ?? "bypass",
             challenge_ts: new Date().toISOString(),
-            hostname: "localhost"
+            hostname: "localhost",
         };
     }
 
     const formData = new URLSearchParams();
     formData.append("secret", secretKey);
     formData.append("response", token);
-    
+
     // Google API can return "browser-error" or reject verification if remoteIp is a loopback/internal IP.
     // Only append remoteip if it looks like a valid public/external IP.
-    if (remoteIp && !["127.0.0.1", "::1", "0.0.0.0", "localhost"].includes(remoteIp)) {
+    if (
+        remoteIp &&
+        !["127.0.0.1", "::1", "0.0.0.0", "localhost"].includes(remoteIp)
+    ) {
         formData.append("remoteip", remoteIp);
     }
 

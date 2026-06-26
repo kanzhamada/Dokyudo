@@ -19,7 +19,7 @@ export const db = drizzle(queryClient, { schema });
  * Returns a configured Drizzle transaction instance simulating the `anon` Supabase role.
  */
 export async function withAnonDb<T>(
-    callback: (tx: ReturnType<typeof drizzle<typeof schema>>) => Promise<T>
+    callback: (tx: ReturnType<typeof drizzle<typeof schema>>) => Promise<T>,
 ): Promise<T> {
     return await db.transaction(async (tx) => {
         await tx.execute(sql`set local role anon`);
@@ -33,12 +33,12 @@ export async function withAnonDb<T>(
  */
 export async function withAuthDb<T>(
     userId: string,
-    callback: (tx: ReturnType<typeof drizzle<typeof schema>>) => Promise<T>
+    callback: (tx: ReturnType<typeof drizzle<typeof schema>>) => Promise<T>,
 ): Promise<T> {
     return await db.transaction(async (tx) => {
         await tx.execute(sql`set local role authenticated`);
         await tx.execute(
-            sql`select set_config('request.jwt.claims', ${JSON.stringify({ sub: userId })}, true)`
+            sql`select set_config('request.jwt.claims', ${JSON.stringify({ sub: userId })}, true)`,
         );
         return await callback(tx as any);
     });

@@ -40,9 +40,13 @@ export function validateEnvironment(): void {
     }
 
     // Warn about optional vars using defaults
-    for (const [varName, defaultValue] of Object.entries(OPTIONAL_ENV_VARS_WITH_DEFAULTS)) {
+    for (const [varName, defaultValue] of Object.entries(
+        OPTIONAL_ENV_VARS_WITH_DEFAULTS,
+    )) {
         if (!Deno.env.get(varName)) {
-            console.warn(`⚠️  ${varName} not set, using default: ${defaultValue}`);
+            console.warn(
+                `⚠️  ${varName} not set, using default: ${defaultValue}`,
+            );
         }
     }
 

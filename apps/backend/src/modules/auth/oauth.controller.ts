@@ -81,7 +81,9 @@ async function processOAuthCallback(c: Context, provider: string) {
         // Redirect to frontend with error instead of returning JSON
         // (since the user is in a browser redirect flow, not an API call)
         const frontendUrl = getEnv("FRONTEND_URL");
-        const errorMsg = encodeURIComponent(error.message || "OAuth authentication failed");
+        const errorMsg = encodeURIComponent(
+            error.message || "OAuth authentication failed",
+        );
         return c.redirect(`${frontendUrl}/oauth-callback?error=${errorMsg}`);
     }
 }

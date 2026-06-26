@@ -1,7 +1,12 @@
 import { resend } from "../../config/resend.ts";
 import { AppError } from "./errors.util.ts";
 
-export async function sendVerificationEmail(email: string, actionLink: string, userId: string, requestId: string) {
+export async function sendVerificationEmail(
+    email: string,
+    actionLink: string,
+    userId: string,
+    requestId: string,
+) {
     const { error } = await resend.emails.send(
         {
             from: "Dokyudo <team@dokyudo.my.id>",
@@ -27,15 +32,18 @@ export async function sendVerificationEmail(email: string, actionLink: string, u
                 </div>
             `,
         },
-        { 
+        {
             // Idempotency key to prevent sending multiple emails for the same signup attempt (retry logic)
             // Incorporating requestId ensures that if the user legitimately requests a new link, it will send a new email.
-            idempotencyKey: `register-email/${userId}-${requestId}` 
-        }
+            idempotencyKey: `register-email/${userId}-${requestId}`,
+        },
     );
 
     if (error) {
-        console.error("Failed to send verification email via Resend:", error.message);
+        console.error(
+            "Failed to send verification email via Resend:",
+            error.message,
+        );
         throw new AppError({
             code: "INTERNAL_ERROR",
             message: "Failed to send verification email. Please try again.",
@@ -44,7 +52,12 @@ export async function sendVerificationEmail(email: string, actionLink: string, u
     }
 }
 
-export async function sendRecoveryEmail(email: string, actionLink: string, otp: string, requestId: string) {
+export async function sendRecoveryEmail(
+    email: string,
+    actionLink: string,
+    otp: string,
+    requestId: string,
+) {
     const { error } = await resend.emails.send(
         {
             from: "Dokyudo <team@dokyudo.my.id>",
@@ -54,7 +67,7 @@ export async function sendRecoveryEmail(email: string, actionLink: string, otp: 
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                     <h2>Password Reset Request</h2>
                     <p>We received a request to reset your password. You can either use the 6-digit OTP below or click the magic link to reset it.</p>
-                    
+
                     <div style="background-color: #f4f4f4; padding: 15px; border-radius: 6px; text-align: center; margin: 20px 0;">
                         <h3 style="margin: 0; color: #333;">Your OTP</h3>
                         <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #000; margin: 10px 0;">
@@ -78,13 +91,16 @@ export async function sendRecoveryEmail(email: string, actionLink: string, otp: 
                 </div>
             `,
         },
-        { 
-            idempotencyKey: `recovery-email/${email}-${requestId}` 
-        }
+        {
+            idempotencyKey: `recovery-email/${email}-${requestId}`,
+        },
     );
 
     if (error) {
-        console.error("Failed to send recovery email via Resend:", error.message);
+        console.error(
+            "Failed to send recovery email via Resend:",
+            error.message,
+        );
         throw new AppError({
             code: "INTERNAL_ERROR",
             message: "Failed to send recovery email. Please try again.",

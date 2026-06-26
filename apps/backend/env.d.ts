@@ -5,10 +5,12 @@
 declare namespace Deno {
     export const env: {
         get(key: string): string | undefined;
+        set(key: string, value: string): void;
     };
     export function readTextFile(path: string): Promise<string>;
     export const args: string[];
     export function test(name: string, fn: () => void | Promise<void>): void;
+    export function test(options: { name: string; fn: () => void | Promise<void> }): void;
     export function serve(options: any, handler?: any): any;
     export function exit(code?: number): never;
 }
@@ -24,5 +26,7 @@ interface ImportMeta {
 }
 
 declare module "@std/assert" {
+    export function assert(expr: unknown, msg?: string): asserts expr;
     export function assertEquals(actual: unknown, expected: unknown, msg?: string): void;
+    export function assertRejects(fn: () => Promise<unknown> | void, errorClass?: any, msgIncludes?: string, msg?: string): Promise<unknown>;
 }

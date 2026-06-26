@@ -19,7 +19,7 @@ export function createApp(): OpenAPIHono<AppEnv> {
                             requestId,
                         },
                     },
-                    400
+                    400,
                 );
             }
         },

@@ -8,10 +8,14 @@
         "module": "esnext",
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "ignoreDeprecations": "6.0",
+        "paths": {
+            "@std/assert": ["./env.d.ts"]
+        }
     },
     "include": [
         "**/*.ts",
-        "dummy.d.ts"
+        "env.d.ts"
     ]
 }

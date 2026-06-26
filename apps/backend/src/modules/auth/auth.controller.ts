@@ -22,8 +22,11 @@ export async function handleRegister(c: Context) {
     });
 
     return c.json(
-        { message: "Registration successful, please check your email for verification" },
-        201
+        {
+            message:
+                "Registration successful, please check your email for verification",
+        },
+        201,
     );
 }
 
@@ -54,7 +57,7 @@ export async function handleLogin(c: Context) {
                 email: authData.user.email!,
             },
         },
-        200
+        200,
     );
 }
 
@@ -81,10 +84,7 @@ export async function handleLogout(c: Context) {
         logContext,
     });
 
-    return c.json(
-        { message: "Successfully logged out" },
-        200
-    );
+    return c.json({ message: "Successfully logged out" }, 200);
 }
 
 export async function handleForgetPassword(c: Context) {
@@ -106,7 +106,7 @@ export async function handleForgetPassword(c: Context) {
 
     return c.json(
         { message: "If an account exists, a recovery email has been sent." },
-        200
+        200,
     );
 }
 
@@ -130,7 +130,7 @@ export async function handleResetPassword(c: Context) {
 
     return c.json(
         { message: "Password has been successfully reset. Please log in." },
-        200
+        200,
     );
 }
 
@@ -157,6 +157,6 @@ export async function handleUpdatePassword(c: Context) {
 
     return c.json(
         { message: "Password successfully updated. Please log in again." },
-        200
+        200,
     );
 }

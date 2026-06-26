@@ -33,7 +33,9 @@ export class AppError extends Error {
             error: {
                 code: this.code,
                 message: this.message,
-                ...(this.retryAfter !== undefined && { retryAfter: this.retryAfter }),
+                ...(this.retryAfter !== undefined && {
+                    retryAfter: this.retryAfter,
+                }),
                 requestId,
             },
         };

@@ -44,7 +44,9 @@ interface OAuthCallbackResult {
  * Handles the OAuth callback by exchanging the authorization code for a session.
  * Enforces the PRD email verification gate (§5.1).
  */
-export async function handleOAuthCallback(code: string): Promise<OAuthCallbackResult> {
+export async function handleOAuthCallback(
+    code: string,
+): Promise<OAuthCallbackResult> {
     if (!code) {
         throw new AppError({
             code: "VALIDATION_ERROR",
@@ -78,15 +80,20 @@ export async function handleOAuthCallback(code: string): Promise<OAuthCallbackRe
     if (!isEmailVerified) {
         // Kill the session immediately — do not let unverified users through
         try {
-            const { getSupabaseAdmin } = await import("../../config/supabase.ts");
-            await getSupabaseAdmin().auth.admin.signOut(session.access_token, "global");
+            const { getSupabaseAdmin } =
+                await import("../../config/supabase.ts");
+            await getSupabaseAdmin().auth.admin.signOut(
+                session.access_token,
+                "global",
+            );
         } catch (err) {
             console.error("Failed to revoke unverified OAuth session:", err);
         }
 
         throw new AppError({
             code: "UNAUTHORIZED",
-            message: "Email address is not verified. Please verify your email before logging in.",
+            message:
+                "Email address is not verified. Please verify your email before logging in.",
             status: 401,
         });
     }
@@ -96,7 +103,10 @@ export async function handleOAuthCallback(code: string): Promise<OAuthCallbackRe
         try {
             await redis.del(`unverified_email:${user.email}`);
         } catch (err) {
-            console.error("Failed to clean up unverified email cache from Redis", err);
+            console.error(
+                "Failed to clean up unverified email cache from Redis",
+                err,
+            );
         }
     }
 
