@@ -6,6 +6,6 @@ const router = createApp();
 
 // Mount all feature routes here
 router.route("/auth", authRoutes);
-router.route("/poc", pocRoutes);
+// router.route("/poc", pocRoutes);
 
 export default router;
