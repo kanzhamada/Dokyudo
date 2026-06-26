@@ -30,3 +30,28 @@ export interface LogoutParams {
     accessToken: string;
     logContext?: Record<string, any>;
 }
+
+export interface ForgetPasswordParams {
+    email: string;
+    recaptchaToken: string;
+    clientIp: string;
+    userAgent: string;
+    requestId: string;
+    logContext?: Record<string, any>;
+}
+
+export interface ResetPasswordParams {
+    email: string;
+    otp: string;
+    newPassword: string;
+    clientIp: string;
+    userAgent: string;
+    requestId: string;
+    logContext?: Record<string, any>;
+}
+
+export interface UpdatePasswordParams {
+    accessToken: string;
+    newPassword: string;
+    logContext?: Record<string, any>;
+}

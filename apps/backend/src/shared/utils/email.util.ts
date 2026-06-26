@@ -43,3 +43,52 @@ export async function sendVerificationEmail(email: string, actionLink: string, u
         });
     }
 }
+
+export async function sendRecoveryEmail(email: string, actionLink: string, otp: string, requestId: string) {
+    const { error } = await resend.emails.send(
+        {
+            from: "Dokyudo <team@dokyudo.my.id>",
+            to: [email],
+            subject: "Reset your password - Dokyudo",
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2>Password Reset Request</h2>
+                    <p>We received a request to reset your password. You can either use the 6-digit OTP below or click the magic link to reset it.</p>
+                    
+                    <div style="background-color: #f4f4f4; padding: 15px; border-radius: 6px; text-align: center; margin: 20px 0;">
+                        <h3 style="margin: 0; color: #333;">Your OTP</h3>
+                        <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #000; margin: 10px 0;">
+                            ${otp}
+                        </p>
+                    </div>
+
+                    <p style="margin: 30px 0; text-align: center;">
+                        <a href="${actionLink}" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                            Reset Password via Link
+                        </a>
+                    </p>
+                    <p style="color: #666; font-size: 14px;">
+                        If the button above does not work, you can copy and paste this link into your browser:
+                        <br/>
+                        <a href="${actionLink}">${actionLink}</a>
+                    </p>
+                    <p style="color: #666; font-size: 14px; margin-top: 30px;">
+                        If you did not request a password reset, please ignore this email or contact support if you have concerns.
+                    </p>
+                </div>
+            `,
+        },
+        { 
+            idempotencyKey: `recovery-email/${email}-${requestId}` 
+        }
+    );
+
+    if (error) {
+        console.error("Failed to send recovery email via Resend:", error.message);
+        throw new AppError({
+            code: "INTERNAL_ERROR",
+            message: "Failed to send recovery email. Please try again.",
+            status: 500,
+        });
+    }
+}

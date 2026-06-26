@@ -96,3 +96,91 @@ export const LogoutResponseSchema = z
         }),
     })
     .openapi("LogoutResponse");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Password Recovery Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ForgetPasswordBodySchema = z
+    .object({
+        email: z.string().email().max(255, "Email is too long").openapi({
+            description: "User email address",
+            example: "user@example.com",
+        }),
+        recaptchaToken: z
+            .string()
+            .min(1, "reCAPTCHA token is required")
+            .openapi({
+                description: "Google reCAPTCHA v3 token",
+            }),
+    })
+    .openapi("ForgetPasswordBody");
+
+export const ForgetPasswordResponseSchema = z
+    .object({
+        message: z.string().openapi({
+            description: "Success message",
+            example: "If an account exists, a recovery email has been sent.",
+        }),
+    })
+    .openapi("ForgetPasswordResponse");
+
+export const ResetPasswordBodySchema = z
+    .object({
+        email: z.string().email().max(255, "Email is too long").openapi({
+            description: "User email address",
+            example: "user@example.com",
+        }),
+        otp: z.string().length(8, "OTP must be exactly 8 characters").openapi({
+            description: "8-digit OTP received via email",
+            example: "12345678",
+        }),
+        newPassword: z
+            .string()
+            .min(8, "Password must be at least 8 characters")
+            .max(72, "Password is too long")
+            .regex(
+                /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/,
+                "Must contain uppercase, lowercase, number, and symbol (e.g. Secure@123)",
+            )
+            .openapi({
+                description: "New user password",
+                example: "Secure@123",
+            }),
+    })
+    .openapi("ResetPasswordBody");
+
+export const ResetPasswordResponseSchema = z
+    .object({
+        message: z.string().openapi({
+            description: "Success message",
+            example: "Password has been successfully reset. Please log in.",
+        }),
+    })
+    .openapi("ResetPasswordResponse");
+
+export const UpdatePasswordBodySchema = z
+    .object({
+        newPassword: z
+            .string()
+            .min(8, "Password must be at least 8 characters")
+            .max(72, "Password is too long")
+            .regex(
+                /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/,
+                "Must contain uppercase, lowercase, number, and symbol (e.g. Secure@123)",
+            )
+            .openapi({
+                description: "New user password",
+                example: "Secure@123",
+            }),
+    })
+    .openapi("UpdatePasswordBody");
+
+export const UpdatePasswordResponseSchema = z
+    .object({
+        message: z.string().openapi({
+            description: "Success message",
+            example: "Password successfully updated. Please log in again.",
+        }),
+    })
+    .openapi("UpdatePasswordResponse");

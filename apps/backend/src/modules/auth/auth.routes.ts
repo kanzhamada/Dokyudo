@@ -2,7 +2,7 @@ import { createApp } from "../../config/hono.ts";
 import { createRoute, z } from "@hono/zod-openapi";
 import * as authController from "./auth.controller.ts";
 import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
-import { LoginBodySchema, LoginResponseSchema, RegisterBodySchema, RegisterResponseSchema, LogoutResponseSchema } from "./auth.schema.ts";
+import { LoginBodySchema, LoginResponseSchema, RegisterBodySchema, RegisterResponseSchema, LogoutResponseSchema, ForgetPasswordBodySchema, ForgetPasswordResponseSchema, ResetPasswordBodySchema, ResetPasswordResponseSchema, UpdatePasswordBodySchema, UpdatePasswordResponseSchema } from "./auth.schema.ts";
 import { oauthRoutes } from "./oauth.routes.ts";
 
 export const authRoutes = createApp();
@@ -166,3 +166,162 @@ authRoutes.openapi(createRoute({
         },
     },
 }), authController.handleLogout as any);
+
+authRoutes.openapi(createRoute({
+    method: "post",
+    path: "/forget-password",
+    tags: ["Auth"],
+    summary: "Request a password reset link/OTP",
+    description: "Generates a recovery OTP and magic link via Supabase and sends it to the user's email via Resend.",
+    request: {
+        body: {
+            content: {
+                "application/json": {
+                    schema: ForgetPasswordBodySchema,
+                },
+            },
+            required: true,
+        },
+    },
+    responses: {
+        200: {
+            description: "Recovery email sent",
+            content: {
+                "application/json": {
+                    schema: ForgetPasswordResponseSchema,
+                },
+            },
+        },
+        400: {
+            description: "Validation error",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+        429: {
+            description: "Rate limit exceeded",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+        500: {
+            description: "Internal server error",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+    },
+}), authController.handleForgetPassword as any);
+
+authRoutes.openapi(createRoute({
+    method: "post",
+    path: "/reset-password",
+    tags: ["Auth"],
+    summary: "Reset password using OTP",
+    description: "Verifies the 6-digit OTP from the recovery email and updates the password.",
+    request: {
+        body: {
+            content: {
+                "application/json": {
+                    schema: ResetPasswordBodySchema,
+                },
+            },
+            required: true,
+        },
+    },
+    responses: {
+        200: {
+            description: "Password reset successful",
+            content: {
+                "application/json": {
+                    schema: ResetPasswordResponseSchema,
+                },
+            },
+        },
+        400: {
+            description: "Validation error",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+        401: {
+            description: "Invalid or expired OTP",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+        500: {
+            description: "Internal server error",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+    },
+}), authController.handleResetPassword as any);
+
+authRoutes.openapi(createRoute({
+    method: "put",
+    path: "/update-password",
+    tags: ["Auth"],
+    summary: "Update password for authenticated user",
+    description: "Updates the password for a logged-in user using their Bearer token, then invalidates all sessions to force re-login.",
+    request: {
+        headers: z.object({
+            authorization: z.string().optional().openapi({ description: "Bearer <token>", example: "Bearer eyJhb..." }),
+        }),
+        body: {
+            content: {
+                "application/json": {
+                    schema: UpdatePasswordBodySchema,
+                },
+            },
+            required: true,
+        },
+    },
+    responses: {
+        200: {
+            description: "Password updated successfully",
+            content: {
+                "application/json": {
+                    schema: UpdatePasswordResponseSchema,
+                },
+            },
+        },
+        400: {
+            description: "Validation error",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+        401: {
+            description: "Invalid or expired session",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+        500: {
+            description: "Internal server error",
+            content: {
+                "application/json": {
+                    schema: ErrorResponseSchema,
+                },
+            },
+        },
+    },
+}), authController.handleUpdatePassword as any);

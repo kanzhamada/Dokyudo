@@ -5,12 +5,18 @@ import { redis } from "../../config/redis.ts";
 import { loginAttempts, users } from "../../shared/models/db.model.ts";
 import { and, count, eq, gte } from "drizzle-orm";
 import { verifyRecaptcha } from "../../shared/utils/recaptcha.util.ts";
-import { sendVerificationEmail } from "../../shared/utils/email.util.ts";
+import {
+    sendVerificationEmail,
+    sendRecoveryEmail,
+} from "../../shared/utils/email.util.ts";
 import {
     LoginAttemptParams,
     LoginParams,
     LogoutParams,
     RegisterParams,
+    ForgetPasswordParams,
+    ResetPasswordParams,
+    UpdatePasswordParams,
 } from "../../shared/types/auth.types.ts";
 
 const LOCKOUT_WINDOW_MINUTES = 15;
@@ -91,7 +97,8 @@ export async function registerUser(params: RegisterParams) {
     if (isUnverifiedCooldown) {
         throw new AppError({
             code: "VALIDATION_ERROR",
-            message: "Account already registered. Please check your email inbox to verify your account.",
+            message:
+                "Account already registered. Please check your email inbox to verify your account.",
             status: 400,
         });
     }
@@ -375,7 +382,10 @@ export async function loginUser(params: LoginParams) {
     try {
         await redis.del(`unverified_email:${params.email}`);
     } catch (err) {
-        console.error("Failed to clean up unverified email cache from Redis", err);
+        console.error(
+            "Failed to clean up unverified email cache from Redis",
+            err,
+        );
     }
 
     return authData;
@@ -409,12 +419,12 @@ export async function logoutUser(params: LogoutParams) {
     if (error) {
         // If the token is already expired or invalid, we consider the logout successful
         // to provide an idempotent, error-free experience for the frontend.
-        const isExpiredOrInvalid = 
-            error.message.toLowerCase().includes("jwt") || 
-            error.message.toLowerCase().includes("token") || 
-            error.message.toLowerCase().includes("expired") || 
+        const isExpiredOrInvalid =
+            error.message.toLowerCase().includes("jwt") ||
+            error.message.toLowerCase().includes("token") ||
+            error.message.toLowerCase().includes("expired") ||
             error.message.toLowerCase().includes("invalid");
-        
+
         if (isExpiredOrInvalid) {
             if (params.logContext) {
                 params.logContext.authEvent = "logout_success_idempotent";
@@ -436,5 +446,200 @@ export async function logoutUser(params: LogoutParams) {
 
     if (params.logContext) {
         params.logContext.authEvent = "logout_success";
+    }
+}
+
+export async function forgetPassword(params: ForgetPasswordParams) {
+    // Step A: Verify reCAPTCHA v3 token
+    await verifyRecaptcha({
+        token: params.recaptchaToken,
+        remoteIp: params.clientIp,
+        expectedAction: "forget_password",
+    });
+
+    const supabase = getSupabaseAdmin();
+    const windowStart = new Date(
+        Date.now() - LOCKOUT_WINDOW_MINUTES * 60 * 1000,
+    ).toISOString();
+
+    // Step B: Basic Per-IP Rate Limiting for recovery requests
+    try {
+        const ipRegData = await db
+            .select({
+                userAgent: loginAttempts.userAgent,
+            })
+            .from(loginAttempts)
+            .where(
+                and(
+                    eq(loginAttempts.ipAddress, params.clientIp),
+                    eq(loginAttempts.authProvider, "forget_password"),
+                    gte(loginAttempts.attemptedAt, new Date(windowStart)),
+                ),
+            )
+            .limit(5);
+
+        if (ipRegData.length >= 5) {
+            throw new AppError({
+                code: "RATE_LIMIT_EXCEEDED",
+                message:
+                    "Too many password recovery requests from this IP. Please try again later.",
+                status: 429,
+                retryAfter: LOCKOUT_DURATION_MINUTES * 60,
+            });
+        }
+    } catch (err: any) {
+        if (err instanceof AppError) throw err;
+        console.error(
+            "Failed to check rate limit for forget password:",
+            err.message,
+        );
+    }
+
+    // Step C: Generate Recovery Link via Supabase Admin API
+    const { data: linkData, error: recoveryError } =
+        await supabase.auth.admin.generateLink({
+            type: "recovery",
+            email: params.email,
+        });
+
+    // Step D: Log attempt
+    await logLoginAttempt({
+        email: params.email,
+        ipAddress: params.clientIp,
+        userAgent: params.userAgent,
+        isSuccess: !recoveryError,
+        authProvider: "forget_password",
+    });
+
+    // Silently ignore "user not found" to prevent email enumeration
+    if (recoveryError) {
+        if (
+            recoveryError.status === 404 ||
+            recoveryError.status === 422 ||
+            recoveryError.message?.toLowerCase().includes("not found")
+        ) {
+            if (params.logContext)
+                params.logContext.authEvent = "forget_password_user_not_found";
+            return; // Return silently
+        }
+
+        throw new AppError({
+            code: "INTERNAL_ERROR",
+            message:
+                "Failed to process password recovery. Please try again later.",
+            status: 500,
+        });
+    }
+
+    // Step E: Send Email
+    if (linkData && linkData.properties) {
+        await sendRecoveryEmail(
+            params.email,
+            linkData.properties.action_link,
+            linkData.properties.email_otp,
+            params.requestId,
+        );
+    }
+
+    if (params.logContext)
+        params.logContext.authEvent = "forget_password_success";
+}
+
+export async function resetPassword(params: ResetPasswordParams) {
+    const supabase = getSupabaseAuth();
+
+    // Verify OTP using Supabase anonymous client
+    const { data, error } = await supabase.auth.verifyOtp({
+        email: params.email,
+        token: params.otp,
+        type: "recovery",
+    });
+
+    if (error || !data.user) {
+        if (params.logContext) {
+            params.logContext.authEvent = "reset_password_failed";
+            params.logContext.authError = error?.message;
+        }
+        throw new AppError({
+            code: "UNAUTHORIZED",
+            message:
+                "Invalid or expired OTP. Please request a new password reset link.",
+            status: 401,
+        });
+    }
+
+    // Update password using Admin API
+    const adminSupabase = getSupabaseAdmin();
+    const { error: updateError } =
+        await adminSupabase.auth.admin.updateUserById(data.user.id, {
+            password: params.newPassword,
+        });
+
+    if (updateError) {
+        throw new AppError({
+            code: "INTERNAL_ERROR",
+            message: "Failed to update password. Please try again.",
+            status: 500,
+        });
+    }
+
+    // Since they used OTP, they might have gotten an implicit session from verifyOtp.
+    // Let's force re-login by killing any existing sessions.
+    try {
+        await adminSupabase.auth.admin.signOut(
+            data.session?.access_token || "",
+            "global",
+        );
+    } catch (e) {
+        // ignore
+    }
+
+    if (params.logContext) {
+        params.logContext.authEvent = "reset_password_success";
+        params.logContext.userId = data.user.id;
+    }
+}
+
+export async function updatePassword(params: UpdatePasswordParams) {
+    const supabase = getSupabaseAuth();
+
+    // Validate the provided access token
+    const { data, error } = await supabase.auth.getUser(params.accessToken);
+
+    if (error || !data.user) {
+        throw new AppError({
+            code: "UNAUTHORIZED",
+            message: "Invalid or expired session. Please log in again.",
+            status: 401,
+        });
+    }
+
+    const adminSupabase = getSupabaseAdmin();
+
+    // Update the user's password
+    const { error: updateError } =
+        await adminSupabase.auth.admin.updateUserById(data.user.id, {
+            password: params.newPassword,
+        });
+
+    if (updateError) {
+        throw new AppError({
+            code: "INTERNAL_ERROR",
+            message: "Failed to update password.",
+            status: 500,
+        });
+    }
+
+    // Force re-login: Invalidate all sessions globally for this user
+    try {
+        await adminSupabase.auth.admin.signOut(params.accessToken, "global");
+    } catch (signOutErr) {
+        console.error("Failed to sign out after password update:", signOutErr);
+        // We don't throw here; the password was successfully updated.
+    }
+
+    if (params.logContext) {
+        params.logContext.authEvent = "update_password_success";
+        params.logContext.userId = data.user.id;
     }
 }
