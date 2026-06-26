@@ -1,0 +1,26 @@
+meta {
+  name: Hybrid Semantic Search
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/search
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "query": "What is the sliding window chunk size and overlap ratio?"
+  }
+}
+
+docs {
+  Performs tenant-safe hybrid search using cosine similarity on pgvector + keyword matching on tsvector, merged via RRF (Reciprocal Rank Fusion).
+}

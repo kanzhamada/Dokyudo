@@ -1,0 +1,26 @@
+meta {
+  name: Update Feature Flag
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/admin/feature-flags/{{flagId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "isEnabled": false
+  }
+}
+
+docs {
+  Admin route to modify status/description on an existing feature flag.
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Get System Metrics
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/admin/metrics
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Exposes system counters, database connection states, and AI model timings for the admin panel dashboard.
+}

@@ -1,0 +1,21 @@
+meta {
+  name: OAuth Google Initiate
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/auth/oauth/google
+  body: none
+  auth: none
+}
+
+docs {
+  Initiates the Google OAuth 2.0 (OpenID Connect) flow.
+  Returns HTTP 302 redirecting to Google's authorization endpoint with:
+    - client_id, redirect_uri, scope=openid email profile
+    - state (random UUID, stored in Redis as oauth:{state} with 5-min TTL for CSRF protection)
+  NOTE: followRedirects is disabled intentionally — the redirect URL itself is the testable artifact.
+  Internal classification: PUBLIC (no auth token required).
+  
+}

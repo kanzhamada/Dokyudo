@@ -1,0 +1,15 @@
+meta {
+  name: Gateway Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  Basic endpoint to check Gateway API service health status, check DB pools and Redis readiness.
+}

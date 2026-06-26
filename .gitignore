@@ -1,6 +1,7 @@
 apps/frontend/static/documents
 docs/research
 poc
+taskmd
 
 # Node
 node_modules/

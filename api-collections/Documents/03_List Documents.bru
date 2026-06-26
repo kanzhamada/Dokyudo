@@ -1,0 +1,19 @@
+meta {
+  name: List Documents
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/documents
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Lists all documents uploaded by the authenticated tenant with their current ingestion status (pending, processing, ready, failed).
+}

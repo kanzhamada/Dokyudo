@@ -1,0 +1,27 @@
+meta {
+  name: RAG QA Chat
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/chat
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "question": "Summarize the error handling standard",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+docs {
+  Streams answer tokens back using Server-Sent Events (SSE). Retrieves top 5 chunks, builds context prompt, and calls AI Gateway.
+}

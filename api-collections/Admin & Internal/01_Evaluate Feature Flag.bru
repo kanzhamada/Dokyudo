@@ -1,0 +1,15 @@
+meta {
+  name: Evaluate Feature Flag
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/internal/features/{{flagName}}
+  body: none
+  auth: none
+}
+
+docs {
+  Internal route to evaluate a feature flag configuration for a specific tenant during request routing at the Gateway.
+}

@@ -1,0 +1,19 @@
+meta {
+  name: List Webhook Logs
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/admin/webhook-logs
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Admin operations dashboard endpoint to query all tenant webhook delivery histories.
+}

@@ -1,0 +1,25 @@
+meta {
+  name: OAuth Google Callback
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/auth/oauth/google/callback
+  body: none
+  auth: none
+}
+
+docs {
+  Google OAuth 2.0 callback handler. Called by Google after user grants consent.
+  Flow:
+    1. Validates state param against Redis key oauth:{state} (single-use, 5-min TTL).
+    2. Exchanges authorization code for Google tokens via token endpoint.
+    3. Fetches user profile (email, name) from Google's userinfo endpoint.
+    4. Only proceeds if email_verified=true from provider (per PRD §5.1 security policy).
+    5. Upserts user+tenant record (or links provider if email already exists).
+    6. Issues Dokyudo JWT (15-min) + Redis session (24-h), then redirects to /app/dashboard.
+  Returns: HTTP 302 to /app/dashboard on success, HTTP 401 if state is invalid/expired.
+  Internal classification: PUBLIC (no auth token required — this IS the auth initiation).
+  
+}

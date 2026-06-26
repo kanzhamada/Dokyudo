@@ -1,0 +1,19 @@
+meta {
+  name: Get Document Details
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/documents/{{documentId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Fetches detailed metadata and individual text chunks/vectors for a specific document.
+}

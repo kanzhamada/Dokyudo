@@ -1,0 +1,19 @@
+meta {
+  name: Delete Webhook
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/webhooks/{{webhookId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Removes a webhook registration, stopping subsequent delivery events.
+}

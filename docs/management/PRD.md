@@ -78,9 +78,9 @@
 - **On-Premise Storage:** Files are uploaded directly to the self-hosted MinIO storage node via a Presigned URL routed through a Cloudflare Tunnel.
     - **Orphan File Handling**: When a presigned URL is generated, a record is created in the `documents` table with `status = 'pending'`. A daily cron job automatically deletes any `pending` documents (and their corresponding MinIO files) older than 24 hours to prevent orphaned files from consuming storage if the user abandons the upload.
     
-- **Asynchronous Ingestion (Transactional Outbox Pattern):** To prevent Dual-Write failure (Postgres vs Upstash), ingestion utilizes a strict Transactional Outbox Pattern orchestrated via **Supabase `pgmq`**.
-    - Document metadata is saved to Postgres within the same database transaction that pushes an event payload into the `pgmq` queue.
-    - A background Deno worker processes the `pgmq` queue, extracts text, generates embeddings, and safely pushes to Upstash Vector. Retries are handled automatically by the queue.
+- **Asynchronous Ingestion (Event-Driven Push):** To prevent Dual-Write failure (Postgres vs Upstash) and conserve Deno CPU time, ingestion utilizes an Event-Driven Push Pattern orchestrated via **Supabase `pg_net`**.
+    - Document metadata is saved to Postgres, which fires a database trigger.
+    - The trigger uses `pg_net` to push an asynchronous HTTP POST payload directly to a background worker hosted on the **On-Premise STB MinIO server**. The STB worker extracts text, generates embeddings, and safely pushes to Upstash Vector.
         
 - **Finance-Optimized Chunking Strategy**: Because Financial Annual Reports contain long tables and balance sheets, text is extracted and chunked using a larger sliding window of **1,000 to 1,500 tokens with a 150-token overlap**. This ensures data tables are not split horizontally.
     
@@ -233,7 +233,8 @@ A reusable circuit breaker configuration is applied to external dependencies:
 - **Failure threshold**: 5 failures in a 10‑second sliding window.
 - **Open duration**: 30 seconds, then transitions to half‑open.
 - **Half‑open probe count**: 1 successful probe to close the circuit.
-- **State Storage**: The Circuit Breaker state (failure counts, open/closed status, timestamps) MUST utilize a **Local In-Memory Cache** (e.g., with a 5-second TTL) within the Deno instance for rapid evaluation, while using Redis (Upstash) as the central Backing Store for cross-instance synchronization. Synchronous Redis fetches on every single request are strictly prohibited to protect the free tier limits.
+- **State Storage**: The Circuit Breaker state (failure counts, open/closed status) MUST be evaluated directly against Upstash Redis using **Redis Pipelining**. 
+- **Forbidden**: Do not build complex In-Memory sync mechanisms in Deno Deploy. Serverless isolates are ephemeral. Pipeline your Rate Limiting and Circuit Breaker logic into a single network call to Upstash.
 - Applies to:
   - Upstash Vector similarity queries inside Search Service.
   - Each LLM provider in the AI API Gateway.
@@ -418,7 +419,7 @@ _The backend system is implemented as a Modular Monolith inside Deno + Hono, all
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | **API Gateway**              | Auth (Supabase JWT), rate limiting, tenant context injection, **feature flag enforcement** (single point)                                            | Redis, Feature Flag Service         |
 | **Ingestion Service**        | Accept upload metadata (presigned URL), enqueue job with `{docId, storagePath, mimeType}`, track document status                                            | Object Storage, Job Queue            |
-| **Automatic Embedding Pipeline**         | Transactional Outbox Pattern via Supabase `pgmq`. A background Deno worker consumes the queue, downloads from MinIO, extracts text, chunks (1000-1500 tokens, 150 overlap), embeds, upserts into Upstash Vector, updates DB status, and publishes document.ready event. | MinIO, Embedding API, Upstash Vector, Supabase `pgmq` |
+| **Automatic Embedding Pipeline**         | Event-Driven Push via Supabase `pg_net`. Postgres triggers a webhook to the On-Premise STB worker. The worker downloads from MinIO, extracts text, chunks (1000-1500 tokens, 150 overlap), embeds, upserts into Upstash Vector, updates DB status, and pushes document.ready event. | MinIO, Embedding API, Upstash Vector, Supabase `pg_net` |
 | **Search Service**           | Embed query, execute Application-Layer Scatter-Gather RRF (parallel fetch from Upstash Vector + Supabase FTS, in-memory rank, lazy hydration). | Embedding API, Upstash Vector, Supabase |
 | **RAG Service**              | Retrieve context via Search Service, build prompt, stream via SSE using AI API Gateway, save conversation history                                           | Search Service, AI API Gateway       |
 | **AI API Gateway**           | Integrated module: routes to LLM providers (Gemini → Ollama), circuit breaker per provider, structured logging                              | LLM providers                        |
@@ -564,7 +565,7 @@ graph TD
 | API Gateway, Ingestion, Search, RAG, Feature Flag, Activity/Metrics, AI API Gateway | Deno Deploy | Deno Deploy |
 | Background Workers (Embeddings, Webhook, Notification) | Deno Deploy | Deno Deploy |
 
-- **Note**: The ingestion pipeline utilizes a Transactional Outbox Pattern orchestrated via Supabase `pgmq`. The Deno Edge workers pull from this `pgmq` queue to handle tasks like chunking, embedding generation, and webhook delivery securely and resiliently without polluting the main database.
+- **Note**: The ingestion pipeline utilizes an Event-Driven Push Pattern orchestrated via Supabase `pg_net`. Postgres triggers push HTTP requests directly to the On-Premise STB worker to handle tasks like chunking and embedding generation. This conserves the $0 serverless CPU limits by keeping heavy compute off Deno Deploy.
 - **Production**: Serverless: Deno Deploy (Backend), Cloudflare Pages (Frontend), Upstash (Redis, Vector), MinIO (Storage via Tunnels), Supabase (Postgres, Auth).
 
 ---
@@ -622,7 +623,7 @@ graph TD
 
 ### Phase 3 – Subscriptions & Outbox Queues
 
-- Implement Supabase `pgmq` Job Queue for the Transactional Outbox pattern (Ingestion & Webhooks).
+- Implement Supabase `pg_net` triggers for the Event-Driven Push pattern (Ingestion & Webhooks).
     
 - Xendit/Midtrans Sandbox integration: One-Time Invoice for the "Investor" tier.
     

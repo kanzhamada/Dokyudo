@@ -1,0 +1,19 @@
+meta {
+  name: List Feature Flags
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/admin/feature-flags
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Admin route to retrieve all registered system feature flags.
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Logout User
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/auth/logout
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Invalidates the user's session globally using the Supabase Admin API.
+}
