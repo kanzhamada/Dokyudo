@@ -2,6 +2,7 @@ apps/frontend/static/documents
 docs/research
 poc
 taskmd
+Production.bru
 
 # Node
 node_modules/

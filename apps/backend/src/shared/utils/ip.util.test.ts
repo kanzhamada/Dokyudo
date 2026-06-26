@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { extractClientIp } from "../../shared/middlewares/request.middleware.ts";
+import { extractClientIp } from "./ip.util.ts";
 
 Deno.test("extractClientIp — X-Forwarded-For takes priority", () => {
     const headers = new Headers({

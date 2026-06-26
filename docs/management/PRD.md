@@ -187,9 +187,20 @@
 - Tenant‑facing feature enforcement is handled exclusively by the **API Gateway**. Individual services do not independently evaluate flags for external requests.
 
 ### 5.8 Notification System
-- Send email notifications (e.g., “Your document is ready to search”) via the **job queue**.
+- Send email notifications via the **Resend API**.
+- To prevent blocking the main thread, sending emails is offloaded to the **job queue**.
 - Job payload: `{ template, recipient, payload }`.
-- Worker sends via SendGrid/Mailgun. Failed deliveries go to DLQ.
+- Failed deliveries go to DLQ (Dead Letter Queue).
+
+**Transactional Email Roadmap (By Development Phase):**
+- **Phase 1 (Core MVP):**
+  - **Email Verification:** OTP/Magic Link sent upon user registration.
+  - **Account Recovery:** Password reset and recovery emails.
+- **Phase 3 (Subscriptions & B2B):**
+  - **Invoice Receipt:** Confirmation email upon successful payment in the Sandbox Gateway.
+  - **Seat Invitation:** Emailing activation vouchers for colleagues in the Multi-Seat tier.
+- **Phase 4 (Enterprise):**
+  - **Document Ready:** Asynchronous notification when a large document finishes embedding.
 
 ### 5.9 Activity Feed
 - Every action (upload, index completion, search, Q&A, webhook error) is logged in `activity_log` with `tenant_id`, type, and timestamp.
@@ -544,6 +555,7 @@ graph TD
 | **Databases** | Supabase PostgreSQL (Relational) + Upstash Vector (Embeddings) | Separation of structured data and high-throughput vector queries |
 | **Storage** | Self-Hosted MinIO on ARM64 + Cloudflared (Tunnel) | Bypasses vendor lock-in; S3-compatible, secured via Zero Trust |
 | **Cache & Queue** | Upstash Redis + Supabase `pg_cron` | Rate limiting, outbox pattern queueing, and scheduled workers |
+| **Email Provider** | Resend API | Developer-friendly transactional email delivery via API and Webhooks |
 | **LLMs (Generation)** | Groq, Gemini 1.5 Flash, Cohere, BYOK (OpenAI/Claude) | Multi-provider fallback for HA and Zero-Cost protection |
 | **Embeddings** | Gemini `gemini-embedding-2` (Output: 768-dim) | High-fidelity financial context within Upstash free limits |
 | **Cryptography** | Web Crypto API (AES-256-GCM) | Native Deno API for robust BYOK encryption |

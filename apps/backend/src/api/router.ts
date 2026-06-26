@@ -1,6 +1,6 @@
 import { createApp } from "../config/hono.ts";
 import { authRoutes } from "../modules/auth/auth.routes.ts";
-// import { pocRoutes } from "../modules/poc/poc.routes.ts";
+// import { pocRoutes } from "../modules/poc/poc_routes.ts";
 
 const router = createApp();
 

@@ -1,4 +1,4 @@
-import { extractClientIp } from "../../shared/middlewares/request.middleware.ts";
+import { extractClientIp } from "../../shared/utils/ip.util.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import * as authService from "./auth.service.ts";
 import { type Context } from "hono";
