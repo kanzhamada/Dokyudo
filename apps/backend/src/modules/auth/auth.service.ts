@@ -371,6 +371,13 @@ export async function loginUser(params: LoginParams) {
         params.logContext.userId = authData.user.id;
     }
 
+    // Cleanup: Remove the unverified email cooldown cache since user is now verified and logged in
+    try {
+        await redis.del(`unverified_email:${params.email}`);
+    } catch (err) {
+        console.error("Failed to clean up unverified email cache from Redis", err);
+    }
+
     return authData;
 }
 

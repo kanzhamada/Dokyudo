@@ -27,5 +27,5 @@ vars:pre-request {
 }
 
 docs {
-  Logs in a tenant via Supabase Auth after reCAPTCHA v3 validation, lockout check, and anti-bruteforce rate limiting. Returns short-lived access JWT and refresh token. Failed attempts are logged to public.login_attempts. After 5 failures (same email+IP in 15 min), account locks for 15 minutes. Tokens are auto-captured as runtime variables.
+  Logs in a tenant via Supabase Auth after reCAPTCHA v3 validation, lockout check, and anti-bruteforce rate limiting (Per-IP + Per-Email Password Spraying + User-Agent Anomaly Detection). Returns short-lived access JWT and refresh token. Failed attempts are logged to public.login_attempts. After 5 failures (same email in 15 min), account locks for 15 minutes. On success, also clears the Redis `unverified_email:{email}` registration cache. Tokens are auto-captured as runtime variables.
 }
