@@ -13,6 +13,10 @@ const REQUIRED_ENV_VARS = [
     "RESEND_API_KEY",
 ] as const;
 
+/** Optional env vars with sensible defaults */
+const OPTIONAL_ENV_VARS_WITH_DEFAULTS: Record<string, string> = {
+    FRONTEND_URL: "http://localhost:5173",
+};
 /**
  * Validates that all required environment variables are present and non-empty.
  * Called at server startup (not during test imports).
@@ -35,5 +39,20 @@ export function validateEnvironment(): void {
         Deno.exit(1);
     }
 
+    // Warn about optional vars using defaults
+    for (const [varName, defaultValue] of Object.entries(OPTIONAL_ENV_VARS_WITH_DEFAULTS)) {
+        if (!Deno.env.get(varName)) {
+            console.warn(`⚠️  ${varName} not set, using default: ${defaultValue}`);
+        }
+    }
+
     console.log("✅ All required environment variables are present.");
+}
+
+/**
+ * Gets an environment variable with optional fallback.
+ * For optional vars, uses the configured default from OPTIONAL_ENV_VARS_WITH_DEFAULTS.
+ */
+export function getEnv(key: string): string {
+    return Deno.env.get(key) || OPTIONAL_ENV_VARS_WITH_DEFAULTS[key] || "";
 }

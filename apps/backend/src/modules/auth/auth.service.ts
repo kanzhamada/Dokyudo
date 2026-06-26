@@ -407,6 +407,22 @@ export async function logoutUser(params: LogoutParams) {
     );
 
     if (error) {
+        // If the token is already expired or invalid, we consider the logout successful
+        // to provide an idempotent, error-free experience for the frontend.
+        const isExpiredOrInvalid = 
+            error.message.toLowerCase().includes("jwt") || 
+            error.message.toLowerCase().includes("token") || 
+            error.message.toLowerCase().includes("expired") || 
+            error.message.toLowerCase().includes("invalid");
+        
+        if (isExpiredOrInvalid) {
+            if (params.logContext) {
+                params.logContext.authEvent = "logout_success_idempotent";
+                params.logContext.authNote = error.message;
+            }
+            return; // Treat as success
+        }
+
         if (params.logContext) {
             params.logContext.authEvent = "logout_failed";
             params.logContext.authError = error.message;

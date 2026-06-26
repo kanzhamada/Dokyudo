@@ -11,11 +11,9 @@ get {
 }
 
 docs {
-  Initiates the Google OAuth 2.0 (OpenID Connect) flow.
-  Returns HTTP 302 redirecting to Google's authorization endpoint with:
-    - client_id, redirect_uri, scope=openid email profile
-    - state (random UUID, stored in Redis as oauth:{state} with 5-min TTL for CSRF protection)
-  NOTE: followRedirects is disabled intentionally — the redirect URL itself is the testable artifact.
+  Initiates the Google OAuth 2.0 (OpenID Connect) flow via Supabase's built-in Server-Side PKCE.
+  Returns HTTP 302 redirecting to Google's authorization endpoint.
+  Supabase handles state/PKCE verification internally — no manual Redis state management needed.
+  Google/GitHub OAuth client credentials are configured in the Supabase Dashboard, not in backend env vars.
   Internal classification: PUBLIC (no auth token required).
-  
 }

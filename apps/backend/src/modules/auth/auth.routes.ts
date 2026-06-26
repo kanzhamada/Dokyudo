@@ -3,8 +3,12 @@ import { createRoute, z } from "@hono/zod-openapi";
 import * as authController from "./auth.controller.ts";
 import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
 import { LoginBodySchema, LoginResponseSchema, RegisterBodySchema, RegisterResponseSchema, LogoutResponseSchema } from "./auth.schema.ts";
+import { oauthRoutes } from "./oauth.routes.ts";
 
 export const authRoutes = createApp();
+
+// Mount OAuth sub-routes (GET /oauth/google, /oauth/google/callback, etc.)
+authRoutes.route("/", oauthRoutes);
 
 authRoutes.openapi(createRoute({
     method: "post",
