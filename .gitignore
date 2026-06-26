@@ -1,4 +1,6 @@
 apps/frontend/static/documents
+docs/research
+poc
 
 # Node
 node_modules/
@@ -13,6 +15,7 @@ pnpm-debug.log*
 # Environments
 .env
 .env.*
+.env.keys
 !.env.example
 !.env.test
 
@@ -39,6 +42,12 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# AI Assistants & Agents
+.agents/
+.cursor/
+.aider/
+.cline/
 
 # Vite
 vite.config.js.timestamp-*

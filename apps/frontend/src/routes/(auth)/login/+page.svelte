@@ -53,7 +53,7 @@
 				});
 
 				// Debug Log: Raw response AFTER hitting backend
-				console.log(`[Auth Login] Backend Response (POST /api/auth/login):`, result);
+				// console.log(`[Auth Login] Backend Response (POST /api/auth/login):`, result);
 
 				if (result.ok) {
 					localStorage.removeItem('dokyudo_login_lockout');

@@ -66,6 +66,30 @@
       "sourceType": "github",
       "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
       "computedHash": "0d2c4857a7d6fdcd3fbc46e458fa4c497f029cab89a01548b3defce203003932"
+    },
+    "upstash-ratelimit-js": {
+      "source": "upstash/skills",
+      "sourceType": "github",
+      "skillPath": "skills/upstash-ratelimit-js/SKILL.md",
+      "computedHash": "a50677d24615b67727a585862a6eb694c1a70448c61b9f76d446d44c75578df2"
+    },
+    "upstash-redis-js": {
+      "source": "upstash/skills",
+      "sourceType": "github",
+      "skillPath": "skills/upstash-redis-js/SKILL.md",
+      "computedHash": "2ce020fc849bbbb20a6266944d99a9499d54a3cde335fa17763f58542e670c69"
+    },
+    "upstash-redis-start": {
+      "source": "upstash/skills",
+      "sourceType": "github",
+      "skillPath": "skills/upstash-redis-start/SKILL.md",
+      "computedHash": "bba5c66b93c8af94fe976c68b3d3e208952ef2261611452dc41e6efa285b5299"
+    },
+    "upstash-vector-js": {
+      "source": "upstash/skills",
+      "sourceType": "github",
+      "skillPath": "skills/upstash-vector-js/SKILL.md",
+      "computedHash": "5de3a1ab886fba5b0b1061e3d0659eebae0f0a5fc53ce21ddc13d4d68282841f"
     }
   }
 }

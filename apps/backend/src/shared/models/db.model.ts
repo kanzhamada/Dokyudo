@@ -6,6 +6,8 @@ import {
     timestamp,
     text,
     boolean,
+    jsonb,
+    bigint,
     index,
     pgSchema,
     customType,
@@ -15,6 +17,13 @@ import {
 const inet = customType<{ data: string }>({
     dataType() {
         return "inet";
+    },
+});
+
+// Define custom tsvector type for Full-Text Search
+const tsvector = customType<{ data: string }>({
+    dataType() {
+        return "tsvector";
     },
 });
 
@@ -78,3 +87,84 @@ export const loginAttempts = pgTable(
         ),
     })
 );
+
+// ==============================================================================
+// 4. DOCUMENTS TABLE
+// ==============================================================================
+export const documents = pgTable("documents", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+        .notNull()
+        .references(() => tenants.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    storagePath: text("storage_path").notNull(),
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    description: text("description"),
+    status: varchar("status", { length: 50 }).default("pending").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==============================================================================
+// 5. DOCUMENT CHUNKS TABLE (FTS & Lazy Hydration)
+// ==============================================================================
+export const documentChunks = pgTable("document_chunks", {
+    id: uuid("id").primaryKey(), // ID strictly matches Upstash Vector ID
+    tenantId: uuid("tenant_id")
+        .notNull()
+        .references(() => tenants.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+        .notNull()
+        .references(() => documents.id, { onDelete: "cascade" }),
+    chunkIndex: integer("chunk_index").notNull(),
+    content: text("content").notNull(),
+    fts: tsvector("fts"),
+});
+
+// ==============================================================================
+// 6. CONVERSATIONS TABLE
+// ==============================================================================
+export const conversations = pgTable("conversations", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+        .notNull()
+        .references(() => tenants.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", precision: 3, withTimezone: true })
+        .defaultNow()
+        .notNull()
+        .$onUpdateFn(() => new Date()),
+});
+
+// ==============================================================================
+// 7. CONVERSATION TURNS TABLE (RAG History & Observability)
+// ==============================================================================
+export const conversationTurns = pgTable("conversation_turns", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+        .notNull()
+        .references(() => tenants.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+        .notNull()
+        .references(() => conversations.id, { onDelete: "cascade" }),
+    question: text("question").notNull(),
+    answer: text("answer").notNull(),
+    modelUsed: varchar("model_used", { length: 100 }).notNull(),
+    latencyMs: integer("latency_ms"),
+    contextReferences: jsonb("context_references"),
+    createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==============================================================================
+// 8. OUTBOX EVENTS TABLE (Transactional Outbox)
+// ==============================================================================
+export const outboxEvents = pgTable("outbox_events", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+        .notNull()
+        .references(() => tenants.id, { onDelete: "cascade" }),
+    eventType: varchar("event_type", { length: 255 }).notNull(),
+    payload: jsonb("payload").notNull(),
+    status: varchar("status", { length: 50 }).default("pending").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow().notNull(),
+});
