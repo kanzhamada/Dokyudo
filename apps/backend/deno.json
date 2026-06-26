@@ -13,6 +13,7 @@
         "@scalar/hono-api-reference": "npm:@scalar/hono-api-reference@^0.5",
         "@supabase/supabase-js": "npm:@supabase/supabase-js@^2",
         "postgres": "npm:postgres@^3.4.9",
+        "resend": "npm:resend@^6.14.0",
         "zod": "npm:zod@^3",
         "@upstash/redis": "npm:@upstash/redis@^1.34.0",
         "@upstash/ratelimit": "npm:@upstash/ratelimit@^1.2.1"
