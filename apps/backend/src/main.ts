@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { AppError } from "./shared/utils/errors.util.ts";
 import { requestIdMiddleware } from "./shared/middlewares/request_id.middleware.ts";
 import { loggerMiddleware } from "./shared/middlewares/logger.middleware.ts";
+import { rateLimiterMiddleware } from "./shared/middlewares/rate_limiter.middleware.ts";
 import { validateEnvironment } from "./config/env.ts";
 import rootRouter from "./api/router.ts";
 import { createApp } from "./config/hono.ts";
@@ -23,6 +24,7 @@ app.use(
 // Global middleware: Request ID propagation & Logging
 app.use("/*", requestIdMiddleware);
 app.use("/*", loggerMiddleware);
+app.use("/*", rateLimiterMiddleware);
 
 // Global Error Handler
 app.onError((err, c) => {

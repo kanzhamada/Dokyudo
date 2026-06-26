@@ -45,7 +45,7 @@ Deno.test("POST /api/auth/register — positive: successfully creates a user", a
 
 Deno.test("POST /api/auth/register — negative: User-Agent anomaly detection drops IP limit to 3", async () => {
     const maliciousIp = `192.168.200.${Math.floor(Math.random() * 255)}`;
-    
+
     // Send 4 requests with different User-Agents
     for (let i = 1; i <= 4; i++) {
         const freshEmail = `reg-spam-${crypto.randomUUID()}@example.com`;
@@ -57,7 +57,7 @@ Deno.test("POST /api/auth/register — negative: User-Agent anomaly detection dr
             "X-Forwarded-For": maliciousIp,
             "User-Agent": `Spam-Bot-v${i}`
         });
-        // We aren't testing the exact response (could be 201 or 400 if local supa fails), 
+        // We aren't testing the exact response (could be 201 or 400 if local supa fails),
         // we just care that the DB logs it.
     }
 
@@ -270,7 +270,7 @@ Deno.test("POST /api/auth/login — negative: invalid email format returns 400",
 Deno.test("POST /api/auth/login — negative: User-Agent anomaly detection drops IP limit to 3", async () => {
     const maliciousIp = `192.168.100.${Math.floor(Math.random() * 255)}`;
     const freshEmail = `ua-test-${crypto.randomUUID()}@example.com`;
-    
+
     // Send 4 requests with different User-Agents
     // (Logs 4 rows in DB with 4 unique UAs)
     for (let i = 1; i <= 4; i++) {
@@ -282,7 +282,7 @@ Deno.test("POST /api/auth/login — negative: User-Agent anomaly detection drops
             "X-Forwarded-For": maliciousIp,
             "User-Agent": `Malicious-Bot-v${i}`
         });
-        assertEquals(res.status, 401); 
+        assertEquals(res.status, 401);
     }
 
     // The 5th request will detect 4 unique UAs in DB, triggering the anomaly limit (3)
@@ -317,7 +317,7 @@ Deno.test("POST /api/auth/login — negative: Per-Email Password Spraying Lockou
         }, {
             "X-Forwarded-For": sprayIp,
         });
-        assertEquals(res.status, 401); 
+        assertEquals(res.status, 401);
     }
 
     // 6th attempt detects 5 failed attempts in DB and locks the account
@@ -353,7 +353,7 @@ Deno.test("POST /api/auth/logout — positive: successfully logs out user", asyn
     });
 
     const res = await app.fetch(req);
-    
+
     if (res.status === 200) {
         const json = await res.json();
         assertEquals(json.message, "Successfully logged out");

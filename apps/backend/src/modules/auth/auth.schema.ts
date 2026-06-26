@@ -6,32 +6,39 @@ import { z } from "@hono/zod-openapi";
 
 export const RegisterBodySchema = z
     .object({
-        email: z
-            .string()
-            .email()
-            .max(255, "Email is too long")
-            .openapi({ description: "User email address", example: "user@example.com" }),
+        email: z.string().email().max(255, "Email is too long").openapi({
+            description: "User email address",
+            example: "user@example.com",
+        }),
         password: z
             .string()
             .min(8, "Password must be at least 8 characters")
             .max(72, "Password is too long")
-            .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/, "Must contain uppercase, lowercase, number, and symbol (e.g. Secure@123)")
-            .openapi({ description: "User password (min 8 chars, strong)", example: "Secure@123" }),
+            .regex(
+                /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/,
+                "Must contain uppercase, lowercase, number, and symbol (e.g. Secure@123)",
+            )
+            .openapi({
+                description: "User password (min 8 chars, strong)",
+                example: "Secure@123",
+            }),
         recaptchaToken: z
             .string()
             .min(1, "reCAPTCHA token is required")
-            .openapi({ description: "Google reCAPTCHA v3 token from client-side execute()" }),
+            .openapi({
+                description:
+                    "Google reCAPTCHA v3 token from client-side execute()",
+            }),
     })
     .openapi("RegisterBody");
 
 export const RegisterResponseSchema = z
     .object({
-        message: z
-            .string()
-            .openapi({
-                description: "Success message",
-                example: "Registration successful. Please check your email for verification.",
-            }),
+        message: z.string().openapi({
+            description: "Success message",
+            example:
+                "Registration successful. Please check your email for verification.",
+        }),
     })
     .openapi("RegisterResponse");
 
@@ -41,11 +48,10 @@ export const RegisterResponseSchema = z
 
 export const LoginBodySchema = z
     .object({
-        email: z
-            .string()
-            .email()
-            .max(255, "Email is too long")
-            .openapi({ description: "User email address", example: "user@example.com" }),
+        email: z.string().email().max(255, "Email is too long").openapi({
+            description: "User email address",
+            example: "user@example.com",
+        }),
         password: z
             .string()
             .min(1, "Password is required")
@@ -54,7 +60,10 @@ export const LoginBodySchema = z
         recaptchaToken: z
             .string()
             .min(1, "reCAPTCHA token is required")
-            .openapi({ description: "Google reCAPTCHA v3 token from client-side execute()" }),
+            .openapi({
+                description:
+                    "Google reCAPTCHA v3 token from client-side execute()",
+            }),
     })
     .openapi("LoginBody");
 
@@ -63,12 +72,14 @@ export const LoginResponseSchema = z
         accessToken: z
             .string()
             .openapi({ description: "Short-lived JWT access token" }),
-        refreshToken: z
-            .string()
-            .openapi({ description: "Refresh token for obtaining new access tokens" }),
+        refreshToken: z.string().openapi({
+            description: "Refresh token for obtaining new access tokens",
+        }),
         user: z.object({
             id: z.string().uuid().openapi({ description: "User UUID" }),
-            email: z.string().email().max(255, "Email is too long").openapi({ description: "User email" }),
+            email: z.string().email().max(255, "Email is too long").openapi({
+                description: "User email",
+            }),
         }),
     })
     .openapi("LoginResponse");
@@ -79,8 +90,9 @@ export const LoginResponseSchema = z
 
 export const LogoutResponseSchema = z
     .object({
-        message: z
-            .string()
-            .openapi({ description: "Success message", example: "Successfully logged out" }),
+        message: z.string().openapi({
+            description: "Success message",
+            example: "Successfully logged out",
+        }),
     })
     .openapi("LogoutResponse");
