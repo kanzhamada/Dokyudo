@@ -1,6 +1,8 @@
 import os
+import time
 import uuid
 import tempfile
+import httpx
 from core.config import settings
 from services.storage import download_pdf
 from services.extractor import extract_text_from_pdf, chunk_text
@@ -12,10 +14,39 @@ from services.database import (
     mark_document_processed
 )
 
+# Load Lua script from external file
+script_dir = os.path.dirname(__file__)
+lua_path = os.path.join(script_dir, 'gatekeeper.lua')
+with open(lua_path, 'r') as f:
+    gatekeeper_lua = f.read()
+
+def execute_gatekeeper(estimated_tokens: int):
+    if not settings.UPSTASH_REDIS_REST_URL or not settings.UPSTASH_REDIS_REST_TOKEN:
+        raise ValueError("UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN not set in .env")
+        
+    tpm_key = "ratelimit:gemini:tpm:global"
+    rpm_key = "ratelimit:gemini:rpm:global"
+    rpd_key = "ratelimit:gemini:rpd:global"
+    
+    url = f"{settings.UPSTASH_REDIS_REST_URL}"
+    headers = {
+        "Authorization": f"Bearer {settings.UPSTASH_REDIS_REST_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = ["EVAL", gatekeeper_lua, 3, tpm_key, rpm_key, rpd_key, estimated_tokens]
+    
+    with httpx.Client() as client:
+        res = client.post(url, headers=headers, json=payload, timeout=10.0)
+        res.raise_for_status()
+        data = res.json()
+        if "error" in data:
+            raise Exception(f"Upstash Redis Error: {data['error']}")
+        return data["result"]
+
 def process_document(tenant_id: str, document_id: str):
     print(f"[Processor] Starting job for {document_id} (Tenant: {tenant_id})")
     
-    # 0. Idempotency Check (prevent duplicate processing if webhook retries)
     if check_document_idempotency(document_id):
         print(f"[Processor] Document {document_id} is already processed. Skipping.")
         return
@@ -27,28 +58,56 @@ def process_document(tenant_id: str, document_id: str):
     temp_pdf.close()
     
     try:
-        # 1. Download
+        print("1. Reading PDF from disk...")
         download_pdf(tenant_id, document_id, temp_pdf.name)
         
-        # 2. Extract
         full_text = extract_text_from_pdf(temp_pdf.name)
         
-        # 3. Chunk
-        print(f"[Processor] Chunking text (Total chars: {len(full_text)})")
-        chunks = chunk_text(full_text, chunk_size=1000, overlap=150)
-        print(f"[Processor] Produced {len(chunks)} chunks.")
+        print(f"2. PDF Parsed. Total Length: {len(full_text)}")
         
-        # 4. Embed & Upsert
-        print(f"[Processor] Starting Vector Embedding for {len(chunks)} chunks...")
+        chunks = chunk_text(full_text, chunk_size=1000, overlap=150)
+        print(f"3. Chunking complete. Processing ALL {len(chunks)} chunks!")
+        
+        print(f"4. Document {document_id} is checked and inserted into Postgres.")
+        
+        if not settings.UPSTASH_REDIS_REST_URL or not settings.UPSTASH_REDIS_REST_TOKEN:
+            raise ValueError("Missing UPSTASH_REDIS credentials in .env")
+            
+        print("5. Initialized Upstash Redis SDK. Starting Gatekeeper Loop...")
         
         upstash_payload = []
         postgres_payload = []
         
         for i, chunk_text_content in enumerate(chunks):
             chunk_id = str(uuid.uuid4())
+            estimated_tokens = max(1, len(chunk_text_content) // 3)
+            
+            if estimated_tokens > 8192:
+                print(f"[PAYLOAD_TOO_LARGE] Chunk {i} rejected. Size: {estimated_tokens} tokens.")
+                continue
+                
+            gatekeeper_passed = False
+            retry_count = 0
+            
+            while not gatekeeper_passed and retry_count < 3:
+                status, reason, reset_in_ms = execute_gatekeeper(estimated_tokens)
+                
+                if status == 1:
+                    gatekeeper_passed = True
+                    print(f"[GATEKEEPER OK] Chunk {i+1}/{len(chunks)} ({estimated_tokens} tk) => Deducted. Processing...")
+                else:
+                    wait_ms = max(100, reset_in_ms + 100)
+                    wait_sec = (wait_ms + 999) // 1000
+                    print(f"[GATEKEEPER THROTTLE] {reason}. Sleeping for {wait_sec}s...")
+                    time.sleep(wait_sec)
+                    retry_count += 1
+                    
+            if not gatekeeper_passed:
+                print(f"[Processor WARNING] Gatekeeper failed after retries for chunk {i+1}. Skipping chunk.")
+                continue
+            
             vector = generate_embedding_with_retry(chunk_text_content)
             
-            # Format output for Upstash Vector
             upstash_payload.append({
                 "id": chunk_id,
                 "vector": vector,
@@ -60,7 +119,6 @@ def process_document(tenant_id: str, document_id: str):
                 }
             })
             
-            # Format output for Supabase document_chunks
             postgres_payload.append({
                 "id": chunk_id,
                 "tenant_id": tenant_id,
@@ -69,21 +127,16 @@ def process_document(tenant_id: str, document_id: str):
                 "content": chunk_text_content
             })
             
-            # Batch flush every 50 chunks or at the very end
             if len(upstash_payload) >= 50 or i == len(chunks) - 1:
-                print(f"[Processor] Flushing {len(upstash_payload)} vectors to DBs...")
-                # Transaksional-ish: Insert raw text first, then vectors
+                print(f"-> Flushing {len(upstash_payload)} vectors to Upstash...")
                 insert_document_chunks(postgres_payload)
                 upsert_vectors_to_upstash(upstash_payload)
                 
-                # Reset payload buffer
                 upstash_payload = []
                 postgres_payload = []
-                print(f"[Processor] Processed {i + 1}/{len(chunks)} chunks.")
                 
-        # 5. Mark Document as Processed
         mark_document_processed(document_id)
-        print(f"[Processor] Successfully processed and marked {document_id} as done.")
+        print("7. All chunks processed and upserted successfully!")
         
     except Exception as e:
         print(f"[Processor ERROR] Failed to process {document_id}: {str(e)}")

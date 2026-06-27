@@ -5,18 +5,18 @@ meta {
 }
 
 post {
-  url: http://{{stb_worker_host}}:8080/api/ingest
+  url: {{stb_worker_host}}/api/ingest
   body: json
   auth: none
 }
 
 body:json {
   {
-    "document_id": "b1bc7e1f-7106-444c-a111-ce10fb27063f",
-    "tenant_id": "tenant_abc123"
+    "document_id": "1436c851-886a-4796-986a-5fab9c250433",
+    "tenant_id": "9462a645-c164-4878-8171-8b35d26ace4f"
   }
 }
 
 vars:pre-request {
-  stb_worker_host: worker.dokyudo.my.id
+  stb_worker_host: https://worker.dokyudo.my.id
 }
