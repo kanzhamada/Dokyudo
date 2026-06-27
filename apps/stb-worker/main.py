@@ -90,6 +90,13 @@ def process_document(tenant_id: str, document_id: str):
         if os.path.exists(temp_pdf.name):
             os.remove(temp_pdf.name)
 
+@app.get("/api/health")
+async def health_check():
+    """
+    Health check endpoint for Docker / Watchtower monitoring.
+    """
+    return {"status": "ok", "service": "stb-worker"}
+
 @app.post("/api/ingest")
 async def ingest_document(payload: IngestPayload, background_tasks: BackgroundTasks):
     """
