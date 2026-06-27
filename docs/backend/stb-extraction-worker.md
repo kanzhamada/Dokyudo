@@ -1,47 +1,63 @@
-# STB Text Extraction & Chunking Worker
+# STB Ingestion, Chunking, & Embedding Worker
 
 ## 1. Core Logic
-Fitur ini (`apps/stb-worker`) adalah layanan asinkron berbasis Python (FastAPI) yang berjalan secara fisik di dalam STB (Set Top Box). Ketika Supabase Trigger mengirimkan sinyal melalui Webhook `/api/ingest`, worker ini akan mengunduh file PDF dari instans MinIO lokal, mengekstrak teksnya halaman per halaman menggunakan `PyMuPDF`, dan memecah teks tersebut menjadi *chunks* menggunakan *tokenizer* berbasis `tiktoken` (OpenAI cl100k_base).
+Fitur ini (`apps/stb-worker`) adalah layanan asinkron berbasis Python (FastAPI) dengan pola **Clean Architecture** yang berjalan secara fisik di dalam STB (Set Top Box). 
+Ketika Supabase Trigger mengirimkan sinyal melalui Webhook `/api/ingest`, worker ini akan:
+1. Mengunduh file PDF dari instans MinIO lokal.
+2. Mengekstrak teksnya halaman per halaman menggunakan `PyMuPDF`.
+3. Memecah teks tersebut menjadi *chunks* menggunakan *tokenizer* berbasis `tiktoken` (OpenAI cl100k_base).
+4. **Menerjemahkan teks (Embedding)** menjadi vektor 768-dimensi secara sekuensial menggunakan API Google Gemini (`gemini-embedding-2`) dan mem-format *payload* agar siap dikirim ke Upstash Vector DB.
 
 ## 2. Flow Diagram
 ```mermaid
 sequenceDiagram
     participant Supabase as PostgreSQL pg_net
     participant API as FastAPI (STB Worker)
-    participant MinIO as Local MinIO (STB)
-    participant Disk as Local SSD
+    participant Disk as Local SSD (MinIO/Temp)
+    participant Gemini as Google GenAI
+    participant PostgREST as Supabase API
+    participant Upstash as Upstash Vector
 
     Supabase-)API: POST /api/ingest (document_id, tenant_id)
     API-->>Supabase: 202 Accepted (Queued)
     
     activate API
-    API->>MinIO: Download PDF (tenant_id/document_id.pdf)
-    MinIO-->>Disk: File tersimpan di /mnt/hdd/worker_tmp
+    API->>PostgREST: GET /rest/v1/documents (Idempotency Check)
+    API->>Disk: Download PDF dari MinIO ke /mnt/hdd/worker_tmp
     
-    API->>Disk: Buka PDF dengan PyMuPDF
-    Disk-->>API: Stream Text per halaman
+    API->>Disk: Buka PDF dengan PyMuPDF & Chunking
     
-    API->>API: Hitung & pecah teks (1000 tokens, overlap 150)
+    loop Per 50 Chunks
+        API->>Gemini: Minta Vektor (Exponential Backoff jika 429)
+        Gemini-->>API: 768-dimensi Float Array
+        API->>PostgREST: POST /rest/v1/document_chunks (Teks Mentah)
+        API->>Upstash: POST /upsert (Vektor + Metadata)
+    end
+    
+    API->>PostgREST: PATCH /rest/v1/documents (status='processed')
     API->>Disk: Hapus file temp (Cleanup)
     deactivate API
 ```
 
 ## 3. Completion Timestamp
-**Completed At:** 2026-06-27T13:30:00+07:00 (WIB)
+**Completed At:** 2026-06-27T21:02:00+07:00 (WIB)
 
-## 4. File Mapping
-- **Created:**
-  - `apps/stb-worker/main.py` (Entry point FastAPI dan logika chunking)
-  - `apps/stb-worker/requirements.txt` (Dependensi: fastapi, uvicorn, pymupdf, tiktoken, boto3, python-dotenv)
-  - `apps/stb-worker/.env.example` (Konfigurasi path S3 dan Tmp dir)
-  - `deploy_worker.sh` (Script rsync untuk mempermudah deploy kode laptop ke STB)
+## 4. File Mapping (Clean Architecture)
+Struktur aplikasi telah difaktorkan ulang (*refactored*) agar mudah di-_maintenance_:
+- `apps/stb-worker/main.py`: Entry point aplikasi dan inisiasi FastAPI.
+- `apps/stb-worker/core/config.py`: Pengaturan environment (S3, Token, API Key, DB).
+- `apps/stb-worker/api/ingest.py`: Definisi *routing* HTTP.
+- `apps/stb-worker/services/storage.py`: Logika komunikasi AWS S3 / MinIO.
+- `apps/stb-worker/services/extractor.py`: Logika PyMuPDF dan TikToken.
+- `apps/stb-worker/services/embedding.py`: Logika SDK `google-genai` dengan Exponential Backoff.
+- `apps/stb-worker/services/database.py`: Logika HTTP client (`httpx`) untuk PostgREST dan Upstash Vector.
+- `apps/stb-worker/services/processor.py`: Menyatukan semua *services* menjadi satu alur utuh (*Background Task*).
+- `apps/stb-worker/tests/test_api.py`: Unit test dasar (Pytest) untuk mengecek kesehatan *endpoint*.
 
-## 5. Connections
-- **Database (Supabase):** Sebagai *Sender* yang memicu proses ekstraksi via ekstensi `pg_net`.
-- **MinIO:** Sebagai *Data Source* dengan routing *loopback* (127.0.0.1) tanpa melewati internet agar unduhan PDF stabil, tidak berbayar (zero egress), dan sangat cepat.
-- **Hardware (STB):** Terdapat konfigurasi khusus di `main.py` menggunakan `tempfile` berparameter direktori SSD, agar ukuran RAM STB yang terbatas (~900MB) tidak kehabisan akibat default `/tmp` berbasis `tmpfs`.
-
-## 6. Architectural Decisions
-- **Python over Deno:** Meskipun *backend* utama memakai Deno, Worker ini ditulis dalam Python demi mengakses ekosistem pemrosesan dokumen dan AI (*tokenizer*) yang jauh lebih superior, ringan, dan cepat di arsitektur ARM64.
-- **FastAPI BackgroundTasks:** Webhook yang ditembak oleh `pg_net` tidak disarankan untuk dibiarkan terbuka (blocking) karena batas *timeout* HTTP. Oleh karena itu, *endpoint* `/api/ingest` langsung mengembalikan `202 Accepted`, dan memindah proses unduhan+ekstraksi ke `BackgroundTasks` internal FastAPI.
-- **Memory Constraint Mitigation:** Download PDF tidak disedot langsung ke memori (string/bytes buffer) karena sangat berbahaya untuk PDF > 50MB. File didownload murni ke SSD (disk), dibaca sedikit demi sedikit oleh `PyMuPDF`, lalu *garbage file*-nya dihapus di dalam block `finally`.
+## 5. Architectural Decisions
+- **REST API for Databases & AI:** STB Worker tidak menggunakan Driver ORM/SQL (seperti SQLAlchemy atau asyncpg) maupun SDK AI resmi (`google-genai`) untuk menghindari *overhead* ukuran dependensi dan isu kompatibilitas. Melainkan, worker berkomunikasi dengan Supabase Postgres, Upstash Vector, dan Google Gemini API secara langsung menggunakan REST API via library `httpx`.
+- **Idempotency Check:** Melakukan *query* ke Supabase sebelum memproses PDF. Jika `status == 'processed'`, proses akan langsung berhenti untuk mencegah duplikasi *embedding* jika pg_net me- *retry* pengiriman webhook.
+- **Clean Architecture Modularization:** File dipecah menjadi modul agar tidak menumpuk di `main.py`. Ini mempermudah tim untuk mencari sumber *bug*.
+- **Custom Exponential Backoff:** Mempertimbangkan limitasi Gemini API (*Rate Limit 429*), layanan *embedding* menggunakan perulangan sederhana yang akan melakukan "tidur" secara eksponensial (5s, 10s, 20s, 40s) jika terdeteksi kuota tersentuh.
+- **Python over Deno:** Tetap dipertahankan dalam Python demi ekosistem dokumen (`PyMuPDF`) dan AI Tokenizer. 
+- **Memory Constraint Mitigation:** PDF didownload murni ke SSD (disk), bukan disedot ke RAM, lalu *garbage file*-nya dihapus di dalam block `finally`.
