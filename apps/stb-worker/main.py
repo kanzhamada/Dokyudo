@@ -95,7 +95,7 @@ async def health_check():
     """
     Health check endpoint for Docker / Watchtower monitoring.
     """
-    return {"status": "ok", "service": "stb-worker"}
+    return {"status": "ok"}
 
 @app.post("/api/ingest")
 async def ingest_document(payload: IngestPayload, background_tasks: BackgroundTasks):

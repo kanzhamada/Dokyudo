@@ -12,7 +12,6 @@ Deno.test("GET /health — returns 200 with status ok", async () => {
     assertEquals(res.status, 200);
     const json = await res.json();
     assertEquals(json.status, "ok");
-    assertEquals(typeof json.timestamp, "string");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

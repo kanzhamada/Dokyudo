@@ -50,7 +50,6 @@ app.onError((err, c) => {
 app.get("/health", (c) => {
     return c.json({
         status: "ok",
-        timestamp: new Date().toISOString(),
     });
 });
 
