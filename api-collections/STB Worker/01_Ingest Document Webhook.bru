@@ -1,0 +1,22 @@
+meta {
+  name: Ingest Document Webhook
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://{{stb_worker_host}}:8080/api/ingest
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "document_id": "b1bc7e1f-7106-444c-a111-ce10fb27063f",
+    "tenant_id": "tenant_abc123"
+  }
+}
+
+vars:pre-request {
+  stb_worker_host: worker.dokyudo.my.id
+}
