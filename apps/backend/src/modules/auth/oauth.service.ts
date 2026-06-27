@@ -1,4 +1,4 @@
-import { getSupabaseAuth } from "../../config/supabase.ts";
+import { getSupabaseAnon } from "../../config/supabase.ts";
 import { getEnv } from "../../config/env.ts";
 import { redis } from "../../config/redis.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
@@ -10,7 +10,7 @@ type OAuthProvider = "google" | "github";
  * Uses Supabase's built-in PKCE flow — no client_secret needed in our backend.
  */
 export async function initiateOAuth(provider: OAuthProvider): Promise<string> {
-    const supabase = getSupabaseAuth();
+    const supabase = getSupabaseAnon();
 
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -55,7 +55,7 @@ export async function handleOAuthCallback(
         });
     }
 
-    const supabase = getSupabaseAuth();
+    const supabase = getSupabaseAnon();
 
     // Exchange the PKCE code for a Supabase session
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);

@@ -1,5 +1,5 @@
 import { AppError } from "../../shared/utils/errors.util.ts";
-import { getSupabaseAdmin, getSupabaseAuth } from "../../config/supabase.ts";
+import { getSupabaseAdmin, getSupabaseAnon } from "../../config/supabase.ts";
 import { db } from "../../config/drizzle.ts";
 import { redis } from "../../config/redis.ts";
 import { loginAttempts, users } from "../../shared/models/db.model.ts";
@@ -341,7 +341,7 @@ export async function loginUser(params: LoginParams) {
     }
 
     // Step D: Auth
-    const authClient = getSupabaseAuth();
+    const authClient = getSupabaseAnon();
     const { data: authData, error: authError } =
         await authClient.auth.signInWithPassword({
             email: params.email,
@@ -546,7 +546,7 @@ export async function forgetPassword(params: ForgetPasswordParams) {
 }
 
 export async function resetPassword(params: ResetPasswordParams) {
-    const supabase = getSupabaseAuth();
+    const supabase = getSupabaseAnon();
 
     // Verify OTP using Supabase anonymous client
     const { data, error } = await supabase.auth.verifyOtp({
@@ -601,7 +601,7 @@ export async function resetPassword(params: ResetPasswordParams) {
 }
 
 export async function updatePassword(params: UpdatePasswordParams) {
-    const supabase = getSupabaseAuth();
+    const supabase = getSupabaseAnon();
 
     // Validate the provided access token
     const { data, error } = await supabase.auth.getUser(params.accessToken);

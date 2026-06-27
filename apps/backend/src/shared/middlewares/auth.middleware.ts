@@ -1,10 +1,11 @@
 import { Context, Next } from "hono";
-import { verify } from "hono/jwt";
+import { verify, decode } from "hono/jwt";
 import { AppError } from "../utils/errors.util.ts";
 import { db } from "../../config/drizzle.ts";
 import { users } from "../models/db.model.ts";
 import { eq } from "drizzle-orm";
 import { redis } from "../../config/redis.ts";
+import { getSupabaseAnon } from "../../config/supabase.ts";
 
 export async function authMiddleware(c: Context, next: Next) {
     const authHeader = c.req.header("Authorization");
@@ -28,18 +29,39 @@ export async function authMiddleware(c: Context, next: Next) {
     }
 
     let payload: any;
+    let userId: string | undefined;
+
     try {
-        payload = await verify(token, secret, "HS256");
+        const { header } = decode(token);
+        
+        if (header.alg === "HS256") {
+            // Local fast verification for symmetric secrets
+            payload = await verify(token, secret, "HS256");
+            userId = payload.sub;
+        } else {
+            // Network verification for asymmetric keys (ES256/RS256) which Supabase now uses by default
+            const supabase = getSupabaseAnon();
+            const { data, error } = await supabase.auth.getUser(token);
+            
+            if (error) throw new Error(error.message);
+            if (!data.user) throw new Error("User not found");
+            
+            payload = {
+                sub: data.user.id,
+                app_metadata: data.user.app_metadata,
+                user_metadata: data.user.user_metadata,
+            };
+            userId = data.user.id;
+        }
     } catch (err: any) {
         const isExpired = err.message?.toLowerCase().includes("expired");
         throw new AppError({
             code: "UNAUTHORIZED",
-            message: isExpired ? "JWT has expired" : "Invalid JWT signature",
+            message: isExpired ? "JWT has expired" : `Invalid JWT signature: ${err.message}`,
             status: 401,
         });
     }
 
-    const userId = payload.sub;
     if (!userId) {
         throw new AppError({
             code: "UNAUTHORIZED",

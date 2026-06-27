@@ -16,6 +16,8 @@
         "resend": "npm:resend@^6.14.0",
         "zod": "npm:zod@^3",
         "@upstash/redis": "npm:@upstash/redis@^1.34.0",
-        "@upstash/ratelimit": "npm:@upstash/ratelimit@^1.2.1"
+        "@upstash/ratelimit": "npm:@upstash/ratelimit@^1.2.1",
+        "@aws-sdk/client-s3": "npm:@aws-sdk/client-s3@^3.600.0",
+        "@aws-sdk/s3-request-presigner": "npm:@aws-sdk/s3-request-presigner@^3.600.0"
     }
 }

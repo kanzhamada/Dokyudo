@@ -18,7 +18,7 @@ export function getSupabaseAdmin(): SupabaseClient {
     return adminClient;
 }
 
-export function getSupabaseAuth(): SupabaseClient {
+export function getSupabaseAnon(): SupabaseClient {
     if (!anonClient) {
         const url = Deno.env.get("SUPABASE_URL")!;
         const key = Deno.env.get("SUPABASE_ANON_KEY")!;

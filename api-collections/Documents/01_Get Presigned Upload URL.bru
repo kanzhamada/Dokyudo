@@ -4,9 +4,9 @@ meta {
   seq: 1
 }
 
-get {
-  url: {{baseUrl}}/api/documents/presigned
-  body: none
+post {
+  url: {{baseUrl}}/api/documents/presigned-url
+  body: json
   auth: none
 }
 
@@ -14,6 +14,14 @@ headers {
   Authorization: Bearer {{accessToken}}
 }
 
+body:json {
+  {
+    "filename": "financial_report_2023.pdf",
+    "mimeType": "application/pdf",
+    "sizeBytes": 1048576
+  }
+}
+
 docs {
-  Generates a presigned PUT URL directly to the Supabase Storage S3 object storage, bypassing backend bandwidth for large uploads (max 25MB).
+  Generates a presigned PUT URL directly to the self-hosted MinIO STB storage, bypassing backend bandwidth for large uploads (max 25MB). Creates a pending document record.
 }

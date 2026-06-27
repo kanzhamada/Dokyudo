@@ -11,6 +11,10 @@ const REQUIRED_ENV_VARS = [
     "UPSTASH_REDIS_REST_URL",
     "UPSTASH_REDIS_REST_TOKEN",
     "RESEND_API_KEY",
+    "S3_ENDPOINT",
+    "S3_ACCESS_KEY",
+    "S3_SECRET_KEY",
+    "S3_BUCKET_NAME",
 ] as const;
 
 /** Optional env vars with sensible defaults */
