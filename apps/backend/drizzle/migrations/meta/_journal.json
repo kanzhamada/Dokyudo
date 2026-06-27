@@ -15,6 +15,13 @@
       "when": 1782210124446,
       "tag": "0001_daffy_thanos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782538460361,
+      "tag": "0002_pgnet_trigger",
+      "breakpoints": true
     }
   ]
 }
