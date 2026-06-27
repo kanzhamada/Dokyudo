@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3";
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 import { getEnv } from "../../config/env.ts";
 
@@ -46,4 +46,33 @@ export async function generatePresignedPutUrl(
     });
     
     return await getSignedUrl(client, command, { expiresIn: expiresInSecs });
+}
+
+/**
+ * Checks if an object exists in the S3 bucket.
+ */
+export async function checkObjectExists(
+    bucketName: string,
+    objectKey: string
+): Promise<boolean> {
+    const client = getS3Client();
+    const command = new HeadObjectCommand({
+        Bucket: bucketName,
+        Key: objectKey,
+    });
+    
+    try {
+        await client.send(command);
+        return true;
+    } catch (err: any) {
+        console.error("S3 HeadObject Error:", err.name, err.$metadata?.httpStatusCode, err);
+        if (
+            err.name === "NotFound" || 
+            err.name === "NoSuchKey" || 
+            err.$metadata?.httpStatusCode === 404
+        ) {
+            return false;
+        }
+        throw err;
+    }
 }

@@ -25,3 +25,20 @@ export async function handleGeneratePresignedUrl(c: Context) {
     return c.json(result, 201);
 }
 
+export async function handleConfirmUpload(c: Context) {
+    const tenantId = c.get("tenantId") as string;
+    if (!tenantId) {
+        throw new AppError({
+            code: "UNAUTHORIZED",
+            message: "Missing tenant context",
+            status: 401,
+        });
+    }
+
+    const body = await c.req.json();
+    const { documentId } = body;
+    
+    const result = await DocumentsService.confirmUpload(tenantId, documentId);
+
+    return c.json(result, 200);
+}

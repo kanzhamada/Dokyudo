@@ -1,0 +1,26 @@
+meta {
+  name: Confirm Document Upload
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/documents/confirm-upload
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "documentId": "123e4567-e89b-12d3-a456-426614174000"
+  }
+}
+
+docs {
+  Verifies the document exists in MinIO STB storage and updates its status to 'confirmed' in the database.
+}

@@ -142,3 +142,63 @@ Deno.test(
         assertEquals(json.expiresIn, 900);
     },
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Confirm Upload Endpoint Tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+Deno.test(
+    "POST /api/documents/confirm-upload — negative: missing authorization header returns 401",
+    async () => {
+        const res = await makeRequest("/api/documents/confirm-upload", {
+            documentId: crypto.randomUUID(),
+        });
+
+        assertEquals(res.status, 401);
+    },
+);
+
+Deno.test(
+    "POST /api/documents/confirm-upload — negative: missing required fields returns 400",
+    async () => {
+        const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+        const res = await makeRequest(
+            "/api/documents/confirm-upload",
+            {}, // Empty body
+            headers,
+        );
+
+        if (!validToken) {
+            assertEquals(res.status, 401);
+            return;
+        }
+
+        assertEquals(res.status, 400);
+        const json = await res.json();
+        assertEquals(json.error.code, "VALIDATION_ERROR");
+    },
+);
+
+Deno.test(
+    "POST /api/documents/confirm-upload — negative: non-existent document returns 404",
+    async () => {
+        const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+        const res = await makeRequest(
+            "/api/documents/confirm-upload",
+            {
+                documentId: crypto.randomUUID(), // Random UUID that doesn't exist
+            },
+            headers,
+        );
+
+        if (!validToken) {
+            assertEquals(res.status, 401);
+            return;
+        }
+
+        assertEquals(res.status, 404);
+        const json = await res.json();
+        assertEquals(json.error.code, "NOT_FOUND");
+    },
+);
+

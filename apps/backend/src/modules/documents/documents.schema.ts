@@ -31,3 +31,22 @@ export const PresignedUrlResponseSchema = z.object({
         description: "URL expiration time in seconds",
     }),
 });
+
+export const ConfirmUploadBodySchema = z.object({
+    documentId: z.string().uuid().openapi({
+        example: "123e4567-e89b-12d3-a456-426614174000",
+        description: "The ID of the document to confirm",
+    }),
+});
+
+export const ConfirmUploadResponseSchema = z.object({
+    message: z.string().openapi({
+        example: "Document uploaded and confirmed successfully",
+    }),
+    documentId: z.string().uuid().openapi({
+        example: "123e4567-e89b-12d3-a456-426614174000",
+    }),
+    status: z.string().openapi({
+        example: "confirmed",
+    }),
+});

@@ -5,6 +5,8 @@ import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
 import {
     PresignedUrlBodySchema,
     PresignedUrlResponseSchema,
+    ConfirmUploadBodySchema,
+    ConfirmUploadResponseSchema,
 } from "./documents.schema.ts";
 
 export const documentsRoutes = createApp();
@@ -65,4 +67,69 @@ documentsRoutes.openapi(
         },
     }),
     documentsController.handleGeneratePresignedUrl as any,
+);
+
+documentsRoutes.openapi(
+    createRoute({
+        method: "post",
+        path: "/confirm-upload",
+        tags: ["Documents"],
+        summary: "Confirm document upload",
+        description:
+            "Verifies that a document was successfully uploaded to the storage service " +
+            "and updates its status in the database to 'confirmed'.",
+        request: {
+            body: {
+                content: {
+                    "application/json": {
+                        schema: ConfirmUploadBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Upload confirmed successfully",
+                content: {
+                    "application/json": {
+                        schema: ConfirmUploadResponseSchema,
+                    },
+                },
+            },
+            400: {
+                description: "Validation error or file not found in storage",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            404: {
+                description: "Document not found in database",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    documentsController.handleConfirmUpload as any,
 );

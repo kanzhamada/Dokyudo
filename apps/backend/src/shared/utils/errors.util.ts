@@ -7,6 +7,7 @@ export type ErrorCode =
     | "QUOTA_EXCEEDED"
     | "DOCUMENT_NOT_READY"
     | "PROVIDER_UNAVAILABLE"
+    | "NOT_FOUND"
     | "INTERNAL_ERROR";
 
 interface AppErrorOptions {
