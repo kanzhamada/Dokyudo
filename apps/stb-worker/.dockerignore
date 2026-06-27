@@ -1,0 +1,26 @@
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Cache & Bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment Variables & Secrets
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# Temp files
+*.log
+tmp/
+worker_tmp/
+.pytest_cache/
+.coverage
