@@ -2,19 +2,7 @@ import { createApp } from "../../config/hono.ts";
 import { createRoute, z } from "@hono/zod-openapi";
 import * as authController from "./auth.controller.ts";
 import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
-import {
-    LoginBodySchema,
-    LoginResponseSchema,
-    RegisterBodySchema,
-    RegisterResponseSchema,
-    LogoutResponseSchema,
-    ForgetPasswordBodySchema,
-    ForgetPasswordResponseSchema,
-    ResetPasswordBodySchema,
-    ResetPasswordResponseSchema,
-    UpdatePasswordBodySchema,
-    UpdatePasswordResponseSchema,
-} from "./auth.schema.ts";
+import * as AuthSchema from "./auth.schema.ts";
 import { oauthRoutes } from "./oauth.routes.ts";
 
 export const authRoutes = createApp();
@@ -36,7 +24,7 @@ authRoutes.openapi(
             body: {
                 content: {
                     "application/json": {
-                        schema: RegisterBodySchema,
+                        schema: AuthSchema.RegisterBodySchema,
                     },
                 },
                 required: true,
@@ -48,7 +36,7 @@ authRoutes.openapi(
                     "Registration successful — check email for verification",
                 content: {
                     "application/json": {
-                        schema: RegisterResponseSchema,
+                        schema: AuthSchema.RegisterResponseSchema,
                     },
                 },
             },
@@ -88,7 +76,7 @@ authRoutes.openapi(
             body: {
                 content: {
                     "application/json": {
-                        schema: LoginBodySchema,
+                        schema: AuthSchema.LoginBodySchema,
                     },
                 },
                 required: true,
@@ -100,7 +88,7 @@ authRoutes.openapi(
                     "Login successful — returns JWT tokens and user info",
                 content: {
                     "application/json": {
-                        schema: LoginResponseSchema,
+                        schema: AuthSchema.LoginResponseSchema,
                     },
                 },
             },
@@ -173,7 +161,7 @@ authRoutes.openapi(
                 description: "Logout successful",
                 content: {
                     "application/json": {
-                        schema: LogoutResponseSchema,
+                        schema: AuthSchema.LogoutResponseSchema,
                     },
                 },
             },
@@ -210,7 +198,7 @@ authRoutes.openapi(
             body: {
                 content: {
                     "application/json": {
-                        schema: ForgetPasswordBodySchema,
+                        schema: AuthSchema.ForgetPasswordBodySchema,
                     },
                 },
                 required: true,
@@ -221,7 +209,7 @@ authRoutes.openapi(
                 description: "Recovery email sent",
                 content: {
                     "application/json": {
-                        schema: ForgetPasswordResponseSchema,
+                        schema: AuthSchema.ForgetPasswordResponseSchema,
                     },
                 },
             },
@@ -266,7 +254,7 @@ authRoutes.openapi(
             body: {
                 content: {
                     "application/json": {
-                        schema: ResetPasswordBodySchema,
+                        schema: AuthSchema.ResetPasswordBodySchema,
                     },
                 },
                 required: true,
@@ -277,7 +265,7 @@ authRoutes.openapi(
                 description: "Password reset successful",
                 content: {
                     "application/json": {
-                        schema: ResetPasswordResponseSchema,
+                        schema: AuthSchema.ResetPasswordResponseSchema,
                     },
                 },
             },
@@ -328,7 +316,7 @@ authRoutes.openapi(
             body: {
                 content: {
                     "application/json": {
-                        schema: UpdatePasswordBodySchema,
+                        schema: AuthSchema.UpdatePasswordBodySchema,
                     },
                 },
                 required: true,
@@ -339,7 +327,7 @@ authRoutes.openapi(
                 description: "Password updated successfully",
                 content: {
                     "application/json": {
-                        schema: UpdatePasswordResponseSchema,
+                        schema: AuthSchema.UpdatePasswordResponseSchema,
                     },
                 },
             },

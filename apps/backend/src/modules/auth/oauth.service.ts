@@ -42,7 +42,7 @@ interface OAuthCallbackResult {
 
 /**
  * Handles the OAuth callback by exchanging the authorization code for a session.
- * Enforces the PRD email verification gate (§5.1).
+ * Enforces the email verification gate.
  */
 export async function handleOAuthCallback(
     code: string,
@@ -70,7 +70,6 @@ export async function handleOAuthCallback(
 
     const { session, user } = data;
 
-    // PRD §5.1: Email Verification Gate
     // The backend MUST only proceed if email is verified.
     // Unverified emails trigger immediate session deletion + 401.
     const isEmailVerified =

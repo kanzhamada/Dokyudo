@@ -2,12 +2,7 @@ import { createApp } from "../../config/hono.ts";
 import { createRoute } from "@hono/zod-openapi";
 import * as documentsController from "./documents.controller.ts";
 import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
-import {
-    PresignedUrlBodySchema,
-    PresignedUrlResponseSchema,
-    ConfirmUploadBodySchema,
-    ConfirmUploadResponseSchema,
-} from "./documents.schema.ts";
+import * as DocumentsSchema from "./documents.schema.ts";
 
 export const documentsRoutes = createApp();
 
@@ -25,7 +20,7 @@ documentsRoutes.openapi(
             body: {
                 content: {
                     "application/json": {
-                        schema: PresignedUrlBodySchema,
+                        schema: DocumentsSchema.PresignedUrlBodySchema,
                     },
                 },
                 required: true,
@@ -36,7 +31,7 @@ documentsRoutes.openapi(
                 description: "Presigned URL generated successfully",
                 content: {
                     "application/json": {
-                        schema: PresignedUrlResponseSchema,
+                        schema: DocumentsSchema.PresignedUrlResponseSchema,
                     },
                 },
             },
@@ -82,7 +77,7 @@ documentsRoutes.openapi(
             body: {
                 content: {
                     "application/json": {
-                        schema: ConfirmUploadBodySchema,
+                        schema: DocumentsSchema.ConfirmUploadBodySchema,
                     },
                 },
                 required: true,
@@ -93,7 +88,7 @@ documentsRoutes.openapi(
                 description: "Upload confirmed successfully",
                 content: {
                     "application/json": {
-                        schema: ConfirmUploadResponseSchema,
+                        schema: DocumentsSchema.ConfirmUploadResponseSchema,
                     },
                 },
             },

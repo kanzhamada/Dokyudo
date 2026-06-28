@@ -9,21 +9,13 @@ import {
     sendVerificationEmail,
     sendRecoveryEmail,
 } from "../../shared/utils/email.util.ts";
-import {
-    LoginAttemptParams,
-    LoginParams,
-    LogoutParams,
-    RegisterParams,
-    ForgetPasswordParams,
-    ResetPasswordParams,
-    UpdatePasswordParams,
-} from "../../shared/types/auth.types.ts";
+import * as AuthTypes from "../../shared/types/auth.types.ts";
 
 const LOCKOUT_WINDOW_MINUTES = 15;
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
 
-export async function registerUser(params: RegisterParams) {
+export async function registerUser(params: AuthTypes.RegisterParams) {
     // Step A: Verify reCAPTCHA v3 token
     await verifyRecaptcha({
         token: params.recaptchaToken,
@@ -196,7 +188,7 @@ export async function registerUser(params: RegisterParams) {
     }
 }
 
-export async function loginUser(params: LoginParams) {
+export async function loginUser(params: AuthTypes.LoginParams) {
     // Step A: Verify reCAPTCHA
     await verifyRecaptcha({
         token: params.recaptchaToken,
@@ -391,7 +383,7 @@ export async function loginUser(params: LoginParams) {
     return authData;
 }
 
-async function logLoginAttempt(params: LoginAttemptParams): Promise<void> {
+async function logLoginAttempt(params: AuthTypes.LoginAttemptParams): Promise<void> {
     try {
         await db.insert(loginAttempts).values({
             emailAttempted: params.email,
@@ -409,7 +401,7 @@ async function logLoginAttempt(params: LoginAttemptParams): Promise<void> {
     }
 }
 
-export async function logoutUser(params: LogoutParams) {
+export async function logoutUser(params: AuthTypes.LogoutParams) {
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.auth.admin.signOut(
         params.accessToken,
@@ -449,7 +441,7 @@ export async function logoutUser(params: LogoutParams) {
     }
 }
 
-export async function forgetPassword(params: ForgetPasswordParams) {
+export async function forgetPassword(params: AuthTypes.ForgetPasswordParams) {
     // Step A: Verify reCAPTCHA v3 token
     await verifyRecaptcha({
         token: params.recaptchaToken,
@@ -545,7 +537,7 @@ export async function forgetPassword(params: ForgetPasswordParams) {
         params.logContext.authEvent = "forget_password_success";
 }
 
-export async function resetPassword(params: ResetPasswordParams) {
+export async function resetPassword(params: AuthTypes.ResetPasswordParams) {
     const supabase = getSupabaseAnon();
 
     // Verify OTP using Supabase anonymous client
@@ -600,7 +592,7 @@ export async function resetPassword(params: ResetPasswordParams) {
     }
 }
 
-export async function updatePassword(params: UpdatePasswordParams) {
+export async function updatePassword(params: AuthTypes.UpdatePasswordParams) {
     const supabase = getSupabaseAnon();
 
     // Validate the provided access token

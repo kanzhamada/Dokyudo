@@ -20,23 +20,22 @@ export const loggerMiddleware: MiddlewareHandler = async (c, next) => {
 
     c.set("logContext", logContext);
 
-    try {
-        await next();
-    } catch (err: any) {
-        logContext.error = err.message;
-        if (!(err instanceof AppError)) {
-            logContext.stack = err.stack;
+    await next();
+    
+    if (c.error) {
+        logContext.error = c.error.message;
+        if (!(c.error instanceof AppError)) {
+            logContext.stack = c.error.stack;
         }
-        throw err;
-    } finally {
-        logContext.status = c.res.status;
-        logContext.durationMs = Math.round(performance.now() - start);
+    }
 
-        const isDev = Deno.env.get("NODE_ENV") !== "production";
-        if (isDev) {
-            console.log(JSON.stringify(logContext, null, 2));
-        } else {
-            console.log(JSON.stringify(logContext));
-        }
+    logContext.status = c.res.status;
+    logContext.durationMs = Math.round(performance.now() - start);
+
+    const isDev = Deno.env.get("NODE_ENV") !== "production";
+    if (isDev) {
+        console.log(JSON.stringify(logContext, null, 2));
+    } else {
+        console.log(JSON.stringify(logContext));
     }
 };
