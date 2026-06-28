@@ -1,6 +1,7 @@
 import boto3
 from botocore.client import Config
 from core.config import settings
+from core.logger import dev_print
 
 def get_s3_client():
     return boto3.client(
@@ -15,5 +16,5 @@ def get_s3_client():
 def download_pdf(tenant_id: str, document_id: str, dest_path: str):
     s3 = get_s3_client()
     object_key = f"{tenant_id}/{document_id}.pdf"
-    print(f"[Storage] Downloading {object_key} to {dest_path}")
+    dev_print(f"[Storage] Downloading {object_key} to {dest_path}")
     s3.download_file(settings.S3_BUCKET_NAME, object_key, dest_path)

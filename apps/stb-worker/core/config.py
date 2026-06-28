@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 load_dotenv() # Load variables from .env file
 
 class Settings:
+    NODE_ENV = os.getenv('NODE_ENV', 'dev')
+    WORKER_SECRET = os.getenv('WORKER_SECRET')
     S3_ENDPOINT = os.getenv('S3_ENDPOINT', 'http://127.0.0.1:9000')
     S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY')
     S3_SECRET_KEY = os.getenv('S3_SECRET_KEY')

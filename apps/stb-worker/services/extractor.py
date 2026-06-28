@@ -1,8 +1,9 @@
 import fitz
 import tiktoken
+from core.logger import dev_print
 
 def extract_text_from_pdf(file_path: str) -> str:
-    print(f"[Extractor] Extracting text from {file_path}")
+    dev_print(f"[Extractor] Extracting text from {file_path}")
     doc = fitz.open(file_path)
     full_text = ""
     for page in doc:

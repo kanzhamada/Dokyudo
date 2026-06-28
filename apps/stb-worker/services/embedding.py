@@ -1,6 +1,7 @@
 import time
 import httpx
 from core.config import settings
+from core.logger import dev_print
 
 def generate_embedding_with_retry(text: str, max_retries: int = 5) -> list[float]:
     """
@@ -31,7 +32,7 @@ def generate_embedding_with_retry(text: str, max_retries: int = 5) -> list[float
                 
             if res.status_code == 429:
                 wait_ms = (2 ** attempt) * 5
-                print(f"[Embedding] API Rate Limit (429). Sleeping for {wait_ms}s before retry...")
+                dev_print(f"[Embedding] API Rate Limit (429). Sleeping for {wait_ms}s before retry...")
                 time.sleep(wait_ms)
                 continue
                 
@@ -42,7 +43,7 @@ def generate_embedding_with_retry(text: str, max_retries: int = 5) -> list[float
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
                 wait_ms = (2 ** attempt) * 5
-                print(f"[Embedding] API Rate Limit (429). Sleeping for {wait_ms}s before retry...")
+                dev_print(f"[Embedding] API Rate Limit (429). Sleeping for {wait_ms}s before retry...")
                 time.sleep(wait_ms)
             else:
                 raise Exception(f"Gemini API Error: {e.response.text}")
@@ -50,7 +51,7 @@ def generate_embedding_with_retry(text: str, max_retries: int = 5) -> list[float
             err_str = str(e).lower()
             if "429" in err_str or "quota" in err_str or "rate limit" in err_str:
                 wait_ms = (2 ** attempt) * 5
-                print(f"[Embedding] API Exception Rate Limit. Sleeping for {wait_ms}s...")
+                dev_print(f"[Embedding] API Exception Rate Limit. Sleeping for {wait_ms}s...")
                 time.sleep(wait_ms)
             else:
                 raise Exception(f"Gemini API Exception: {str(e)}")

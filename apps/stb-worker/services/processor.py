@@ -1,9 +1,11 @@
 import os
+import re
 import time
 import uuid
 import tempfile
 import httpx
 from core.config import settings
+from core.logger import dev_print
 from services.storage import download_pdf
 from services.extractor import extract_text_from_pdf, chunk_text
 from services.embedding import generate_embedding_with_retry
@@ -44,11 +46,19 @@ def execute_gatekeeper(estimated_tokens: int):
             raise Exception(f"Upstash Redis Error: {data['error']}")
         return data["result"]
 
+def is_valid_uuid(val: str) -> bool:
+    pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+    return bool(pattern.match(val))
+
 def process_document(tenant_id: str, document_id: str):
-    print(f"[Processor] Starting job for {document_id} (Tenant: {tenant_id})")
+    if not is_valid_uuid(tenant_id) or not is_valid_uuid(document_id):
+        dev_print(f"[SECURITY ALERT] Path Traversal blocked! Invalid input. tenant: {tenant_id}, doc: {document_id}")
+        return
+        
+    dev_print(f"[Processor] Starting job for {document_id} (Tenant: {tenant_id})")
     
     if check_document_idempotency(document_id):
-        print(f"[Processor] Document {document_id} is already processed. Skipping.")
+        dev_print(f"[Processor] Document {document_id} is already processed. Skipping.")
         return
     
     if settings.WORKER_TMP_DIR and not os.path.exists(settings.WORKER_TMP_DIR):
@@ -58,22 +68,22 @@ def process_document(tenant_id: str, document_id: str):
     temp_pdf.close()
     
     try:
-        print("1. Reading PDF from disk...")
+        dev_print("1. Reading PDF from disk...")
         download_pdf(tenant_id, document_id, temp_pdf.name)
         
         full_text = extract_text_from_pdf(temp_pdf.name)
         
-        print(f"2. PDF Parsed. Total Length: {len(full_text)}")
+        dev_print(f"2. PDF Parsed. Total Length: {len(full_text)}")
         
         chunks = chunk_text(full_text, chunk_size=1000, overlap=150)
-        print(f"3. Chunking complete. Processing ALL {len(chunks)} chunks!")
+        dev_print(f"3. Chunking complete. Processing ALL {len(chunks)} chunks!")
         
-        print(f"4. Document {document_id} is checked and inserted into Postgres.")
+        dev_print(f"4. Document {document_id} is checked and inserted into Postgres.")
         
         if not settings.UPSTASH_REDIS_REST_URL or not settings.UPSTASH_REDIS_REST_TOKEN:
             raise ValueError("Missing UPSTASH_REDIS credentials in .env")
             
-        print("5. Initialized Upstash Redis SDK. Starting Gatekeeper Loop...")
+        dev_print("5. Initialized Upstash Redis SDK. Starting Gatekeeper Loop...")
         
         upstash_payload = []
         postgres_payload = []
@@ -83,7 +93,7 @@ def process_document(tenant_id: str, document_id: str):
             estimated_tokens = max(1, len(chunk_text_content) // 3)
             
             if estimated_tokens > 8192:
-                print(f"[PAYLOAD_TOO_LARGE] Chunk {i} rejected. Size: {estimated_tokens} tokens.")
+                dev_print(f"[PAYLOAD_TOO_LARGE] Chunk {i} rejected. Size: {estimated_tokens} tokens.")
                 continue
                 
             gatekeeper_passed = False
@@ -94,16 +104,16 @@ def process_document(tenant_id: str, document_id: str):
                 
                 if status == 1:
                     gatekeeper_passed = True
-                    print(f"[GATEKEEPER OK] Chunk {i+1}/{len(chunks)} ({estimated_tokens} tk) => Deducted. Processing...")
+                    dev_print(f"[GATEKEEPER OK] Chunk {i+1}/{len(chunks)} ({estimated_tokens} tk) => Deducted. Processing...")
                 else:
                     wait_ms = max(100, reset_in_ms + 100)
                     wait_sec = (wait_ms + 999) // 1000
-                    print(f"[GATEKEEPER THROTTLE] {reason}. Sleeping for {wait_sec}s...")
+                    dev_print(f"[GATEKEEPER THROTTLE] {reason}. Sleeping for {wait_sec}s...")
                     time.sleep(wait_sec)
                     retry_count += 1
                     
             if not gatekeeper_passed:
-                print(f"[Processor WARNING] Gatekeeper failed after retries for chunk {i+1}. Skipping chunk.")
+                dev_print(f"[Processor WARNING] Gatekeeper failed after retries for chunk {i+1}. Skipping chunk.")
                 continue
             
             vector = generate_embedding_with_retry(chunk_text_content)
@@ -128,7 +138,7 @@ def process_document(tenant_id: str, document_id: str):
             })
             
             if len(upstash_payload) >= 50 or i == len(chunks) - 1:
-                print(f"-> Flushing {len(upstash_payload)} vectors to Upstash...")
+                dev_print(f"-> Flushing {len(upstash_payload)} vectors to Upstash...")
                 insert_document_chunks(postgres_payload)
                 upsert_vectors_to_upstash(upstash_payload)
                 
@@ -136,10 +146,10 @@ def process_document(tenant_id: str, document_id: str):
                 postgres_payload = []
                 
         mark_document_processed(document_id)
-        print("7. All chunks processed and upserted successfully!")
+        dev_print("7. All chunks processed and upserted successfully!")
         
     except Exception as e:
-        print(f"[Processor ERROR] Failed to process {document_id}: {str(e)}")
+        dev_print(f"[Processor ERROR] Failed to process {document_id}: {str(e)}")
     finally:
         if os.path.exists(temp_pdf.name):
             os.remove(temp_pdf.name)
