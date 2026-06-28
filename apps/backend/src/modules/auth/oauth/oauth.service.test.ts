@@ -1,7 +1,7 @@
 import { describe, it } from "jsr:@std/testing/bdd";
 import { assertEquals, assertRejects, assertExists } from "jsr:@std/assert";
 import { initiateOAuth, handleOAuthCallback } from "./oauth.service.ts";
-import { AppError } from "../../shared/utils/errors.util.ts";
+import { AppError } from "../../../shared/utils/errors.util.ts";
 
 describe("OAuthService Isolated Tests", () => {
     describe("initiateOAuth", () => {

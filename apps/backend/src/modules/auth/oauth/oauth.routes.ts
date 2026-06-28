@@ -1,7 +1,7 @@
-import { createApp } from "../../config/hono.ts";
+import { createApp } from "../../../config/hono.ts";
 import { createRoute, z } from "@hono/zod-openapi";
 import * as oauthController from "./oauth.controller.ts";
-import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
+import { ErrorResponseSchema } from "../../../shared/schemas/shared.schema.ts";
 
 export const oauthRoutes = createApp();
 

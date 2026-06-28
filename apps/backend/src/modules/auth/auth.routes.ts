@@ -3,7 +3,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import * as authController from "./auth.controller.ts";
 import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
 import * as AuthSchema from "./auth.schema.ts";
-import { oauthRoutes } from "./oauth.routes.ts";
+import { oauthRoutes } from "./oauth/mod.ts";
 
 export const authRoutes = createApp();
 

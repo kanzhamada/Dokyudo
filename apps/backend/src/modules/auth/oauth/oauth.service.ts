@@ -1,7 +1,7 @@
-import { getSupabaseAnon } from "../../config/supabase.ts";
-import { getEnv } from "../../config/env.ts";
-import { redis } from "../../config/redis.ts";
-import { AppError } from "../../shared/utils/errors.util.ts";
+import { getSupabaseAnon } from "../../../config/supabase.ts";
+import { getEnv } from "../../../config/env.ts";
+import { redis } from "../../../config/redis.ts";
+import { AppError } from "../../../shared/utils/errors.util.ts";
 
 type OAuthProvider = "google" | "github";
 
@@ -80,7 +80,7 @@ export async function handleOAuthCallback(
         // Kill the session immediately — do not let unverified users through
         try {
             const { getSupabaseAdmin } =
-                await import("../../config/supabase.ts");
+                await import("../../../config/supabase.ts");
             await getSupabaseAdmin().auth.admin.signOut(
                 session.access_token,
                 "global",

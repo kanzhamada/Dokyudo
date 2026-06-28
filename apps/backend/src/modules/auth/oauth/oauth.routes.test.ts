@@ -1,6 +1,6 @@
 import { describe, it } from "jsr:@std/testing/bdd";
 import { assertEquals } from "jsr:@std/assert";
-import app from "../../main.ts";
+import app from "../../../main.ts";
 
 /** Helper: make a GET request to the test app */
 async function makeGetRequest(path: string): Promise<Response> {

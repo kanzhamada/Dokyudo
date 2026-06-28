@@ -1,5 +1,5 @@
 import { type Context } from "hono";
-import { getEnv } from "../../config/env.ts";
+import { getEnv } from "../../../config/env.ts";
 import * as oauthService from "./oauth.service.ts";
 
 export async function handleGoogleRedirect(c: Context) {
