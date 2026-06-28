@@ -6,6 +6,7 @@ import { loggerMiddleware } from "./shared/middlewares/logger.middleware.ts";
 import { rateLimiterMiddleware } from "./shared/middlewares/rate_limiter.middleware.ts";
 import { validateEnvironment } from "./config/env.ts";
 import rootRouter from "./api/router.ts";
+import { cryptoPuzzleMiddleware } from "./shared/middlewares/crypto_puzzle.middleware.ts";
 import { createApp } from "./config/hono.ts";
 
 const app = createApp();
@@ -16,7 +17,7 @@ app.use(
     cors({
         origin: "*",
         allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
+        allowHeaders: ["Content-Type", "Authorization", "X-Request-ID", "X-Dokyudo-Puzzle"],
         exposeHeaders: ["X-Request-ID"],
     }),
 );
@@ -54,6 +55,7 @@ app.get("/health", (c) => {
 });
 
 // Main API
+app.use("/api/*", cryptoPuzzleMiddleware);
 app.route("/api", rootRouter);
 
 // OpenAPI Documentation

@@ -1,0 +1,19 @@
+{
+  "name": "puzzle_wasm",
+  "type": "module",
+  "collaborators": [
+    "Dokyudo Developer"
+  ],
+  "description": "A WebAssembly Proof of Concept for Dynamic Crypto Puzzle",
+  "version": "0.1.0",
+  "files": [
+    "puzzle_wasm_bg.wasm",
+    "puzzle_wasm.js",
+    "puzzle_wasm.d.ts"
+  ],
+  "main": "puzzle_wasm.js",
+  "types": "puzzle_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

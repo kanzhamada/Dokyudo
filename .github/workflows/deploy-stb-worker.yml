@@ -3,7 +3,6 @@ name: Deploy STB Worker
 on:
   push:
     branches: [ "main" ]
-    # Workflow ini HANYA jalan kalau ada perubahan di folder stb-worker
     paths:
       - 'apps/stb-worker/**'
       - '.github/workflows/deploy-stb-worker.yml'
@@ -35,7 +34,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Ubah nama owner repo ke huruf kecil (syarat Docker image name)
       - name: Downcase Image Name
         run: |
           echo "IMAGE_NAME=${github_repository_owner,,}/dokyudo-stb-worker" >> ${GITHUB_ENV}
@@ -46,10 +44,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./apps/stb-worker
-          # Targetkan khusus ke OS Armbian Aarch64 milik STB
           platforms: linux/arm64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          # Memanfaatkan cache Github Actions agar build selanjutnya lebih cepat
           cache-from: type=gha
           cache-to: type=gha,mode=max
