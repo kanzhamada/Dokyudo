@@ -4,44 +4,47 @@ import { generatePresignedPutUrl, checkObjectExists } from "../../shared/utils/s
 import { withAuthDb } from "../../config/drizzle.ts";
 import { eq, and } from "drizzle-orm";
 import { documents } from "../../shared/models/db.model.ts";
+import * as DocumentSchema from "./documents.schema.ts";
+import { MAX_DOCUMENT_SIZE_BYTES, PRESIGNED_URL_EXPIRES_IN_SECONDS } from "../../shared/constants/documents.constant.ts";
 
 export class DocumentsService {
     /**
      * Generates a presigned URL and creates a pending document record.
      */
     static async createPresignedUrl(
-        tenantId: string,
-        filename: string,
-        mimeType: string,
-        sizeBytes: number,
-    ) {
+        params: DocumentSchema.CreatePresignedUrlParams,
+    ): Promise<DocumentSchema.PresignedUrlResponse> {
         
-        // Enforce maximum size (25MB)
-        if (sizeBytes > 25 * 1024 * 1024) {
+        // Enforce maximum size
+        if (params.sizeBytes > MAX_DOCUMENT_SIZE_BYTES) {
             throw new AppError({
                 code: "VALIDATION_ERROR",
-                message: "File size exceeds maximum allowed size of 25MB",
+                message: `File size exceeds maximum allowed size of ${MAX_DOCUMENT_SIZE_BYTES / (1024 * 1024)}MB`,
                 status: 400,
             });
         }
 
         const docId = crypto.randomUUID();
-        const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
-        const objectKey = `${tenantId}/${docId}.${ext}`;
+        const ext = params.filename.includes(".") ? params.filename.split(".").pop() : "bin";
+        const objectKey = `${params.tenantId}/${docId}.${ext}`;
 
         const bucketName = getEnv("S3_BUCKET_NAME");
-        const expiresIn = 900; // 15 minutes
 
-        let url: string;
+        let url: string | null = null;
         try {
             url = await generatePresignedPutUrl(
                 bucketName,
                 objectKey,
-                mimeType,
-                expiresIn,
+                params.mimeType,
+                PRESIGNED_URL_EXPIRES_IN_SECONDS,
             );
         } catch (err: any) {
-            console.error("Failed to generate presigned URL:", err);
+            if (params.logContext) {
+                params.logContext.s3Error = "Failed to generate presigned URL: " + err.message;
+            }
+        }
+
+        if (!url) {
             throw new AppError({
                 code: "INTERNAL_ERROR",
                 message: "Failed to communicate with storage service",
@@ -49,20 +52,27 @@ export class DocumentsService {
             });
         }
 
+        let dbInsertSuccess = false;
         try {
-            await withAuthDb(tenantId, async (tx) => {
+            await withAuthDb(params.tenantId, async (tx) => {
                 await tx.insert(documents).values({
                     id: docId,
-                    tenantId,
-                    title: filename,
+                    tenantId: params.tenantId,
+                    title: params.filename,
                     storagePath: `${docId}.${ext}`,
-                    sizeBytes,
+                    sizeBytes: params.sizeBytes,
                     description: "",
                     status: "pending",
                 });
             });
+            dbInsertSuccess = true;
         } catch (err: any) {
-            console.error("Failed to insert pending document:", err);
+            if (params.logContext) {
+                params.logContext.dbError = "Failed to insert pending document: " + err.message;
+            }
+        }
+
+        if (!dbInsertSuccess) {
             throw new AppError({
                 code: "INTERNAL_ERROR",
                 message: "Failed to register document in database",
@@ -74,22 +84,25 @@ export class DocumentsService {
             url,
             documentId: docId,
             key: objectKey,
-            expiresIn,
+            expiresIn: PRESIGNED_URL_EXPIRES_IN_SECONDS,
         };
     }
 
     /**
      * Confirms that a document was successfully uploaded to MinIO.
      */
-    static async confirmUpload(tenantId: string, documentId: string) {
+    static async confirmUpload(
+        params: DocumentSchema.ConfirmUploadParams,
+    ): Promise<DocumentSchema.ConfirmUploadResponse> {
         let doc: any = null;
+        let dbQueryError = false;
 
         try {
-            await withAuthDb(tenantId, async (tx) => {
+            await withAuthDb(params.tenantId, async (tx) => {
                 const results = await tx.select().from(documents).where(
                     and(
-                        eq(documents.id, documentId),
-                        eq(documents.tenantId, tenantId)
+                        eq(documents.id, params.documentId),
+                        eq(documents.tenantId, params.tenantId)
                     )
                 );
                 if (results.length > 0) {
@@ -97,7 +110,13 @@ export class DocumentsService {
                 }
             });
         } catch (err: any) {
-            console.error("Failed to fetch document for confirmation:", err);
+            if (params.logContext) {
+                params.logContext.dbError = "Failed to fetch document for confirmation: " + err.message;
+            }
+            dbQueryError = true;
+        }
+
+        if (dbQueryError) {
             throw new AppError({
                 code: "INTERNAL_ERROR",
                 message: "Failed to query document",
@@ -116,19 +135,26 @@ export class DocumentsService {
         if (doc.status === "confirmed") {
             return {
                 message: "Document already confirmed",
-                documentId,
+                documentId: params.documentId,
                 status: "confirmed",
             };
         }
 
         const bucketName = getEnv("S3_BUCKET_NAME");
-        const objectKey = `${tenantId}/${doc.storagePath}`;
+        const objectKey = `${params.tenantId}/${doc.storagePath}`;
 
         let exists = false;
+        let s3CheckError = false;
         try {
             exists = await checkObjectExists(bucketName, objectKey);
         } catch (err: any) {
-            console.error("Failed to check object existence in S3:", err);
+            if (params.logContext) {
+                params.logContext.s3Error = "Failed to check object existence in S3: " + err.message;
+            }
+            s3CheckError = true;
+        }
+
+        if (s3CheckError) {
             throw new AppError({
                 code: "INTERNAL_ERROR",
                 message: "Failed to communicate with storage service",
@@ -144,19 +170,26 @@ export class DocumentsService {
             });
         }
 
+        let dbUpdateSuccess = false;
         try {
-            await withAuthDb(tenantId, async (tx) => {
+            await withAuthDb(params.tenantId, async (tx) => {
                 await tx.update(documents)
                     .set({ status: "confirmed" })
                     .where(
                         and(
-                            eq(documents.id, documentId),
-                            eq(documents.tenantId, tenantId)
+                            eq(documents.id, params.documentId),
+                            eq(documents.tenantId, params.tenantId)
                         )
                     );
             });
+            dbUpdateSuccess = true;
         } catch (err: any) {
-            console.error("Failed to update document status:", err);
+            if (params.logContext) {
+                params.logContext.dbError = "Failed to update document status: " + err.message;
+            }
+        }
+
+        if (!dbUpdateSuccess) {
             throw new AppError({
                 code: "INTERNAL_ERROR",
                 message: "Failed to update document status",
@@ -166,7 +199,7 @@ export class DocumentsService {
 
         return {
             message: "Document uploaded and confirmed successfully",
-            documentId,
+            documentId: params.documentId,
             status: "confirmed",
         };
     }

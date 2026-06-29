@@ -1,31 +1,40 @@
 import { Context } from "hono";
-import { AppError } from "../../shared/utils/errors.util.ts";
 import { DocumentsService } from "./documents.service.ts";
 import { ContextExtractor } from "../../shared/utils/context.util.ts";
+import * as DocumentSchema from "./documents.schema.ts";
 
 export async function handleGeneratePresignedUrl(c: Context) {
-    const { tenantId } = new ContextExtractor(c).extractAuthContext();
+    const extractor = new ContextExtractor(c);
+    const { tenantId, logContext } = extractor.extractAuthContext();
 
-    const body = await c.req.json();
-    const { filename, mimeType, sizeBytes } = body;
+    const body = extractor.extractValidJson<DocumentSchema.PresignedUrlBody>();
     
-    const result = await DocumentsService.createPresignedUrl(
+    const params: DocumentSchema.CreatePresignedUrlParams = {
         tenantId,
-        filename,
-        mimeType,
-        sizeBytes
-    );
+        filename: body.filename,
+        mimeType: body.mimeType,
+        sizeBytes: body.sizeBytes,
+        logContext,
+    };
+
+    const result = await DocumentsService.createPresignedUrl(params);
 
     return c.json(result, 201);
 }
 
 export async function handleConfirmUpload(c: Context) {
-    const { tenantId } = new ContextExtractor(c).extractAuthContext();
+    const extractor = new ContextExtractor(c);
+    const { tenantId, logContext } = extractor.extractAuthContext();
 
-    const body = await c.req.json();
-    const { documentId } = body;
+    const body = extractor.extractValidJson<DocumentSchema.ConfirmUploadBody>();
     
-    const result = await DocumentsService.confirmUpload(tenantId, documentId);
+    const params: DocumentSchema.ConfirmUploadParams = {
+        tenantId,
+        documentId: body.documentId,
+        logContext,
+    };
+
+    const result = await DocumentsService.confirmUpload(params);
 
     return c.json(result, 200);
 }

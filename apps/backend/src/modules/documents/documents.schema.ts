@@ -13,6 +13,15 @@ export const PresignedUrlBodySchema = z.object({
     }),
 });
 
+export type PresignedUrlBody = z.infer<typeof PresignedUrlBodySchema>;
+
+export const CreatePresignedUrlParamsSchema = PresignedUrlBodySchema.extend({
+    tenantId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type CreatePresignedUrlParams = z.infer<typeof CreatePresignedUrlParamsSchema>;
+
 export const PresignedUrlResponseSchema = z.object({
     url: z.string().openapi({
         example: "https://s3.dokyudo.my.id/dokyudo-documents/...",
@@ -32,12 +41,23 @@ export const PresignedUrlResponseSchema = z.object({
     }),
 });
 
+export type PresignedUrlResponse = z.infer<typeof PresignedUrlResponseSchema>;
+
 export const ConfirmUploadBodySchema = z.object({
     documentId: z.string().uuid().openapi({
         example: "123e4567-e89b-12d3-a456-426614174000",
         description: "The ID of the document to confirm",
     }),
 });
+
+export type ConfirmUploadBody = z.infer<typeof ConfirmUploadBodySchema>;
+
+export const ConfirmUploadParamsSchema = ConfirmUploadBodySchema.extend({
+    tenantId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type ConfirmUploadParams = z.infer<typeof ConfirmUploadParamsSchema>;
 
 export const ConfirmUploadResponseSchema = z.object({
     message: z.string().openapi({
@@ -50,3 +70,5 @@ export const ConfirmUploadResponseSchema = z.object({
         example: "confirmed",
     }),
 });
+
+export type ConfirmUploadResponse = z.infer<typeof ConfirmUploadResponseSchema>;

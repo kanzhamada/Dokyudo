@@ -1,0 +1,2 @@
+export const MAX_DOCUMENT_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+export const PRESIGNED_URL_EXPIRES_IN_SECONDS = 900; // 15 minutes

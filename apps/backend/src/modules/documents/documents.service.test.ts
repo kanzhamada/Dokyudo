@@ -39,14 +39,24 @@ describe("DocumentsService Isolated Tests", () => {
     describe("createPresignedUrl", () => {
         it("negative: rejects file size over 25MB", async () => {
             await assertRejects(
-                () => DocumentsService.createPresignedUrl(TEST_TENANT_ID, "big.pdf", "application/pdf", 30 * 1024 * 1024),
+                () => DocumentsService.createPresignedUrl({
+                    tenantId: TEST_TENANT_ID, 
+                    filename: "big.pdf", 
+                    mimeType: "application/pdf", 
+                    sizeBytes: 30 * 1024 * 1024
+                }),
                 AppError,
                 "File size exceeds maximum allowed size"
             );
         });
 
         it("positive: creates presigned URL and pending DB record", async () => {
-            const res = await DocumentsService.createPresignedUrl(TEST_TENANT_ID, "test.pdf", "application/pdf", 1024 * 1024);
+            const res = await DocumentsService.createPresignedUrl({
+                tenantId: TEST_TENANT_ID, 
+                filename: "test.pdf", 
+                mimeType: "application/pdf", 
+                sizeBytes: 1024 * 1024
+            });
             
             assertExists(res.url);
             assertEquals(res.url.includes("X-Amz-Signature"), true);
@@ -65,7 +75,10 @@ describe("DocumentsService Isolated Tests", () => {
         it("negative: rejects if document not found in DB", async () => {
             const fakeDocId = crypto.randomUUID(); // valid UUID syntax
             await assertRejects(
-                () => DocumentsService.confirmUpload(TEST_TENANT_ID, fakeDocId),
+                () => DocumentsService.confirmUpload({
+                    tenantId: TEST_TENANT_ID, 
+                    documentId: fakeDocId
+                }),
                 AppError,
                 "Document not found"
             );
@@ -84,7 +97,10 @@ describe("DocumentsService Isolated Tests", () => {
             });
 
             await assertRejects(
-                () => DocumentsService.confirmUpload(TEST_TENANT_ID, docId),
+                () => DocumentsService.confirmUpload({
+                    tenantId: TEST_TENANT_ID, 
+                    documentId: docId
+                }),
                 AppError,
                 "File not found in storage"
             );
@@ -102,7 +118,10 @@ describe("DocumentsService Isolated Tests", () => {
                 status: "confirmed", // already confirmed
             });
 
-            const res = await DocumentsService.confirmUpload(TEST_TENANT_ID, docId);
+            const res = await DocumentsService.confirmUpload({
+                tenantId: TEST_TENANT_ID, 
+                documentId: docId
+            });
             assertEquals(res.message, "Document already confirmed");
         });
     });

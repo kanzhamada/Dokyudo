@@ -2,6 +2,7 @@ import { createApp } from "../../../config/hono.ts";
 import { createRoute, z } from "@hono/zod-openapi";
 import * as oauthController from "./oauth.controller.ts";
 import { ErrorResponseSchema } from "../../../shared/schemas/shared.schema.ts";
+import { OAuthCallbackQuerySchema } from "./oauth.schema.ts";
 
 export const oauthRoutes = createApp();
 
@@ -46,17 +47,7 @@ oauthRoutes.openapi(
             "enforces the email verification gate (PRD §5.1), and redirects to the frontend with tokens. " +
             "New users get a tenant automatically provisioned via the database trigger.",
         request: {
-            query: z.object({
-                code: z.string().optional().openapi({
-                    description: "Authorization code from Google",
-                }),
-                error: z.string().optional().openapi({
-                    description: "Error code if user denied consent",
-                }),
-                error_description: z.string().optional().openapi({
-                    description: "Human-readable error description",
-                }),
-            }),
+            query: OAuthCallbackQuerySchema,
         },
         responses: {
             302: {
@@ -109,17 +100,7 @@ oauthRoutes.openapi(
             "enforces the email verification gate (PRD §5.1), and redirects to the frontend with tokens. " +
             "New users get a tenant automatically provisioned via the database trigger.",
         request: {
-            query: z.object({
-                code: z.string().optional().openapi({
-                    description: "Authorization code from GitHub",
-                }),
-                error: z.string().optional().openapi({
-                    description: "Error code if user denied consent",
-                }),
-                error_description: z.string().optional().openapi({
-                    description: "Human-readable error description",
-                }),
-            }),
+            query: OAuthCallbackQuerySchema,
         },
         responses: {
             302: {

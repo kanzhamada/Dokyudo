@@ -67,4 +67,11 @@ export class ContextExtractor {
     extractValidJson<T = any>(): T {
         return this.c.req.valid("json" as never) as T;
     }
+
+    /**
+     * Extracts validated query parameters from Hono Context, casted to the expected type.
+     */
+    extractValidQuery<T = any>(): T {
+        return this.c.req.valid("query" as never) as T;
+    }
 }

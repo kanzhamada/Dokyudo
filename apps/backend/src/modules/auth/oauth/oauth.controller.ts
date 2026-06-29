@@ -1,22 +1,40 @@
 import { type Context } from "hono";
 import { getEnv } from "../../../config/env.ts";
-import * as oauthService from "./oauth.service.ts";
+import { OAuthService } from "./oauth.service.ts";
+import { ContextExtractor } from "../../../shared/utils/context.util.ts";
+import * as OAuthSchema from "./oauth.schema.ts";
 
 export async function handleGoogleRedirect(c: Context) {
-    const authUrl = await oauthService.initiateOAuth("google");
+    const extractor = new ContextExtractor(c);
+    const { logContext } = extractor.extractBaseContext();
 
-    if (c.get("logContext")) {
-        c.get("logContext").authEvent = "oauth_google_redirect";
+    const params: OAuthSchema.InitiateOAuthParams = {
+        provider: "google",
+        logContext,
+    };
+
+    const authUrl = await OAuthService.initiateOAuth(params);
+
+    if (logContext) {
+        logContext.authEvent = "oauth_google_redirect";
     }
 
     return c.redirect(authUrl);
 }
 
 export async function handleGitHubRedirect(c: Context) {
-    const authUrl = await oauthService.initiateOAuth("github");
+    const extractor = new ContextExtractor(c);
+    const { logContext } = extractor.extractBaseContext();
 
-    if (c.get("logContext")) {
-        c.get("logContext").authEvent = "oauth_github_redirect";
+    const params: OAuthSchema.InitiateOAuthParams = {
+        provider: "github",
+        logContext,
+    };
+
+    const authUrl = await OAuthService.initiateOAuth(params);
+
+    if (logContext) {
+        logContext.authEvent = "oauth_github_redirect";
     }
 
     return c.redirect(authUrl);
@@ -34,10 +52,14 @@ export async function handleGitHubCallback(c: Context) {
  * Shared callback handler for both Google and GitHub OAuth flows.
  * Exchanges the authorization code for a session and redirects to the frontend.
  */
-async function processOAuthCallback(c: Context, provider: string) {
-    const code = c.req.query("code");
-    const errorParam = c.req.query("error");
-    const errorDescription = c.req.query("error_description");
+async function processOAuthCallback(c: Context, provider: "google" | "github") {
+    const extractor = new ContextExtractor(c);
+    const { logContext } = extractor.extractBaseContext();
+    const query = extractor.extractValidQuery<OAuthSchema.OAuthCallbackQuery>();
+
+    const code = query.code;
+    const errorParam = query.error;
+    const errorDescription = query.error_description;
 
     // Handle provider-side errors (e.g., user denied consent)
     if (errorParam) {
@@ -54,10 +76,17 @@ async function processOAuthCallback(c: Context, provider: string) {
     }
 
     try {
-        const result = await oauthService.handleOAuthCallback(code);
+        const params: OAuthSchema.OAuthCallbackParams = {
+            code,
+            provider,
+            error: errorParam,
+            error_description: errorDescription,
+            logContext,
+        };
 
-        if (c.get("logContext")) {
-            const logContext = c.get("logContext");
+        const result = await OAuthService.handleOAuthCallback(params);
+
+        if (logContext) {
             logContext.authEvent = `oauth_${provider}_success`;
             logContext.authEmail = result.user.email;
             logContext.userId = result.user.id;
@@ -65,15 +94,16 @@ async function processOAuthCallback(c: Context, provider: string) {
 
         // Redirect to frontend with tokens
         const frontendUrl = getEnv("FRONTEND_URL");
-        const params = new URLSearchParams({
+        const paramsObj = new URLSearchParams({
             access_token: result.accessToken,
             refresh_token: result.refreshToken,
         });
 
-        return c.redirect(`${frontendUrl}/oauth-callback?${params.toString()}`);
+        return c.redirect(
+            `${frontendUrl}/oauth-callback?${paramsObj.toString()}`,
+        );
     } catch (error: any) {
-        if (c.get("logContext")) {
-            const logContext = c.get("logContext");
+        if (logContext) {
             logContext.authEvent = `oauth_${provider}_failed`;
             logContext.authError = error.message;
         }
