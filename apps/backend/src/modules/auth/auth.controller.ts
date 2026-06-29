@@ -1,17 +1,15 @@
-import { extractClientIp } from "../../shared/utils/ip.util.ts";
-import { AppError } from "../../shared/utils/errors.util.ts";
-import * as authService from "./auth.service.ts";
+import { ContextExtractor } from "../../shared/utils/context.util.ts";
+import { AuthService } from "./auth.service.ts";
+import * as AuthSchema from "./auth.schema.ts";
 import { type Context } from "hono";
 
 export async function handleRegister(c: Context) {
-    const requestId = c.get("requestId") ?? crypto.randomUUID();
-    const body = c.req.valid("json" as never) as any;
-    const clientIp = extractClientIp(c.req.raw.headers);
-    const userAgent = c.req.header("user-agent") ?? "unknown";
+    const extractor = new ContextExtractor(c);
+    const { requestId, clientIp, userAgent, logContext } =
+        extractor.extractAuditContext();
+    const body = extractor.extractValidJson<AuthSchema.RegisterBody>();
 
-    const logContext = c.get("logContext");
-
-    await authService.registerUser({
+    const params: AuthSchema.RegisterParams = {
         email: body.email,
         password: body.password,
         recaptchaToken: body.recaptchaToken,
@@ -19,7 +17,9 @@ export async function handleRegister(c: Context) {
         userAgent,
         requestId,
         logContext,
-    });
+    };
+
+    await AuthService.registerUser(params);
 
     return c.json(
         {
@@ -31,14 +31,12 @@ export async function handleRegister(c: Context) {
 }
 
 export async function handleLogin(c: Context) {
-    const requestId = c.get("requestId") ?? crypto.randomUUID();
-    const body = c.req.valid("json" as never) as any;
-    const clientIp = extractClientIp(c.req.raw.headers);
-    const userAgent = c.req.header("user-agent") ?? "unknown";
+    const extractor = new ContextExtractor(c);
+    const { requestId, clientIp, userAgent, logContext } =
+        extractor.extractAuditContext();
+    const body = extractor.extractValidJson<AuthSchema.LoginBody>();
 
-    const logContext = c.get("logContext");
-
-    const authData = await authService.loginUser({
+    const params: AuthSchema.LoginParams = {
         email: body.email,
         password: body.password,
         recaptchaToken: body.recaptchaToken,
@@ -46,7 +44,9 @@ export async function handleLogin(c: Context) {
         userAgent,
         requestId,
         logContext,
-    });
+    };
+
+    const authData = await AuthService.loginUser(params);
 
     return c.json(
         {
@@ -62,47 +62,36 @@ export async function handleLogin(c: Context) {
 }
 
 export async function handleLogout(c: Context) {
-    const authHeader = c.req.header("Authorization");
-    const logContext = c.get("logContext");
+    const extractor = new ContextExtractor(c);
+    const { logContext } = extractor.extractBaseContext();
+    const accessToken = extractor.extractBearerToken();
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        if (logContext) {
-            logContext.authEvent = "logout_failed";
-            logContext.authError = "Missing or invalid authorization token";
-        }
-        throw new AppError({
-            code: "UNAUTHORIZED",
-            message: "Missing or invalid authorization token",
-            status: 401,
-        });
-    }
-
-    const accessToken = authHeader.split(" ")[1];
-
-    await authService.logoutUser({
+    const params: AuthSchema.LogoutParams = {
         accessToken,
         logContext,
-    });
+    };
+
+    await AuthService.logoutUser(params);
 
     return c.json({ message: "Successfully logged out" }, 200);
 }
 
 export async function handleForgetPassword(c: Context) {
-    const requestId = c.get("requestId") ?? crypto.randomUUID();
-    const body = c.req.valid("json" as never) as any;
-    const clientIp = extractClientIp(c.req.raw.headers);
-    const userAgent = c.req.header("user-agent") ?? "unknown";
+    const extractor = new ContextExtractor(c);
+    const { requestId, clientIp, userAgent, logContext } =
+        extractor.extractAuditContext();
+    const body = extractor.extractValidJson<AuthSchema.ForgetPasswordBody>();
 
-    const logContext = c.get("logContext");
-
-    await authService.forgetPassword({
+    const params: AuthSchema.ForgetPasswordParams = {
         email: body.email,
         recaptchaToken: body.recaptchaToken,
         clientIp,
         userAgent,
         requestId,
         logContext,
-    });
+    };
+
+    await AuthService.forgetPassword(params);
 
     return c.json(
         { message: "If an account exists, a recovery email has been sent." },
@@ -111,14 +100,12 @@ export async function handleForgetPassword(c: Context) {
 }
 
 export async function handleResetPassword(c: Context) {
-    const requestId = c.get("requestId") ?? crypto.randomUUID();
-    const body = c.req.valid("json" as never) as any;
-    const clientIp = extractClientIp(c.req.raw.headers);
-    const userAgent = c.req.header("user-agent") ?? "unknown";
+    const extractor = new ContextExtractor(c);
+    const { requestId, clientIp, userAgent, logContext } =
+        extractor.extractAuditContext();
+    const body = extractor.extractValidJson<AuthSchema.ResetPasswordBody>();
 
-    const logContext = c.get("logContext");
-
-    await authService.resetPassword({
+    const params: AuthSchema.ResetPasswordParams = {
         email: body.email,
         otp: body.otp,
         newPassword: body.newPassword,
@@ -126,7 +113,9 @@ export async function handleResetPassword(c: Context) {
         userAgent,
         requestId,
         logContext,
-    });
+    };
+
+    await AuthService.resetPassword(params);
 
     return c.json(
         { message: "Password has been successfully reset. Please log in." },
@@ -135,25 +124,18 @@ export async function handleResetPassword(c: Context) {
 }
 
 export async function handleUpdatePassword(c: Context) {
-    const authHeader = c.req.header("Authorization");
-    const body = c.req.valid("json" as never) as any;
-    const logContext = c.get("logContext");
+    const extractor = new ContextExtractor(c);
+    const { logContext } = extractor.extractBaseContext();
+    const accessToken = extractor.extractBearerToken();
+    const body = extractor.extractValidJson<AuthSchema.UpdatePasswordBody>();
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        throw new AppError({
-            code: "UNAUTHORIZED",
-            message: "Missing or invalid authorization token",
-            status: 401,
-        });
-    }
-
-    const accessToken = authHeader.split(" ")[1];
-
-    await authService.updatePassword({
+    const params: AuthSchema.UpdatePasswordParams = {
         accessToken,
         newPassword: body.newPassword,
         logContext,
-    });
+    };
+
+    await AuthService.updatePassword(params);
 
     return c.json(
         { message: "Password successfully updated. Please log in again." },

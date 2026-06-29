@@ -8,19 +8,16 @@ export const handleSearch = async (c: Context) => {
         c,
     ).extractAuthContext();
 
-    const { query, limit } = c.req.valid("query" as never) as {
-        query: string;
-        limit: number;
-    };
+    const { query, limit } = c.req.valid("query" as never) as any;
 
     const params: SearchParams = {
         tenantId,
-        queryText: query,
+        query,
         limit,
         logContext,
     };
 
     const results = await SearchService.executeHybridSearch(params);
 
-    return c.json({ data: results });
+    return c.json({ data: results }, 200);
 };

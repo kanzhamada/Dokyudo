@@ -1,14 +1,5 @@
 import { z } from "@hono/zod-openapi";
 
-export const SearchParamsSchema = z.object({
-    tenantId: z.string().uuid(),
-    queryText: z.string().min(1),
-    limit: z.number().int().min(1).optional(),
-    logContext: z.any().optional(),
-});
-
-export type SearchParams = z.infer<typeof SearchParamsSchema>;
-
 export const SearchQuerySchema = z.object({
     query: z.string().min(1).openapi({
         example: "What is the return policy?",
@@ -19,6 +10,14 @@ export const SearchQuerySchema = z.object({
         description: "Maximum number of results to return",
     }),
 });
+
+export type SearchQuery = z.infer<typeof SearchQuerySchema>;
+
+export const SearchParamsSchema = SearchQuerySchema.extend({
+    tenantId: z.string().uuid(),
+    logContext: z.any().optional(),
+});
+export type SearchParams = z.infer<typeof SearchParamsSchema>;
 
 export const SearchResultItemSchema = z.object({
     id: z.string().uuid(),

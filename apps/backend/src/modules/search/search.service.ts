@@ -16,7 +16,7 @@ export class SearchService {
     private static async getEmbedding(params: SearchParams): Promise<number[]> {
         const cacheKey = await RedisKeys.embeddingCache(
             GEMINI_MODELS.embedding,
-            params.queryText,
+            params.query,
         );
         
         let cached: number[] | null = null;
@@ -37,7 +37,7 @@ export class SearchService {
         let safeValues: number[] | null = null;
         
         try {
-            safeValues = await gemini.generateEmbedding(params.queryText);
+            safeValues = await gemini.generateEmbedding(params.query);
         } catch (e: any) {
             if (params.logContext) {
                 params.logContext.searchEvent = "llm_embedding_failed";
@@ -66,11 +66,11 @@ export class SearchService {
     }
 
     static async executeHybridSearch(params: SearchParams) {
-        const { tenantId, queryText, limit = 10, logContext } = params;
+        const { tenantId, query, limit = 10, logContext } = params;
 
         const k = 60; 
 
-        const rankCalc = sql<number>`ts_rank(${documentChunks.fts}, (websearch_to_tsquery('indonesian', ${queryText}) || websearch_to_tsquery('english', ${queryText})))`;
+        const rankCalc = sql<number>`ts_rank(${documentChunks.fts}, (websearch_to_tsquery('indonesian', ${query}) || websearch_to_tsquery('english', ${query})))`;
 
         const ftsPromise = withAuthDb(tenantId, async (tx) => {
             return await tx
@@ -82,7 +82,7 @@ export class SearchService {
                 .where(
                     and(
                         eq(documentChunks.tenantId, tenantId),
-                        sql`${documentChunks.fts} @@ (websearch_to_tsquery('indonesian', ${queryText}) || websearch_to_tsquery('english', ${queryText}))`,
+                        sql`${documentChunks.fts} @@ (websearch_to_tsquery('indonesian', ${query}) || websearch_to_tsquery('english', ${query}))`,
                     ),
                 )
                 .orderBy(desc(rankCalc))

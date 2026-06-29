@@ -1,5 +1,6 @@
 import { Context } from "hono";
 import { AppError } from "./errors.util.ts";
+import { extractClientIp } from "./ip.util.ts";
 
 export class ContextExtractor {
     private c: Context;
@@ -31,5 +32,39 @@ export class ContextExtractor {
             tenantId,
             userId,
         };
+    }
+
+    extractAuditContext() {
+        const requestId = this.c.get("requestId") ?? crypto.randomUUID();
+        const clientIp = extractClientIp(this.c.req.raw.headers);
+        const userAgent = this.c.req.header("user-agent") ?? "unknown";
+
+        return {
+            ...this.extractBaseContext(),
+            requestId,
+            clientIp,
+            userAgent,
+        };
+    }
+
+    extractBearerToken() {
+        const authHeader = this.c.req.header("Authorization");
+        
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            throw new AppError({
+                code: "UNAUTHORIZED",
+                message: "Missing or invalid authorization token",
+                status: 401,
+            });
+        }
+        
+        return authHeader.split(" ")[1];
+    }
+
+    /**
+     * Extracts validated JSON body from Hono Context, casted to the expected type.
+     */
+    extractValidJson<T = any>(): T {
+        return this.c.req.valid("json" as never) as T;
     }
 }

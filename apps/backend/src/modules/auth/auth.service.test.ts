@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, afterAll } from "jsr:@std/testing/bdd";
 import { assertEquals, assertRejects, assertExists } from "jsr:@std/assert";
-import { registerUser, loginUser, logoutUser, forgetPassword } from "./auth.service.ts";
+import { AuthService } from "./auth.service.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { db } from "../../config/drizzle.ts";
 import { users, loginAttempts } from "../../shared/models/db.model.ts";
@@ -47,7 +47,7 @@ describe("AuthService Isolated Tests", () => {
     describe("registerUser", () => {
         it("positive: registers a new user successfully", async () => {
             const logContext: any = {};
-            await registerUser({
+            await AuthService.registerUser({
                 email: TEST_EMAIL,
                 password: "StrongPassword123!",
                 recaptchaToken: "bypass",
@@ -68,7 +68,7 @@ describe("AuthService Isolated Tests", () => {
 
         it("negative: rejects duplicate registration", async () => {
             await assertRejects(
-                () => registerUser({
+                () => AuthService.registerUser({
                     email: TEST_EMAIL,
                     password: "StrongPassword123!",
                     recaptchaToken: "bypass",
@@ -85,7 +85,7 @@ describe("AuthService Isolated Tests", () => {
     describe("loginUser", () => {
         it("negative: rejects login for unverified user", async () => {
             await assertRejects(
-                () => loginUser({
+                () => AuthService.loginUser({
                     email: TEST_EMAIL,
                     password: "StrongPassword123!",
                     recaptchaToken: "bypass",
@@ -102,7 +102,7 @@ describe("AuthService Isolated Tests", () => {
     describe("forgetPassword", () => {
         it("positive: processes recovery for existing user", async () => {
             const logContext: any = {};
-            await forgetPassword({
+            await AuthService.forgetPassword({
                 email: TEST_EMAIL,
                 recaptchaToken: "bypass",
                 clientIp: TEST_IP,
@@ -116,7 +116,7 @@ describe("AuthService Isolated Tests", () => {
 
         it("positive: silently ignores non-existent user", async () => {
             const logContext: any = {};
-            await forgetPassword({
+            await AuthService.forgetPassword({
                 email: "nobody_exists_here@example.com",
                 recaptchaToken: "bypass",
                 clientIp: TEST_IP,

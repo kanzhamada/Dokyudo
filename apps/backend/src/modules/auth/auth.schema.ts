@@ -36,6 +36,16 @@ export const RegisterBodySchema = z
             }),
     })
     .openapi("RegisterBody");
+export type RegisterBody = z.infer<typeof RegisterBodySchema>;
+
+const RegisterParamsSchema = RegisterBodySchema.extend({
+    clientIp: z.string(),
+    userAgent: z.string(),
+    requestId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type RegisterParams = z.infer<typeof RegisterParamsSchema>;
 
 export const RegisterResponseSchema = z
     .object({
@@ -76,6 +86,16 @@ export const LoginBodySchema = z
             }),
     })
     .openapi("LoginBody");
+export type LoginBody = z.infer<typeof LoginBodySchema>;
+
+const LoginParamsSchema = LoginBodySchema.extend({
+    clientIp: z.string(),
+    userAgent: z.string(),
+    requestId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type LoginParams = z.infer<typeof LoginParamsSchema>;
 
 export const LoginResponseSchema = z
     .object({
@@ -94,9 +114,27 @@ export const LoginResponseSchema = z
     })
     .openapi("LoginResponse");
 
+export const LoginAttemptParamsSchema = z.object({
+    email: z.string(),
+    ipAddress: z.string(),
+    userAgent: z.string(),
+    isSuccess: z.boolean(),
+    authProvider: z.string().optional(),
+    logContext: z.any().optional(),
+});
+
+export type LoginAttemptParams = z.infer<typeof LoginAttemptParamsSchema>;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Logout Schemas
 // ─────────────────────────────────────────────────────────────────────────────
+
+const LogoutParamsSchema = z.object({
+    accessToken: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type LogoutParams = z.infer<typeof LogoutParamsSchema>;
 
 export const LogoutResponseSchema = z
     .object({
@@ -125,6 +163,16 @@ export const ForgetPasswordBodySchema = z
             }),
     })
     .openapi("ForgetPasswordBody");
+export type ForgetPasswordBody = z.infer<typeof ForgetPasswordBodySchema>;
+
+const ForgetPasswordParamsSchema = ForgetPasswordBodySchema.extend({
+    clientIp: z.string(),
+    userAgent: z.string(),
+    requestId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type ForgetPasswordParams = z.infer<typeof ForgetPasswordParamsSchema>;
 
 export const ForgetPasswordResponseSchema = z
     .object({
@@ -159,6 +207,16 @@ export const ResetPasswordBodySchema = z
             }),
     })
     .openapi("ResetPasswordBody");
+export type ResetPasswordBody = z.infer<typeof ResetPasswordBodySchema>;
+
+const ResetPasswordParamsSchema = ResetPasswordBodySchema.extend({
+    clientIp: z.string(),
+    userAgent: z.string(),
+    requestId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type ResetPasswordParams = z.infer<typeof ResetPasswordParamsSchema>;
 
 export const ResetPasswordResponseSchema = z
     .object({
@@ -185,6 +243,14 @@ export const UpdatePasswordBodySchema = z
             }),
     })
     .openapi("UpdatePasswordBody");
+export type UpdatePasswordBody = z.infer<typeof UpdatePasswordBodySchema>;
+
+const UpdatePasswordParamsSchema = UpdatePasswordBodySchema.extend({
+    accessToken: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type UpdatePasswordParams = z.infer<typeof UpdatePasswordParamsSchema>;
 
 export const UpdatePasswordResponseSchema = z
     .object({

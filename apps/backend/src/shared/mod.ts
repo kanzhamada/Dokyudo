@@ -4,7 +4,6 @@ export * from "./utils/ip.util.ts";
 export * from "./models/db.model.ts";
 export * from "./schemas/shared.schema.ts";
 export * from "./types/app.types.ts";
-export * from "./types/auth.types.ts";
 export * from "./types/recaptcha.types.ts";
 export * from "./utils/errors.util.ts";
 export * from "./utils/recaptcha.util.ts";
