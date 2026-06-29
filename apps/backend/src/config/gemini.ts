@@ -3,7 +3,14 @@ import { getEnv } from "./env.ts";
 
 export const GEMINI_MODELS = {
     embedding: "gemini-embedding-2",
-    // llm: "gemini-2.5-flash",
+    llmDefault: "gemini-3.1-flash-lite",
+    llmFallbackChain: [
+        "gemini-3.1-flash-lite",
+        "gemini-2.5-flash-lite",
+        "gemini-3-flash",
+        "gemini-3.5-flash",
+        "gemini-2.5-flash",
+    ],
 } as const;
 
 class GeminiClient {
@@ -34,9 +41,15 @@ class GeminiClient {
     }
 
     /**
-     * Future LLM generation methods (e.g., generateText) can be added here
-     * using GEMINI_MODELS.llm
+     * Generate a streaming text response from the LLM.
+     * Accepts an optional model parameter for fallback purposes.
      */
+    async generateTextStream(prompt: string, model: string = GEMINI_MODELS.llmDefault) {
+        return await this.client.models.generateContentStream({
+            model: model,
+            contents: prompt,
+        });
+    }
 }
 
 export const gemini = new GeminiClient();
