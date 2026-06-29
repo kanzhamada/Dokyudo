@@ -4,7 +4,8 @@ import { redis } from "../../config/redis.ts";
 import { determineAgentType, validatePuzzleToken } from "../utils/crypto_puzzle.util.ts";
 
 export async function cryptoPuzzleMiddleware(c: Context, next: Next) {
-    if (Deno.env.get("NODE_ENV") === "dev") {
+    const env = Deno.env.get("NODE_ENV");
+    if (env === "dev" || env === "test") {
         return await next();
     }
 

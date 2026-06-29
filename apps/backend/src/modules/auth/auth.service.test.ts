@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { getSupabaseAdmin } from "../../config/supabase.ts";
 
 describe("AuthService Isolated Tests", () => {
-    const TEST_EMAIL = "isolated_test@example.com";
+    const TEST_EMAIL = `isolated_test_${crypto.randomUUID()}@example.com`;
     const TEST_IP = "127.0.0.1";
     const supabase = getSupabaseAdmin();
 

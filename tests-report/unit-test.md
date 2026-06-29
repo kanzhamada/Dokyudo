@@ -2,7 +2,7 @@
 
 **Date of Testing:** June 28, 2026
 **Target Architecture:** Deno (Hono) Modular Monolith
-**Overall Status:** **PASSED** (7 Test Modules, 63 Test Steps)
+**Overall Status:** **PASSED** (8 Test Modules, 68 Test Steps)
 **Methodology:** BDD (Behavior-Driven Development) via `jsr:@std/testing/bdd`
 
 ## 1. Main App & Global Endpoints (`main.test.ts`)
@@ -73,7 +73,16 @@
 | **Confirm Upload**|`negative: non-existent document returns 404` | HTTP 404, `NOT_FOUND` | HTTP 404, Match | ✅ Pass |
 
 
-## 4. Middlewares & Utils
+## 4. Search Routes (`search.routes.test.ts`)
+
+| Test Case / Step | Description & Path | Expected Result | Actual Result | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **Search** | `negative: missing authorization header returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Search** | `negative: missing query parameter returns 400` | HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
+| **Search** | `positive: valid query returns 200 and search results` | HTTP 200, Array of data | HTTP 200, Match | ✅ Pass |
+
+
+## 5. Middlewares & Utils
 
 | Suite | Description & Path | Expected Result | Actual Result | Status |
 | :--- | :--- | :--- | :--- | :---: |
@@ -112,7 +121,7 @@
 | **Puzzle** | `Allows request with valid new puzzle token`| HTTP 200 | HTTP 200 | ✅ Pass |
 | **Puzzle** | `Blocks replay attack on reused token` | HTTP 403, "Replay Attack Detected" | HTTP 403 | ✅ Pass |
 
-## 5. Services (Isolated)
+## 6. Services (Isolated)
 
 | Suite | Description & Path | Expected Result | Actual Result | Status |
 | :--- | :--- | :--- | :--- | :---: |
@@ -130,6 +139,8 @@
 | **OAuth Svc**| `initiateOAuth: returns valid GitHub URL` | Returns URL with `provider=github` | Match string | ✅ Pass |
 | **OAuth Svc**| `handleOAuthCallback: throws missing code` | Throws "Missing authorization code" | AppError thrown | ✅ Pass |
 | **OAuth Svc**| `handleOAuthCallback: throws invalid code` | Throws "OAuth code exchange failed" | AppError thrown | ✅ Pass |
+| **Search Svc**| `executeHybridSearch: valid query` | Returns FTS & Vector matched data | Valid array returned | ✅ Pass |
+| **Search Svc**| `executeHybridSearch: LLM failure` | Throws "Hybrid search execution failed"| AppError thrown | ✅ Pass |
 
 ---
 *Report auto-generated after applying BDD refactoring and strict isolation testing.*

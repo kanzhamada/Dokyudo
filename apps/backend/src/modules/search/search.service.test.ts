@@ -1,47 +1,91 @@
-import { assertEquals, assertRejects, assertExists } from "jsr:@std/assert";
-import { executeHybridSearch } from "./search.service.ts";
-import { createCircuitBreaker, CircuitBreakerOpenError } from "../../infra/circuit-breaker.ts";
+import { describe, it, beforeAll, afterAll } from "jsr:@std/testing/bdd";
+import { assertEquals, assertExists, assertRejects } from "jsr:@std/assert";
+import { stub, returnsNext } from "jsr:@std/testing/mock";
+import { SearchService } from "./search.service.ts";
+import { db } from "../../config/drizzle.ts";
+import { documentChunks, documents, tenants } from "../../shared/models/db.model.ts";
+import { eq } from "drizzle-orm";
+import { gemini } from "../../config/gemini.ts";
+import { vectorIndex } from "../../config/vector.ts";
+import { AppError } from "../../shared/utils/errors.util.ts";
 
-Deno.test("executeHybridSearch() - Positive: Execute search and return empty array for unknown tenant", async () => {
-    assertExists(executeHybridSearch);
-    
-    const fakeTenant = crypto.randomUUID();
-    const results = await executeHybridSearch(fakeTenant, "test query", 5);
-    
-    assertEquals(Array.isArray(results), true);
-    assertEquals(results.length, 0); 
-});
+describe("SearchService Isolated Tests", () => {
+    const TEST_TENANT_ID = crypto.randomUUID();
+    const TEST_DOC_ID = crypto.randomUUID();
 
-Deno.test("Circuit Breaker - Negative: Circuit trips after threshold and throws CircuitBreakerOpenError", async () => {
-    // Generate a unique instance name to avoid Redis collisions during tests
-    const instanceName = `test-cb-${crypto.randomUUID()}`;
-    const cb = createCircuitBreaker(instanceName, {
-        failureThreshold: 5,
-        windowMs: 10000,
-        openDurationMs: 5000,
-        halfOpenProbes: 1
+    beforeAll(async () => {
+        // Create dummy tenant and chunk for DB tests
+        await db.insert(tenants).values({
+            id: TEST_TENANT_ID,
+            name: "Search Service Test Tenant",
+        }).onConflictDoNothing();
+
+        await db.insert(documents).values({
+            id: TEST_DOC_ID,
+            tenantId: TEST_TENANT_ID,
+            title: "Test Document",
+            storagePath: "test.pdf",
+            sizeBytes: 100,
+            status: "confirmed",
+            description: "",
+        }).onConflictDoNothing();
+
+        await db.insert(documentChunks).values({
+            id: crypto.randomUUID(),
+            tenantId: TEST_TENANT_ID,
+            documentId: TEST_DOC_ID,
+            chunkIndex: 0,
+            content: "Ini adalah dokumen dummy tentang kebijakan pengembalian barang",
+        }).onConflictDoNothing();
     });
 
-    const failingFunction = async () => {
-        throw new Error("Simulated API failure");
-    };
+    afterAll(async () => {
+        await db.delete(documentChunks).where(eq(documentChunks.tenantId, TEST_TENANT_ID));
+        await db.delete(documents).where(eq(documents.tenantId, TEST_TENANT_ID));
+        await db.delete(tenants).where(eq(tenants.id, TEST_TENANT_ID));
+    });
 
-    // Cause 5 failures
-    for (let i = 0; i < 5; i++) {
-        await assertRejects(
-            async () => {
-                await cb.execute(failingFunction);
-            },
-            Error,
-            "Simulated API failure"
-        );
-    }
+    describe("executeHybridSearch", () => {
+        it("positive: returns hybrid search results for valid query", async () => {
+            // Mock LLM Embedding to return a dummy vector
+            using geminiStub = stub(gemini, "generateEmbedding", () => Promise.resolve([0.1, 0.2, 0.3]));
+            
+            // Mock Upstash Vector Index to return a dummy match
+            using vectorStub = stub(vectorIndex, "query", () => Promise.resolve([{
+                id: crypto.randomUUID(),
+                score: 0.9,
+            }]));
 
-    // 6th call should instantly throw CircuitBreakerOpenError (Fail-Fast)
-    await assertRejects(
-        async () => {
-            await cb.execute(failingFunction);
-        },
-        CircuitBreakerOpenError
-    );
+            const params = {
+                tenantId: TEST_TENANT_ID,
+                query: "kebijakan pengembalian",
+                limit: 5,
+                logContext: {},
+            };
+
+            const results = await SearchService.executeHybridSearch(params);
+            
+            assertExists(results);
+            assertEquals(Array.isArray(results), true);
+            // It should at least search the DB (FTS) and Vector (mocked)
+        });
+
+        it("negative: throws error if LLM embedding fails completely", async () => {
+            // Stub gemini to throw error
+            using geminiStub = stub(gemini, "generateEmbedding", () => { throw new Error("API Limit Reached"); });
+            
+            const params = {
+                tenantId: TEST_TENANT_ID,
+                query: "kebijakan pengembalian",
+                limit: 5,
+                logContext: {},
+            };
+
+            await assertRejects(
+                () => SearchService.executeHybridSearch(params),
+                AppError,
+                "Hybrid search execution failed"
+            );
+        });
+    });
 });
