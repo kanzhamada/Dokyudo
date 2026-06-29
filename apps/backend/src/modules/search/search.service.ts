@@ -72,46 +72,65 @@ export class SearchService {
 
         const rankCalc = sql<number>`ts_rank(${documentChunks.fts}, (websearch_to_tsquery('indonesian', ${query}) || websearch_to_tsquery('english', ${query})))`;
 
-        const ftsPromise = withAuthDb(tenantId, async (tx) => {
-            return await tx
-                .select({
-                    id: documentChunks.id,
-                    rank: rankCalc,
-                })
-                .from(documentChunks)
-                .where(
-                    and(
-                        eq(documentChunks.tenantId, tenantId),
-                        sql`${documentChunks.fts} @@ (websearch_to_tsquery('indonesian', ${query}) || websearch_to_tsquery('english', ${query}))`,
-                    ),
-                )
-                .orderBy(desc(rankCalc))
-                .limit(limit * 2);
-        });
-
-        const vectorPromise = (async () => {
-            const embedding = await embeddingCB.execute(() =>
-                SearchService.getEmbedding(params),
-            );
-
-            const vec = await vectorIndex.query({
-                vector: embedding,
-                topK: limit * 2,
-                includeMetadata: false,
-                includeVectors: false,
-                filter: `tenantId = '${tenantId}'`,
-            });
-            const vecLen = vec.length;
-            const vecMapped = new Array(vecLen);
-            for (let i = 0; i < vecLen; i++) {
-                vecMapped[i] = { id: vec[i].id as string, rank: i + 1 };
+        const ftsPromise = (async () => {
+            try {
+                return await withAuthDb(tenantId, async (tx) => {
+                    return await tx
+                        .select({
+                            id: documentChunks.id,
+                            rank: rankCalc,
+                        })
+                        .from(documentChunks)
+                        .where(
+                            and(
+                                eq(documentChunks.tenantId, tenantId),
+                                sql`${documentChunks.fts} @@ (websearch_to_tsquery('indonesian', ${query}) || websearch_to_tsquery('english', ${query}))`,
+                            ),
+                        )
+                        .orderBy(desc(rankCalc))
+                        .limit(limit * 2);
+                });
+            } catch (err: any) {
+                if (logContext) {
+                    logContext.searchEvent = "fts_search_failed_graceful_degradation";
+                    logContext.searchError = err.message;
+                }
+                return [];
             }
-
-            return vecMapped;
         })();
 
-        let ftsResults: { id: string; rank: number }[] | null = null;
-        let vectorIds: { id: string; rank: number }[] | null = null;
+        const vectorPromise = (async () => {
+            try {
+                const embedding = await embeddingCB.execute(() =>
+                    SearchService.getEmbedding(params),
+                );
+
+                const vec = await vectorIndex.query({
+                    vector: embedding,
+                    topK: limit * 2,
+                    includeMetadata: false,
+                    includeVectors: false,
+                    filter: `tenantId = '${tenantId}'`,
+                });
+                const vecLen = vec.length;
+                const vecMapped = new Array(vecLen);
+                for (let i = 0; i < vecLen; i++) {
+                    vecMapped[i] = { id: vec[i].id as string, rank: i + 1 };
+                }
+
+                return vecMapped;
+            } catch (err: any) {
+                if (logContext) {
+                    logContext.searchEvent = "vector_search_failed_graceful_degradation";
+                    logContext.searchError = err.message;
+                }
+                // Gracefully degrade by returning empty vector results
+                return [];
+            }
+        })();
+
+        let ftsResults: { id: string; rank: number }[] = [];
+        let vectorIds: { id: string; rank: number }[] = [];
 
         try {
             const [fts, vec] = await Promise.all([ftsPromise, vectorPromise]);
@@ -120,17 +139,9 @@ export class SearchService {
             vectorIds = vec;
         } catch (err: any) {
             if (logContext) {
-                logContext.searchEvent = "hybrid_search_failed";
+                logContext.searchEvent = "hybrid_search_promise_all_failed";
                 logContext.searchError = err.message;
             }
-        }
-
-        if (!ftsResults || !vectorIds) {
-            throw new AppError({
-                code: "INTERNAL_ERROR",
-                message: "Hybrid search execution failed",
-                status: 500,
-            });
         }
 
         const scores = new Map<string, number>();
