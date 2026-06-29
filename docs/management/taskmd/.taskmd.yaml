@@ -1,0 +1,21 @@
+dir: ./tasks
+id:
+    strategy: prefixed
+    prefix: dky
+
+phases:
+    - id: core-infra
+      name: "Phase 1 - Core Infra"
+      description: "Core Infrastructure, Gateway, and Auth"
+    - id: auth-identity
+      name: "Phase 2 - Auth"
+      description: "Login, Register, OAuth, Forget Password, and Logout"
+    - id: ingestion
+      name: "Phase 3 - Ingestion"
+      description: "Document Upload, Parsing, and Embedding pipeline"
+    - id: rag
+      name: "Phase 4 - RAG"
+      description: "Semantic Search and AI API Gateway"
+    - id: b2b-security
+      name: "Phase 5 - B2B & Security"
+      description: "Webhooks, Payments, and Quota Teardowns"

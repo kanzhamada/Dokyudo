@@ -4,23 +4,23 @@ meta {
   seq: 1
 }
 
-post {
+get {
   url: {{baseUrl}}/api/search
   body: json
   auth: none
 }
 
 headers {
-  Content-Type: application/json
   Authorization: Bearer {{accessToken}}
 }
 
 body:json {
   {
-    "query": "What is the sliding window chunk size and overlap ratio?"
+    "query": "lokal",
+    "limit": 2
   }
 }
 
 docs {
-  Performs tenant-safe hybrid search using cosine similarity on pgvector + keyword matching on tsvector, merged via RRF (Reciprocal Rank Fusion).
+  Performs tenant-safe hybrid search using Upstash Vector + Postgres FTS, merged via RRF (Reciprocal Rank Fusion).
 }

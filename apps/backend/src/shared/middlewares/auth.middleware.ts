@@ -33,7 +33,7 @@ export async function authMiddleware(c: Context, next: Next) {
 
     try {
         const { header } = decode(token);
-        
+
         if (header.alg === "HS256") {
             // Local fast verification for symmetric secrets
             payload = await verify(token, secret, "HS256");
@@ -42,10 +42,10 @@ export async function authMiddleware(c: Context, next: Next) {
             // Network verification for asymmetric keys (ES256/RS256) which Supabase now uses by default
             const supabase = getSupabaseAnon();
             const { data, error } = await supabase.auth.getUser(token);
-            
+
             if (error) throw new Error(error.message);
             if (!data.user) throw new Error("User not found");
-            
+
             payload = {
                 sub: data.user.id,
                 app_metadata: data.user.app_metadata,
@@ -57,7 +57,9 @@ export async function authMiddleware(c: Context, next: Next) {
         const isExpired = err.message?.toLowerCase().includes("expired");
         throw new AppError({
             code: "UNAUTHORIZED",
-            message: isExpired ? "JWT has expired" : `Invalid JWT signature: ${err.message}`,
+            message: isExpired
+                ? "JWT has expired"
+                : `Invalid JWT signature: ${err.message}`,
             status: 401,
         });
     }

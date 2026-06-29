@@ -12,6 +12,7 @@ import {
     uuid,
     varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // Define the custom inet type for Drizzle to support IP addresses natively
 const inet = customType<{ data: string }>({
@@ -139,8 +140,11 @@ export const documentChunks = pgTable("document_chunks", {
         .references(() => documents.id, { onDelete: "cascade" }),
     chunkIndex: integer("chunk_index").notNull(),
     content: text("content").notNull(),
-    fts: tsvector("fts"),
-});
+    fts: tsvector("fts").generatedAlwaysAs(sql`to_tsvector('indonesian', content) || to_tsvector('english', content)`),
+}, (table) => ({
+    tenantIdx: index("idx_document_chunks_tenant").on(table.tenantId),
+    ftsIdx: index("idx_document_chunks_fts").using("gin", table.fts),
+}));
 
 // ==============================================================================
 // 6. CONVERSATIONS TABLE

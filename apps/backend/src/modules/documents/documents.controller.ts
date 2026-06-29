@@ -1,16 +1,10 @@
 import { Context } from "hono";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { DocumentsService } from "./documents.service.ts";
+import { ContextExtractor } from "../../shared/utils/context.util.ts";
 
 export async function handleGeneratePresignedUrl(c: Context) {
-    const tenantId = c.get("tenantId") as string;
-    if (!tenantId) {
-        throw new AppError({
-            code: "UNAUTHORIZED",
-            message: "Missing tenant context",
-            status: 401,
-        });
-    }
+    const { tenantId } = new ContextExtractor(c).extractAuthContext();
 
     const body = await c.req.json();
     const { filename, mimeType, sizeBytes } = body;
@@ -26,14 +20,7 @@ export async function handleGeneratePresignedUrl(c: Context) {
 }
 
 export async function handleConfirmUpload(c: Context) {
-    const tenantId = c.get("tenantId") as string;
-    if (!tenantId) {
-        throw new AppError({
-            code: "UNAUTHORIZED",
-            message: "Missing tenant context",
-            status: 401,
-        });
-    }
+    const { tenantId } = new ContextExtractor(c).extractAuthContext();
 
     const body = await c.req.json();
     const { documentId } = body;

@@ -6,10 +6,15 @@ import { z } from "@hono/zod-openapi";
 
 export const RegisterBodySchema = z
     .object({
-        email: z.string().email().max(255, "Email is too long").openapi({
-            description: "User email address",
-            example: "user@example.com",
-        }),
+        email: z
+            .string()
+            .email()
+            .min(1, "Email is required")
+            .max(255, "Email is too long")
+            .openapi({
+                description: "User email address",
+                example: "user@example.com",
+            }),
         password: z
             .string()
             .min(8, "Password must be at least 8 characters")
@@ -48,10 +53,15 @@ export const RegisterResponseSchema = z
 
 export const LoginBodySchema = z
     .object({
-        email: z.string().email().max(255, "Email is too long").openapi({
-            description: "User email address",
-            example: "user@example.com",
-        }),
+        email: z
+            .string()
+            .email()
+            .min(1, "Email is required")
+            .max(255, "Email is too long")
+            .openapi({
+                description: "User email address",
+                example: "user@example.com",
+            }),
         password: z
             .string()
             .min(1, "Password is required")
