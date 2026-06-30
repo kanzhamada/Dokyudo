@@ -216,4 +216,21 @@ describe("Documents Routes", () => {
             assertEquals(Array.isArray(json.documents), true);
         });
     });
+
+    describe("GET /api/documents/:id/preview", () => {
+        it("negative: missing authorization returns 401", async () => {
+            const res = await makeRequest(`/api/documents/${crypto.randomUUID()}/preview`, "GET");
+            assertEquals(res.status, 401);
+        });
+
+        it("negative: missing document returns 404", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(`/api/documents/${crypto.randomUUID()}/preview`, "GET", undefined, headers);
+            
+            if (!validToken) return;
+            assertEquals(res.status, 404);
+            const json = await res.json();
+            assertEquals(json.error.code, "NOT_FOUND");
+        });
+    });
 });

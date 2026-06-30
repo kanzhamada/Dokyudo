@@ -1,12 +1,12 @@
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { getEnv } from "../../config/env.ts";
-import { generatePresignedPutUrl, checkObjectExists, deleteObject } from "../../shared/utils/s3.util.ts";
+import { generatePresignedPutUrl, checkObjectExists, deleteObject, generatePresignedGetUrl } from "../../shared/utils/s3.util.ts";
 import { withAuthDb, db } from "../../config/drizzle.ts";
 import { eq, and } from "drizzle-orm";
 import { documents, documentChunks } from "../../shared/models/db.model.ts";
 import { vectorIndex } from "../../config/vector.ts";
 import * as DocumentSchema from "./documents.schema.ts";
-import { MAX_DOCUMENT_SIZE_BYTES, PRESIGNED_URL_EXPIRES_IN_SECONDS } from "../../shared/constants/documents.constant.ts";
+import { MAX_DOCUMENT_SIZE_BYTES, PRESIGNED_URL_EXPIRES_IN_SECONDS, PRESIGNED_GET_URL_EXPIRES_IN_SECONDS } from "../../shared/constants/documents.constant.ts";
 
 export class DocumentsService {
     /**
@@ -341,6 +341,76 @@ export class DocumentsService {
 
         return {
             documents: documentItems,
+        };
+    }
+
+    /**
+     * Generates a presigned URL to view/download a document.
+     */
+    static async getDocumentPreview(
+        params: DocumentSchema.GetDocumentPreviewParams,
+    ): Promise<DocumentSchema.GetDocumentPreviewResponse> {
+        let doc: any = null;
+
+        try {
+            await withAuthDb(params.tenantId, async (tx) => {
+                const results = await tx.select().from(documents).where(
+                    and(
+                        eq(documents.id, params.documentId),
+                        eq(documents.tenantId, params.tenantId)
+                    )
+                );
+                if (results.length > 0) {
+                    doc = results[0];
+                }
+            });
+        } catch (err: any) {
+            if (params.logContext) params.logContext.dbError = "Failed to fetch document: " + err.message;
+            throw new AppError({
+                code: "INTERNAL_ERROR",
+                message: "Database query failed",
+                status: 500,
+            });
+        }
+
+        if (!doc) {
+            throw new AppError({
+                code: "NOT_FOUND",
+                message: "Document not found",
+                status: 404,
+            });
+        }
+
+        const bucketName = getEnv("S3_BUCKET_NAME");
+        const objectKey = `${params.tenantId}/${doc.storagePath}`;
+
+        let url: string | null = null;
+        try {
+            url = await generatePresignedGetUrl(
+                bucketName,
+                objectKey,
+                PRESIGNED_GET_URL_EXPIRES_IN_SECONDS,
+            );
+        } catch (err: any) {
+            if (params.logContext) params.logContext.s3Error = "Failed to generate presigned GET URL: " + err.message;
+            throw new AppError({
+                code: "INTERNAL_ERROR",
+                message: "Failed to communicate with storage service",
+                status: 500,
+            });
+        }
+
+        if (!url) {
+            throw new AppError({
+                code: "INTERNAL_ERROR",
+                message: "Failed to generate preview URL",
+                status: 500,
+            });
+        }
+
+        return {
+            url,
+            expiresIn: PRESIGNED_GET_URL_EXPIRES_IN_SECONDS,
         };
     }
 }

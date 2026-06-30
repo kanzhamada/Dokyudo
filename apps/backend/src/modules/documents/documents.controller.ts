@@ -67,3 +67,18 @@ export async function handleListDocuments(c: Context) {
 
     return c.json(result, 200);
 }
+
+export async function handleGetDocumentPreview(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, logContext } = extractor.extractAuthContext();
+
+    const params: DocumentSchema.GetDocumentPreviewParams = {
+        tenantId,
+        documentId: c.req.param("id"),
+        logContext,
+    };
+
+    const result = await DocumentsService.getDocumentPreview(params);
+
+    return c.json(result, 200);
+}

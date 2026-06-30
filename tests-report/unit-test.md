@@ -75,6 +75,8 @@
 | **Delete Doc** | `negative: deleting non-existent document returns 404`| HTTP 404, `NOT_FOUND` | HTTP 404, Match | ✅ Pass |
 | **List Docs** | `negative: missing authorization returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
 | **List Docs** | `positive: returns list of documents` | HTTP 200, array of docs | HTTP 200, Match | ✅ Pass |
+| **Preview** | `negative: missing authorization returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Preview** | `negative: missing document returns 404` | HTTP 404, `NOT_FOUND` | HTTP 404, Match | ✅ Pass |
 
 
 ## 4. Search Routes (`search.routes.test.ts`)
@@ -148,6 +150,8 @@
 | **Docs Svc** | `deleteDocument: rejects if document not found in DB`| Throws "Document not found" | AppError thrown | ✅ Pass |
 | **Docs Svc** | `deleteDocument: deletes document and chunks...` | Returns success, DB empty | DB empty | ✅ Pass |
 | **Docs Svc** | `listDocuments: returns array of documents` | Returns documents for tenant | Returned array | ✅ Pass |
+| **Docs Svc** | `getDocumentPreview: rejects if not found` | Throws "Document not found" | AppError thrown | ✅ Pass |
+| **Docs Svc** | `getDocumentPreview: returns presigned GET URL` | Returns URL & 43200 expiry | Returned URL | ✅ Pass |
 | **Auth Svc** | `registerUser: successful registration` | DB logged, Returns success | DB inserted | ✅ Pass |
 | **Auth Svc** | `registerUser: rejects duplicate` | Throws "Account already registered"| AppError thrown | ✅ Pass |
 | **Auth Svc** | `loginUser: rejects unverified user` | Throws "Invalid email or password" | AppError thrown | ✅ Pass |

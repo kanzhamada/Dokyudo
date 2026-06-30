@@ -119,3 +119,31 @@ export const ListDocumentsResponseSchema = z.object({
 });
 
 export type ListDocumentsResponse = z.infer<typeof ListDocumentsResponseSchema>;
+
+export const GetDocumentPreviewParamSchema = z.object({
+    id: z.string().uuid().openapi({
+        example: "123e4567-e89b-12d3-a456-426614174000",
+        description: "The ID of the document to preview",
+    }),
+});
+
+export const GetDocumentPreviewParamsSchema = z.object({
+    documentId: z.string().uuid(),
+    tenantId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type GetDocumentPreviewParams = z.infer<typeof GetDocumentPreviewParamsSchema>;
+
+export const GetDocumentPreviewResponseSchema = z.object({
+    url: z.string().url().openapi({
+        example: "https://s3.dokyudo.my.id/dokyudo-documents/...",
+        description: "The presigned GET URL for viewing the document",
+    }),
+    expiresIn: z.number().openapi({
+        example: 43200,
+        description: "URL expiration time in seconds",
+    }),
+});
+
+export type GetDocumentPreviewResponse = z.infer<typeof GetDocumentPreviewResponseSchema>;

@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand, GetObjectCommand } from "npm:@aws-sdk/client-s3";
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 import { getEnv } from "../../config/env.ts";
 
@@ -43,6 +43,23 @@ export async function generatePresignedPutUrl(
         Bucket: bucketName,
         Key: objectKey,
         ContentType: mimeType,
+    });
+    
+    return await getSignedUrl(client, command, { expiresIn: expiresInSecs });
+}
+
+/**
+ * Generates a presigned URL for a GET request to download/view an object.
+ */
+export async function generatePresignedGetUrl(
+    bucketName: string,
+    objectKey: string,
+    expiresInSecs = 900
+): Promise<string> {
+    const client = getS3Client();
+    const command = new GetObjectCommand({
+        Bucket: bucketName,
+        Key: objectKey,
     });
     
     return await getSignedUrl(client, command, { expiresIn: expiresInSecs });

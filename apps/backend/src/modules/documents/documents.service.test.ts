@@ -208,4 +208,44 @@ describe("DocumentsService Isolated Tests", () => {
             await db.delete(documents).where(eq(documents.id, docId2));
         });
     });
+
+    describe("getDocumentPreview", () => {
+        it("negative: rejects if document not found in DB", async () => {
+            const fakeId = crypto.randomUUID();
+            try {
+                await DocumentsService.getDocumentPreview({
+                    tenantId: TEST_TENANT_ID,
+                    documentId: fakeId,
+                });
+                assertEquals(true, false, "Should have thrown AppError");
+            } catch (err: any) {
+                assertEquals(err.status, 404);
+            }
+        });
+
+        it("positive: returns presigned GET URL and expiry time", async () => {
+            const docId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: docId,
+                tenantId: TEST_TENANT_ID,
+                title: "doc3.pdf",
+                storagePath: "doc3.pdf",
+                sizeBytes: 100,
+                description: "",
+                status: "confirmed",
+            });
+
+            const res = await DocumentsService.getDocumentPreview({
+                tenantId: TEST_TENANT_ID,
+                documentId: docId,
+            });
+            
+            assertEquals(typeof res.url, "string");
+            assertEquals(res.url.startsWith("http"), true);
+            assertEquals(res.expiresIn, 43200);
+
+            // cleanup
+            await db.delete(documents).where(eq(documents.id, docId));
+        });
+    });
 });

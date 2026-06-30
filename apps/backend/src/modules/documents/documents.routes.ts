@@ -215,3 +215,51 @@ documentsRoutes.openapi(
     }),
     documentsController.handleListDocuments as any,
 );
+
+documentsRoutes.openapi(
+    createRoute({
+        method: "get",
+        path: "/{id}/preview",
+        tags: ["Documents"],
+        summary: "Get a presigned GET URL for a document",
+        description: "Generates a presigned GET URL (12 hours) that can be used directly in an iframe, PDF viewer, or downloaded.",
+        request: {
+            params: DocumentsSchema.GetDocumentPreviewParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Presigned URL generated successfully",
+                content: {
+                    "application/json": {
+                        schema: DocumentsSchema.GetDocumentPreviewResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            404: {
+                description: "Document not found",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    documentsController.handleGetDocumentPreview as any,
+);

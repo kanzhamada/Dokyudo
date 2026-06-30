@@ -7,6 +7,7 @@ Key capabilities:
 - **Presigned URLs**: Grants secure, temporary (15-min) PUT access for the client to upload files directly to MinIO (S3-compatible storage), registering the file as `pending` in the DB.
 - **Upload Confirmation**: Transitions a `pending` document to `confirmed` after verifying the object physically exists in S3.
 - **List Documents**: A `GET` endpoint that retrieves all documents belonging to a tenant, designed specifically to supply the SvelteKit frontend load function for client-side table rendering (TanStack Table).
+- **Document Preview**: A `GET` endpoint (`/api/documents/:id/preview`) that securely generates a short-lived Presigned GET URL (12 hours) allowing the frontend to render the PDF via an iframe or PDFViewer without exposing the private S3 bucket.
 - **Comprehensive Deletion**: A single `DELETE` endpoint that purges the document and cleanly orchestrates the deletion of its embedded chunks in Upstash Vector, its binary file in MinIO, and its Postgres records (with `CASCADE` cleanup).
 
 ## Flow Diagram
@@ -45,6 +46,12 @@ sequenceDiagram
     Client->>API Gateway: GET /api/documents
     API Gateway->>Database: SELECT * FROM documents WHERE tenantId = ...
     API Gateway-->>Client: 200 OK (JSON array)
+
+    %% Preview Flow
+    Client->>API Gateway: GET /api/documents/:id/preview
+    API Gateway->>Database: SELECT storagePath
+    API Gateway->>Storage (AWS SDK): generatePresignedGetUrl
+    API Gateway-->>Client: 200 OK (url, expiresIn)
 ```
 
 ## Completion Timestamp
@@ -52,13 +59,15 @@ sequenceDiagram
 **Time:** 15:10 (UTC+7)
 
 ## File Mapping
-- `apps/backend/src/modules/documents/documents.service.ts`: Implemented `createPresignedUrl`, `confirmUpload`, `deleteDocument`, and `listDocuments`.
+- `apps/backend/src/modules/documents/documents.service.ts`: Implemented `createPresignedUrl`, `confirmUpload`, `deleteDocument`, `listDocuments`, and `getDocumentPreview`.
 - `apps/backend/src/modules/documents/documents.controller.ts`: Added request handlers bridging Zod validation to the service layer.
-- `apps/backend/src/modules/documents/documents.routes.ts`: OpenAPI schemas for all Document CRUD operations.
+- `apps/backend/src/modules/documents/documents.routes.ts`: OpenAPI schemas for all Document CRUD operations, including preview.
 - `apps/backend/src/modules/documents/documents.schema.ts`: Standardized Zod I/O validation.
-- `apps/backend/src/shared/utils/s3.util.ts`: Added `deleteObject` using AWS SDK.
+- `apps/backend/src/shared/utils/s3.util.ts`: Added `deleteObject` and `generatePresignedGetUrl` using AWS SDK.
+- `apps/backend/src/modules/poc/preview.poc.html`: HTML PoC for testing the PDF preview using iframe.
 - `api-collections/Documents/05_Delete Document.bru`: Updated Bruno API collection.
 - `api-collections/Documents/03_List Documents.bru`: Verified Bruno API collection for listing documents.
+- `api-collections/Documents/06_Get Document Preview.bru`: Added Bruno API collection for preview.
 
 ## Connections
 - **Client (Frontend):** Uploads files to MinIO directly using the returned Presigned URL, offloading network bandwidth from Deno Deploy.
@@ -72,3 +81,4 @@ sequenceDiagram
 2. **Order of Deletion Operations**: The backend extracts `chunkIds` *before* hitting Postgres, deletes from Vector, then S3, then finally Postgres. This ensures that if the process dies halfway, we don't have orphaned data in external stores without a DB record to track them.
 3. **Tenant-Level Isolation**: All document database queries (`SELECT`, `UPDATE`, `DELETE`) enforce an explicit `and(eq(documents.tenantId, params.tenantId))` constraint, strictly preventing IDOR vulnerabilities.
 4. **Client-Side Data Processing**: For listing documents, the backend sends the entire tenant's document list in one JSON response. The SvelteKit frontend utilizes TanStack Table to handle sorting, filtering, and pagination exclusively on the client side, ensuring rapid UI responsiveness without needing multiple backend endpoints for small-to-medium scale document libraries.
+5. **Secure Previews**: The MinIO bucket is kept strictly private. Previews are generated dynamically via `getDocumentPreview` using AWS SDK's `GetObjectCommand`, yielding a 12-hour Presigned GET URL. This prevents hotlinking and data leakage while still allowing rich client-side rendering.
