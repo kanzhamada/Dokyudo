@@ -8,7 +8,7 @@ import {
     conversations,
     conversationTurns,
 } from "../../shared/models/db.model.ts";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 
 export class RagService {
     /**
@@ -291,18 +291,36 @@ ${question}
     static async listConversations(params: {
         userId: string;
         tenantId: string;
+        limit?: number;
+        cursor?: string;
     }) {
-        const { userId, tenantId } = params;
-        
+        const { userId, tenantId, limit = 20, cursor } = params;
+
         let results: any[] = [];
+
         await withAuthDb(userId, async (tx) => {
-            results = await tx
+            let query = tx
                 .select()
                 .from(conversations)
-                .where(eq(conversations.tenantId, tenantId))
-                .orderBy(desc(conversations.updatedAt));
+                .where(
+                    cursor
+                        ? and(
+                              eq(conversations.tenantId, tenantId),
+                              lt(conversations.updatedAt, new Date(cursor))
+                          )
+                        : eq(conversations.tenantId, tenantId)
+                )
+                .orderBy(desc(conversations.updatedAt))
+                .limit(limit);
+
+            results = await query;
         });
-        
+
+        let nextCursor: string | null = null;
+        if (results.length === limit) {
+            nextCursor = results[results.length - 1].updatedAt.toISOString();
+        }
+
         return {
             conversations: results.map((c) => ({
                 id: c.id,
@@ -310,6 +328,7 @@ ${question}
                 createdAt: c.createdAt.toISOString(),
                 updatedAt: c.updatedAt.toISOString(),
             })),
+            nextCursor,
         };
     }
     static async getConversation(params: {

@@ -31,8 +31,14 @@ export const ConversationItemSchema = z.object({
 });
 export type ConversationItem = z.infer<typeof ConversationItemSchema>;
 
+export const ListConversationsQuerySchema = z.object({
+    limit: z.coerce.number().min(1).max(100).default(20),
+    cursor: z.string().datetime().optional(), // ISO string of updatedAt
+});
+
 export const ListConversationsResponseSchema = z.object({
     conversations: z.array(ConversationItemSchema),
+    nextCursor: z.string().nullable().optional(),
 });
 export type ListConversationsResponse = z.infer<typeof ListConversationsResponseSchema>;
 

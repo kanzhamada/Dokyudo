@@ -132,7 +132,10 @@ ragRoutes.openapi(
         path: "/conversations",
         tags: ["RAG"],
         summary: "List Conversations",
-        description: "Returns a list of conversations for the current tenant, ordered by most recently updated.",
+        description: "Returns a list of conversations for the current tenant, ordered by most recently updated. Supports cursor-based pagination.",
+        request: {
+            query: RagSchema.ListConversationsQuerySchema,
+        },
         responses: {
             200: {
                 description: "Success",

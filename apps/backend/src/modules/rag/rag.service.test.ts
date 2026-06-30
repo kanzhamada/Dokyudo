@@ -60,12 +60,46 @@ describe("RagService Isolated Tests", () => {
             const res = await RagService.listConversations({
                 userId: TEST_USER_ID,
                 tenantId: TEST_TENANT_ID,
+                limit: 10,
             });
 
             assertEquals(Array.isArray(res.conversations), true);
             // Initially one from setup
             assertEquals(res.conversations.length, 1);
             assertEquals(res.conversations[0].id, TEST_CONVERSATION_ID);
+            assertEquals(res.nextCursor, null);
+        });
+
+        it("positive: honors cursor limit and updates cursor correctly", async () => {
+            // we will insert one more to test cursor
+            const secondConv = crypto.randomUUID();
+            await db.insert(conversations).values({
+                id: secondConv,
+                tenantId: TEST_TENANT_ID,
+                title: "Test Conversation 2",
+            });
+
+            // get with limit 1
+            const res = await RagService.listConversations({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                limit: 1,
+            });
+
+            assertEquals(res.conversations.length, 1);
+            assertEquals(res.conversations[0].id, secondConv);
+            assertExists(res.nextCursor);
+
+            // query with cursor
+            const res2 = await RagService.listConversations({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                limit: 1,
+                cursor: res.nextCursor!,
+            });
+
+            assertEquals(res2.conversations.length, 1);
+            assertEquals(res2.conversations[0].id, TEST_CONVERSATION_ID);
         });
     });
 

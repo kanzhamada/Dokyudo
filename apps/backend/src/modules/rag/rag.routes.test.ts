@@ -117,6 +117,18 @@ describe("RAG Routes", () => {
             assertExists(json.conversations);
             assertEquals(Array.isArray(json.conversations), true);
         });
+
+        it("positive: returns limited list of conversations with query param", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest("/api/rag/conversations?limit=1", "GET", undefined, headers);
+            
+            if (!validToken) return;
+            assertEquals(res.status, 200);
+            const json = await res.json();
+            assertExists(json.conversations);
+            assertEquals(Array.isArray(json.conversations), true);
+            assertEquals(json.conversations.length <= 1, true);
+        });
     });
 
     describe("GET /api/rag/conversations/:id", () => {

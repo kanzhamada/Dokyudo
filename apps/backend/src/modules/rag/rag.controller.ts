@@ -64,9 +64,13 @@ export async function handleListConversations(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, userId } = extractor.extractAuthContext();
 
+    const query = c.req.valid("query" as never) as { limit: number; cursor?: string };
+
     const result = await RagService.listConversations({
         userId,
         tenantId,
+        limit: query.limit,
+        cursor: query.cursor,
     });
 
     return c.json(result);
