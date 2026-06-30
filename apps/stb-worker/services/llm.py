@@ -12,10 +12,10 @@ def generate_llm_description(text: str) -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GOOGLE_API_KEY}"
 
     prompt = f"""You are a professional document archiving assistant.
-Your task is to create a very concise, dense, and clear description of this document based on its introductory text.
+Your task is to write a comprehensive but brief summary of this document based on its introductory text.
 
 Strict rules:
-1. Maximum 1 to 2 sentences only.
+1. You MUST write exactly 1 or 2 complete sentences. Do not just output a single word or title.
 2. Maximum 150 characters.
 3. Get straight to the point, do not use introductory phrases like "This document discusses...".
 4. Match the language of the description with the dominant language of the document. If the document is in English, write in English. If it is in Indonesian, write in Indonesian.
@@ -31,9 +31,15 @@ Introductory Document Text:
             "parts": [{"text": prompt}]
         }],
         "generationConfig": {
-            "temperature": 0.2,
-            "maxOutputTokens": 64
-        }
+            "temperature": 0.3,
+            "maxOutputTokens": 150
+        },
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+        ]
     }
 
     dev_print("[LLM] Generating document description...")
@@ -45,9 +51,14 @@ Introductory Document Text:
             data = res.json()
 
             if "candidates" in data and len(data["candidates"]) > 0:
-                description = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                dev_print(f"[LLM] Description generated: {description}")
-                return description
+                candidate = data["candidates"][0]
+                if "parts" in candidate["content"]:
+                    description = candidate["content"]["parts"][0]["text"].strip()
+                    dev_print(f"[LLM] Description generated: {description}")
+                    return description
+                else:
+                    dev_print(f"[LLM ERROR] Blocked by safety or finishReason: {candidate.get('finishReason')}")
+                    return ""
             else:
                 dev_print("[LLM ERROR] No candidates returned from Gemini.")
                 return ""
