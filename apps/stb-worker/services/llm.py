@@ -9,7 +9,7 @@ def generate_llm_description(text: str) -> str:
     if not settings.GOOGLE_API_KEY:
         raise ValueError("GOOGLE_API_KEY is not set in environment")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GOOGLE_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={settings.GOOGLE_API_KEY}"
 
     prompt = f"""You are an expert document summarizer.
 Your task is to write a comprehensive paragraph summarizing the core subject, purpose, and key entities of this document based on its introductory text.
