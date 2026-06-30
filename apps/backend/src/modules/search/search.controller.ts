@@ -19,5 +19,16 @@ export const handleSearch = async (c: Context) => {
 
     const results = await SearchService.executeHybridSearch(params);
 
-    return c.json({ data: results }, 200);
+    // Group by documentId, keeping only the highest scoring chunk (first encountered)
+    const uniqueDocuments = [];
+    const seenDocumentIds = new Set();
+    
+    for (const res of results) {
+        if (!seenDocumentIds.has(res.documentId)) {
+            seenDocumentIds.add(res.documentId);
+            uniqueDocuments.push(res);
+        }
+    }
+
+    return c.json({ data: uniqueDocuments }, 200);
 };

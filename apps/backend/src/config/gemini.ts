@@ -50,6 +50,17 @@ class GeminiClient {
             contents: prompt,
         });
     }
+
+    /**
+     * Generate a full text response (non-streaming) from the LLM.
+     * Useful for quick classification or gatekeeping tasks.
+     */
+    async generateText(prompt: string, model: string = GEMINI_MODELS.llmDefault) {
+        return await this.client.models.generateContent({
+            model: model,
+            contents: prompt,
+        });
+    }
 }
 
 export const gemini = new GeminiClient();
