@@ -38,3 +38,32 @@ export async function handleConfirmUpload(c: Context) {
 
     return c.json(result, 200);
 }
+
+export async function handleDeleteDocument(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, logContext } = extractor.extractAuthContext();
+
+    const params: DocumentSchema.DeleteDocumentParams = {
+        tenantId,
+        documentId: c.req.param("id"),
+        logContext,
+    };
+
+    const result = await DocumentsService.deleteDocument(params);
+
+    return c.json({ data: result }, 200);
+}
+
+export async function handleListDocuments(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, logContext } = extractor.extractAuthContext();
+
+    const params: DocumentSchema.ListDocumentsParams = {
+        tenantId,
+        logContext,
+    };
+
+    const result = await DocumentsService.listDocuments(params);
+
+    return c.json(result, 200);
+}

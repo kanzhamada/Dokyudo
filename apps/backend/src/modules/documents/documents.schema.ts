@@ -72,3 +72,50 @@ export const ConfirmUploadResponseSchema = z.object({
 });
 
 export type ConfirmUploadResponse = z.infer<typeof ConfirmUploadResponseSchema>;
+
+export const DeleteDocumentParamSchema = z.object({
+    id: z.string().uuid().openapi({
+        example: "123e4567-e89b-12d3-a456-426614174000",
+        description: "The ID of the document to delete",
+    }),
+});
+
+export const DeleteDocumentParamsSchema = z.object({
+    documentId: z.string().uuid(),
+    tenantId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type DeleteDocumentParams = z.infer<typeof DeleteDocumentParamsSchema>;
+
+export const DeleteDocumentResponseSchema = z.object({
+    success: z.boolean().openapi({ example: true }),
+    message: z.string().openapi({ example: "Document successfully deleted" }),
+});
+
+export type DeleteDocumentResponse = z.infer<typeof DeleteDocumentResponseSchema>;
+
+export const ListDocumentsParamsSchema = z.object({
+    tenantId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type ListDocumentsParams = z.infer<typeof ListDocumentsParamsSchema>;
+
+export const DocumentItemSchema = z.object({
+    id: z.string().uuid(),
+    title: z.string(),
+    description: z.string().nullable(),
+    storagePath: z.string(),
+    sizeBytes: z.number(),
+    status: z.string(),
+    createdAt: z.string(),
+});
+
+export type DocumentItem = z.infer<typeof DocumentItemSchema>;
+
+export const ListDocumentsResponseSchema = z.object({
+    documents: z.array(DocumentItemSchema),
+});
+
+export type ListDocumentsResponse = z.infer<typeof ListDocumentsResponseSchema>;

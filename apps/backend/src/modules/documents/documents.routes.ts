@@ -128,3 +128,90 @@ documentsRoutes.openapi(
     }),
     documentsController.handleConfirmUpload as any,
 );
+
+documentsRoutes.openapi(
+    createRoute({
+        method: "delete",
+        path: "/{id}",
+        tags: ["Documents"],
+        summary: "Delete a document",
+        description:
+            "Deletes a document from the database, removes its vector embeddings from Upstash, " +
+            "and deletes the associated file from S3 storage.",
+        request: {
+            params: DocumentsSchema.DeleteDocumentParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Document deleted successfully",
+                content: {
+                    "application/json": {
+                        schema: DocumentsSchema.DeleteDocumentResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            404: {
+                description: "Document not found",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    documentsController.handleDeleteDocument as any,
+);
+
+documentsRoutes.openapi(
+    createRoute({
+        method: "get",
+        path: "/",
+        tags: ["Documents"],
+        summary: "List all documents",
+        description: "Returns a list of all documents for the authenticated tenant.",
+        responses: {
+            200: {
+                description: "List of documents",
+                content: {
+                    "application/json": {
+                        schema: DocumentsSchema.ListDocumentsResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    documentsController.handleListDocuments as any,
+);

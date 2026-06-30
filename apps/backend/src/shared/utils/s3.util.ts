@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand } from "npm:@aws-sdk/client-s3";
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 import { getEnv } from "../../config/env.ts";
 
@@ -73,6 +73,27 @@ export async function checkObjectExists(
         ) {
             return false;
         }
+        throw err;
+    }
+}
+
+/**
+ * Deletes an object from the S3 bucket.
+ */
+export async function deleteObject(
+    bucketName: string,
+    objectKey: string
+): Promise<void> {
+    const client = getS3Client();
+    const command = new DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: objectKey,
+    });
+    
+    try {
+        await client.send(command);
+    } catch (err: any) {
+        console.error("S3 DeleteObject Error:", err.name, err.$metadata?.httpStatusCode, err);
         throw err;
     }
 }

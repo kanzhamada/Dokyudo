@@ -71,6 +71,10 @@
 | **Confirm Upload**|`negative: missing authorization header returns 401`| HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
 | **Confirm Upload**|`negative: missing required fields returns 400` | HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
 | **Confirm Upload**|`negative: non-existent document returns 404` | HTTP 404, `NOT_FOUND` | HTTP 404, Match | ✅ Pass |
+| **Delete Doc** | `negative: missing authorization returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Delete Doc** | `negative: deleting non-existent document returns 404`| HTTP 404, `NOT_FOUND` | HTTP 404, Match | ✅ Pass |
+| **List Docs** | `negative: missing authorization returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **List Docs** | `positive: returns list of documents` | HTTP 200, array of docs | HTTP 200, Match | ✅ Pass |
 
 
 ## 4. Search Routes (`search.routes.test.ts`)
@@ -141,6 +145,9 @@
 | **Docs Svc** | `confirmUpload: rejects missing DB doc` | Throws "Document not found" | AppError thrown | ✅ Pass |
 | **Docs Svc** | `confirmUpload: rejects missing S3 file` | Throws "File not found in storage" | AppError thrown | ✅ Pass |
 | **Docs Svc** | `confirmUpload: returns early if confirmed` | Returns success immediately | Returned early | ✅ Pass |
+| **Docs Svc** | `deleteDocument: rejects if document not found in DB`| Throws "Document not found" | AppError thrown | ✅ Pass |
+| **Docs Svc** | `deleteDocument: deletes document and chunks...` | Returns success, DB empty | DB empty | ✅ Pass |
+| **Docs Svc** | `listDocuments: returns array of documents` | Returns documents for tenant | Returned array | ✅ Pass |
 | **Auth Svc** | `registerUser: successful registration` | DB logged, Returns success | DB inserted | ✅ Pass |
 | **Auth Svc** | `registerUser: rejects duplicate` | Throws "Account already registered"| AppError thrown | ✅ Pass |
 | **Auth Svc** | `loginUser: rejects unverified user` | Throws "Invalid email or password" | AppError thrown | ✅ Pass |

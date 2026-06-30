@@ -6,6 +6,8 @@ import { db } from "../../config/drizzle.ts";
 import { documents, tenants } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
 import * as s3Util from "../../shared/utils/s3.util.ts";
+import { stub } from "jsr:@std/testing/mock";
+import { vectorIndex } from "../../config/vector.ts";
 
 describe("DocumentsService Isolated Tests", () => {
     const TEST_TENANT_ID = crypto.randomUUID();
@@ -123,6 +125,87 @@ describe("DocumentsService Isolated Tests", () => {
                 documentId: docId
             });
             assertEquals(res.message, "Document already confirmed");
+        });
+    });
+
+    describe("deleteDocument", () => {
+        it("negative: rejects if document not found in DB", async () => {
+            const fakeDocId = crypto.randomUUID();
+            await assertRejects(
+                () => DocumentsService.deleteDocument({
+                    tenantId: TEST_TENANT_ID,
+                    documentId: fakeDocId
+                }),
+                AppError,
+                "Document not found"
+            );
+        });
+
+        it("positive: deletes document and chunks from db, vector, and s3", async () => {
+            using vectorStub = stub(vectorIndex, "delete", () => Promise.resolve({ deleted: 1 }) as any);
+            
+            const docId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: docId,
+                tenantId: TEST_TENANT_ID,
+                title: "delete-me.pdf",
+                storagePath: `${docId}.pdf`,
+                sizeBytes: 100,
+                description: "",
+                status: "confirmed",
+            });
+
+            const res = await DocumentsService.deleteDocument({
+                tenantId: TEST_TENANT_ID,
+                documentId: docId
+            });
+
+            assertEquals(res.success, true);
+            
+            // verify db deletion
+            const docs = await db.select().from(documents).where(eq(documents.id, docId));
+            assertEquals(docs.length, 0);
+        });
+    });
+
+    describe("listDocuments", () => {
+        it("positive: returns array of documents for the tenant", async () => {
+            const docId1 = crypto.randomUUID();
+            const docId2 = crypto.randomUUID();
+
+            await db.insert(documents).values([
+                {
+                    id: docId1,
+                    tenantId: TEST_TENANT_ID,
+                    title: "doc1.pdf",
+                    storagePath: "doc1.pdf",
+                    sizeBytes: 100,
+                    description: "",
+                    status: "confirmed",
+                },
+                {
+                    id: docId2,
+                    tenantId: TEST_TENANT_ID,
+                    title: "doc2.pdf",
+                    storagePath: "doc2.pdf",
+                    sizeBytes: 200,
+                    description: "",
+                    status: "pending",
+                }
+            ]);
+
+            const res = await DocumentsService.listDocuments({ tenantId: TEST_TENANT_ID });
+            
+            assertEquals(Array.isArray(res.documents), true);
+            assertEquals(res.documents.length >= 2, true);
+            
+            const titles = res.documents.map(d => d.title);
+            assertEquals(titles.includes("doc1.pdf"), true);
+            assertEquals(titles.includes("doc2.pdf"), true);
+
+            // cleanup
+            await db.delete(documents).where(eq(documents.id, docId1));
+            await db.delete(documents).where(eq(documents.id, docId2));
         });
     });
 });

@@ -5,19 +5,20 @@ import app from "../../main.ts";
 /** Helper: make a request to the test app */
 async function makeRequest(
     path: string,
-    body: Record<string, unknown>,
+    method: string,
+    body?: Record<string, unknown>,
     headers: Record<string, string> = {},
 ): Promise<Response> {
     const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
     const req = new Request(`http://localhost${path}`, {
-        method: "POST",
+        method,
         headers: {
             "Content-Type": "application/json",
             "X-Request-ID": "test-request-id-002",
             "X-Forwarded-For": randomIp,
             ...headers,
         },
-        body: JSON.stringify(body),
+        body: body ? JSON.stringify(body) : undefined,
     });
     return await app.fetch(req);
 }
@@ -30,14 +31,14 @@ describe("Documents Routes", () => {
         const testPassword = "SecurePassword123!";
 
         // Attempt register
-        await makeRequest("/api/auth/register", {
+        await makeRequest("/api/auth/register", "POST", {
             email: testEmail,
             password: testPassword,
             recaptchaToken: "dummy",
         });
 
         // Attempt login
-        const res = await makeRequest("/api/auth/login", {
+        const res = await makeRequest("/api/auth/login", "POST", {
             email: testEmail,
             password: testPassword,
             recaptchaToken: "dummy",
@@ -51,7 +52,7 @@ describe("Documents Routes", () => {
 
     describe("POST /api/documents/presigned-url", () => {
         it("negative: missing authorization header returns 401", async () => {
-            const res = await makeRequest("/api/documents/presigned-url", {
+            const res = await makeRequest("/api/documents/presigned-url", "POST", {
                 filename: "test.pdf",
                 mimeType: "application/pdf",
                 sizeBytes: 1024,
@@ -66,6 +67,7 @@ describe("Documents Routes", () => {
             const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
             const res = await makeRequest(
                 "/api/documents/presigned-url",
+                "POST",
                 {},
                 headers,
             );
@@ -84,6 +86,7 @@ describe("Documents Routes", () => {
             const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
             const res = await makeRequest(
                 "/api/documents/presigned-url",
+                "POST",
                 {
                     filename: "huge_file.pdf",
                     mimeType: "application/pdf",
@@ -107,6 +110,7 @@ describe("Documents Routes", () => {
             const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
             const res = await makeRequest(
                 "/api/documents/presigned-url",
+                "POST",
                 {
                     filename: "report_2026.pdf",
                     mimeType: "application/pdf",
@@ -131,7 +135,7 @@ describe("Documents Routes", () => {
 
     describe("POST /api/documents/confirm-upload", () => {
         it("negative: missing authorization header returns 401", async () => {
-            const res = await makeRequest("/api/documents/confirm-upload", {
+            const res = await makeRequest("/api/documents/confirm-upload", "POST", {
                 documentId: crypto.randomUUID(),
             });
 
@@ -142,6 +146,7 @@ describe("Documents Routes", () => {
             const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
             const res = await makeRequest(
                 "/api/documents/confirm-upload",
+                "POST",
                 {},
                 headers,
             );
@@ -160,6 +165,7 @@ describe("Documents Routes", () => {
             const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
             const res = await makeRequest(
                 "/api/documents/confirm-upload",
+                "POST",
                 {
                     documentId: crypto.randomUUID(),
                 },
@@ -174,6 +180,40 @@ describe("Documents Routes", () => {
             assertEquals(res.status, 404);
             const json = await res.json();
             assertEquals(json.error.code, "NOT_FOUND");
+        });
+    });
+
+    describe("DELETE /api/documents/:id", () => {
+        it("negative: missing authorization returns 401", async () => {
+            const res = await makeRequest(`/api/documents/${crypto.randomUUID()}`, "DELETE");
+            assertEquals(res.status, 401);
+        });
+
+        it("negative: deleting non-existent document returns 404", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(`/api/documents/${crypto.randomUUID()}`, "DELETE", undefined, headers);
+            
+            if (!validToken) return;
+            assertEquals(res.status, 404);
+            const json = await res.json();
+            assertEquals(json.error.code, "NOT_FOUND");
+        });
+    });
+
+    describe("GET /api/documents", () => {
+        it("negative: missing authorization returns 401", async () => {
+            const res = await makeRequest("/api/documents", "GET");
+            assertEquals(res.status, 401);
+        });
+
+        it("positive: returns list of documents", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest("/api/documents", "GET", undefined, headers);
+            
+            if (!validToken) return;
+            assertEquals(res.status, 200);
+            const json = await res.json();
+            assertEquals(Array.isArray(json.documents), true);
         });
     });
 });
