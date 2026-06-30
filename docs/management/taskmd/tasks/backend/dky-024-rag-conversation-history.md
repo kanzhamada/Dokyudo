@@ -1,7 +1,7 @@
 ---
 id: "dky-024"
 title: "RAG Conversation History Scope"
-status: pending
+status: completed
 priority: medium
 effort: medium
 type: feature
@@ -17,10 +17,10 @@ created_at: 2026-06-28
 Mengelola sesi tanya jawab agar RAG dapat mengingat konteks chat sebelumnya melalui `conversations` dan `conversation_turns`.
 
 ## Tasks
-- [ ] Buat atau sesuaikan schema tabel `conversations` dan `conversation_turns` (lengkap dengan `tenant_id`)
-- [ ] Implementasikan Drizzle ORM query untuk menyimpan setiap pertanyaan dan jawaban
-- [ ] Simpan metadata (model yang dipakai, latency, id chunk konteks) ke `conversation_turns`
-- [ ] Ambil `conversation_id` opsional dari input client, jika tidak ada, buat baru
+- [x] Buat atau sesuaikan schema tabel `conversations` dan `conversation_turns` (lengkap dengan `tenant_id`)
+- [x] Implementasikan Drizzle ORM query untuk menyimpan setiap pertanyaan dan jawaban
+- [x] Simpan metadata (model yang dipakai, latency, id chunk konteks) ke `conversation_turns`
+- [x] Ambil `conversation_id` opsional dari input client, jika tidak ada, buat baru
 
 ## Acceptance Criteria
 - Tiap turn tercatat di database dengan `tenant_id`
