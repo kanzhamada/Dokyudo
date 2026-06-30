@@ -4,11 +4,13 @@ import time
 import uuid
 import tempfile
 import httpx
+from concurrent.futures import ThreadPoolExecutor
 from core.config import settings
 from core.logger import dev_print
 from services.storage import download_pdf
 from services.extractor import extract_text_from_pdf, chunk_text_with_pages
 from services.embedding import generate_embedding_with_retry
+from services.llm import generate_llm_description
 from services.database import (
     check_document_idempotency,
     insert_document_chunks,
@@ -50,6 +52,72 @@ def is_valid_uuid(val: str) -> bool:
     pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
     return bool(pattern.match(val))
 
+def _process_chunks_loop(chunks, document_id, tenant_id):
+    upstash_payload = []
+    postgres_payload = []
+    
+    for i, chunk_data in enumerate(chunks):
+        chunk_text_content = chunk_data["text"]
+        chunk_pages = chunk_data["pages"]
+        
+        chunk_id = str(uuid.uuid4())
+        estimated_tokens = max(1, len(chunk_text_content) // 3)
+        
+        if estimated_tokens > 8192:
+            dev_print(f"[PAYLOAD_TOO_LARGE] Chunk {i} rejected. Size: {estimated_tokens} tokens.")
+            continue
+            
+        gatekeeper_passed = False
+        retry_count = 0
+        
+        while not gatekeeper_passed and retry_count < 3:
+            status, reason, reset_in_ms = execute_gatekeeper(estimated_tokens)
+            
+            if status == 1:
+                gatekeeper_passed = True
+                dev_print(f"[GATEKEEPER OK] Chunk {i+1}/{len(chunks)} ({estimated_tokens} tk) => Deducted. Processing...")
+            else:
+                wait_ms = max(100, reset_in_ms + 100)
+                wait_sec = (wait_ms + 999) // 1000
+                dev_print(f"[GATEKEEPER THROTTLE] {reason}. Sleeping for {wait_sec}s...")
+                time.sleep(wait_sec)
+                retry_count += 1
+                
+        if not gatekeeper_passed:
+            dev_print(f"[Processor WARNING] Gatekeeper failed after retries for chunk {i+1}. Skipping chunk.")
+            continue
+        
+        vector = generate_embedding_with_retry(chunk_text_content)
+        
+        upstash_payload.append({
+            "id": chunk_id,
+            "vector": vector,
+            "metadata": {
+                "tenantId": tenant_id,
+                "documentId": document_id,
+                "chunkIndex": i,
+                "pages": chunk_pages,
+                "content": chunk_text_content
+            }
+        })
+        
+        postgres_payload.append({
+            "id": chunk_id,
+            "tenant_id": tenant_id,
+            "document_id": document_id,
+            "chunk_index": i,
+            "metadata": { "pages": chunk_pages },
+            "content": chunk_text_content
+        })
+        
+        if len(upstash_payload) >= 50 or i == len(chunks) - 1:
+            dev_print(f"-> Flushing {len(upstash_payload)} vectors to Upstash...")
+            insert_document_chunks(postgres_payload)
+            upsert_vectors_to_upstash(upstash_payload)
+            
+            upstash_payload = []
+            postgres_payload = []
+
 def process_document(tenant_id: str, document_id: str):
     if not is_valid_uuid(tenant_id) or not is_valid_uuid(document_id):
         dev_print(f"[SECURITY ALERT] Path Traversal blocked! Invalid input. tenant: {tenant_id}, doc: {document_id}")
@@ -85,72 +153,21 @@ def process_document(tenant_id: str, document_id: str):
             
         dev_print("5. Initialized Upstash Redis SDK. Starting Gatekeeper Loop...")
         
-        upstash_payload = []
-        postgres_payload = []
+        # Get the first 3000 characters from the pages for description generation
+        full_text = " ".join([p["text"] for p in pages])
+        head_text = full_text[:3000]
         
-        for i, chunk_data in enumerate(chunks):
-            chunk_text_content = chunk_data["text"]
-            chunk_pages = chunk_data["pages"]
+        # Run chunk processing and LLM description in parallel using threads
+        description = ""
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_chunks = executor.submit(_process_chunks_loop, chunks, document_id, tenant_id)
+            future_llm = executor.submit(generate_llm_description, head_text)
             
-            chunk_id = str(uuid.uuid4())
-            estimated_tokens = max(1, len(chunk_text_content) // 3)
+            # Wait for both to finish
+            future_chunks.result()
+            description = future_llm.result()
             
-            if estimated_tokens > 8192:
-                dev_print(f"[PAYLOAD_TOO_LARGE] Chunk {i} rejected. Size: {estimated_tokens} tokens.")
-                continue
-                
-            gatekeeper_passed = False
-            retry_count = 0
-            
-            while not gatekeeper_passed and retry_count < 3:
-                status, reason, reset_in_ms = execute_gatekeeper(estimated_tokens)
-                
-                if status == 1:
-                    gatekeeper_passed = True
-                    dev_print(f"[GATEKEEPER OK] Chunk {i+1}/{len(chunks)} ({estimated_tokens} tk) => Deducted. Processing...")
-                else:
-                    wait_ms = max(100, reset_in_ms + 100)
-                    wait_sec = (wait_ms + 999) // 1000
-                    dev_print(f"[GATEKEEPER THROTTLE] {reason}. Sleeping for {wait_sec}s...")
-                    time.sleep(wait_sec)
-                    retry_count += 1
-                    
-            if not gatekeeper_passed:
-                dev_print(f"[Processor WARNING] Gatekeeper failed after retries for chunk {i+1}. Skipping chunk.")
-                continue
-            
-            vector = generate_embedding_with_retry(chunk_text_content)
-            
-            upstash_payload.append({
-                "id": chunk_id,
-                "vector": vector,
-                "metadata": {
-                    "tenantId": tenant_id,
-                    "documentId": document_id,
-                    "chunkIndex": i,
-                    "pages": chunk_pages,
-                    "content": chunk_text_content
-                }
-            })
-            
-            postgres_payload.append({
-                "id": chunk_id,
-                "tenant_id": tenant_id,
-                "document_id": document_id,
-                "chunk_index": i,
-                "metadata": { "pages": chunk_pages },
-                "content": chunk_text_content
-            })
-            
-            if len(upstash_payload) >= 50 or i == len(chunks) - 1:
-                dev_print(f"-> Flushing {len(upstash_payload)} vectors to Upstash...")
-                insert_document_chunks(postgres_payload)
-                upsert_vectors_to_upstash(upstash_payload)
-                
-                upstash_payload = []
-                postgres_payload = []
-                
-        mark_document_processed(document_id)
+        mark_document_processed(document_id, description)
         dev_print("7. All chunks processed and upserted successfully!")
         
     except Exception as e:

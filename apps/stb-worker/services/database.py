@@ -32,16 +32,20 @@ def check_document_idempotency(document_id: str) -> bool:
             return True
     return False
 
-def mark_document_processed(document_id: str):
+def mark_document_processed(document_id: str, description: str = ""):
     """
-    Update the document status to 'processed'.
+    Update the document status to 'processed' and set the LLM generated description.
     """
     url = f"{settings.SUPABASE_URL}/rest/v1/documents?id=eq.{document_id}"
     headers = get_supabase_headers()
     headers["Prefer"] = "return=representation"
     
+    payload = {"status": "processed"}
+    if description:
+        payload["description"] = description
+        
     with httpx.Client() as client:
-        res = client.patch(url, headers=headers, json={"status": "processed"})
+        res = client.patch(url, headers=headers, json=payload)
         res.raise_for_status()
 
 def insert_document_chunks(chunks_payload: list[dict]):
