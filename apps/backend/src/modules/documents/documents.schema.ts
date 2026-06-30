@@ -1,13 +1,21 @@
 import { z } from "@hono/zod-openapi";
+import { MAX_DOCUMENT_SIZE_BYTES } from "../../shared/constants/documents.constant.ts";
+
+const SUPPORTED_MIME_TYPES = ["application/pdf", "text/plain"] as const;
 
 export const PresignedUrlBodySchema = z.object({
-    filename: z.string().min(1).openapi({
+    filename: z.string().min(1).refine((name) => {
+        const ext = name.split('.').pop()?.toLowerCase();
+        return ext === "pdf" || ext === "txt";
+    }, { message: "Unsupported file extension. Only .pdf and .txt files are allowed." }).openapi({
         example: "financial_report_2023.pdf",
     }),
-    mimeType: z.string().min(1).openapi({
+    mimeType: z.enum(SUPPORTED_MIME_TYPES, {
+        errorMap: () => ({ message: "Unsupported MIME type. Only application/pdf and text/plain are allowed." })
+    }).openapi({
         example: "application/pdf",
     }),
-    sizeBytes: z.number().int().positive().openapi({
+    sizeBytes: z.number().int().positive().max(MAX_DOCUMENT_SIZE_BYTES, `File size exceeds the maximum limit of ${MAX_DOCUMENT_SIZE_BYTES} bytes.`).openapi({
         example: 1048576,
         description: "File size in bytes",
     }),
