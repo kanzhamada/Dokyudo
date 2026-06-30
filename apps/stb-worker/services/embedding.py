@@ -30,9 +30,9 @@ def generate_embedding_with_retry(text: str, max_retries: int = 5) -> list[float
             with httpx.Client(timeout=30.0) as client:
                 res = client.post(url, headers=headers, json=payload)
                 
-            if res.status_code == 429:
+            if res.status_code in [429, 500, 502, 503, 504]:
                 wait_ms = (2 ** attempt) * 5
-                dev_print(f"[Embedding] API Rate Limit (429). Sleeping for {wait_ms}s before retry...")
+                dev_print(f"[Embedding] API Error ({res.status_code}). Sleeping for {wait_ms}s before retry...")
                 time.sleep(wait_ms)
                 continue
                 
@@ -41,9 +41,9 @@ def generate_embedding_with_retry(text: str, max_retries: int = 5) -> list[float
             return data["embedding"]["values"]
             
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429:
+            if e.response.status_code in [429, 500, 502, 503, 504]:
                 wait_ms = (2 ** attempt) * 5
-                dev_print(f"[Embedding] API Rate Limit (429). Sleeping for {wait_ms}s before retry...")
+                dev_print(f"[Embedding] API Error ({e.response.status_code}). Sleeping for {wait_ms}s before retry...")
                 time.sleep(wait_ms)
             else:
                 raise Exception(f"Gemini API Error: {e.response.text}")
