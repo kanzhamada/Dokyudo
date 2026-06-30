@@ -1,0 +1,25 @@
+meta {
+  name: Checkout Session
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/payments/checkout
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "tierToUnlock": "INVESTOR"
+  }
+}
+
+docs {
+  Creates a new dummy Payment Request to Xendit Sandbox API. Returns a checkoutUrl that you can open in your browser to simulate successful/failed payment. Requires valid JWT (tenant session).
+}

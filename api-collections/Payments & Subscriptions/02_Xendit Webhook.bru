@@ -1,0 +1,39 @@
+meta {
+  name: Xendit Webhook
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/payments/webhook
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  x-callback-token: {{xenditSecretKey}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "event": "payment.succeeded",
+    "data": {
+      "reference_id": "dokyudo-9462a645-c164-4878-8171-8b35d26ace4f-1782832715935",
+      "status": "SUCCEEDED",
+      "failure_code": null
+    }
+  }
+}
+
+vars:pre-request {
+  xenditSecretKey: tvtnp56SNGls1egLMPg8qxbY2TaV82JNWEwfzELXDvhSdxtA
+}
+
+docs {
+  Simulates a Server-to-Server webhook call from Xendit. Replace `YOUR_XENDIT_WEBHOOK_SECRET_HERE` with the actual secret from your `.env` to bypass the security check. Replace `reference_id` with the `externalId` returned from the Checkout Session.
+}
