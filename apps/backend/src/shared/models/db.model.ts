@@ -5,6 +5,7 @@ import {
     index,
     integer,
     jsonb,
+    pgEnum,
     pgSchema,
     pgTable,
     text,
@@ -217,3 +218,64 @@ export const outboxEvents = pgTable("outbox_events", {
         .defaultNow()
         .notNull(),
 });
+
+// ==============================================================================
+// 9. TENANT SUBSCRIPTIONS (1:1 relation with tenants)
+// ==============================================================================
+export const tierEnum = pgEnum("tier_enum", ["FREE", "SIMULATE", "INVESTOR", "REAL"]);
+
+export const tenantSubscriptions = pgTable("tenant_subscriptions", {
+    tenantId: uuid("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+    tier: tierEnum("tier").notNull().default("FREE"), // FREE, SIMULATE, INVESTOR, REAL
+    
+    uploadsCount: integer("uploads_count").notNull().default(0),
+    searchesCount: integer("searches_count").notNull().default(0),
+    qaCount: integer("qa_count").notNull().default(0),
+    
+    storageUsedBytes: bigint("storage_used_bytes", { mode: "number" }).notNull().default(0),
+    
+    expiresAt: timestamp("expires_at", { mode: "date", precision: 3, withTimezone: true }), 
+    lastResetAt: timestamp("last_reset_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
+});
+
+// ==============================================================================
+// 10. PAYMENT TRANSACTIONS (Xendit Payment API v3)
+// ==============================================================================
+export const paymentStatusEnum = pgEnum("payment_status_enum", [
+    "PENDING",
+    "ACCEPTING_PAYMENTS",
+    "SUCCEEDED",
+    "FAILED",
+    "CANCELED",
+    "EXPIRED"
+]);
+
+export const paymentTransactions = pgTable(
+    "payment_transactions",
+    {
+        id: uuid("id").defaultRandom().primaryKey(),
+        tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
+        
+        externalId: varchar("external_id", { length: 255 }).notNull().unique(),
+        paymentRequestId: varchar("payment_request_id", { length: 255 }),
+        paymentActions: jsonb("payment_actions"),
+        
+        tierToUnlock: tierEnum("tier_to_unlock").notNull(),
+        amount: integer("amount").notNull(),
+        currency: varchar("currency", { length: 3 }).notNull().default("IDR"),
+        
+        status: paymentStatusEnum("status").notNull().default("PENDING"),
+        failureCode: varchar("failure_code", { length: 100 }),
+        
+        webhookPayload: jsonb("webhook_payload"),
+        
+        paidAt: timestamp("paid_at", { mode: "date", precision: 3, withTimezone: true }),
+        createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
+    },
+    (table) => ({
+        tenantStatusIdx: index("idx_payment_trx_tenant_status").on(table.tenantId, table.status),
+        externalIdIdx: index("idx_payment_trx_external_id").on(table.externalId),
+    })
+);
+
