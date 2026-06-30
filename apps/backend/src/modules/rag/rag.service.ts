@@ -8,7 +8,7 @@ import {
     conversations,
     conversationTurns,
 } from "../../shared/models/db.model.ts";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 export class RagService {
     /**
@@ -281,5 +281,63 @@ ${question}
         });
 
         return stream;
+    }
+
+    static async updateConversationTitle(params: {
+        userId: string;
+        tenantId: string;
+        conversationId: string;
+        title: string;
+    }) {
+        const { userId, tenantId, conversationId, title } = params;
+
+        await withAuthDb(userId, async (tx) => {
+            const result = await tx
+                .update(conversations)
+                .set({ title, updatedAt: new Date() })
+                .where(
+                    and(
+                        eq(conversations.id, conversationId),
+                        eq(conversations.tenantId, tenantId)
+                    )
+                )
+                .returning({ id: conversations.id });
+
+            if (result.length === 0) {
+                throw new AppError({
+                    code: "NOT_FOUND",
+                    message: "Conversation not found",
+                    status: 404,
+                });
+            }
+        });
+    }
+
+    static async deleteConversation(params: {
+        userId: string;
+        tenantId: string;
+        conversationId: string;
+    }) {
+        const { userId, tenantId, conversationId } = params;
+
+        await withAuthDb(userId, async (tx) => {
+            const result = await tx
+                .delete(conversations)
+                .where(
+                    and(
+                        eq(conversations.id, conversationId),
+                        eq(conversations.tenantId, tenantId)
+                    )
+                )
+                .returning({ id: conversations.id });
+
+            if (result.length === 0) {
+                throw new AppError({
+                    code: "NOT_FOUND",
+                    message: "Conversation not found",
+                    status: 404,
+                });
+            }
+        });
     }
 }

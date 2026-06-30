@@ -1,0 +1,19 @@
+meta {
+  name: Delete Conversation
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/rag/conversations/{{conversationId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Deletes a specific conversation by ID.
+}

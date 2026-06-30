@@ -1,0 +1,26 @@
+meta {
+  name: Update Conversation Title
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/rag/conversations/{{conversationId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "title": "New Conversation Title"
+  }
+}
+
+docs {
+  Updates the title of a specific conversation by ID.
+}

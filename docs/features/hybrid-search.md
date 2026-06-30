@@ -1,14 +1,14 @@
 # Hybrid Search (dky-014)
 
-**Completed At:** 2026-06-29 16:10
-**Status:** Completed & Refactored (Clean Code + Unit Tested)
+**Completed At:** 2026-06-30 14:57
+**Status:** Completed & Refactored (Clean Code, Metadata Extraction, Deduplication)
 
 ## Core Logic
 The Search endpoint (`/api/search`) receives a plain text query from the user. It splits the work into two parallel paths:
-1. **FTS (Full Text Search)**: Queries Postgres `document_chunks` table directly.
-2. **Semantic Search**: Calls the LLM Embedding API (e.g. Gemini `text-embedding-004`) to convert the query into a vector, then queries Upstash Vector.
+1. **FTS (Full Text Search)**: Queries Postgres `documentChunks` table directly.
+2. **Semantic Search**: Calls the LLM Embedding API to convert the query into a vector, then queries Upstash Vector.
 
-The IDs returned from both sources are scored using the **Reciprocal Rank Fusion (RRF)** algorithm in the Deno memory layer. Finally, the absolute Top-K IDs are gathered from Postgres via a single lazy hydration query to fetch the actual text content.
+The IDs returned from both sources are scored using the **Reciprocal Rank Fusion (RRF)** algorithm in the Deno memory layer. We fetch the actual text content and JSONB `metadata` (containing page numbers) via a single lazy hydration query. Finally, the chunks are grouped and deduplicated by their parent `documentId`, mapping all referenced pages and surfacing only the single most relevant chunk content per document to the frontend.
 
 ## Flow Diagram
 ```mermaid
@@ -36,8 +36,9 @@ sequenceDiagram
     Note over Gateway: Merge Phase: RRF Algorithm
     
     Gateway->>DB: Gather Phase: SELECT * FROM chunks WHERE id IN (...)
-    DB-->>Gateway: Full Chunk Content
-    Gateway-->>User: JSON Results
+    DB-->>Gateway: Full Chunk Content + JSONB Metadata (Pages)
+    Note over Gateway: Deduplication Phase: Group by documentId, collect unique pages
+    Gateway-->>User: JSON Results (Unique Docs + Pages array)
 ```
 
 ## Architectural Decisions
@@ -46,6 +47,8 @@ sequenceDiagram
 3. **Tenant Isolation**: Both FTS and Vector queries strictly enforce `tenant_id` filtering at the scatter phase.
 4. **Clean Code Architecture**: Controller logic relies on `ContextExtractor` for tenant verification. `SearchService` operates as a static OOP class accepting single strongly-typed `params` objects inferred from Zod. Guard Clauses are employed outside `try/catch` to ensure error purity.
 5. **Robust Mock Testing**: `search.service.test.ts` strictly mocks external integrations (LLM & Vector index) via `jsr:@std/testing/mock` stubs, isolating the DB behavior and RRF scoring algorithms. `search.routes.test.ts` validates the end-to-end integration path.
+6. **Chunk Deduplication (UX Driven)**: Multiple chunks often map to the same `documentId`. To prevent frontend spam, the search API groups them by document, aggregating all `metadata.pages` into a clean array and returning the highest scoring chunk's content as a preview.
+7. **Page Tracking via JSONB**: The STB Extraction worker parses documents page-by-page via PyMuPDF, inserting page coordinates into a JSONB `metadata` column in `documentChunks`.
 
 ## File Mapping
 - **Routes & Controller**: `apps/backend/src/modules/search/search.routes.ts`, `search.controller.ts`

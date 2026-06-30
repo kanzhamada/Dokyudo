@@ -27,3 +27,35 @@ export async function handleChat(c: Context) {
         "X-Accel-Buffering": "no",
     });
 }
+
+export async function handleUpdateConversationTitle(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { id: conversationId } = c.req.valid("param" as never) as { id: string };
+    const body = extractor.extractValidJson<RagSchema.UpdateConversationBody>();
+
+    await RagService.updateConversationTitle({
+        userId,
+        tenantId,
+        conversationId,
+        title: body.title,
+    });
+
+    return c.json({ data: { success: true } });
+}
+
+export async function handleDeleteConversation(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { id: conversationId } = c.req.valid("param" as never) as { id: string };
+
+    await RagService.deleteConversation({
+        userId,
+        tenantId,
+        conversationId,
+    });
+
+    return c.json({ data: { success: true } });
+}

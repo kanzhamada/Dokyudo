@@ -58,3 +58,70 @@ ragRoutes.openapi(
     }),
     ragController.handleChat as any,
 );
+
+ragRoutes.openapi(
+    createRoute({
+        method: "patch",
+        path: "/conversations/{id}",
+        tags: ["RAG"],
+        summary: "Update Conversation Title",
+        description: "Updates the title of a conversation.",
+        request: {
+            params: RagSchema.ConversationParamSchema,
+            body: {
+                content: {
+                    "application/json": {
+                        schema: RagSchema.UpdateConversationBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Success",
+            },
+            400: {
+                description: "Validation error",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Not found",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleUpdateConversationTitle as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "delete",
+        path: "/conversations/{id}",
+        tags: ["RAG"],
+        summary: "Delete Conversation",
+        description: "Deletes a conversation.",
+        request: {
+            params: RagSchema.ConversationParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Success",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Not found",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleDeleteConversation as any,
+);

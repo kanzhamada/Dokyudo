@@ -13,3 +13,12 @@ export interface ChatServiceParams {
     conversationId?: string;
     logContext?: Record<string, any>;
 }
+
+export const ConversationParamSchema = z.object({
+    id: z.string().uuid("Invalid conversation ID"),
+});
+
+export const UpdateConversationBodySchema = z.object({
+    title: z.string().min(1, "Title cannot be empty").max(100, "Title is too long"),
+});
+export type UpdateConversationBody = z.infer<typeof UpdateConversationBodySchema>;

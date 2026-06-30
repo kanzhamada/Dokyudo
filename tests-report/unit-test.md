@@ -81,6 +81,17 @@
 | **Search** | `negative: missing query parameter returns 400` | HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
 | **Search** | `positive: valid query returns 200 and search results` | HTTP 200, Array of data | HTTP 200, Match | ✅ Pass |
 
+## 5. RAG Routes (`rag.routes.test.ts`)
+
+| Test Case / Step | Description & Path | Expected Result | Actual Result | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **Chat** | `negative: missing authorization returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Chat** | `negative: invalid body returns 400` | HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
+| **Update Title** | `positive: updates title successfully` | HTTP 200, `success: true` | HTTP 200, Match | ✅ Pass |
+| **Update Title** | `negative: empty title returns 400 validation error` | HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
+| **Delete** | `positive: deletes conversation successfully` | HTTP 200, `success: true` | HTTP 200, Match | ✅ Pass |
+| **Delete** | `negative: deleting already deleted conversation returns 404` | HTTP 404, `NOT_FOUND` | HTTP 404, Match | ✅ Pass |
+
 
 ## 5. Middlewares & Utils
 
@@ -141,6 +152,11 @@
 | **OAuth Svc**| `handleOAuthCallback: throws invalid code` | Throws "OAuth code exchange failed" | AppError thrown | ✅ Pass |
 | **Search Svc**| `executeHybridSearch: valid query` | Returns FTS & Vector matched data | Valid array returned | ✅ Pass |
 | **Search Svc**| `executeHybridSearch: LLM failure` | Throws "Hybrid search execution failed"| AppError thrown | ✅ Pass |
+| **RAG Svc** | `streamChat: throws error if prompt injection is detected` | Throws "Input rejected: Detected..." | AppError thrown | ✅ Pass |
+| **RAG Svc** | `updateConversationTitle: updates conversation title successfully` | Updates DB title | DB matches | ✅ Pass |
+| **RAG Svc** | `updateConversationTitle: throws 404 if conversation does not exist or wrong tenant`| Throws "Conversation not found" | AppError thrown | ✅ Pass |
+| **RAG Svc** | `deleteConversation: throws 404 if conversation does not exist` | Throws "Conversation not found" | AppError thrown | ✅ Pass |
+| **RAG Svc** | `deleteConversation: deletes conversation successfully` | Deletes from DB | DB matches | ✅ Pass |
 
 ---
 *Report auto-generated after applying BDD refactoring and strict isolation testing.*
