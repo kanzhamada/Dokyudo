@@ -1,7 +1,7 @@
 ---
 id: "dky-016"
 title: "SSE Streaming RAG Chat Service"
-status: pending
+status: completed
 priority: high
 effort: large
 type: feature
@@ -17,11 +17,11 @@ created_at: 2026-06-26
 Membuat endpoint `/api/chat` dengan Prompt Engineering, RAG Context, dan Server-Sent Events (SSE) tanpa buffering.
 
 ## Tasks
-- [ ] Construct Augmented Prompt using context retrieved from `dky-014`
-- [ ] Call AI API Gateway (`dky-015`) with prompt
-- [ ] Set up SSE headers (`text/event-stream`, `keep-alive`)
-- [ ] Stream tokens to client directly via `ReadableStream`
-- [ ] Implement Defensive JSON parsing for metadata
+- [x] Construct Augmented Prompt using context retrieved from `dky-014`
+- [x] Call AI API Gateway (`dky-015`) with prompt
+- [x] Set up SSE headers (`text/event-stream`, `keep-alive`)
+- [x] Stream tokens to client directly via `ReadableStream`
+- [x] Implement Defensive JSON parsing for metadata
 
 ## Acceptance Criteria
 - Tokens stream to client without buffering delays

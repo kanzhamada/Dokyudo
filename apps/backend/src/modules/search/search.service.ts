@@ -175,6 +175,7 @@ export class SearchService {
                 .select({
                     id: documentChunks.id,
                     documentId: documentChunks.documentId,
+                    metadata: documentChunks.metadata,
                     content: documentChunks.content,
                 })
                 .from(documentChunks)

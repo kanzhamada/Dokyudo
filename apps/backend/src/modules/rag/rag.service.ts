@@ -3,13 +3,15 @@ import { ChatServiceParams } from "./rag.schema.ts";
 import { SearchService } from "../search/search.service.ts";
 import { gemini, GEMINI_MODELS } from "../../config/gemini.ts";
 import { createCircuitBreaker } from "../../infra/circuit_breaker.infra.ts";
+import { withAuthDb } from "../../config/drizzle.ts";
+import { conversations, conversationTurns } from "../../shared/models/db.model.ts";
 
 export class RagService {
     /**
      * Executes RAG pipeline and returns an SSE ReadableStream.
      */
     static async streamChat(params: ChatServiceParams): Promise<ReadableStream> {
-        const { tenantId, question, conversationId, logContext } = params;
+        const { tenantId, userId, question, conversationId, logContext } = params;
 
         // 1. Retrieve Context via Hybrid Search
         const searchResults = await SearchService.executeHybridSearch({
@@ -54,6 +56,28 @@ ${question}
             async start(controller) {
                 const encoder = new TextEncoder();
                 let success = false;
+                let fullAnswer = "";
+                let successfulModel = "";
+                const startMs = Date.now();
+                
+                // Group unique pages per document ID
+                const referencesMap = new Map<string, Set<number>>();
+                for (const doc of searchResults) {
+                    const docId = doc.documentId;
+                    if (!referencesMap.has(docId)) referencesMap.set(docId, new Set());
+                    
+                    const meta = doc.metadata as { pages?: number[] } | null;
+                    if (meta && Array.isArray(meta.pages)) {
+                        for (const p of meta.pages) {
+                            referencesMap.get(docId)!.add(p);
+                        }
+                    }
+                }
+                
+                const references = Array.from(referencesMap.entries()).map(([docId, pagesSet]) => ({
+                    documentId: docId,
+                    pages: Array.from(pagesSet).sort((a, b) => a - b)
+                }));
 
                 for (const model of GEMINI_MODELS.llmFallbackChain) {
                     try {
@@ -64,9 +88,15 @@ ${question}
                             gemini.generateTextStream(augmentedPrompt, model)
                         );
                         
-                        // Connection established, stream the tokens
+                        // Connection established, send references metadata first
+                        controller.enqueue(
+                            encoder.encode(`event: references\ndata: ${JSON.stringify({ references })}\n\n`)
+                        );
+                        
+                        // Stream the tokens
                         for await (const chunk of responseStream) {
                             if (chunk.text) {
+                                fullAnswer += chunk.text;
                                 controller.enqueue(
                                     encoder.encode(`event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`)
                                 );
@@ -75,6 +105,7 @@ ${question}
                         
                         // Successfully streamed
                         success = true;
+                        successfulModel = model;
                         if (logContext) {
                             logContext.ragModelUsed = model;
                         }
@@ -98,8 +129,49 @@ ${question}
                     controller.enqueue(encoder.encode("event: done\ndata: [DONE]\n\n"));
                 }
                 
-                // TODO: Save conversation_turn to DB in finally block or here
+                // Close controller first so client isn't waiting
                 controller.close();
+                
+                // Save conversation_turn to DB asynchronously
+                if (success) {
+                    try {
+                        const latencyMs = Date.now() - startMs;
+                        let cid = conversationId;
+                        
+                        if (!cid) {
+                            const [newConv] = await withAuthDb(userId, async (tx) => {
+                                return await tx.insert(conversations).values({
+                                    tenantId,
+                                    title: question.substring(0, 50) || "New Conversation",
+                                }).returning({ id: conversations.id });
+                            });
+                            cid = newConv.id;
+                        }
+                        
+                        await withAuthDb(userId, async (tx) => {
+                            await tx.insert(conversationTurns).values({
+                                tenantId,
+                                conversationId: cid!,
+                                question,
+                                answer: fullAnswer,
+                                modelUsed: successfulModel,
+                                latencyMs,
+                                contextReferences: chunkIds.length > 0 ? chunkIds : null,
+                            });
+                        });
+                        
+                        if (logContext) {
+                            logContext.ragEvent = "conversation_saved";
+                            logContext.latencyMs = latencyMs;
+                        }
+                    } catch (dbErr: any) {
+                        console.error("[RAG DB SAVE ERROR]:", dbErr);
+                        if (logContext) {
+                            logContext.ragEvent = "conversation_save_error";
+                            logContext.ragError = dbErr.message;
+                        }
+                    }
+                }
             }
         });
 

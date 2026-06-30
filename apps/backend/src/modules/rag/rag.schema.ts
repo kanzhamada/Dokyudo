@@ -8,6 +8,7 @@ export type ChatBody = z.infer<typeof ChatBodySchema>;
 
 export interface ChatServiceParams {
     tenantId: string;
+    userId: string;
     question: string;
     conversationId?: string;
     logContext?: Record<string, any>;

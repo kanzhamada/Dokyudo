@@ -7,7 +7,7 @@ import httpx
 from core.config import settings
 from core.logger import dev_print
 from services.storage import download_pdf
-from services.extractor import extract_text_from_pdf, chunk_text
+from services.extractor import extract_text_from_pdf, chunk_text_with_pages
 from services.embedding import generate_embedding_with_retry
 from services.database import (
     check_document_idempotency,
@@ -71,11 +71,11 @@ def process_document(tenant_id: str, document_id: str):
         dev_print("1. Reading PDF from disk...")
         download_pdf(tenant_id, document_id, temp_pdf.name)
         
-        full_text = extract_text_from_pdf(temp_pdf.name)
+        pages = extract_text_from_pdf(temp_pdf.name)
         
-        dev_print(f"2. PDF Parsed. Total Length: {len(full_text)}")
+        dev_print(f"2. PDF Parsed. Total Pages: {len(pages)}")
         
-        chunks = chunk_text(full_text, chunk_size=1000, overlap=150)
+        chunks = chunk_text_with_pages(pages, chunk_size=1000, overlap=150)
         dev_print(f"3. Chunking complete. Processing ALL {len(chunks)} chunks!")
         
         dev_print(f"4. Document {document_id} is checked and inserted into Postgres.")
@@ -88,7 +88,10 @@ def process_document(tenant_id: str, document_id: str):
         upstash_payload = []
         postgres_payload = []
         
-        for i, chunk_text_content in enumerate(chunks):
+        for i, chunk_data in enumerate(chunks):
+            chunk_text_content = chunk_data["text"]
+            chunk_pages = chunk_data["pages"]
+            
             chunk_id = str(uuid.uuid4())
             estimated_tokens = max(1, len(chunk_text_content) // 3)
             
@@ -125,6 +128,7 @@ def process_document(tenant_id: str, document_id: str):
                     "tenantId": tenant_id,
                     "documentId": document_id,
                     "chunkIndex": i,
+                    "pages": chunk_pages,
                     "content": chunk_text_content
                 }
             })
@@ -134,6 +138,7 @@ def process_document(tenant_id: str, document_id: str):
                 "tenant_id": tenant_id,
                 "document_id": document_id,
                 "chunk_index": i,
+                "metadata": { "pages": chunk_pages },
                 "content": chunk_text_content
             })
             

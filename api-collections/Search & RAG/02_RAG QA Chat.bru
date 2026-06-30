@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{baseUrl}}/api/chat
+  url: {{baseUrl}}/api/rag/chat
   body: json
   auth: none
 }
@@ -13,12 +13,13 @@ post {
 headers {
   Content-Type: application/json
   Authorization: Bearer {{accessToken}}
+  Accept: text/event-stream
 }
 
 body:json {
   {
-    "question": "Summarize the error handling standard",
-    "conversationId": "{{conversationId}}"
+    "question": "Summarize the error handling standard"
+  //   "conversation_id": "{{conversationId}}"
   }
 }
 

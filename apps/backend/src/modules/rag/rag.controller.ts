@@ -5,12 +5,13 @@ import * as RagSchema from "./rag.schema.ts";
 
 export async function handleChat(c: Context) {
     const extractor = new ContextExtractor(c);
-    const { tenantId, logContext } = extractor.extractAuthContext();
+    const { tenantId, userId, logContext } = extractor.extractAuthContext();
 
     const body = extractor.extractValidJson<RagSchema.ChatBody>();
 
     const params: RagSchema.ChatServiceParams = {
         tenantId,
+        userId,
         question: body.question,
         conversationId: body.conversation_id,
         logContext,

@@ -2,22 +2,40 @@ import fitz
 import tiktoken
 from core.logger import dev_print
 
-def extract_text_from_pdf(file_path: str) -> str:
+def extract_text_from_pdf(file_path: str) -> list[dict]:
     dev_print(f"[Extractor] Extracting text from {file_path}")
     doc = fitz.open(file_path)
-    full_text = ""
-    for page in doc:
-        full_text += page.get_text() + "\n"
+    pages = []
+    for i, page in enumerate(doc):
+        pages.append({"page_number": i + 1, "text": page.get_text() + "\n"})
     doc.close()
-    return full_text
+    return pages
 
-def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 150) -> list[str]:
+def chunk_text_with_pages(pages: list[dict], chunk_size: int = 1000, overlap: int = 150) -> list[dict]:
     enc = tiktoken.get_encoding("cl100k_base")
-    tokens = enc.encode(text)
+    
+    all_tokens = []
+    token_to_page = []
+    
+    for p in pages:
+        tokens = enc.encode(p["text"], allowed_special="all")
+        all_tokens.extend(tokens)
+        token_to_page.extend([p["page_number"]] * len(tokens))
+        
     chunks = []
     i = 0
-    while i < len(tokens):
-        chunk_tokens = tokens[i:i + chunk_size]
-        chunks.append(enc.decode(chunk_tokens))
+    while i < len(all_tokens):
+        chunk_tokens = all_tokens[i:i + chunk_size]
+        chunk_text = enc.decode(chunk_tokens)
+        
+        # Get unique pages for this chunk
+        chunk_pages = sorted(list(set(token_to_page[i:i + chunk_size])))
+        
+        chunks.append({
+            "text": chunk_text,
+            "pages": chunk_pages
+        })
+        
         i += chunk_size - overlap
+        
     return chunks

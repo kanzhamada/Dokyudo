@@ -139,6 +139,7 @@ export const documentChunks = pgTable("document_chunks", {
         .notNull()
         .references(() => documents.id, { onDelete: "cascade" }),
     chunkIndex: integer("chunk_index").notNull(),
+    metadata: jsonb("metadata"),
     content: text("content").notNull(),
     fts: tsvector("fts").generatedAlwaysAs(sql`to_tsvector('indonesian', content) || to_tsvector('english', content)`),
 }, (table) => ({
