@@ -11,14 +11,14 @@ def generate_llm_description(text: str) -> str:
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GOOGLE_API_KEY}"
 
-    prompt = f"""You are a professional document archiving assistant.
-Your task is to write a comprehensive but brief summary of this document based on its introductory text.
+    prompt = f"""You are an expert document summarizer.
+Your task is to write a comprehensive paragraph summarizing the core subject, purpose, and key entities of this document based on its introductory text.
 
-Strict rules:
-1. You MUST write exactly 1 or 2 complete sentences. Do not just output a single word or title.
-2. Maximum 150 characters.
-3. Get straight to the point, do not use introductory phrases like "This document discusses...".
-4. Match the language of the description with the dominant language of the document. If the document is in English, write in English. If it is in Indonesian, write in Indonesian.
+STRICT INSTRUCTIONS:
+1. You MUST write exactly 2 to 3 complete and descriptive sentences.
+2. The summary MUST contain at least 20 words. Do NOT output a single word, title, or fragmented sentence.
+3. Be direct. Do not start with "This document discusses..." or "This is a document about...".
+4. Language MUST MATCH the dominant language of the text.
 
 Introductory Document Text:
 ---
@@ -31,8 +31,8 @@ Introductory Document Text:
             "parts": [{"text": prompt}]
         }],
         "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 150
+            "temperature": 0.5,
+            "maxOutputTokens": 256
         },
         "safetySettings": [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
