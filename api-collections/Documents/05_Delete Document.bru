@@ -1,0 +1,19 @@
+meta {
+  name: Delete Document
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/documents/{{documentId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Deletes a document from the database, removes its chunks from Upstash Vector, and deletes the associated file from S3 (MinIO).
+}
