@@ -19,7 +19,11 @@ sequenceDiagram
     API-->>Client: 201 Created (url, documentId)
     Client->>MinIO: PUT file to Presigned URL
     MinIO-->>Client: 200 OK (Upload Success)
+    MinIO-->>Client: 200 OK (Upload Success)
 ```
+
+## 2.5 Upload Cancellation
+Jika klien memutuskan untuk membatalkan unggahan (*AbortController* di *frontend*), klien cukup memanggil endpoint `DELETE /api/documents/:id`. Endpoint ini secara otomatis akan menghapus status `pending` di PostgreSQL dan memastikan file di MinIO (jika ada *partial upload*) ikut terhapus.
 
 ## 3. Completion Timestamp
 **Completed At:** 2026-06-27T11:42:00+07:00 (WIB)

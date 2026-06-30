@@ -261,8 +261,13 @@ ${question}
                                 modelUsed: successfulModel,
                                 latencyMs,
                                 contextReferences:
-                                    chunkIds.length > 0 ? chunkIds : null,
+                                    references.length > 0 ? references : null,
                             });
+                            
+                            // Explicitly touch the updatedAt field on the parent conversation
+                            await tx.update(conversations)
+                                .set({ updatedAt: new Date() })
+                                .where(eq(conversations.id, cid!));
                         });
 
                         if (logContext) {
@@ -281,6 +286,86 @@ ${question}
         });
 
         return stream;
+    }
+
+    static async listConversations(params: {
+        userId: string;
+        tenantId: string;
+    }) {
+        const { userId, tenantId } = params;
+        
+        let results: any[] = [];
+        await withAuthDb(userId, async (tx) => {
+            results = await tx
+                .select()
+                .from(conversations)
+                .where(eq(conversations.tenantId, tenantId))
+                .orderBy(desc(conversations.updatedAt));
+        });
+        
+        return {
+            conversations: results.map((c) => ({
+                id: c.id,
+                title: c.title,
+                createdAt: c.createdAt.toISOString(),
+                updatedAt: c.updatedAt.toISOString(),
+            })),
+        };
+    }
+    static async getConversation(params: {
+        userId: string;
+        tenantId: string;
+        conversationId: string;
+    }) {
+        const { userId, tenantId, conversationId } = params;
+
+        let conversation: any = null;
+        let turns: any[] = [];
+
+        await withAuthDb(userId, async (tx) => {
+            const results = await tx
+                .select()
+                .from(conversations)
+                .where(
+                    and(
+                        eq(conversations.id, conversationId),
+                        eq(conversations.tenantId, tenantId)
+                    )
+                );
+
+            if (results.length > 0) {
+                conversation = results[0];
+
+                turns = await tx
+                    .select()
+                    .from(conversationTurns)
+                    .where(eq(conversationTurns.conversationId, conversationId))
+                    .orderBy(conversationTurns.createdAt);
+            }
+        });
+
+        if (!conversation) {
+            throw new AppError({
+                code: "NOT_FOUND",
+                message: "Conversation not found",
+                status: 404,
+            });
+        }
+
+        return {
+            id: conversation.id,
+            title: conversation.title,
+            createdAt: conversation.createdAt.toISOString(),
+            updatedAt: conversation.updatedAt.toISOString(),
+            turns: turns.map((t) => ({
+                id: t.id,
+                question: t.question,
+                answer: t.answer,
+                modelUsed: t.modelUsed,
+                contextReferences: t.contextReferences,
+                createdAt: t.createdAt.toISOString(),
+            })),
+        };
     }
 
     static async updateConversationTitle(params: {

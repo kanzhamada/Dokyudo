@@ -55,6 +55,45 @@ describe("RagService Isolated Tests", () => {
         // testing successful streaming is complex due to SSE ReadableStream mock, so we focus on unit test DB operations next.
     });
 
+    describe("listConversations", () => {
+        it("positive: returns list of conversations ordered by updatedAt desc", async () => {
+            const res = await RagService.listConversations({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+            });
+
+            assertEquals(Array.isArray(res.conversations), true);
+            // Initially one from setup
+            assertEquals(res.conversations.length, 1);
+            assertEquals(res.conversations[0].id, TEST_CONVERSATION_ID);
+        });
+    });
+
+    describe("getConversation", () => {
+        it("positive: returns a conversation with turns", async () => {
+            const res = await RagService.getConversation({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+            });
+
+            assertEquals(res.id, TEST_CONVERSATION_ID);
+            assertEquals(Array.isArray(res.turns), true);
+        });
+
+        it("negative: throws 404 for invalid conversation", async () => {
+            await assertRejects(
+                () => RagService.getConversation({
+                    userId: TEST_USER_ID,
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: crypto.randomUUID(),
+                }),
+                AppError,
+                "Conversation not found"
+            );
+        });
+    });
+
     describe("updateConversationTitle", () => {
         it("positive: updates conversation title successfully", async () => {
             await RagService.updateConversationTitle({

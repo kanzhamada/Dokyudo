@@ -101,6 +101,45 @@ describe("RAG Routes", () => {
         });
     });
 
+    describe("GET /api/rag/conversations", () => {
+        it("negative: missing authorization returns 401", async () => {
+            const res = await makeRequest("/api/rag/conversations", "GET");
+            assertEquals(res.status, 401);
+        });
+
+        it("positive: returns list of conversations", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest("/api/rag/conversations", "GET", undefined, headers);
+            
+            if (!validToken) return;
+            assertEquals(res.status, 200);
+            const json = await res.json();
+            assertExists(json.conversations);
+            assertEquals(Array.isArray(json.conversations), true);
+        });
+    });
+
+    describe("GET /api/rag/conversations/:id", () => {
+        it("positive: returns the conversation and its turns", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(`/api/rag/conversations/${testConversationId}`, "GET", undefined, headers);
+            
+            if (!validToken) return;
+            assertEquals(res.status, 200);
+            const json = await res.json();
+            assertEquals(json.id, testConversationId);
+            assertEquals(Array.isArray(json.turns), true);
+        });
+
+        it("negative: returns 404 for invalid id", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(`/api/rag/conversations/${crypto.randomUUID()}`, "GET", undefined, headers);
+            
+            if (!validToken) return;
+            assertEquals(res.status, 404);
+        });
+    });
+
     describe("DELETE /api/rag/conversations/:id", () => {
         it("positive: deletes conversation successfully", async () => {
             const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};

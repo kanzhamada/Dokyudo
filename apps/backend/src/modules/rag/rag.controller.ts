@@ -59,3 +59,30 @@ export async function handleDeleteConversation(c: Context) {
 
     return c.json({ data: { success: true } });
 }
+
+export async function handleListConversations(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const result = await RagService.listConversations({
+        userId,
+        tenantId,
+    });
+
+    return c.json(result);
+}
+
+export async function handleGetConversation(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { id: conversationId } = c.req.valid("param" as never) as { id: string };
+
+    const result = await RagService.getConversation({
+        userId,
+        tenantId,
+        conversationId,
+    });
+
+    return c.json(result);
+}

@@ -22,3 +22,39 @@ export const UpdateConversationBodySchema = z.object({
     title: z.string().min(1, "Title cannot be empty").max(100, "Title is too long"),
 });
 export type UpdateConversationBody = z.infer<typeof UpdateConversationBodySchema>;
+
+export const ConversationItemSchema = z.object({
+    id: z.string().uuid(),
+    title: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+});
+export type ConversationItem = z.infer<typeof ConversationItemSchema>;
+
+export const ListConversationsResponseSchema = z.object({
+    conversations: z.array(ConversationItemSchema),
+});
+export type ListConversationsResponse = z.infer<typeof ListConversationsResponseSchema>;
+
+export const ContextReferenceSchema = z.object({
+    documentId: z.string(),
+    title: z.string().optional(),
+    pages: z.array(z.number()),
+});
+export type ContextReference = z.infer<typeof ContextReferenceSchema>;
+
+export const ConversationTurnSchema = z.object({
+    id: z.string().uuid(),
+    question: z.string(),
+    answer: z.string(),
+    modelUsed: z.string().nullable(),
+    contextReferences: z.array(ContextReferenceSchema).nullable(),
+    createdAt: z.string(),
+});
+export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
+
+export const GetConversationResponseSchema = ConversationItemSchema.extend({
+    turns: z.array(ConversationTurnSchema),
+});
+export type GetConversationResponse = z.infer<typeof GetConversationResponseSchema>;
+

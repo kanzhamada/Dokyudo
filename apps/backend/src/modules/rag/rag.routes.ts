@@ -125,3 +125,88 @@ ragRoutes.openapi(
     }),
     ragController.handleDeleteConversation as any,
 );
+
+ragRoutes.openapi(
+    createRoute({
+        method: "get",
+        path: "/conversations",
+        tags: ["RAG"],
+        summary: "List Conversations",
+        description: "Returns a list of conversations for the current tenant, ordered by most recently updated.",
+        responses: {
+            200: {
+                description: "Success",
+                content: {
+                    "application/json": {
+                        schema: RagSchema.ListConversationsResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    ragController.handleListConversations as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "get",
+        path: "/conversations/{id}",
+        tags: ["RAG"],
+        summary: "Get Conversation",
+        description: "Returns a specific conversation and all of its chat turns.",
+        request: {
+            params: RagSchema.ConversationParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Success",
+                content: {
+                    "application/json": {
+                        schema: RagSchema.GetConversationResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            404: {
+                description: "Not found",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    ragController.handleGetConversation as any,
+);
