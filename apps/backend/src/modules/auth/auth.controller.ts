@@ -2,6 +2,7 @@ import { ContextExtractor } from "../../shared/utils/context.util.ts";
 import { AuthService } from "./auth.service.ts";
 import * as AuthSchema from "./auth.schema.ts";
 import { type Context } from "hono";
+import { AppError } from "../../shared/utils/errors.util.ts";
 
 export async function handleRegister(c: Context) {
     const extractor = new ContextExtractor(c);
@@ -142,3 +143,26 @@ export async function handleUpdatePassword(c: Context) {
         200,
     );
 }
+
+export const handleGetProfile = async (c: Context) => {
+    const userId = c.get("userId");
+    const tenantId = c.get("tenantId");
+    
+    if (!userId || !tenantId) {
+        throw new AppError({
+            code: "UNAUTHORIZED",
+            message: "Missing authentication context",
+            status: 401,
+        });
+    }
+
+    const logContext = c.get("logContext") || {};
+    
+    const profile = await AuthService.getProfile({
+        userId,
+        tenantId,
+        logContext,
+    });
+    
+    return c.json(profile, 200);
+};

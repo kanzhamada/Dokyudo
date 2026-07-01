@@ -4,6 +4,7 @@ import * as authController from "./auth.controller.ts";
 import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
 import * as AuthSchema from "./auth.schema.ts";
 import { oauthRoutes } from "./oauth/mod.ts";
+import { authMiddleware } from "../../shared/middlewares/auth.middleware.ts";
 
 export const authRoutes = createApp();
 
@@ -358,4 +359,43 @@ authRoutes.openapi(
         },
     }),
     authController.handleUpdatePassword as any,
+);
+
+authRoutes.openapi(
+    createRoute({
+        method: "get",
+        path: "/me",
+        tags: ["Auth"],
+        summary: "Get current user profile and subscription tier",
+        description:
+            "Returns user details, tenant info, and current subscription status. Automatically handles lazy-downgrade if subscription is expired.",
+        middleware: [authMiddleware] as const,
+        responses: {
+            200: {
+                description: "Profile returned successfully",
+                content: {
+                    "application/json": {
+                        schema: AuthSchema.ProfileResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    authController.handleGetProfile as any,
 );

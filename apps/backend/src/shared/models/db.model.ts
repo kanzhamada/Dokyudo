@@ -222,7 +222,7 @@ export const outboxEvents = pgTable("outbox_events", {
 // ==============================================================================
 // 9. TENANT SUBSCRIPTIONS (1:1 relation with tenants)
 // ==============================================================================
-export const tierEnum = pgEnum("tier_enum", ["FREE", "SIMULATE", "INVESTOR", "REAL"]);
+export const tierEnum = pgEnum("tier_enum", ["FREE", "SIMULATE", "OIL_INVESTOR", "PRO"]);
 
 export const tenantSubscriptions = pgTable("tenant_subscriptions", {
     tenantId: uuid("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
@@ -268,7 +268,6 @@ export const paymentTransactions = pgTable(
         currency: varchar("currency", { length: 3 }).notNull().default("USD"),
         
         status: paymentStatusEnum("status").notNull().default("PENDING"),
-        failureCode: varchar("failure_code", { length: 100 }),
         
         webhookPayload: jsonb("webhook_payload"),
         

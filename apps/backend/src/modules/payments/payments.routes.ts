@@ -80,3 +80,36 @@ paymentsRoutes.openapi(
     }),
     paymentsController.handleWebhook,
 );
+
+// 3. POST /portal (Protected by Auth)
+paymentsRoutes.openapi(
+    createRoute({
+        method: "post",
+        path: "/portal",
+        tags: ["Payments"],
+        summary: "Create Stripe Customer Portal Session",
+        description: "Creates a session for the user to manage their subscription (cancel, update, etc).",
+        request: {
+            // Empty body
+        },
+        responses: {
+            201: {
+                description: "Portal session created",
+                content: {
+                    "application/json": {
+                        schema: PaymentsSchema.PortalResponseSchema,
+                    },
+                },
+            },
+            400: {
+                description: "No active Stripe customer found",
+                content: { "application/json": { schema: ErrorResponseSchema } },
+            },
+            502: {
+                description: "Stripe error",
+                content: { "application/json": { schema: ErrorResponseSchema } },
+            },
+        },
+    }),
+    paymentsController.handlePortal as any,
+);

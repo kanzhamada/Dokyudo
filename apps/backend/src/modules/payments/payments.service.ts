@@ -1,5 +1,9 @@
 import { db } from "../../config/drizzle.ts";
-import { paymentTransactions, tenantSubscriptions, tenants } from "../../shared/models/db.model.ts";
+import {
+    paymentTransactions,
+    tenantSubscriptions,
+    tenants,
+} from "../../shared/models/db.model.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { stripe } from "../../config/stripe.ts";
 import { CreateCheckoutBody } from "./payments.schema.ts";
@@ -20,10 +24,21 @@ export class PaymentsService {
     }) {
         const { body, tenantId, logContext } = params;
 
-        // 1. Pricing Logic (Inline Price Data for Sandbox)
-        // In production, you would fetch predefined Price IDs from Stripe.
-        let amount = body.tierToUnlock === "INVESTOR" ? 150000 : 50000; // Cents (e.g., $1500.00 / $500.00)
-        
+        const priceMap: Record<string, string> = {
+            PRO: "price_1ToIk49XAhQgRBc1B3Rx1KpL",
+            SIMULATE: "price_1ToGzM9XAhQgRBc1wmvawFCs",
+            OIL_INVESTOR: "price_1ToHBm9XAhQgRBc15Fyuc6yy",
+        };
+
+        const priceId = priceMap[body.tierToUnlock];
+        if (!priceId) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                status: 400,
+                message: "Invalid tier to unlock",
+            });
+        }
+
         const externalId = `dokyudo-${tenantId}-${Date.now()}`;
 
         // 2. Tenant Check
@@ -31,7 +46,7 @@ export class PaymentsService {
             .select()
             .from(tenants)
             .where(eq(tenants.id, tenantId));
-            
+
         if (!tenant) {
             throw new AppError({
                 code: "NOT_FOUND",
@@ -40,10 +55,24 @@ export class PaymentsService {
             });
         }
 
+        // 3. Re-use Stripe Customer ID if it exists (prevents duplicate customers in Stripe Dashboard)
+        const [sub] = await db
+            .select()
+            .from(tenantSubscriptions)
+            .where(eq(tenantSubscriptions.tenantId, tenantId));
+        const stripeCustomerId = sub?.stripeCustomerId || undefined;
+
+        const checkoutMode =
+            body.tierToUnlock === "OIL_INVESTOR" ||
+            body.tierToUnlock === "SIMULATE"
+                ? "payment"
+                : "subscription";
+
         let session: Stripe.Checkout.Session;
         try {
             session = await stripe.checkout.sessions.create({
-                mode: 'subscription',
+                mode: checkoutMode,
+                customer: stripeCustomerId,
                 client_reference_id: externalId,
                 metadata: {
                     tenantId: tenantId,
@@ -51,20 +80,13 @@ export class PaymentsService {
                 },
                 line_items: [
                     {
-                        price_data: {
-                            currency: 'usd',
-                            recurring: { interval: 'month' },
-                            product_data: {
-                                name: `Dokyudo ${body.tierToUnlock} Tier`,
-                                description: "Monthly SaaS Subscription",
-                            },
-                            unit_amount: amount,
-                        },
+                        price: priceId,
                         quantity: 1,
                     },
                 ],
                 // We do not pass payment_method_types per stripe-best-practices
-                success_url: "http://localhost:5173/dashboard/billing/success?session_id={CHECKOUT_SESSION_ID}",
+                success_url:
+                    "http://localhost:5173/dashboard/billing/success?session_id={CHECKOUT_SESSION_ID}",
                 cancel_url: "http://localhost:5173/dashboard/billing/cancel",
             });
         } catch (error: any) {
@@ -83,9 +105,9 @@ export class PaymentsService {
                 tenantId,
                 externalId,
                 stripeSessionId: session.id,
-                tierToUnlock: body.tierToUnlock,
-                amount,
-                currency: "USD",
+                tierToUnlock: body.tierToUnlock as any,
+                amount: session.amount_total || 0,
+                currency: (session.currency || "USD").toUpperCase(),
                 status: "PENDING",
             })
             .returning();
@@ -109,12 +131,16 @@ export class PaymentsService {
         if (logContext) logContext.stripeEventType = event.type;
 
         switch (event.type) {
-            case 'checkout.session.completed': {
+            case "checkout.session.completed": {
                 const session = event.data.object as Stripe.Checkout.Session;
-                
+
                 // 1. Fetch transaction
                 const externalId = session.client_reference_id;
-                if (!externalId) return { acknowledged: true, reason: "no_client_reference_id" };
+                if (!externalId)
+                    return {
+                        acknowledged: true,
+                        reason: "no_client_reference_id",
+                    };
 
                 const [trx] = await db
                     .select()
@@ -122,8 +148,12 @@ export class PaymentsService {
                     .where(eq(paymentTransactions.externalId, externalId));
 
                 if (!trx) {
-                    if (logContext) logContext.webhookWarning = `Unknown reference_id: ${externalId}`;
-                    return { acknowledged: true, reason: "unknown_transaction" };
+                    if (logContext)
+                        logContext.webhookWarning = `Unknown reference_id: ${externalId}`;
+                    return {
+                        acknowledged: true,
+                        reason: "unknown_transaction",
+                    };
                 }
 
                 // 2. Update Transaction
@@ -138,33 +168,86 @@ export class PaymentsService {
                     .where(eq(paymentTransactions.id, trx.id));
 
                 // 3. Upgrade Tenant Subscription
-                const tierToUnlock = session.metadata?.tierToUnlock || trx.tierToUnlock;
-                
-                const [sub] = await db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, trx.tenantId));
-                
+                const tierToUnlock =
+                    session.metadata?.tierToUnlock || trx.tierToUnlock;
+
+                const [sub] = await db
+                    .select()
+                    .from(tenantSubscriptions)
+                    .where(eq(tenantSubscriptions.tenantId, trx.tenantId));
+
                 if (sub) {
-                    await db.update(tenantSubscriptions).set({
-                        tier: tierToUnlock as any,
-                        stripeCustomerId: session.customer as string,
-                        stripeSubscriptionId: session.subscription as string,
-                        updatedAt: new Date()
-                    }).where(eq(tenantSubscriptions.tenantId, trx.tenantId));
+                    await db
+                        .update(tenantSubscriptions)
+                        .set({
+                            tier: tierToUnlock as any,
+                            stripeCustomerId: session.customer as string,
+                            stripeSubscriptionId: session.subscription
+                                ? (session.subscription as string)
+                                : sub.stripeSubscriptionId,
+                            ...(tierToUnlock === "SIMULATE"
+                                ? {
+                                      expiresAt: new Date(
+                                          Date.now() + 24 * 60 * 60 * 1000,
+                                      ),
+                                  }
+                                : tierToUnlock === "OIL_INVESTOR"
+                                  ? { expiresAt: null }
+                                  : {}),
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(tenantSubscriptions.tenantId, trx.tenantId));
                 } else {
                     await db.insert(tenantSubscriptions).values({
                         tenantId: trx.tenantId,
                         tier: tierToUnlock as any,
                         stripeCustomerId: session.customer as string,
-                        stripeSubscriptionId: session.subscription as string,
+                        stripeSubscriptionId: session.subscription
+                            ? (session.subscription as string)
+                            : null,
                     });
                 }
                 break;
             }
-            case 'customer.subscription.deleted': {
+            case "customer.subscription.created":
+            case "customer.subscription.updated": {
                 const subscription = event.data.object as Stripe.Subscription;
-                // Downgrade to FREE when subscription is canceled/deleted
-                await db.update(tenantSubscriptions)
-                    .set({ tier: "FREE", updatedAt: new Date() })
-                    .where(eq(tenantSubscriptions.stripeSubscriptionId, subscription.id));
+
+                // If user canceled via Customer Portal, cancel_at_period_end becomes true.
+                // We set expiresAt to cancel_at timestamp. If they renew, it becomes null (indefinite).
+                const isCanceling = subscription.cancel_at_period_end;
+                const expiresAt =
+                    isCanceling && typeof subscription.cancel_at === "number"
+                        ? new Date(subscription.cancel_at * 1000)
+                        : null;
+
+                await db
+                    .update(tenantSubscriptions)
+                    .set({ expiresAt, updatedAt: new Date() })
+                    .where(
+                        eq(
+                            tenantSubscriptions.stripeSubscriptionId,
+                            subscription.id,
+                        ),
+                    );
+                break;
+            }
+            case "customer.subscription.deleted": {
+                const subscription = event.data.object as Stripe.Subscription;
+                // Downgrade to FREE when subscription is completely canceled/deleted by Stripe
+                await db
+                    .update(tenantSubscriptions)
+                    .set({
+                        tier: "FREE",
+                        expiresAt: null,
+                        updatedAt: new Date(),
+                    })
+                    .where(
+                        eq(
+                            tenantSubscriptions.stripeSubscriptionId,
+                            subscription.id,
+                        ),
+                    );
                 break;
             }
             default:
@@ -173,5 +256,46 @@ export class PaymentsService {
         }
 
         return { acknowledged: true, eventType: event.type };
+    }
+
+    /**
+     * Creates a Stripe Customer Portal Session for managing subscriptions.
+     */
+    static async createPortalSession(params: {
+        tenantId: string;
+        logContext?: Record<string, any>;
+    }) {
+        const { tenantId, logContext } = params;
+
+        const [sub] = await db
+            .select()
+            .from(tenantSubscriptions)
+            .where(eq(tenantSubscriptions.tenantId, tenantId));
+
+        if (!sub || !sub.stripeCustomerId) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                status: 400,
+                message: "No active Stripe customer found for this tenant",
+            });
+        }
+
+        try {
+            const portalSession = await stripe.billingPortal.sessions.create({
+                customer: sub.stripeCustomerId,
+                return_url: "http://localhost:5173/dashboard/billing",
+            });
+
+            return {
+                portalUrl: portalSession.url,
+            };
+        } catch (error: any) {
+            if (logContext) logContext.stripeError = error.message;
+            throw new AppError({
+                code: "PROVIDER_UNAVAILABLE",
+                status: 502,
+                message: "Failed to communicate with Stripe Billing Portal",
+            });
+        }
     }
 }

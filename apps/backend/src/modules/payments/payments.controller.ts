@@ -62,3 +62,16 @@ export async function handleWebhook(c: Context) {
     // 4. Always return 200 OK so Stripe stops retrying
     return c.json(result, 200);
 }
+
+export async function handlePortal(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId } = extractor.extractAuthContext();
+    const { logContext } = extractor.extractAuditContext();
+
+    const result = await PaymentsService.createPortalSession({
+        tenantId,
+        logContext,
+    });
+
+    return c.json(result, 201);
+}

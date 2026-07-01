@@ -1,0 +1,20 @@
+meta {
+  name: Stripe Customer Portal
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/payments/portal
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  Creates a Stripe Customer Portal session so the user can securely update their billing details, download invoices, or cancel their subscription.
+  Requires a valid JWT and an active Stripe Customer ID stored in the database.
+}
