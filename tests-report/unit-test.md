@@ -140,7 +140,20 @@
 | **Puzzle** | `Allows request with valid new puzzle token`| HTTP 200 | HTTP 200 | ✅ Pass |
 | **Puzzle** | `Blocks replay attack on reused token` | HTTP 403, "Replay Attack Detected" | HTTP 403 | ✅ Pass |
 
-## 6. Services (Isolated)
+## 6. Payments Module (`payments.routes.test.ts`)
+
+| Test Case / Step | Description & Path | Expected Result | Actual Result | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **Checkout** | `positive: returns 201 with checkout url` | HTTP 201, `checkoutUrl`, `sessionId` | HTTP 201, Match | ✅ Pass |
+| **Checkout** | `negative: invalid tier returns 400` | HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
+| **Checkout** | `negative: missing authorization returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Portal** | `negative: rejects if tenant has no active stripe customer` | HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
+| **Portal** | `negative: missing authorization returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Webhook** | `negative: missing stripe-signature returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Webhook** | `negative: invalid signature returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Webhook** | `positive: valid signature processes webhook` | HTTP 200, JSON acknowledged | HTTP 200, Match | ✅ Pass |
+
+## 7. Services (Isolated)
 
 | Suite | Description & Path | Expected Result | Actual Result | Status |
 | :--- | :--- | :--- | :--- | :---: |
@@ -173,6 +186,15 @@
 | **RAG Svc** | `updateConversationTitle: throws 404 if conversation does not exist or wrong tenant`| Throws "Conversation not found" | AppError thrown | ✅ Pass |
 | **RAG Svc** | `deleteConversation: throws 404 if conversation does not exist` | Throws "Conversation not found" | AppError thrown | ✅ Pass |
 | **RAG Svc** | `deleteConversation: deletes conversation successfully` | Deletes from DB | DB matches | ✅ Pass |
+| **Payments Svc**| `createCheckoutSession: positive creates transaction` | Returns `checkoutUrl`, `sessionId`, inserts DB | DB matched | ✅ Pass |
+| **Payments Svc**| `createCheckoutSession: negative rejects invalid tier` | Throws "Invalid tier to unlock" | AppError thrown | ✅ Pass |
+| **Payments Svc**| `createCheckoutSession: negative rejects missing tenant`| Throws "Tenant not found" | AppError thrown | ✅ Pass |
+| **Payments Svc**| `createCheckoutSession: negative stripe error` | Throws "Failed to communicate with Stripe" | AppError thrown | ✅ Pass |
+| **Payments Svc**| `handleWebhook: positive checkout.session.completed` | Updates Trx status to SUCCEEDED and upgrades tier| DB matched | ✅ Pass |
+| **Payments Svc**| `handleWebhook: negative ignores unknown transaction` | Returns `acknowledged`, `unknown_transaction` | Matched | ✅ Pass |
+| **Payments Svc**| `handleWebhook: positive downgrades sub on deleted` | Tier updated to `FREE`, expiresAt to null | DB matched | ✅ Pass |
+| **Payments Svc**| `createPortalSession: positive creates portal session` | Returns `portalUrl` | Matched URL | ✅ Pass |
+| **Payments Svc**| `createPortalSession: negative rejects if no stripe_cust`| Throws "No active Stripe customer found" | AppError thrown | ✅ Pass |
 
 ---
 *Report auto-generated after applying BDD refactoring and strict isolation testing.*

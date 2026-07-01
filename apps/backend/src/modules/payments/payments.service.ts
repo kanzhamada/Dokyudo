@@ -1,4 +1,4 @@
-import { db } from "../../config/drizzle.ts";
+import { db, withAuthDb } from "../../config/drizzle.ts";
 import {
     paymentTransactions,
     tenantSubscriptions,
@@ -9,6 +9,7 @@ import { stripe } from "../../config/stripe.ts";
 import { CreateCheckoutBody } from "./payments.schema.ts";
 import { eq } from "drizzle-orm";
 import type Stripe from "npm:stripe@^15.5.0";
+import { getEnv } from "../../config/env.ts";
 
 export class PaymentsService {
     /**
@@ -22,7 +23,7 @@ export class PaymentsService {
         countryCode: string;
         logContext?: Record<string, any>;
     }) {
-        const { body, tenantId, logContext } = params;
+        const { body, tenantId, userId, logContext } = params;
 
         const priceMap: Record<string, string> = {
             PRO: "price_1ToIk49XAhQgRBc1B3Rx1KpL",
@@ -42,10 +43,12 @@ export class PaymentsService {
         const externalId = `dokyudo-${tenantId}-${Date.now()}`;
 
         // 2. Tenant Check
-        const [tenant] = await db
-            .select()
-            .from(tenants)
-            .where(eq(tenants.id, tenantId));
+        const [tenant] = await withAuthDb(userId, async (tx) => {
+            return await tx
+                .select()
+                .from(tenants)
+                .where(eq(tenants.id, tenantId));
+        });
 
         if (!tenant) {
             throw new AppError({
@@ -56,10 +59,12 @@ export class PaymentsService {
         }
 
         // 3. Re-use Stripe Customer ID if it exists (prevents duplicate customers in Stripe Dashboard)
-        const [sub] = await db
-            .select()
-            .from(tenantSubscriptions)
-            .where(eq(tenantSubscriptions.tenantId, tenantId));
+        const [sub] = await withAuthDb(userId, async (tx) => {
+            return await tx
+                .select()
+                .from(tenantSubscriptions)
+                .where(eq(tenantSubscriptions.tenantId, tenantId));
+        });
         const stripeCustomerId = sub?.stripeCustomerId || undefined;
 
         const checkoutMode =
@@ -86,8 +91,8 @@ export class PaymentsService {
                 ],
                 // We do not pass payment_method_types per stripe-best-practices
                 success_url:
-                    "http://localhost:5173/dashboard/billing/success?session_id={CHECKOUT_SESSION_ID}",
-                cancel_url: "http://localhost:5173/dashboard/billing/cancel",
+                    `${getEnv("FRONTEND_URL")}/dashboard/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${getEnv("FRONTEND_URL")}/dashboard/billing/cancel`,
             });
         } catch (error: any) {
             if (logContext) logContext.stripeError = error.message;
@@ -99,18 +104,20 @@ export class PaymentsService {
         }
 
         // 5. Store Transaction state in DB
-        const [trx] = await db
-            .insert(paymentTransactions)
-            .values({
-                tenantId,
-                externalId,
-                stripeSessionId: session.id,
-                tierToUnlock: body.tierToUnlock as any,
-                amount: session.amount_total || 0,
-                currency: (session.currency || "USD").toUpperCase(),
-                status: "PENDING",
-            })
-            .returning();
+        const [trx] = await withAuthDb(userId, async (tx) => {
+            return await tx
+                .insert(paymentTransactions)
+                .values({
+                    tenantId,
+                    externalId,
+                    stripeSessionId: session.id,
+                    tierToUnlock: body.tierToUnlock as any,
+                    amount: session.amount_total || 0,
+                    currency: (session.currency || "USD").toUpperCase(),
+                    status: "PENDING",
+                })
+                .returning();
+        });
 
         return {
             checkoutUrl: session.url,
@@ -263,14 +270,17 @@ export class PaymentsService {
      */
     static async createPortalSession(params: {
         tenantId: string;
+        userId: string;
         logContext?: Record<string, any>;
     }) {
-        const { tenantId, logContext } = params;
+        const { tenantId, userId, logContext } = params;
 
-        const [sub] = await db
-            .select()
-            .from(tenantSubscriptions)
-            .where(eq(tenantSubscriptions.tenantId, tenantId));
+        const [sub] = await withAuthDb(userId, async (tx) => {
+            return await tx
+                .select()
+                .from(tenantSubscriptions)
+                .where(eq(tenantSubscriptions.tenantId, tenantId));
+        });
 
         if (!sub || !sub.stripeCustomerId) {
             throw new AppError({
@@ -283,7 +293,7 @@ export class PaymentsService {
         try {
             const portalSession = await stripe.billingPortal.sessions.create({
                 customer: sub.stripeCustomerId,
-                return_url: "http://localhost:5173/dashboard/billing",
+                return_url: `${getEnv("FRONTEND_URL")}/dashboard/billing`,
             });
 
             return {

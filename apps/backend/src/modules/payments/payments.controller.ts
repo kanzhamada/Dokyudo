@@ -65,11 +65,12 @@ export async function handleWebhook(c: Context) {
 
 export async function handlePortal(c: Context) {
     const extractor = new ContextExtractor(c);
-    const { tenantId } = extractor.extractAuthContext();
+    const { tenantId, userId } = extractor.extractAuthContext();
     const { logContext } = extractor.extractAuditContext();
 
     const result = await PaymentsService.createPortalSession({
         tenantId,
+        userId,
         logContext,
     });
 
