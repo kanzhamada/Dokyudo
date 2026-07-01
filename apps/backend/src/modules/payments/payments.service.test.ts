@@ -107,6 +107,39 @@ describe("PaymentsService", () => {
             );
         });
 
+        it("negative: rejects claiming SIMULATE twice in a month", async () => {
+            // First simulate payment success
+            const txId = crypto.randomUUID();
+            const now = new Date();
+            await db.insert(paymentTransactions).values({
+                id: txId,
+                tenantId: testTenantId,
+                externalId: `dokyudo-${testTenantId}-testsim`,
+                tierToUnlock: "SIMULATE",
+                amount: 0,
+                currency: "IDR",
+                status: "SUCCEEDED",
+                paidAt: now
+            });
+
+            const req = {
+                body: { tierToUnlock: "SIMULATE" as const },
+                tenantId: testTenantId,
+                userId: testUserId,
+                clientIp: "127.0.0.1",
+                countryCode: "US",
+            };
+            
+            await assertRejects(
+                () => PaymentsService.createCheckoutSession(req),
+                AppError,
+                "You can only claim the SIMULATE tier once per month"
+            );
+
+            // Cleanup
+            await db.delete(paymentTransactions).where(eq(paymentTransactions.id, txId));
+        });
+
         it("negative: throws on stripe error", async () => {
             checkoutStub.restore(); // Temporarily remove success stub
             const errorStub = stub(stripe.checkout.sessions, "create", () => {

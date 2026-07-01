@@ -7,7 +7,7 @@ import {
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { stripe } from "../../config/stripe.ts";
 import { CreateCheckoutBody } from "./payments.schema.ts";
-import { eq } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import type Stripe from "npm:stripe@^15.5.0";
 import { getEnv } from "../../config/env.ts";
 
@@ -56,6 +56,36 @@ export class PaymentsService {
                 status: 404,
                 message: "Tenant not found",
             });
+        }
+
+        // 2.5 SIMULATE Tier Monthly Constraint
+        if (body.tierToUnlock === "SIMULATE") {
+            const startOfMonth = new Date();
+            startOfMonth.setDate(1);
+            startOfMonth.setHours(0, 0, 0, 0);
+
+            const [existingSimulate] = await withAuthDb(userId, async (tx) => {
+                return await tx
+                    .select()
+                    .from(paymentTransactions)
+                    .where(
+                        and(
+                            eq(paymentTransactions.tenantId, tenantId),
+                            eq(paymentTransactions.tierToUnlock, "SIMULATE"),
+                            eq(paymentTransactions.status, "SUCCEEDED"),
+                            gte(paymentTransactions.paidAt, startOfMonth)
+                        )
+                    )
+                    .limit(1);
+            });
+
+            if (existingSimulate) {
+                throw new AppError({
+                    code: "VALIDATION_ERROR",
+                    status: 400,
+                    message: "You can only claim the SIMULATE tier once per month.",
+                });
+            }
         }
 
         // 3. Re-use Stripe Customer ID if it exists (prevents duplicate customers in Stripe Dashboard)
