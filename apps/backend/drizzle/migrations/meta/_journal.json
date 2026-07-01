@@ -43,6 +43,13 @@
       "when": 1782829112129,
       "tag": "0005_fair_pride",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782840274786,
+      "tag": "0006_big_liz_osborn",
+      "breakpoints": true
     }
   ]
 }

@@ -115,6 +115,11 @@
       "skillPath": "skills/stitch-skill/SKILL.md",
       "computedHash": "3aa58992f0fd9673b975cd48cd4f8ae4b4976fd5cdd9f20e26d3d447aee317fb"
     },
+    "stripe-best-practices": {
+      "source": "docs.stripe.com",
+      "sourceType": "well-known",
+      "computedHash": "4aecf9b7d63a5f63ecbd1fdcb6077e0923a675befa6e9b7aa5d1e51ff28d9dae"
+    },
     "supabase": {
       "source": "supabase/agent-skills",
       "sourceType": "github",

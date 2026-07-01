@@ -234,17 +234,19 @@ export const tenantSubscriptions = pgTable("tenant_subscriptions", {
     
     storageUsedBytes: bigint("storage_used_bytes", { mode: "number" }).notNull().default(0),
     
+    stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
+    stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }).unique(),
+    
     expiresAt: timestamp("expires_at", { mode: "date", precision: 3, withTimezone: true }), 
     lastResetAt: timestamp("last_reset_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
 });
 
 // ==============================================================================
-// 10. PAYMENT TRANSACTIONS (Xendit Payment API v3)
+// 10. PAYMENT TRANSACTIONS (Stripe Checkout API)
 // ==============================================================================
 export const paymentStatusEnum = pgEnum("payment_status_enum", [
     "PENDING",
-    "ACCEPTING_PAYMENTS",
     "SUCCEEDED",
     "FAILED",
     "CANCELED",
@@ -257,13 +259,13 @@ export const paymentTransactions = pgTable(
         id: uuid("id").defaultRandom().primaryKey(),
         tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
         
-        externalId: varchar("external_id", { length: 255 }).notNull().unique(),
-        paymentRequestId: varchar("payment_request_id", { length: 255 }),
-        paymentActions: jsonb("payment_actions"),
+        externalId: varchar("external_id", { length: 255 }).notNull().unique(), // Our internal reference
+        stripeSessionId: varchar("stripe_session_id", { length: 255 }), // Checkout Session ID
+        stripeCustomerId: varchar("stripe_customer_id", { length: 255 }), 
         
         tierToUnlock: tierEnum("tier_to_unlock").notNull(),
         amount: integer("amount").notNull(),
-        currency: varchar("currency", { length: 3 }).notNull().default("IDR"),
+        currency: varchar("currency", { length: 3 }).notNull().default("USD"),
         
         status: paymentStatusEnum("status").notNull().default("PENDING"),
         failureCode: varchar("failure_code", { length: 100 }),
@@ -276,6 +278,7 @@ export const paymentTransactions = pgTable(
     (table) => ({
         tenantStatusIdx: index("idx_payment_trx_tenant_status").on(table.tenantId, table.status),
         externalIdIdx: index("idx_payment_trx_external_id").on(table.externalId),
+        stripeSessionIdx: index("idx_payment_trx_stripe_session").on(table.stripeSessionId),
     })
 );
 

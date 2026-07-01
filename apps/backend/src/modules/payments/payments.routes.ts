@@ -12,8 +12,8 @@ paymentsRoutes.openapi(
         method: "post",
         path: "/checkout",
         tags: ["Payments"],
-        summary: "Create a Xendit Checkout Session",
-        description: "Creates a payment intent (Sandbox) for the specified subscription tier.",
+        summary: "Create a Stripe Checkout Session",
+        description: "Creates a Stripe subscription session for the specified tier.",
         request: {
             body: {
                 content: {
@@ -56,18 +56,10 @@ paymentsRoutes.openapi(
         method: "post",
         path: "/webhook",
         tags: ["Payments"],
-        summary: "Xendit Webhook Listener",
-        description: "Listens for payment success/failure events from Xendit. Must provide valid x-callback-token.",
+        summary: "Stripe Webhook Listener",
+        description: "Listens for Stripe events. Must provide a valid stripe-signature header.",
         request: {
-            headers: PaymentsSchema.WebhookHeadersSchema,
-            body: {
-                content: {
-                    "application/json": {
-                        schema: PaymentsSchema.WebhookPayloadSchema,
-                    },
-                },
-                required: true,
-            },
+            // Strip validation since we read raw body for crypto signatures
         },
         responses: {
             200: {

@@ -1,0 +1,16 @@
+meta {
+  name: Stripe Webhook (Use CLI)
+  type: http
+  seq: 2
+}
+
+docs {
+  WARNING: DO NOT TEST STRIPE WEBHOOKS VIA BRUNO!
+
+  Unlike Xendit which used a static token, Stripe Webhooks require a cryptographic signature (`stripe-signature` header) generated dynamically from the exact raw payload and your STRIPE_WEBHOOK_SECRET. 
+  
+  If you send a request via Bruno, it will fail with 401 Unauthorized because the signature will be missing or invalid.
+
+  To test Stripe Webhooks locally, run this in your terminal:
+  `stripe trigger checkout.session.completed`
+}

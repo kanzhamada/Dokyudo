@@ -23,6 +23,10 @@ const blockLimiter = new Ratelimit({
 });
 
 export async function rateLimiterMiddleware(c: Context, next: Next) {
+    if (c.req.path.includes("/webhook")) {
+        return next();
+    }
+
     const ip = extractClientIp(c.req.raw.headers);
     const userAgent = c.req.header("user-agent")?.toLowerCase() || "";
 
