@@ -2,11 +2,12 @@ import { AppError } from "../../shared/utils/errors.util.ts";
 import { getEnv } from "../../config/env.ts";
 import { generatePresignedPutUrl, checkObjectExists, deleteObject, generatePresignedGetUrl } from "../../shared/utils/s3.util.ts";
 import { withAuthDb, db } from "../../config/drizzle.ts";
-import { eq, and } from "drizzle-orm";
-import { documents, documentChunks } from "../../shared/models/db.model.ts";
+import { eq, and, sql } from "drizzle-orm";
+import { documents, documentChunks, tenantSubscriptions } from "../../shared/models/db.model.ts";
 import { vectorIndex } from "../../config/vector.ts";
 import * as DocumentSchema from "./documents.schema.ts";
-import { MAX_DOCUMENT_SIZE_BYTES, PRESIGNED_URL_EXPIRES_IN_SECONDS, PRESIGNED_GET_URL_EXPIRES_IN_SECONDS } from "../../shared/constants/documents.constant.ts";
+import { PRESIGNED_URL_EXPIRES_IN_SECONDS, PRESIGNED_GET_URL_EXPIRES_IN_SECONDS } from "../../shared/constants/documents.constant.ts";
+import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 
 export class DocumentsService {
     /**
@@ -16,14 +17,10 @@ export class DocumentsService {
         params: DocumentSchema.CreatePresignedUrlParams,
     ): Promise<DocumentSchema.PresignedUrlResponse> {
         
-        // Enforce maximum size
-        if (params.sizeBytes > MAX_DOCUMENT_SIZE_BYTES) {
-            throw new AppError({
-                code: "VALIDATION_ERROR",
-                message: `File size exceeds maximum allowed size of ${MAX_DOCUMENT_SIZE_BYTES / (1024 * 1024)}MB`,
-                status: 400,
-            });
-        }
+        // -1. Tier Quota Validation (Check file size, monthly uploads limit, storage limit)
+        await withAuthDb(params.tenantId, async (tx) => {
+            await TierQuotaUtil.checkUploadQuota(tx, params.tenantId, params.sizeBytes);
+        });
 
         const docId = crypto.randomUUID();
         const ext = params.filename.includes(".") ? params.filename.split(".").pop() : "bin";
@@ -65,6 +62,9 @@ export class DocumentsService {
                     description: "",
                     status: "pending",
                 });
+
+                // Increment uploadsCount atomically within the same transaction
+                await TierQuotaUtil.incrementUpload(tx, params.tenantId);
             });
             dbInsertSuccess = true;
         } catch (err: any) {

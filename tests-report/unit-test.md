@@ -157,10 +157,11 @@
 
 | Suite | Description & Path | Expected Result | Actual Result | Status |
 | :--- | :--- | :--- | :--- | :---: |
-| **Docs Svc** | `createPresignedUrl: rejects > 25MB` | Throws `AppError` | AppError thrown | ✅ Pass |
-| **Docs Svc** | `createPresignedUrl: creates URL + DB record`| Returns valid URL & inserts into DB | Valid return/DB | ✅ Pass |
-| **Docs Svc** | `confirmUpload: rejects missing DB doc` | Throws "Document not found" | AppError thrown | ✅ Pass |
-| **Docs Svc** | `confirmUpload: rejects missing S3 file` | Throws "File not found in storage" | AppError thrown | ✅ Pass |
+| **Docs Svc** | `createPresignedUrl: rejects file size over tier limit` | Throws "File size exceeds..." | AppError thrown | ✅ Pass |
+| **Docs Svc** | `createPresignedUrl: rejects if upload quota is exceeded` | Throws "Upload limit exceeded" | AppError thrown | ✅ Pass |
+| **Docs Svc** | `createPresignedUrl: valid payload` | Returns presigned URL and DB entry | Presigned URL | ✅ Pass |
+| **Docs Svc** | `confirmUpload: rejects missing DB record` | Throws "Document not found" | AppError thrown | ✅ Pass |
+| **Docs Svc** | `confirmUpload: rejects missing S3 file` | Throws "File not found" or "Failed to communicate" | AppError thrown | ✅ Pass |
 | **Docs Svc** | `confirmUpload: returns early if confirmed` | Returns success immediately | Returned early | ✅ Pass |
 | **Docs Svc** | `deleteDocument: rejects if document not found in DB`| Throws "Document not found" | AppError thrown | ✅ Pass |
 | **Docs Svc** | `deleteDocument: deletes document and chunks...` | Returns success, DB empty | DB empty | ✅ Pass |

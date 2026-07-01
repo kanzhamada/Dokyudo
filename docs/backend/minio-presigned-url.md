@@ -1,7 +1,7 @@
 # MinIO Presigned URL Generation
 
 ## 1. Core Logic
-Fitur ini bertanggung jawab untuk memberikan klien akses upload langsung (direct upload) ke MinIO On-Premise (STB) secara aman tanpa membebani bandwith backend Deno. Klien (Frontend) meminta Presigned URL, backend memvalidasi JWT (tenantId) dan metadata file, kemudian menghasilkan URL AWS S3 Presigned yang valid selama 15 menit. Backend juga membuat record dokumen dengan status `pending` di tabel `documents`.
+Fitur ini bertanggung jawab untuk memberikan klien akses upload langsung (direct upload) ke MinIO On-Premise (STB) secara aman tanpa membebani bandwith backend Deno. Klien (Frontend) meminta Presigned URL, backend memvalidasi JWT (tenantId) dan metadata file, mengecek *Tier Subscription Quota* pengguna (file size, total uploads, total storage). Jika semua valid, backend akan menaikkan `uploadsCount` secara atomik, lalu menghasilkan URL AWS S3 Presigned yang valid selama 15 menit. Backend juga membuat record dokumen dengan status `pending` di tabel `documents`.
 
 ## 2. Flow Diagram
 ```mermaid
@@ -13,7 +13,11 @@ sequenceDiagram
 
     Client->>API: POST /api/documents/presigned-url (filename, mimeType, size)
     API->>API: Validasi Zod & Extract Tenant ID dari JWT
-    API->>DB: INSERT into documents (id, tenant_id, status='pending')
+    API->>DB: Fetch tier subscriptions & current total storage
+    alt Quota Exceeded (File Size / Storage / Uploads)
+        API-->>Client: 400 Validation Error (Limit Exceeded)
+    end
+    API->>DB: Atomically UPDATE uploadsCount + 1 AND INSERT into documents (status='pending')
     API->>MinIO: Generate Presigned URL (AWS SDK)
     MinIO-->>API: URL Generated (15 min expiry)
     API-->>Client: 201 Created (url, documentId)
@@ -49,3 +53,4 @@ Jika klien memutuskan untuk membatalkan unggahan (*AbortController* di *frontend
 - **Ext4 HDD Migration on STB**: Menghadapi masalah performa I/O (Error 503 SlowDownWrite) saat STB menggunakan filesystem loopback NTFS/exFAT. Solusi final memindahkan partisi fisik ke `ext4` murni di `/mnt/hdd` dan melakukan `chown`/`chmod` yang tepat untuk user MinIO.
 - **Tenant-isolated Object Keys**: Menggunakan pola `<tenant_id>/<doc_id>.<ext>` di MinIO agar struktur rapi dan mencegah bentrok ID (collision).
 - **Security**: Menggunakan `withAuthDb` (Local Role `authenticated` + JWT Claims) pada insert database untuk memastikan RLS `documents` berjalan secara kokoh di level database.
+- **Tier Quota Enforcement (Pre-flight)**: Pengecekan limit (ukuran file maksimal, jumlah unggahan bulanan, & kapasitas storage maksimal) dilakukan *sebelum* `createPresignedUrl` dipanggil, dan *uploadsCount* di-increment secara atomik dalam 1 transaksi DB bersamaan dengan `INSERT pending document` untuk mencegah eksploitasi *race condition*.

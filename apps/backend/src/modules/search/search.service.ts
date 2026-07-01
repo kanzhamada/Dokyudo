@@ -8,6 +8,7 @@ import { RedisKeys } from "../../shared/constants/redis_keys.constant.ts";
 import { createCircuitBreaker } from "../../infra/circuit_breaker.infra.ts";
 import { gemini, GEMINI_MODELS } from "../../config/gemini.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
+import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 import { SearchParams } from "./search.schema.ts";
 
 // Protect the external LLM Embedding API with a Circuit Breaker
@@ -69,37 +70,9 @@ export class SearchService {
     static async executeHybridSearch(params: SearchParams) {
         const { tenantId, query, limit = 10, logContext } = params;
 
-        // -1. Tier Quota Validation & Enforcement
-        const [subscription] = await withAuthDb(tenantId, async (tx) => {
-            return await tx
-                .select()
-                .from(tenantSubscriptions)
-                .where(eq(tenantSubscriptions.tenantId, tenantId));
-        });
-
-        if (!subscription) {
-            throw new AppError({
-                code: "NOT_FOUND",
-                message: "Tenant subscription not found.",
-                status: 404,
-            });
-        }
-
-        const tierLimits = TIER_LIMITS[subscription.tier];
-        if (subscription.searchesCount >= tierLimits.maxSearchesPerMonth) {
-            throw new AppError({
-                code: "VALIDATION_ERROR",
-                message: `Search limit exceeded. You have reached your monthly limit of ${tierLimits.maxSearchesPerMonth} searches. Please upgrade your tier.`,
-                status: 400,
-            });
-        }
-
-        // Increment the search counter atomically
+        // -1. Tier Quota Validation & Enforcement (Atomic)
         await withAuthDb(tenantId, async (tx) => {
-            await tx
-                .update(tenantSubscriptions)
-                .set({ searchesCount: sql`${tenantSubscriptions.searchesCount} + 1` })
-                .where(eq(tenantSubscriptions.tenantId, tenantId));
+            await TierQuotaUtil.checkAndIncrementSearch(tx, tenantId);
         });
 
         const k = 60; 
