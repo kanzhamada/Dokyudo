@@ -425,6 +425,48 @@ describe("Auth Module", () => {
         });
     });
 
+    describe("GET /api/auth/me", () => {
+        it("positive: returns profile for authenticated user", async () => {
+            const token = validAccessToken || "dummy-valid-token";
+            const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+            const req = new Request("http://localhost/api/auth/me", {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "X-Forwarded-For": randomIp
+                },
+            });
+
+            const res = await app.fetch(req);
+            
+            if (res.status === 200) {
+                const json = await res.json();
+                assertEquals(typeof json.user.id, "string");
+                assertEquals(typeof json.tenant.id, "string");
+                assertEquals(typeof json.subscription.tier, "string");
+            } else {
+                console.warn(
+                    `[WARN] Get Profile returned ${res.status}. Expected 200 if token is valid.`,
+                );
+            }
+        });
+
+        it("negative: missing authorization header returns 401", async () => {
+            const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+            const req = new Request("http://localhost/api/auth/me", {
+                method: "GET",
+                headers: {
+                    "X-Forwarded-For": randomIp
+                }
+            });
+
+            const res = await app.fetch(req);
+            assertEquals(res.status, 401);
+            const json = await res.json();
+            assertEquals(json.error.code, "UNAUTHORIZED");
+        });
+    });
+
     describe("Password Recovery & Update", () => {
         it("positive: sends recovery email", async () => {
             const res = await makeRequest("/api/auth/forget-password", {

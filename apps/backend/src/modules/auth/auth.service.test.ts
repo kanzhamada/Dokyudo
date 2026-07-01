@@ -3,7 +3,7 @@ import { assertEquals, assertRejects, assertExists } from "jsr:@std/assert";
 import { AuthService } from "./auth.service.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { db } from "../../config/drizzle.ts";
-import { users, loginAttempts } from "../../shared/models/db.model.ts";
+import { users, loginAttempts, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
 import { getSupabaseAdmin } from "../../config/supabase.ts";
 
@@ -126,6 +126,106 @@ describe("AuthService Isolated Tests", () => {
             });
 
             assertEquals(logContext.authEvent, "forget_password_user_not_found");
+        });
+    });
+    describe("getProfile (Lazy Evaluation)", () => {
+        let testUserId: string;
+        let testTenantId: string;
+
+        beforeAll(async () => {
+            // 1. Create a real auth.user via Supabase Admin to satisfy foreign keys
+            const email = `profile_test_${crypto.randomUUID()}@example.com`;
+            const { data, error } = await supabase.auth.admin.createUser({
+                email: email,
+                password: "StrongPassword123!",
+                email_confirm: true,
+            });
+            if (error || !data.user) throw new Error("Failed to create test user: " + error?.message);
+            
+            testUserId = data.user.id;
+            testTenantId = crypto.randomUUID();
+
+            // 2. Provision tenants and users tables manually (since the trigger might not fire properly in test environment)
+            await db.insert(tenants).values({
+                id: testTenantId,
+                name: "Test Tenant for Profile",
+            }).onConflictDoNothing();
+
+            await db.insert(users).values({
+                id: testUserId,
+                tenantId: testTenantId,
+                email: email,
+            }).onConflictDoNothing();
+        });
+
+        afterAll(async () => {
+            await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
+            await db.delete(users).where(eq(users.id, testUserId));
+            await db.delete(tenants).where(eq(tenants.id, testTenantId));
+            await supabase.auth.admin.deleteUser(testUserId);
+        });
+
+        it("positive: returns profile and leaves active subscription untouched", async () => {
+            // Setup active subscription (+1 day)
+            await db.insert(tenantSubscriptions).values({
+                tenantId: testTenantId,
+                tier: "PRO",
+                expiresAt: new Date(Date.now() + 86400000), 
+            });
+
+            const result = await AuthService.getProfile({
+                userId: testUserId,
+                tenantId: testTenantId,
+            });
+
+            assertEquals(result.subscription.tier, "PRO");
+            assertExists(result.subscription.expiresAt);
+
+            // Cleanup for next test
+            await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
+        });
+
+        it("positive: lazy downgrades expired subscription to FREE", async () => {
+            // Setup expired subscription (-1 day)
+            await db.insert(tenantSubscriptions).values({
+                tenantId: testTenantId,
+                tier: "SIMULATE",
+                expiresAt: new Date(Date.now() - 86400000),
+            });
+
+            const logContext: any = {};
+            const result = await AuthService.getProfile({
+                userId: testUserId,
+                tenantId: testTenantId,
+                logContext,
+            });
+
+            // Validate response is downgraded
+            assertEquals(result.subscription.tier, "FREE");
+            assertEquals(result.subscription.expiresAt, null);
+
+            // Validate log context recorded the event
+            assertEquals(logContext.authEvent, "tier_auto_downgraded");
+            assertEquals(logContext.oldTier, "SIMULATE");
+
+            // Validate DB actually updated
+            const [dbSub] = await db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
+            assertEquals(dbSub.tier, "FREE");
+            assertEquals(dbSub.expiresAt, null);
+            
+            // Cleanup
+            await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
+        });
+        
+        it("negative: throws NOT_FOUND if user does not exist", async () => {
+            await assertRejects(
+                () => AuthService.getProfile({
+                    userId: crypto.randomUUID(), // fake id
+                    tenantId: testTenantId,
+                }),
+                AppError,
+                "User not found"
+            );
         });
     });
 });

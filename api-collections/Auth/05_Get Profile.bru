@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/me
+  url: {{baseUrl}}/api/auth/me
   body: none
   auth: none
 }
@@ -15,5 +15,7 @@ headers {
 }
 
 docs {
-  Returns the authenticated user details along with the associated tenant context.
+  Returns the authenticated user details, associated tenant context, and current subscription status.
+  
+  Implements Lazy Evaluation: Automatically checks `expiresAt` of the current subscription. If it has expired, silently downgrades the tenant tier to `FREE` before returning the response.
 }

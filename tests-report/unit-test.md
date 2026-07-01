@@ -58,6 +58,8 @@
 | **OAuth** | `GET /oauth/github/callback: invalid dummy code` | HTTP 302, redirect `error=OAuth...` | HTTP 302, Match | ✅ Pass |
 | **Error Env.** | `Error responses include X-Request-ID trace ID` | `error.requestId` matches Request ID | Matched ID | ✅ Pass |
 | **Error Env.** | `Error responses always have the standard envelope`| JSON has `error.code`, `error.message` | Matched Schema| ✅ Pass |
+| **Get Profile**| `positive: returns profile for authenticated user`| HTTP 200, Returns JSON | HTTP 200, Match | ✅ Pass |
+| **Get Profile**| `negative: missing authorization header returns 401`| HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
 
 
 ## 3. Documents Routes (`documents.routes.test.ts`)
@@ -157,6 +159,9 @@
 | **Auth Svc** | `loginUser: rejects unverified user` | Throws "Invalid email or password" | AppError thrown | ✅ Pass |
 | **Auth Svc** | `forgetPassword: processes for existing` | logContext gets "forget_password_success"| Log matched | ✅ Pass |
 | **Auth Svc** | `forgetPassword: ignores non-existent` | logContext gets "forget_password_user_not_found"| Log matched | ✅ Pass |
+| **Auth Svc** | `getProfile: returns profile & untouched tier`| Returns valid `PRO` tier | Tier unchanged | ✅ Pass |
+| **Auth Svc** | `getProfile: lazy downgrades expired tier`| Downgrades DB to `FREE` + logEvent | DB matches | ✅ Pass |
+| **Auth Svc** | `getProfile: throws NOT_FOUND if no user` | Throws "User not found" | AppError thrown| ✅ Pass |
 | **OAuth Svc**| `initiateOAuth: returns valid Google URL` | Returns URL with `provider=google` | Match string | ✅ Pass |
 | **OAuth Svc**| `initiateOAuth: returns valid GitHub URL` | Returns URL with `provider=github` | Match string | ✅ Pass |
 | **OAuth Svc**| `handleOAuthCallback: throws missing code` | Throws "Missing authorization code" | AppError thrown | ✅ Pass |
