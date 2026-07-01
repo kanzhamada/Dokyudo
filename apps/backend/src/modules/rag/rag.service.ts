@@ -7,8 +7,10 @@ import { withAuthDb } from "../../config/drizzle.ts";
 import {
     conversations,
     conversationTurns,
+    tenantSubscriptions,
 } from "../../shared/models/db.model.ts";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { TIER_LIMITS } from "../../shared/constants/tiers.constant.ts";
 
 export class RagService {
     /**
@@ -19,6 +21,31 @@ export class RagService {
     ): Promise<ReadableStream> {
         const { tenantId, userId, question, conversationId, logContext } =
             params;
+
+        // -1. Tier Quota Validation & Enforcement
+        const [subscription] = await withAuthDb(userId, async (tx) => {
+            return await tx
+                .select()
+                .from(tenantSubscriptions)
+                .where(eq(tenantSubscriptions.tenantId, tenantId));
+        });
+
+        if (!subscription) {
+            throw new AppError({
+                code: "NOT_FOUND",
+                message: "Tenant subscription not found.",
+                status: 404,
+            });
+        }
+
+        const tierLimits = TIER_LIMITS[subscription.tier];
+        if (subscription.qaCount >= tierLimits.maxQnaPerMonth) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: `Q&A limit exceeded. You have reached your monthly limit of ${tierLimits.maxQnaPerMonth} queries. Please upgrade your tier.`,
+                status: 400,
+            });
+        }
 
         // 0. LLM Gatekeeper for Prompt Injection
         const guardPrompt = `You are a strict security gatekeeper for a RAG (Retrieval-Augmented Generation) system.
@@ -138,6 +165,14 @@ ${question}
         `.trim();
 
         // 4. Cascading Fallback & SSE Streaming
+        // Increment the Q&A counter atomically right before streaming
+        await withAuthDb(userId, async (tx) => {
+            await tx
+                .update(tenantSubscriptions)
+                .set({ qaCount: sql`${tenantSubscriptions.qaCount} + 1` })
+                .where(eq(tenantSubscriptions.tenantId, tenantId));
+        });
+
         const stream = new ReadableStream({
             async start(controller) {
                 const encoder = new TextEncoder();

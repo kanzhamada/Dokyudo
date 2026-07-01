@@ -4,7 +4,7 @@ import { stub } from "jsr:@std/testing/mock";
 import { RagService } from "./rag.service.ts";
 import { SearchService } from "../search/search.service.ts";
 import { db } from "../../config/drizzle.ts";
-import { conversations, conversationTurns, tenants } from "../../shared/models/db.model.ts";
+import { conversations, conversationTurns, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
 import { gemini } from "../../config/gemini.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
@@ -26,9 +26,16 @@ describe("RagService Isolated Tests", () => {
             tenantId: TEST_TENANT_ID,
             title: "Test Conversation",
         }).onConflictDoNothing();
+
+        await db.insert(tenantSubscriptions).values({
+            tenantId: TEST_TENANT_ID,
+            tier: "FREE",
+            qaCount: 0,
+        }).onConflictDoNothing();
     });
 
     afterAll(async () => {
+        await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
         await db.delete(conversations).where(eq(conversations.tenantId, TEST_TENANT_ID));
         await db.delete(tenants).where(eq(tenants.id, TEST_TENANT_ID));
     });

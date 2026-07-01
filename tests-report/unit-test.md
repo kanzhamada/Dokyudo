@@ -180,8 +180,10 @@
 | **OAuth Svc**| `handleOAuthCallback: throws missing code` | Throws "Missing authorization code" | AppError thrown | ✅ Pass |
 | **OAuth Svc**| `handleOAuthCallback: throws invalid code` | Throws "OAuth code exchange failed" | AppError thrown | ✅ Pass |
 | **Search Svc**| `executeHybridSearch: valid query` | Returns FTS & Vector matched data | Valid array returned | ✅ Pass |
-| **Search Svc**| `executeHybridSearch: LLM failure` | Throws "Hybrid search execution failed"| AppError thrown | ✅ Pass |
+| **Search Svc**| `executeHybridSearch: LLM failure` | Gracefully degrades to return FTS only| Valid array returned | ✅ Pass |
+| **Search Svc**| `executeHybridSearch: throws error if search tier quota is exceeded` | Throws "Search limit exceeded" | AppError thrown | ✅ Pass |
 | **RAG Svc** | `streamChat: throws error if prompt injection is detected` | Throws "Input rejected: Detected..." | AppError thrown | ✅ Pass |
+| **RAG Svc** | `streamChat: throws error if Q&A tier quota is exceeded` | Throws "Q&A limit exceeded." | AppError thrown | ✅ Pass |
 | **RAG Svc** | `updateConversationTitle: updates conversation title successfully` | Updates DB title | DB matches | ✅ Pass |
 | **RAG Svc** | `updateConversationTitle: throws 404 if conversation does not exist or wrong tenant`| Throws "Conversation not found" | AppError thrown | ✅ Pass |
 | **RAG Svc** | `deleteConversation: throws 404 if conversation does not exist` | Throws "Conversation not found" | AppError thrown | ✅ Pass |
@@ -189,6 +191,7 @@
 | **Payments Svc**| `createCheckoutSession: positive creates transaction` | Returns `checkoutUrl`, `sessionId`, inserts DB | DB matched | ✅ Pass |
 | **Payments Svc**| `createCheckoutSession: negative rejects invalid tier` | Throws "Invalid tier to unlock" | AppError thrown | ✅ Pass |
 | **Payments Svc**| `createCheckoutSession: negative rejects missing tenant`| Throws "Tenant not found" | AppError thrown | ✅ Pass |
+| **Payments Svc**| `createCheckoutSession: negative rejects SIMULATE twice in month`| Throws "You can only claim the SIMULATE..." | AppError thrown | ✅ Pass |
 | **Payments Svc**| `createCheckoutSession: negative stripe error` | Throws "Failed to communicate with Stripe" | AppError thrown | ✅ Pass |
 | **Payments Svc**| `handleWebhook: positive checkout.session.completed` | Updates Trx status to SUCCEEDED and upgrades tier| DB matched | ✅ Pass |
 | **Payments Svc**| `handleWebhook: negative ignores unknown transaction` | Returns `acknowledged`, `unknown_transaction` | Matched | ✅ Pass |

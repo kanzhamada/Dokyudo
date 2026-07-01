@@ -3,7 +3,7 @@ import { assertEquals, assertExists, assertRejects } from "jsr:@std/assert";
 import { stub, returnsNext } from "jsr:@std/testing/mock";
 import { SearchService } from "./search.service.ts";
 import { db } from "../../config/drizzle.ts";
-import { documentChunks, documents, tenants } from "../../shared/models/db.model.ts";
+import { documentChunks, documents, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
 import { gemini } from "../../config/gemini.ts";
 import { vectorIndex } from "../../config/vector.ts";
@@ -37,9 +37,16 @@ describe("SearchService Isolated Tests", () => {
             chunkIndex: 0,
             content: "Ini adalah dokumen dummy tentang kebijakan pengembalian barang",
         }).onConflictDoNothing();
+
+        await db.insert(tenantSubscriptions).values({
+            tenantId: TEST_TENANT_ID,
+            tier: "FREE",
+            searchesCount: 0,
+        }).onConflictDoNothing();
     });
 
     afterAll(async () => {
+        await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
         await db.delete(documentChunks).where(eq(documentChunks.tenantId, TEST_TENANT_ID));
         await db.delete(documents).where(eq(documents.tenantId, TEST_TENANT_ID));
         await db.delete(tenants).where(eq(tenants.id, TEST_TENANT_ID));
@@ -81,11 +88,36 @@ describe("SearchService Isolated Tests", () => {
                 logContext: {},
             };
 
+            const results = await SearchService.executeHybridSearch(params);
+            
+            // It should gracefully degrade to FTS and not throw an error
+            assertExists(results);
+            assertEquals(Array.isArray(results), true);
+        });
+
+        it("negative: throws error if search tier limit exceeded", async () => {
+            // Forcefully update the DB to reach limit for FREE
+            await db.update(tenantSubscriptions)
+                .set({ searchesCount: 1000 })
+                .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
+
+            const params = {
+                tenantId: TEST_TENANT_ID,
+                query: "limit test",
+                limit: 5,
+                logContext: {},
+            };
+
             await assertRejects(
                 () => SearchService.executeHybridSearch(params),
                 AppError,
-                "Hybrid search execution failed"
+                "Search limit exceeded"
             );
+
+            // Reset back
+            await db.update(tenantSubscriptions)
+                .set({ searchesCount: 0 })
+                .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
         });
     });
 });

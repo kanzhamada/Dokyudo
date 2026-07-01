@@ -1,6 +1,7 @@
 import { withAuthDb } from "../../config/drizzle.ts";
-import { documentChunks } from "../../shared/models/db.model.ts";
+import { documentChunks, tenantSubscriptions } from "../../shared/models/db.model.ts";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { TIER_LIMITS } from "../../shared/constants/tiers.constant.ts";
 import { vectorIndex } from "../../config/vector.ts";
 import { redis } from "../../config/redis.ts";
 import { RedisKeys } from "../../shared/constants/redis_keys.constant.ts";
@@ -67,6 +68,39 @@ export class SearchService {
 
     static async executeHybridSearch(params: SearchParams) {
         const { tenantId, query, limit = 10, logContext } = params;
+
+        // -1. Tier Quota Validation & Enforcement
+        const [subscription] = await withAuthDb(tenantId, async (tx) => {
+            return await tx
+                .select()
+                .from(tenantSubscriptions)
+                .where(eq(tenantSubscriptions.tenantId, tenantId));
+        });
+
+        if (!subscription) {
+            throw new AppError({
+                code: "NOT_FOUND",
+                message: "Tenant subscription not found.",
+                status: 404,
+            });
+        }
+
+        const tierLimits = TIER_LIMITS[subscription.tier];
+        if (subscription.searchesCount >= tierLimits.maxSearchesPerMonth) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: `Search limit exceeded. You have reached your monthly limit of ${tierLimits.maxSearchesPerMonth} searches. Please upgrade your tier.`,
+                status: 400,
+            });
+        }
+
+        // Increment the search counter atomically
+        await withAuthDb(tenantId, async (tx) => {
+            await tx
+                .update(tenantSubscriptions)
+                .set({ searchesCount: sql`${tenantSubscriptions.searchesCount} + 1` })
+                .where(eq(tenantSubscriptions.tenantId, tenantId));
+        });
 
         const k = 60; 
 
