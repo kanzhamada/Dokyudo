@@ -49,6 +49,18 @@ export const tenants = pgTable("tenants", {
 });
 
 // ==============================================================================
+// 1.5. TENANT KEYS TABLE (BYOK Cryptography)
+// ==============================================================================
+export const tenantKeys = pgTable("tenant_keys", {
+    tenantId: uuid("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+    provider: varchar("provider", { length: 50 }).notNull().default("gemini"), // e.g., gemini, openai
+    encryptedApiKey: text("encrypted_api_key").notNull(),
+    iv: varchar("iv", { length: 64 }).notNull(), // Initialization Vector (hex)
+    createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),
+});
+
+// ==============================================================================
 // 2. USERS TABLE
 // ==============================================================================
 export const users = pgTable("users", {
