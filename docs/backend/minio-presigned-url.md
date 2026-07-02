@@ -30,7 +30,7 @@ sequenceDiagram
 Jika klien memutuskan untuk membatalkan unggahan (*AbortController* di *frontend*), klien cukup memanggil endpoint `DELETE /api/documents/:id`. Endpoint ini secara otomatis akan menghapus status `pending` di PostgreSQL dan memastikan file di MinIO (jika ada *partial upload*) ikut terhapus.
 
 ## 3. Completion Timestamp
-**Completed At:** 2026-06-27T11:42:00+07:00 (WIB)
+**Completed At:** 2026-07-02T15:27:00+07:00 (WIB)
 
 ## 4. File Mapping
 - **Created/Modified:**

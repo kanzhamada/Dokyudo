@@ -29,7 +29,7 @@ export class TierQuotaUtil {
      */
     static async checkSearchQuota(tx: any, tenantId: string): Promise<void> {
         const subscription = await this.getSubscription(tx, tenantId);
-        const tierLimits = TIER_LIMITS[subscription.tier];
+        const tierLimits = TIER_LIMITS[subscription.tier as keyof typeof TIER_LIMITS];
 
         if (subscription.searchesCount >= tierLimits.maxSearchesPerMonth) {
             throw new AppError({
@@ -63,7 +63,7 @@ export class TierQuotaUtil {
      */
     static async checkQaQuota(tx: any, tenantId: string): Promise<void> {
         const subscription = await this.getSubscription(tx, tenantId);
-        const tierLimits = TIER_LIMITS[subscription.tier];
+        const tierLimits = TIER_LIMITS[subscription.tier as keyof typeof TIER_LIMITS];
 
         if (subscription.qaCount >= tierLimits.maxQnaPerMonth) {
             throw new AppError({
@@ -98,7 +98,7 @@ export class TierQuotaUtil {
      */
     static async checkUploadQuota(tx: any, tenantId: string, fileSizeBytes: number): Promise<void> {
         const subscription = await this.getSubscription(tx, tenantId);
-        const tierLimits = TIER_LIMITS[subscription.tier];
+        const tierLimits = TIER_LIMITS[subscription.tier as keyof typeof TIER_LIMITS];
 
         // 1. Check max file size
         if (fileSizeBytes > tierLimits.maxFileSizeBytes) {

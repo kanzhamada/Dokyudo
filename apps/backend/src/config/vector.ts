@@ -1,4 +1,4 @@
-import { Index } from "@upstash/vector";
+import { Index } from "npm:@upstash/vector";
 import { getEnv } from "./env.ts";
 
 export const vectorIndex = new Index({
