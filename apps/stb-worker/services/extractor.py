@@ -12,58 +12,78 @@ def extract_text_from_pdf(file_path: str) -> list[dict]:
     return pages
 
 def recursive_text_split(text: str, chunk_size: int, overlap: int) -> list[str]:
-    # Simplified recursive splitter
-    separators = ["\n\n", "\n", ". ", " ", ""]
-    
-    def split_text(txt, size):
+    """
+    Splits text into chunks of approximately `chunk_size` characters.
+    Uses a priority list of separators, falling back to hard character splits.
+    Overlap is applied between consecutive chunks afterward.
+    """
+    separators = ["\n\n", "\n", ". ", " "]
+
+    def _split_once(txt: str, size: int) -> list[str]:
+        """Split txt into pieces <= size using the best available separator."""
         if len(txt) <= size:
             return [txt]
-            
-        for sep in separators:
-            if sep == "":
-                # Fallback to character splitting
-                return [txt[i:i+size] for i in range(0, len(txt), size)]
-                
-            splits = txt.split(sep)
-            if len(splits) > 1:
-                chunks = []
-                current_chunk = ""
-                
-                for s in splits:
-                    if len(current_chunk) + len(s) + len(sep) > size and current_chunk:
-                        chunks.append(current_chunk)
-                        current_chunk = s + sep
-                    else:
-                        current_chunk += s + sep
-                        
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                    
-                # If splitting by this separator successfully created smaller chunks, return them
-                final_chunks = []
-                for c in chunks:
-                    if len(c) > size:
-                        final_chunks.extend(split_text(c, size))
-                    else:
-                        final_chunks.append(c)
-                return final_chunks
-                
-        return [txt]
 
-    chunks = split_text(text, chunk_size)
-    
-    # Add overlap
-    overlapped_chunks = []
-    for i in range(len(chunks)):
-        if i == 0:
-            overlapped_chunks.append(chunks[i])
-        else:
-            # Prepend overlap from previous chunk
-            prev = chunks[i-1]
-            overlap_str = prev[-overlap:] if len(prev) > overlap else prev
-            overlapped_chunks.append(overlap_str + chunks[i])
-            
-    return overlapped_chunks
+        for sep in separators:
+            parts = txt.split(sep)
+            if len(parts) <= 1:
+                continue
+
+            # Greedily merge parts into chunks that fit within size
+            chunks = []
+            current = parts[0]
+
+            for j in range(1, len(parts)):
+                candidate = current + sep + parts[j]
+                if len(candidate) <= size:
+                    current = candidate
+                else:
+                    if current:
+                        chunks.append(current)
+                    current = parts[j]
+
+            if current:
+                chunks.append(current)
+
+            # Check if we actually made progress (at least 2 pieces)
+            if len(chunks) > 1 or (len(chunks) == 1 and len(chunks[0]) <= size):
+                return chunks
+
+        # Fallback: hard character split (guaranteed to terminate)
+        return [txt[i:i + size] for i in range(0, len(txt), size)]
+
+    # Iterative loop: keep splitting until every piece fits
+    pieces = [text]
+    max_iterations = 200  # Safety cap for STB memory
+    iteration = 0
+
+    while iteration < max_iterations:
+        iteration += 1
+        all_fit = True
+        next_pieces = []
+
+        for piece in pieces:
+            if len(piece) <= chunk_size:
+                next_pieces.append(piece)
+            else:
+                all_fit = False
+                next_pieces.extend(_split_once(piece, chunk_size))
+
+        pieces = next_pieces
+        if all_fit:
+            break
+
+    # Apply overlap between consecutive chunks
+    if overlap <= 0 or len(pieces) <= 1:
+        return pieces
+
+    overlapped = [pieces[0]]
+    for i in range(1, len(pieces)):
+        prev = pieces[i - 1]
+        overlap_str = prev[-overlap:] if len(prev) > overlap else prev
+        overlapped.append(overlap_str + pieces[i])
+
+    return overlapped
 
 def chunk_text_with_pages(pages: list[dict], parent_size: int = 2000, child_size: int = 400, overlap: int = 150) -> list[dict]:
     """
