@@ -115,14 +115,22 @@ export class SearchService {
                 const vec = await vectorIndex.query({
                     vector: embedding,
                     topK: limit * 2,
-                    includeMetadata: false,
+                    includeMetadata: true,
                     includeVectors: false,
                     filter: `tenantId = '${tenantId}'`,
                 });
                 const vecLen = vec.length;
-                const vecMapped = new Array(vecLen);
+                
+                const seenParentIds = new Set<string>();
+                const vecMapped = [];
+                let rank = 1;
+                
                 for (let i = 0; i < vecLen; i++) {
-                    vecMapped[i] = { id: vec[i].id as string, rank: i + 1 };
+                    const parentId = (vec[i].metadata?.parentId as string) || (vec[i].id as string);
+                    if (!seenParentIds.has(parentId)) {
+                        seenParentIds.add(parentId);
+                        vecMapped.push({ id: parentId, rank: rank++ });
+                    }
                 }
 
                 return vecMapped;
