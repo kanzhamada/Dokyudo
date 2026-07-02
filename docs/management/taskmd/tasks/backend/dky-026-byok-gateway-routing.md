@@ -19,7 +19,7 @@ Menambahkan logika routing dinamis pada AI API Gateway. Mencakup fitur **BYOK**,
 ## Tasks
 - [ ] **BYOK Routing**: Cek status custom API Key *tenant*. Jika ada, gunakan fungsi kriptografi (`dky-025`) untuk dekripsi di RAM dan tembak langsung ke provider mereka (OpenAI/Claude).
 - [ ] **Token-Based Free Fallback**: Jika tidak ada BYOK, gunakan daftar LLM gratis (Meta Llama, Cohere Command R, Mistral, Qwen, Groq, Gemini). *Router* harus memilih model secara pintar berdasarkan jumlah panjang token konteks (misal: jika token > 32K, gunakan model dengan *context window* besar).
-- [ ] **Privacy Guard (Leaking PII Prevention)**: Tambahkan opsi konfigurasi (*toggle* di sisi UI yang disimpan ke *database* per *tenant*) untuk melakukan **Exclude** pada model gratis yang menggunakan data input untuk *training* (contoh: memblokir Gemini Free API).
+- [ ] **Privacy Guard (Leaking PII Prevention)**: Tambahkan endpoint opsi konfigurasi (*toggle* di sisi UI yang disimpan ke *database* per *tenant*) untuk melakukan **Exclude** pada model gratis yang menggunakan data input untuk *training* (contoh: memblokir Gemini Free API).
 - [ ] Jika *toggle* privasi aktif, *router* wajib melewati model tersebut dari antrean *fallback*.
 
 ## Acceptance Criteria

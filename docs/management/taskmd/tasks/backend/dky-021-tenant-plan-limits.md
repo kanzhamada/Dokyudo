@@ -1,7 +1,7 @@
 ---
 id: "dky-021"
 title: "Tenant Plan Limits (FREE/PRO)"
-status: pending
+status: completed
 priority: medium
 effort: medium
 type: feature
@@ -17,10 +17,10 @@ created_at: 2026-06-27
 Mengintegrasikan plan tier (FREE/PRO) dari tenant dan mengaplikasikan limitasi pada saat pengguna mengunggah dokumen (Document Upload) dan melakukan tanya jawab (RAG Chat). Fitur ini bergantung pada webhook pembayaran (DKY-019) yang meng-upgrade status tier tenant.
 
 ## Tasks
-- [ ] Tentukan batasan untuk FREE dan PRO (contoh: max ukuran file, max total dokumen, max query chat per hari).
-- [ ] Terapkan pengecekan limitasi pada `POST /api/documents/presigned-url` berdasarkan tier dari tenant.
-- [ ] Terapkan pengecekan limitasi pada rute RAG Chat (Q&A).
-- [ ] Kembalikan kode HTTP yang sesuai (`403 Forbidden` atau `429 Too Many Requests`) dengan standard *error envelope* aplikasi (contoh kode error: `PLAN_LIMIT_EXCEEDED`) ketika limit tercapai.
+- [x] Tentukan batasan untuk FREE dan PRO (contoh: max ukuran file, max total dokumen, max query chat per hari).
+- [x] Terapkan pengecekan limitasi pada `POST /api/documents/presigned-url` berdasarkan tier dari tenant.
+- [x] Terapkan pengecekan limitasi pada rute RAG Chat (Q&A).
+- [x] Kembalikan kode HTTP yang sesuai (`403 Forbidden` atau `429 Too Many Requests`) dengan standard *error envelope* aplikasi (contoh kode error: `PLAN_LIMIT_EXCEEDED`) ketika limit tercapai.
 
 ## Acceptance Criteria
 - Pengguna dengan tier FREE tidak dapat melampaui batasan sistem (upload / chat).

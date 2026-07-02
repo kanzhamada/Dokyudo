@@ -1,7 +1,7 @@
 ---
 id: "dky-019"
 title: "Sandbox Payment Webhook Integration"
-status: pending
+status: completed
 priority: low
 effort: medium
 type: feature
@@ -17,10 +17,10 @@ created_at: 2026-06-26
 Integrasi Dummy Payment Gateway untuk memicu webhook pembayaran dan meng-upgrade tier tenant.
 
 ## Tasks
-- [ ] Create `POST /api/payments/checkout` to generate dummy links
-- [ ] Create `POST /api/payments/webhook` listener
-- [ ] Validate signature from Payment Gateway
-- [ ] Update `tenant_tiers` on successful payment
+- [x] Create `POST /api/payments/checkout` to generate dummy links
+- [x] Create `POST /api/payments/webhook` listener
+- [x] Validate signature from Payment Gateway
+- [x] Update `tenant_tiers` on successful payment
 
 ## Acceptance Criteria
 - Valid signature upgrades tenant tier
