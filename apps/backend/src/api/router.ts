@@ -5,6 +5,7 @@ import { documentsRoutes } from "../modules/documents/mod.ts";
 import { searchRoutes } from "../modules/search/mod.ts";
 import { ragRoutes } from "../modules/rag/mod.ts";
 import { paymentsRoutes } from "../modules/payments/mod.ts";
+import { keysRoutes } from "../modules/keys/mod.ts";
 // import { pocRoutes } from "../modules/poc/poc_routes.ts";
 
 const router = createApp();
@@ -23,6 +24,7 @@ router.route("/documents", documentsRoutes);
 router.route("/search", searchRoutes);
 router.route("/rag", ragRoutes);
 router.route("/payments", paymentsRoutes);
+router.route("/keys", keysRoutes);
 // router.route("/poc", pocRoutes);
 
 export default router;

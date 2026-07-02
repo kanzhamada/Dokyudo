@@ -161,7 +161,7 @@ def process_document(tenant_id: str, document_id: str):
         
         dev_print(f"2. PDF Parsed. Total Pages: {len(pages)}")
         
-        chunks = chunk_text_with_pages(pages, chunk_size=1000, overlap=150)
+        chunks = chunk_text_with_pages(pages, parent_size=2000, child_size=400, overlap=150)
         dev_print(f"3. Chunking complete. Processing ALL {len(chunks)} chunks!")
         
         dev_print(f"4. Document {document_id} is checked and inserted into Postgres.")

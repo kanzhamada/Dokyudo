@@ -1,0 +1,19 @@
+meta {
+  name: Delete API Key
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/api/keys/mistral
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Delete a specific BYOK API Key by provider name.
+}

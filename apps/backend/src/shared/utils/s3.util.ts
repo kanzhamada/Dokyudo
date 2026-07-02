@@ -4,6 +4,7 @@ import { getEnv } from "../../config/env.ts";
 
 // Initialize singleton lazily or eagerly depending on usage
 let s3ClientInstance: S3Client | null = null;
+let s3InternalClientInstance: S3Client | null = null;
 
 export function getS3Client(): S3Client {
     if (!s3ClientInstance) {
@@ -27,6 +28,30 @@ export function getS3Client(): S3Client {
         });
     }
     return s3ClientInstance;
+}
+
+export function getS3InternalClient(): S3Client {
+    if (!s3InternalClientInstance) {
+        const endpoint = getEnv("S3_INTERNAL_ENDPOINT") || getEnv("S3_ENDPOINT");
+        const region = getEnv("S3_REGION") || "us-east-1";
+        const accessKeyId = getEnv("S3_ACCESS_KEY");
+        const secretAccessKey = getEnv("S3_SECRET_KEY");
+        const useSSL = (getEnv("S3_INTERNAL_USE_SSL") || getEnv("S3_USE_SSL")) === "true";
+        const portStr = getEnv("S3_INTERNAL_PORT") || getEnv("S3_PORT");
+        const port = portStr ? parseInt(portStr, 10) : (useSSL ? 443 : 80);
+        const protocol = useSSL ? "https" : "http";
+
+        s3InternalClientInstance = new S3Client({
+            endpoint: `${protocol}://${endpoint}:${port}`,
+            region,
+            credentials: {
+                accessKeyId,
+                secretAccessKey,
+            },
+            forcePathStyle: true, // Required for MinIO
+        });
+    }
+    return s3InternalClientInstance;
 }
 
 /**
@@ -72,7 +97,7 @@ export async function checkObjectExists(
     bucketName: string,
     objectKey: string
 ): Promise<boolean> {
-    const client = getS3Client();
+    const client = getS3InternalClient();
     const command = new HeadObjectCommand({
         Bucket: bucketName,
         Key: objectKey,
@@ -101,7 +126,7 @@ export async function deleteObject(
     bucketName: string,
     objectKey: string
 ): Promise<void> {
-    const client = getS3Client();
+    const client = getS3InternalClient();
     const command = new DeleteObjectCommand({
         Bucket: bucketName,
         Key: objectKey,

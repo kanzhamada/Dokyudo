@@ -14,6 +14,9 @@ export async function handleChat(c: Context) {
         userId,
         question: body.question,
         conversationId: body.conversation_id,
+        provider: body.provider,
+        model: body.model,
+        useByok: body.useByok,
         logContext,
     };
 

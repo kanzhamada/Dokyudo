@@ -4,9 +4,17 @@ import { SearchService } from "../search/search.service.ts";
 import { gemini, GEMINI_MODELS } from "../../config/gemini.ts";
 import { createCircuitBreaker } from "../../infra/circuit_breaker.infra.ts";
 import { withAuthDb } from "../../config/drizzle.ts";
-import { tenantSubscriptions, conversationTurns, conversations } from "../../shared/models/db.model.ts";
+import {
+    tenantSubscriptions,
+    conversationTurns,
+    conversations,
+} from "../../shared/models/db.model.ts";
 import { desc, eq, and, lt, sql } from "drizzle-orm";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
+import { LlmRouterService } from "./llm_router.service.ts";
+import { KeysService } from "../keys/keys.service.ts";
+import { decryptApiKey } from "../../shared/utils/crypto.util.ts";
+import { tenantKeys } from "../../shared/models/db.model.ts";
 
 export class RagService {
     /**
@@ -15,8 +23,16 @@ export class RagService {
     static async streamChat(
         params: ChatServiceParams,
     ): Promise<ReadableStream> {
-        const { tenantId, userId, question, conversationId, logContext } =
-            params;
+        const {
+            tenantId,
+            userId,
+            question,
+            conversationId,
+            provider,
+            model,
+            useByok,
+            logContext,
+        } = params;
 
         // -1. Tier Quota Validation (Check Only)
         await withAuthDb(userId, async (tx) => {
@@ -33,14 +49,19 @@ User Input:
 ${question}`;
 
         try {
-            const guardResponse = await gemini.generateText(guardPrompt, GEMINI_MODELS.llmDefault);
+            const guardResponse = await gemini.generateText(
+                guardPrompt,
+                GEMINI_MODELS.llmDefault,
+            );
             const guardDecision = guardResponse.text?.trim().toUpperCase();
-            
+
             if (guardDecision?.includes("INJECTION")) {
-                if (logContext) logContext.ragEvent = "prompt_injection_blocked";
+                if (logContext)
+                    logContext.ragEvent = "prompt_injection_blocked";
                 throw new AppError({
                     code: "VALIDATION_ERROR",
-                    message: "Input rejected: Detected potential prompt injection or policy violation.",
+                    message:
+                        "Input rejected: Detected potential prompt injection or policy violation.",
                     status: 400,
                 });
             }
@@ -59,7 +80,12 @@ ${question}`;
                     return await tx
                         .select()
                         .from(conversationTurns)
-                        .where(eq(conversationTurns.conversationId, conversationId))
+                        .where(
+                            eq(
+                                conversationTurns.conversationId,
+                                conversationId,
+                            ),
+                        )
                         .orderBy(desc(conversationTurns.createdAt))
                         .limit(3);
                 });
@@ -87,7 +113,8 @@ Rewritten Query:`;
                     const rewritten = rewriteResponse.text?.trim();
                     if (rewritten && rewritten.length > 0) {
                         searchQuery = rewritten;
-                        if (logContext) logContext.ragRewrittenQuery = searchQuery;
+                        if (logContext)
+                            logContext.ragRewrittenQuery = searchQuery;
                     }
                 }
             } catch (e: any) {
@@ -102,8 +129,6 @@ Rewritten Query:`;
             limit: 5,
             logContext,
         });
-
-        console.log("searchResults", searchResults);
 
         // 2. Context Engineering (RAG Context Engineer Skill)
         let contextText = "";
@@ -123,8 +148,6 @@ Rewritten Query:`;
             contextText =
                 "No relevant documents found in the knowledge base.\n";
         }
-
-        console.log("contextText", contextText);
 
         // 3. Construct Augmented Prompt with Structural Guardrails
         const augmentedPrompt = `
@@ -176,58 +199,136 @@ ${question}
                     }),
                 );
 
-                for (const model of GEMINI_MODELS.llmFallbackChain) {
+                // 4.5 Check BYOK Key if requested
+                let byokKey: string | undefined = undefined;
+                if (useByok) {
+                    try {
+                        let encryptedRecord: any = null;
+                        await withAuthDb(tenantId, async (tx) => {
+                            const res = await tx
+                                .select()
+                                .from(tenantKeys)
+                                .where(
+                                    and(
+                                        eq(tenantKeys.tenantId, tenantId),
+                                        eq(tenantKeys.provider, provider),
+                                    ),
+                                );
+                            if (res.length > 0) encryptedRecord = res[0];
+                        });
+
+                        if (!encryptedRecord) {
+                            throw new AppError({
+                                code: "UNAUTHORIZED",
+                                message: `BYOK enabled but no API key found for provider: ${provider}`,
+                                status: 401,
+                            });
+                        }
+
+                        byokKey = await decryptApiKey(
+                            encryptedRecord.encryptedApiKey,
+                            encryptedRecord.iv,
+                        );
+                    } catch (e: any) {
+                        controller.enqueue(
+                            encoder.encode(
+                                `event: error\ndata: ${JSON.stringify({ code: "UNAUTHORIZED", message: e.message || "Failed to load BYOK key" })}\n\n`,
+                            ),
+                        );
+                        controller.close();
+                        return;
+                    }
+                }
+
+                if (useByok) {
+                    // BYOK mode: Strict routing to specific model, no fallback
                     try {
                         const cb = createCircuitBreaker(`llm-gen-${model}`);
-
-                        // Circuit breaker protects the initial connection
                         const responseStream = await cb.execute(() =>
-                            gemini.generateTextStream(augmentedPrompt, model),
+                            LlmRouterService.generateStream({
+                                provider,
+                                model,
+                                prompt: augmentedPrompt,
+                                apiKey: byokKey,
+                            }),
                         );
 
-                        // Connection established, send references metadata first
                         controller.enqueue(
                             encoder.encode(
                                 `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
                             ),
                         );
 
-                        // Stream the tokens
-                        for await (const chunk of responseStream) {
-                            if (chunk.text) {
-                                fullAnswer += chunk.text;
-                                controller.enqueue(
-                                    encoder.encode(
-                                        `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
-                                    ),
-                                );
-                            }
+                        for await (const chunk of responseStream.stream) {
+                            fullAnswer += chunk.text;
+                            controller.enqueue(
+                                encoder.encode(
+                                    `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
+                                ),
+                            );
                         }
 
-                        // Successfully streamed
                         success = true;
                         successfulModel = model;
-                        if (logContext) {
-                            logContext.ragModelUsed = model;
-                        }
-                        break; // Exit the fallback loop
+                        if (logContext) logContext.ragModelUsed = model;
                     } catch (error: any) {
-                        if (logContext) {
-                            logContext.ragEvent = `fallback_failed_${model}`;
-                            logContext.ragError = error.message;
+                        controller.enqueue(
+                            encoder.encode(
+                                `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: error.message })}\n\n`,
+                            ),
+                        );
+                    }
+                } else {
+                    // System Mode: Fallback chain with Gemini
+                    for (const sysModel of GEMINI_MODELS.llmFallbackChain) {
+                        try {
+                            const cb = createCircuitBreaker(
+                                `llm-gen-${sysModel}`,
+                            );
+                            const responseStream = await cb.execute(() =>
+                                gemini.generateTextStream(
+                                    augmentedPrompt,
+                                    sysModel,
+                                ),
+                            );
+
+                            controller.enqueue(
+                                encoder.encode(
+                                    `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
+                                ),
+                            );
+
+                            for await (const chunk of responseStream) {
+                                if (chunk.text) {
+                                    fullAnswer += chunk.text;
+                                    controller.enqueue(
+                                        encoder.encode(
+                                            `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
+                                        ),
+                                    );
+                                }
+                            }
+
+                            success = true;
+                            successfulModel = sysModel;
+                            if (logContext) logContext.ragModelUsed = sysModel;
+                            break;
+                        } catch (error: any) {
+                            if (logContext) {
+                                logContext.ragEvent = `fallback_failed_${sysModel}`;
+                                logContext.ragError = error.message;
+                            }
                         }
-                        // Continue to the next model in the fallback chain
                     }
                 }
 
-                if (!success) {
-                    // All models failed
+                if (!success && !useByok) {
                     controller.enqueue(
                         encoder.encode(
                             `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: "All LLM providers are unavailable" })}\n\n`,
                         ),
                     );
-                } else {
+                } else if (success) {
                     controller.enqueue(
                         encoder.encode("event: done\ndata: [DONE]\n\n"),
                     );
@@ -271,9 +372,10 @@ ${question}
                                 contextReferences:
                                     references.length > 0 ? references : null,
                             });
-                            
+
                             // Explicitly touch the updatedAt field on the parent conversation
-                            await tx.update(conversations)
+                            await tx
+                                .update(conversations)
                                 .set({ updatedAt: new Date() })
                                 .where(eq(conversations.id, cid!));
                         });
@@ -314,9 +416,9 @@ ${question}
                     cursor
                         ? and(
                               eq(conversations.tenantId, tenantId),
-                              lt(conversations.updatedAt, new Date(cursor))
+                              lt(conversations.updatedAt, new Date(cursor)),
                           )
-                        : eq(conversations.tenantId, tenantId)
+                        : eq(conversations.tenantId, tenantId),
                 )
                 .orderBy(desc(conversations.updatedAt))
                 .limit(limit);
@@ -356,8 +458,8 @@ ${question}
                 .where(
                     and(
                         eq(conversations.id, conversationId),
-                        eq(conversations.tenantId, tenantId)
-                    )
+                        eq(conversations.tenantId, tenantId),
+                    ),
                 );
 
             if (results.length > 0) {
@@ -410,8 +512,8 @@ ${question}
                 .where(
                     and(
                         eq(conversations.id, conversationId),
-                        eq(conversations.tenantId, tenantId)
-                    )
+                        eq(conversations.tenantId, tenantId),
+                    ),
                 )
                 .returning({ id: conversations.id });
 
@@ -438,8 +540,8 @@ ${question}
                 .where(
                     and(
                         eq(conversations.id, conversationId),
-                        eq(conversations.tenantId, tenantId)
-                    )
+                        eq(conversations.tenantId, tenantId),
+                    ),
                 )
                 .returning({ id: conversations.id });
 
