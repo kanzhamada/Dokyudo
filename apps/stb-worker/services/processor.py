@@ -56,85 +56,67 @@ def _process_chunks_loop(chunks, document_id, tenant_id):
     upstash_payload = []
     postgres_payload = []
     
-    for i, parent_data in enumerate(chunks):
-        parent_text_content = parent_data["text"]
-        parent_pages = parent_data["pages"]
-        children = parent_data.get("children", [])
+    for i, chunk_data in enumerate(chunks):
+        chunk_text_content = chunk_data["text"]
+        chunk_pages = chunk_data["pages"]
         
-        parent_id = str(uuid.uuid4())
+        chunk_id = str(uuid.uuid4())
+        estimated_tokens = max(1, len(chunk_text_content) // 3)
         
-        # Postgres payload (Parent Chunk)
+        if estimated_tokens > 8192:
+            dev_print(f"[PAYLOAD_TOO_LARGE] Chunk {i} rejected. Size: {estimated_tokens} tokens.")
+            continue
+            
+        gatekeeper_passed = False
+        retry_count = 0
+        
+        while not gatekeeper_passed and retry_count < 3:
+            status, reason, reset_in_ms = execute_gatekeeper(estimated_tokens)
+            
+            if status == 1:
+                gatekeeper_passed = True
+                dev_print(f"[GATEKEEPER OK] Chunk {i+1}/{len(chunks)} ({estimated_tokens} tk) => Deducted. Processing...")
+            else:
+                wait_ms = max(100, reset_in_ms + 100)
+                wait_sec = (wait_ms + 999) // 1000
+                dev_print(f"[GATEKEEPER THROTTLE] {reason}. Sleeping for {wait_sec}s...")
+                time.sleep(wait_sec)
+                retry_count += 1
+                
+        if not gatekeeper_passed:
+            dev_print(f"[Processor WARNING] Gatekeeper failed after retries for chunk {i+1}. Skipping chunk.")
+            continue
+        
+        vector = generate_embedding_with_retry(chunk_text_content)
+        
+        upstash_payload.append({
+            "id": chunk_id,
+            "vector": vector,
+            "metadata": {
+                "tenantId": tenant_id,
+                "documentId": document_id,
+                "chunkIndex": i,
+                "pages": chunk_pages,
+                "content": chunk_text_content
+            }
+        })
+        
         postgres_payload.append({
-            "id": parent_id,
+            "id": chunk_id,
             "tenant_id": tenant_id,
             "document_id": document_id,
             "chunk_index": i,
-            "metadata": { "pages": parent_pages, "type": "parent" },
-            "content": parent_text_content
+            "metadata": { "pages": chunk_pages },
+            "content": chunk_text_content
         })
         
-        # Process Child Chunks
-        for child_idx, child_data in enumerate(children):
-            child_text = child_data["text"]
-            child_id = str(uuid.uuid4())
-            
-            estimated_tokens = max(1, len(child_text) // 3)
-            
-            if estimated_tokens > 8192:
-                dev_print(f"[PAYLOAD_TOO_LARGE] Parent {i} Child {child_idx} rejected. Size: {estimated_tokens} tokens.")
-                continue
-                
-            gatekeeper_passed = False
-            retry_count = 0
-            
-            while not gatekeeper_passed and retry_count < 3:
-                status, reason, reset_in_ms = execute_gatekeeper(estimated_tokens)
-                
-                if status == 1:
-                    gatekeeper_passed = True
-                    dev_print(f"[GATEKEEPER OK] P:{i} C:{child_idx} ({estimated_tokens} tk) => Deducted.")
-                else:
-                    wait_ms = max(100, reset_in_ms + 100)
-                    wait_sec = (wait_ms + 999) // 1000
-                    dev_print(f"[GATEKEEPER THROTTLE] {reason}. Sleeping for {wait_sec}s...")
-                    time.sleep(wait_sec)
-                    retry_count += 1
-                    
-            if not gatekeeper_passed:
-                dev_print(f"[Processor WARNING] Gatekeeper failed after retries for child {child_idx}. Skipping.")
-                continue
-            
-            vector = generate_embedding_with_retry(child_text)
-            
-            upstash_payload.append({
-                "id": child_id,
-                "vector": vector,
-                "metadata": {
-                    "tenantId": tenant_id,
-                    "documentId": document_id,
-                    "parentId": parent_id,
-                    "chunkIndex": i,
-                    "childIndex": child_idx,
-                    "pages": parent_pages,
-                    "content": child_text
-                }
-            })
-            
-            if len(upstash_payload) >= 50:
-                dev_print(f"-> Flushing {len(upstash_payload)} vectors to Upstash...")
-                upsert_vectors_to_upstash(upstash_payload)
-                upstash_payload = []
-                
-        if len(postgres_payload) >= 10 or i == len(chunks) - 1:
-            dev_print(f"-> Flushing {len(postgres_payload)} parent chunks to Postgres...")
+        if len(upstash_payload) >= 50 or i == len(chunks) - 1:
+            dev_print(f"-> Flushing {len(upstash_payload)} vectors to Upstash...")
             insert_document_chunks(postgres_payload)
-            postgres_payload = []
+            upsert_vectors_to_upstash(upstash_payload)
             
-    # Final flush
-    if upstash_payload:
-        upsert_vectors_to_upstash(upstash_payload)
-    if postgres_payload:
-        insert_document_chunks(postgres_payload)
+            upstash_payload = []
+            postgres_payload = []
 
 def process_document(tenant_id: str, document_id: str):
     if not is_valid_uuid(tenant_id) or not is_valid_uuid(document_id):
@@ -161,7 +143,7 @@ def process_document(tenant_id: str, document_id: str):
         
         dev_print(f"2. PDF Parsed. Total Pages: {len(pages)}")
         
-        chunks = chunk_text_with_pages(pages, parent_size=2000, child_size=400, overlap=150)
+        chunks = chunk_text_with_pages(pages, chunk_size=1000, overlap=150)
         dev_print(f"3. Chunking complete. Processing ALL {len(chunks)} chunks!")
         
         dev_print(f"4. Document {document_id} is checked and inserted into Postgres.")
