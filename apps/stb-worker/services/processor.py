@@ -60,12 +60,8 @@ def _process_chunks_loop(chunks, document_id, tenant_id):
     for i, chunk_data in enumerate(chunks):
         # --- Cancellation check at each chunk boundary ---
         if ingestion_queue.is_cancelled(document_id):
-            dev_print(f"[Processor] CANCELLED at chunk {i+1}/{len(chunks)} for {document_id}. Flushing partial data.")
-            # Flush any partial data already processed
-            if upstash_payload:
-                insert_document_chunks(postgres_payload)
-                upsert_vectors_to_upstash(upstash_payload)
-            return False  # Signal cancellation
+            dev_print(f"[Processor] CANCELLED at chunk {i+1}/{len(chunks)} for {document_id}. Discarding {len(upstash_payload)} buffered vectors.")
+            return False  # Signal cancellation — discard buffers, document is being deleted
         
         chunk_text_content = chunk_data["text"]
         chunk_pages = chunk_data["pages"]
