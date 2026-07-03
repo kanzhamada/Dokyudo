@@ -9,6 +9,42 @@ import * as DocumentSchema from "./documents.schema.ts";
 import { PRESIGNED_URL_EXPIRES_IN_SECONDS, PRESIGNED_GET_URL_EXPIRES_IN_SECONDS } from "../../shared/constants/documents.constant.ts";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 
+/**
+ * Sends a cancel request to the STB Worker to stop any queued or active
+ * ingestion job for the given document. Best-effort — failures are logged
+ * but do not block the deletion flow.
+ */
+async function cancelIngestionOnWorker(params: {
+    documentId: string;
+    logContext?: Record<string, any>;
+}): Promise<void> {
+    const workerUrl = getEnv("STB_WORKER_URL");
+    const workerSecret = getEnv("STB_WORKER_SECRET");
+    
+    try {
+        const res = await fetch(`${workerUrl}/api/cancel`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Worker-Secret": workerSecret,
+            },
+            body: JSON.stringify({ document_id: params.documentId }),
+            signal: AbortSignal.timeout(5000),
+        });
+
+        if (!res.ok) {
+            if (params.logContext) {
+                params.logContext.workerCancelError = `HTTP ${res.status}`;
+            }
+        }
+    } catch (err: any) {
+        if (params.logContext) {
+            params.logContext.workerCancelError = "Failed to reach STB Worker: " + err.message;
+        }
+        // Best-effort — do not throw, proceed with deletion
+    }
+}
+
 export class DocumentsService {
     /**
      * Generates a presigned URL and creates a pending document record.
@@ -241,6 +277,12 @@ export class DocumentsService {
                 status: 404,
             });
         }
+
+        // 0. Cancel any queued/active ingestion on STB Worker (best-effort)
+        await cancelIngestionOnWorker({
+            documentId: params.documentId,
+            logContext: params.logContext,
+        });
 
         // 1. Fetch chunk IDs to delete from Upstash Vector
         try {

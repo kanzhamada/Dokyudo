@@ -17,6 +17,7 @@ from services.database import (
     upsert_vectors_to_upstash,
     mark_document_processed
 )
+from services.queue import ingestion_queue
 
 # Load Lua script from external file
 script_dir = os.path.dirname(__file__)
@@ -57,6 +58,15 @@ def _process_chunks_loop(chunks, document_id, tenant_id):
     postgres_payload = []
     
     for i, chunk_data in enumerate(chunks):
+        # --- Cancellation check at each chunk boundary ---
+        if ingestion_queue.is_cancelled(document_id):
+            dev_print(f"[Processor] CANCELLED at chunk {i+1}/{len(chunks)} for {document_id}. Flushing partial data.")
+            # Flush any partial data already processed
+            if upstash_payload:
+                insert_document_chunks(postgres_payload)
+                upsert_vectors_to_upstash(upstash_payload)
+            return False  # Signal cancellation
+        
         chunk_text_content = chunk_data["text"]
         chunk_pages = chunk_data["pages"]
         
@@ -118,6 +128,8 @@ def _process_chunks_loop(chunks, document_id, tenant_id):
             upstash_payload = []
             postgres_payload = []
 
+    return True  # Signal completion
+
 def process_document(tenant_id: str, document_id: str):
     if not is_valid_uuid(tenant_id) or not is_valid_uuid(document_id):
         dev_print(f"[SECURITY ALERT] Path Traversal blocked! Invalid input. tenant: {tenant_id}, doc: {document_id}")
@@ -146,6 +158,11 @@ def process_document(tenant_id: str, document_id: str):
         chunks = chunk_text_with_pages(pages, chunk_size=1000, overlap=150)
         dev_print(f"3. Chunking complete. Processing ALL {len(chunks)} chunks!")
         
+        # Check cancellation before starting expensive embedding loop
+        if ingestion_queue.is_cancelled(document_id):
+            dev_print(f"[Processor] CANCELLED before embedding for {document_id}")
+            return
+        
         dev_print(f"4. Document {document_id} is checked and inserted into Postgres.")
         
         if not settings.UPSTASH_REDIS_REST_URL or not settings.UPSTASH_REDIS_REST_TOKEN:
@@ -164,8 +181,12 @@ def process_document(tenant_id: str, document_id: str):
             future_llm = executor.submit(generate_llm_description, head_text)
             
             # Wait for both to finish
-            future_chunks.result()
+            completed = future_chunks.result()
             description = future_llm.result()
+        
+        if not completed:
+            dev_print(f"[Processor] Job {document_id} was cancelled. Skipping mark_document_processed.")
+            return
             
         mark_document_processed(document_id, description)
         dev_print("7. All chunks processed and upserted successfully!")

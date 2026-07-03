@@ -15,6 +15,8 @@ const REQUIRED_ENV_VARS = [
     "S3_ACCESS_KEY",
     "S3_SECRET_KEY",
     "S3_BUCKET_NAME",
+    "STB_WORKER_URL",
+    "STB_WORKER_SECRET",
 ] as const;
 
 /** Optional env vars with sensible defaults */
