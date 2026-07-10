@@ -32,7 +32,7 @@ export const loggerMiddleware: MiddlewareHandler = async (c, next) => {
     logContext.status = c.res.status;
     logContext.durationMs = Math.round(performance.now() - start);
 
-    const isDev = Deno.env.get("NODE_ENV") !== "production";
+    const isDev = Deno.env.get("NODE_ENV") !== "prod";
     if (isDev) {
         console.log(JSON.stringify(logContext, null, 2));
     } else {

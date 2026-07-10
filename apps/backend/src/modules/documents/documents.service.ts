@@ -2,7 +2,7 @@ import { AppError } from "../../shared/utils/errors.util.ts";
 import { getEnv } from "../../config/env.ts";
 import { generatePresignedPutUrl, checkObjectExists, deleteObject, generatePresignedGetUrl } from "../../shared/utils/s3.util.ts";
 import { withAuthDb, db } from "../../config/drizzle.ts";
-import { eq, and, sql } from ".deno/drizzle-orm@0.45.2/node_modules/drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { documents, documentChunks, tenantSubscriptions } from "../../shared/models/db.model.ts";
 import { vectorIndex } from "../../config/vector.ts";
 import * as DocumentSchema from "./documents.schema.ts";
