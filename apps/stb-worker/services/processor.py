@@ -15,7 +15,8 @@ from services.database import (
     check_document_idempotency,
     insert_document_chunks,
     upsert_vectors_to_upstash,
-    mark_document_processed
+    mark_document_processed,
+    mark_document_queued
 )
 from services.queue import ingestion_queue
 
@@ -29,9 +30,7 @@ def execute_gatekeeper(estimated_tokens: int):
     if not settings.UPSTASH_REDIS_REST_URL or not settings.UPSTASH_REDIS_REST_TOKEN:
         raise ValueError("UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN not set in .env")
         
-    tpm_key = "ratelimit:gemini:tpm:global"
-    rpm_key = "ratelimit:gemini:rpm:global"
-    rpd_key = "ratelimit:gemini:rpd:global"
+    tpd_key = "ratelimit:cloudflare:tpd:global"
     
     url = f"{settings.UPSTASH_REDIS_REST_URL}"
     headers = {
@@ -39,7 +38,7 @@ def execute_gatekeeper(estimated_tokens: int):
         "Content-Type": "application/json"
     }
     
-    payload = ["EVAL", gatekeeper_lua, 3, tpm_key, rpm_key, rpd_key, estimated_tokens]
+    payload = ["EVAL", gatekeeper_lua, 1, tpd_key, estimated_tokens]
     
     with httpx.Client() as client:
         res = client.post(url, headers=headers, json=payload, timeout=10.0)
@@ -83,6 +82,10 @@ def _process_chunks_loop(chunks, document_id, tenant_id):
                 gatekeeper_passed = True
                 dev_print(f"[GATEKEEPER OK] Chunk {i+1}/{len(chunks)} ({estimated_tokens} tk) => Deducted. Processing...")
             else:
+                if "TPD_EXHAUSTED" in reason:
+                    dev_print(f"[GATEKEEPER EXHAUSTED] Daily CF Quota Exceeded. Aborting job.")
+                    raise RuntimeError("TPD_EXHAUSTED")
+                    
                 wait_ms = max(100, reset_in_ms + 100)
                 wait_sec = (wait_ms + 999) // 1000
                 dev_print(f"[GATEKEEPER THROTTLE] {reason}. Sleeping for {wait_sec}s...")
@@ -187,6 +190,12 @@ def process_document(tenant_id: str, document_id: str):
         mark_document_processed(document_id, description)
         dev_print("7. All chunks processed and upserted successfully!")
         
+    except RuntimeError as e:
+        if "TPD_EXHAUSTED" in str(e):
+            dev_print(f"[Processor] Quota exhausted for {document_id}. Marking as quota_exhausted for retry tomorrow.")
+            mark_document_queued(document_id)
+        else:
+            dev_print(f"[Processor ERROR] RuntimeError for {document_id}: {str(e)}")
     except Exception as e:
         dev_print(f"[Processor ERROR] Failed to process {document_id}: {str(e)}")
     finally:

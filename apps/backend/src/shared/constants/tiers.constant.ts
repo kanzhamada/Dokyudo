@@ -8,11 +8,11 @@ export interface TierLimit {
 
 export const TIER_LIMITS: Record<"FREE" | "SIMULATE" | "OIL_INVESTOR" | "PRO", TierLimit> = {
     FREE: {
-        maxFileSizeBytes: 10 * 1024 * 1024, // 10 MB (Aman untuk 30K TPM)
-        maxUploadsPerMonth: 10,
-        maxStorageBytes: 100 * 1024 * 1024, // 100 MB
-        maxQnaPerMonth: 50,
-        maxSearchesPerMonth: 100,
+        maxFileSizeBytes: 100 * 1024 * 1024, // 10 MB (Aman untuk 30K TPM)
+        maxUploadsPerMonth: 100,
+        maxStorageBytes: 1000 * 1024 * 1024, // 100 MB
+        maxQnaPerMonth: 500,
+        maxSearchesPerMonth: 1000,
     },
     // SIMULATE: "Hackathon / Intensive Day" Mode.
     // Karena usia SIMULATE hanya 1 hari & dibatasi klaim 1x sebulan,

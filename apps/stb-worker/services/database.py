@@ -48,6 +48,20 @@ def mark_document_processed(document_id: str, description: str = ""):
         res = client.patch(url, headers=headers, json=payload)
         res.raise_for_status()
 
+def mark_document_queued(document_id: str):
+    """
+    Update the document status to 'quota_exhausted' when the daily Cloudflare
+    token quota (TPD) is depleted mid-job. The document will be retried
+    the next day when the quota resets at UTC 00:00.
+    """
+    url = f"{settings.SUPABASE_URL}/rest/v1/documents?id=eq.{document_id}"
+    headers = get_supabase_headers()
+    headers["Prefer"] = "return=representation"
+
+    with httpx.Client() as client:
+        res = client.patch(url, headers=headers, json={"status": "quota_exhausted"})
+        res.raise_for_status()
+
 def insert_document_chunks(chunks_payload: list[dict]):
     """
     Insert the raw text chunks into Supabase Postgres `document_chunks` table.

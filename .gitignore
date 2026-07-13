@@ -3,6 +3,7 @@ docs/research
 poc
 # taskmd
 api-collections/environments/Production.bru
+tests
 
 # Node
 node_modules/

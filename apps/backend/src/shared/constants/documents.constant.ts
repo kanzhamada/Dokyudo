@@ -1,3 +1,3 @@
-export const MAX_DOCUMENT_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+export const MAX_DOCUMENT_SIZE_BYTES = 250 * 1024 * 1024; // 25 MB
 export const PRESIGNED_URL_EXPIRES_IN_SECONDS = 900; // 15 minutes
 export const PRESIGNED_GET_URL_EXPIRES_IN_SECONDS = 43200; // 12 hours

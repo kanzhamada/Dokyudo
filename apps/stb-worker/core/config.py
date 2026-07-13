@@ -12,7 +12,9 @@ class Settings:
     S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
     WORKER_TMP_DIR = os.getenv('WORKER_TMP_DIR')
     GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-    GEMINI_EMBEDDING_MODEL = 'gemini-embedding-2'
+    CF_EMBEDDING_MODEL = '@cf/qwen/qwen3-embedding-0.6b'
+    CLOUDFLARE_ACCOUNT_ID = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+    CLOUDFLARE_AUTH_TOKEN = os.getenv('CLOUDFLARE_AUTH_TOKEN')
     
     UPSTASH_VECTOR_REST_URL = os.getenv('UPSTASH_VECTOR_REST_URL')
     UPSTASH_VECTOR_REST_TOKEN = os.getenv('UPSTASH_VECTOR_REST_TOKEN')

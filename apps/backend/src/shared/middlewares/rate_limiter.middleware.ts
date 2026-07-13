@@ -27,6 +27,11 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
         return next();
     }
 
+    // Load Test Bypass
+    if (c.req.header("x-load-test-bypass") === "rahasia123") {
+        return next();
+    }
+
     const ip = extractClientIp(c.req.raw.headers);
     const userAgent = c.req.header("user-agent")?.toLowerCase() || "";
 
