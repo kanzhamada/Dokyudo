@@ -84,7 +84,7 @@ export async function handleGetDocumentPreview(c: Context) {
 export async function handleBatchDeleteDocuments(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, logContext } = extractor.extractAuthContext();
-    const body = extractor.extractValidBody<any>(); // Will be validated by OpenAPI middleware
+    const body = extractor.extractValidJson<any>(); // Will be validated by OpenAPI middleware
 
     const params: DocumentSchema.BatchDeleteDocumentsParams = {
         tenantId,
