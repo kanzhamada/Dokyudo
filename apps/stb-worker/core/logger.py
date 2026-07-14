@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime
 from core.config import settings
 
 def dev_print(*args, **kwargs):
@@ -8,5 +9,6 @@ def dev_print(*args, **kwargs):
     saving I/O operations on the STB.
     """
     if settings.NODE_ENV == 'dev':
-        print(*args, **kwargs)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}]", *args, **kwargs)
         sys.stdout.flush()

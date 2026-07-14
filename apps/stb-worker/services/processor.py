@@ -80,7 +80,7 @@ def _process_chunks_loop(chunks, document_id, tenant_id, start_chunk_idx=0):
             
             if status == 1:
                 gatekeeper_passed = True
-                dev_print(f"[GATEKEEPER OK] Batch {batch_idx//BATCH_SIZE + 1} ({total_estimated_tokens} tk) => Deducted. Processing...")
+                dev_print(f"[GATEKEEPER OK] Batch {(start_chunk_idx + batch_offset)//BATCH_SIZE + 1} ({total_estimated_tokens} tk) => Deducted. Processing...")
             else:
                 if "TPD_EXHAUSTED" in reason:
                     dev_print(f"[GATEKEEPER EXHAUSTED] Daily CF Quota Exceeded. Aborting job.")
