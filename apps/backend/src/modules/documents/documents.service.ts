@@ -57,7 +57,7 @@ async function markDocumentFailed(params: {
 }): Promise<void> {
     try {
         await db.update(documents)
-            .set({ status: "failed" })
+            .set({ status: "failed", updatedAt: new Date() })
             .where(
                 and(
                     eq(documents.id, params.documentId),
@@ -256,7 +256,7 @@ export class DocumentsService {
         try {
             await withAuthDb(params.tenantId, async (tx) => {
                 await tx.update(documents)
-                    .set({ status: "confirmed" })
+                    .set({ status: "confirmed", updatedAt: new Date() })
                     .where(
                         and(
                             eq(documents.id, params.documentId),

@@ -157,6 +157,13 @@ export const documents = pgTable("documents", {
     })
         .defaultNow()
         .notNull(),
+    updatedAt: timestamp("updated_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    })
+        .defaultNow()
+        .notNull(),
 });
 
 // ==============================================================================

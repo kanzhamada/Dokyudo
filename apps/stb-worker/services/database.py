@@ -1,4 +1,5 @@
 import httpx
+import datetime
 from core.config import settings
 
 def get_supabase_headers():
@@ -54,7 +55,10 @@ def mark_document_processed(document_id: str, description: str = ""):
     headers = get_supabase_headers()
     headers["Prefer"] = "return=representation"
     
-    payload = {"status": "processed"}
+    payload = {
+        "status": "processed",
+        "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
+    }
     if description:
         payload["description"] = description
         
@@ -73,7 +77,10 @@ def mark_document_queued(document_id: str):
     headers["Prefer"] = "return=representation"
 
     with httpx.Client() as client:
-        res = client.patch(url, headers=headers, json={"status": "quota_exhausted"})
+        res = client.patch(url, headers=headers, json={
+            "status": "quota_exhausted",
+            "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
+        })
         res.raise_for_status()
 
 def mark_document_failed(document_id: str):
@@ -88,7 +95,10 @@ def mark_document_failed(document_id: str):
 
     try:
         with httpx.Client() as client:
-            res = client.patch(url, headers=headers, json={"status": "failed"})
+            res = client.patch(url, headers=headers, json={
+                "status": "failed",
+                "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
+            })
             res.raise_for_status()
     except Exception:
         pass  # Best-effort: do not mask the original error

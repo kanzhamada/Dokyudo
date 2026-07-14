@@ -64,6 +64,13 @@
       "when": 1782987518493,
       "tag": "0008_gigantic_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784037677312,
+      "tag": "0009_fuzzy_reavers",
+      "breakpoints": true
     }
   ]
 }
