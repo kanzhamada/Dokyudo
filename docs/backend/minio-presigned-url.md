@@ -54,3 +54,7 @@ Jika klien memutuskan untuk membatalkan unggahan (*AbortController* di *frontend
 - **Tenant-isolated Object Keys**: Menggunakan pola `<tenant_id>/<doc_id>.<ext>` di MinIO agar struktur rapi dan mencegah bentrok ID (collision).
 - **Security**: Menggunakan `withAuthDb` (Local Role `authenticated` + JWT Claims) pada insert database untuk memastikan RLS `documents` berjalan secara kokoh di level database.
 - **Tier Quota Enforcement (Pre-flight)**: Pengecekan limit (ukuran file maksimal, jumlah unggahan bulanan, & kapasitas storage maksimal) dilakukan *sebelum* `createPresignedUrl` dipanggil, dan *uploadsCount* di-increment secara atomik dalam 1 transaksi DB bersamaan dengan `INSERT pending document` untuk mencegah eksploitasi *race condition*.
+- **Defensive Error Handling (`markDocumentFailed`)**: `confirmUpload` kini memanggil helper `markDocumentFailed` sebelum melempar `AppError(500)` ketika terjadi kegagalan S3 check atau kegagalan DB update status. Hal ini memastikan dokumen tidak pernah tersangkut selamanya di status `pending` akibat kegagalan infrastruktur. `documents.status` sekarang menggunakan *typed PostgreSQL enum* (`document_status_enum`).
+
+## 7. Completion Timestamp
+**Completed At:** 2026-07-14T19:12:00+07:00 (WIB)

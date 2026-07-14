@@ -79,10 +79,11 @@ Cloudflare Workers AI (Free) memiliki batas **10.000 Neuron per hari** yang seta
 | Status | Makna | Dipicu oleh |
 |---|---|---|
 | `pending` | Presigned URL digenerate, file belum diunggah | Backend Deno |
+| `confirmed` | File berhasil diunggah ke MinIO, trigger webhook tembak | Backend Deno (`confirmUpload`) |
 | `processing` | STB Worker sedang aktif memproses PDF | STB Worker (awal job) |
 | `processed` | Semua *chunk* berhasil di-*embed* dan diindeks | STB Worker (akhir job) |
 | `quota_exhausted` | Kuota TPD Cloudflare habis di tengah proses | STB Worker (Gatekeeper) |
-| `failed` | Error tidak terduga (jaringan, PDF corrupt, dll.) | STB Worker (exception handler) |
+| `failed` | Error tak terduga — PDF corrupt, MinIO unreachable, Cloudflare error | STB Worker / Deno (`confirmUpload`) |
 
 ## 6. Architectural Decisions
 - **Cloudflare Workers AI (Qwen3-0.6B, 1024-dim):** Dipilih menggantikan Gemini `gemini-embedding-2` karena: (1) Limit harian berbasis jumlah token (9,3 Juta/hari) jauh lebih mudah diprediksi dan dikelola daripada limit per-menit Gemini; (2) Dimensi 1024 memberikan akurasi pencarian semantik yang lebih tinggi dibanding 768; (3) Qwen3 mencapai SOTA di MTEB untuk tugas pencarian teks multi-bahasa; (4) Tidak ada lagi mekanisme *sleep* per menit yang membuang uptime STB.
@@ -97,8 +98,8 @@ Cloudflare Workers AI (Free) memiliki batas **10.000 Neuron per hari** yang seta
 | `apps/stb-worker/core/config.py` | Hapus `GEMINI_EMBEDDING_MODEL`, tambah `CF_EMBEDDING_MODEL`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AUTH_TOKEN` |
 | `apps/stb-worker/services/embedding.py` | Ganti seluruh implementasi dari Gemini REST ke Cloudflare Workers AI REST. Response path diubah dari `data["embedding"]["values"]` ke `data["result"]["data"][0]`. Dimensi output: 768 → 1024. |
 | `apps/stb-worker/services/gatekeeper.lua` | Rombak total dari 3-bucket (TPM/RPM/RPD) menjadi 1-bucket (TPD). Kuota: 9.300.000 token/hari. |
-| `apps/stb-worker/services/processor.py` | Ubah Redis key dari `ratelimit:gemini:*` ke `ratelimit:cloudflare:tpd:global`. Ganti perilaku `TPD_EXHAUSTED` dari *sleep* ke *abort* via `RuntimeError`. Tangkap `RuntimeError` secara terpisah untuk memanggil `mark_document_queued()`. |
-| `apps/stb-worker/services/database.py` | Tambah fungsi `mark_document_queued()` untuk memperbarui status dokumen ke `quota_exhausted`. |
+| `apps/stb-worker/services/processor.py` | Ubah Redis key dari `ratelimit:gemini:*` ke `ratelimit:cloudflare:tpd:global`. Ganti perilaku `TPD_EXHAUSTED` dari *sleep* ke *abort* via `RuntimeError`. Tangkap `RuntimeError` dan `Exception` secara terpisah: keduanya memanggil `mark_document_queued()` atau `mark_document_failed()`. |
+| `apps/stb-worker/services/database.py` | Tambah fungsi `mark_document_queued()` → status `quota_exhausted`. Tambah fungsi `mark_document_failed()` → status `failed` (best-effort, menelan exception sendiri). |
 
 ## 8. Completion Timestamp
-**Completed At:** 2026-07-13T20:35:00+07:00 (WIB)
+**Completed At:** 2026-07-14T19:12:00+07:00 (WIB)

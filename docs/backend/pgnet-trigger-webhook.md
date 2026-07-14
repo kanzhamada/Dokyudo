@@ -35,3 +35,17 @@ sequenceDiagram
 - **Async Execution:** Ekstensi `pg_net` berjalan sepenuhnya *asynchronous* tanpa memblokir koneksi database Deno. Transaksi Deno akan langsung ditutup meskipun webhook lambat merespons.
 - **Target URL Hardcoding:** URL webhook sementara diisi `https://worker.dokyudo.my.id/api/ingest` (akan disesuaikan dengan infrastruktur *routing* CF Tunnel STB).
 - **Trigger `AFTER UPDATE` vs `AFTER INSERT`:** Berbeda dari spesifikasi awal, *trigger* ini sengaja dipasang sebagai `AFTER UPDATE` spesifik saat `status = 'confirmed'`. Hal ini mencegah webhook ditembak sebelum file fisik sepenuhnya terunggah ke MinIO.
+
+## 7. Document Status Lifecycle
+Kolom `documents.status` sekarang menggunakan **typed PostgreSQL enum** (`document_status_enum`):
+
+| Status | Makna | Dipicu oleh |
+|---|---|---|
+| `pending` | Presigned URL digenerate, file belum diunggah | Backend Deno (`createPresignedUrl`) |
+| `confirmed` | File berhasil diunggah ke MinIO, trigger menembak webhook | Backend Deno (`confirmUpload`) |
+| `processed` | Semua *chunk* berhasil di-*embed* dan diindeks | STB Worker (akhir job) |
+| `quota_exhausted` | Kuota harian Cloudflare (TPD) habis di tengah proses | STB Worker (Gatekeeper) |
+| `failed` | Error tak terduga — PDF corrupt, jaringan, atau storage gagal | STB Worker / Deno (`confirmUpload`) |
+
+## 8. Completion Timestamp
+**Completed At:** 2026-07-14T19:12:00+07:00 (WIB)
