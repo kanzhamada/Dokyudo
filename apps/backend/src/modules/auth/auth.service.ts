@@ -572,12 +572,28 @@ export class AuthService {
 
         // Update password using Admin API
         const adminSupabase = getSupabaseAdmin();
-        const { error: updateError } =
-            await adminSupabase.auth.admin.updateUserById(data.user.id, {
-                password: params.newPassword,
-            });
 
-        if (updateError) {
+        try {
+            const { error: updateError } =
+                await adminSupabase.auth.admin.updateUserById(data.user.id, {
+                    password: params.newPassword,
+                });
+
+            if (updateError) {
+                if (params.logContext) {
+                    params.logContext.authError = updateError.message;
+                }
+                throw new AppError({
+                    code: "INTERNAL_ERROR",
+                    message: "Failed to update password. Please try again.",
+                    status: 500,
+                });
+            }
+        } catch (e: any) {
+            if (e instanceof AppError) throw e;
+            if (params.logContext) {
+                params.logContext.authError = e.message;
+            }
             throw new AppError({
                 code: "INTERNAL_ERROR",
                 message: "Failed to update password. Please try again.",
@@ -619,12 +635,27 @@ export class AuthService {
         const adminSupabase = getSupabaseAdmin();
 
         // Update the user's password
-        const { error: updateError } =
-            await adminSupabase.auth.admin.updateUserById(data.user.id, {
-                password: params.newPassword,
-            });
+        try {
+            const { error: updateError } =
+                await adminSupabase.auth.admin.updateUserById(data.user.id, {
+                    password: params.newPassword,
+                });
 
-        if (updateError) {
+            if (updateError) {
+                if (params.logContext) {
+                    params.logContext.authError = updateError.message;
+                }
+                throw new AppError({
+                    code: "INTERNAL_ERROR",
+                    message: "Failed to update password.",
+                    status: 500,
+                });
+            }
+        } catch (e: any) {
+            if (e instanceof AppError) throw e;
+            if (params.logContext) {
+                params.logContext.authError = e.message;
+            }
             throw new AppError({
                 code: "INTERNAL_ERROR",
                 message: "Failed to update password.",
