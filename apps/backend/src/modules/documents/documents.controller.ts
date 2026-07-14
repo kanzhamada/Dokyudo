@@ -3,21 +3,19 @@ import { DocumentsService } from "./documents.service.ts";
 import { ContextExtractor } from "../../shared/utils/context.util.ts";
 import * as DocumentSchema from "./documents.schema.ts";
 
-export async function handleGeneratePresignedUrl(c: Context) {
+export async function handleGeneratePresignedUrlBatch(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, logContext } = extractor.extractAuthContext();
 
-    const body = extractor.extractValidJson<DocumentSchema.PresignedUrlBody>();
+    const body = extractor.extractValidJson<DocumentSchema.PresignedUrlBatchBody>();
     
-    const params: DocumentSchema.CreatePresignedUrlParams = {
+    const params: DocumentSchema.CreatePresignedUrlBatchParams = {
         tenantId,
-        filename: body.filename,
-        mimeType: body.mimeType,
-        sizeBytes: body.sizeBytes,
+        files: body.files,
         logContext,
     };
 
-    const result = await DocumentsService.createPresignedUrl(params);
+    const result = await DocumentsService.createPresignedUrlBatch(params);
 
     return c.json(result, 201);
 }
@@ -79,6 +77,22 @@ export async function handleGetDocumentPreview(c: Context) {
     };
 
     const result = await DocumentsService.getDocumentPreview(params);
+
+    return c.json(result, 200);
+}
+
+export async function handleBatchDeleteDocuments(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, logContext } = extractor.extractAuthContext();
+    const body = extractor.extractValidBody<any>(); // Will be validated by OpenAPI middleware
+
+    const params: DocumentSchema.BatchDeleteDocumentsParams = {
+        tenantId,
+        documentIds: body.documentIds,
+        logContext,
+    };
+
+    const result = await DocumentsService.batchDeleteDocuments(params);
 
     return c.json(result, 200);
 }

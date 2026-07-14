@@ -144,4 +144,50 @@ export class TierQuotaUtil {
             .set({ uploadsCount: sql`${tenantSubscriptions.uploadsCount} + 1` })
             .where(eq(tenantSubscriptions.tenantId, tenantId));
     }
+
+    /**
+     * Validates upload quota constraints for a batch of files.
+     */
+    static async checkUploadQuotaBatch(tx: any, tenantId: string, files: Array<{ sizeBytes: number }>): Promise<void> {
+        const subscription = await this.getSubscription(tx, tenantId);
+        const tierLimits = TIER_LIMITS[subscription.tier as keyof typeof TIER_LIMITS];
+
+        const totalSizeBytes = files.reduce((sum, file) => sum + file.sizeBytes, 0);
+
+        // 1. Check max file size for each file
+        for (const file of files) {
+            if (file.sizeBytes > tierLimits.maxFileSizeBytes) {
+                throw new AppError({
+                    code: "VALIDATION_ERROR",
+                    message: `One of the files exceeds maximum allowed size of ${tierLimits.maxFileSizeBytes / (1024 * 1024)}MB for your tier.`,
+                    status: 400,
+                });
+            }
+        }
+
+        // 2. Check max uploads per month
+        if (subscription.uploadsCount + files.length > tierLimits.maxUploadsPerMonth) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: `Batch upload exceeds your monthly limit. You have ${tierLimits.maxUploadsPerMonth - subscription.uploadsCount} uploads remaining.`,
+                status: 400,
+            });
+        }
+
+        // 3. Check max storage capacity
+        const storageResult = await tx
+            .select({ totalBytes: sql<number>`sum(${documents.sizeBytes})` })
+            .from(documents)
+            .where(eq(documents.tenantId, tenantId));
+            
+        const currentStorageUsed = Number(storageResult[0]?.totalBytes) || 0;
+        
+        if (currentStorageUsed + totalSizeBytes > tierLimits.maxStorageBytes) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: `Storage limit exceeded. This batch requires ${totalSizeBytes / (1024 * 1024)}MB, but you only have ${(tierLimits.maxStorageBytes - currentStorageUsed) / (1024 * 1024)}MB remaining.`,
+                status: 400,
+            });
+        }
+    }
 }

@@ -1,0 +1,30 @@
+meta {
+  name: Batch Delete Documents
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/documents/batch-delete
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "documentIds": [
+      "123e4567-e89b-12d3-a456-426614174000",
+      "123e4567-e89b-12d3-a456-426614174001"
+    ]
+  }
+}
+
+docs {
+  Deletes multiple documents in a single request.
+  This endpoint cancels any active ingestion on the STB Worker, deletes embeddings from Upstash Vector, removes physical files from MinIO S3, deletes records from Postgres, and refunds the upload quota atomically.
+  Ideal for partial or full upload cancellation from the frontend.
+}

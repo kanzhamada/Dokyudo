@@ -33,47 +33,43 @@ sequenceDiagram
         API->>CF: POST generateContent (gemini-3.1-flash-lite, 3000 chars awal)
         CF-->>API: Deskripsi Paragraf Pendek
     and Embedding Thread
-        loop Per Chunk
+        loop Per Batch (Up to 32 Chunks)
             API->>Redis: POST /eval (Lua Gatekeeper: Cek & Potong TPD)
             alt TPD Habis (Quota Exhausted)
                 Redis-->>API: 0, "TPD_EXHAUSTED", pttl_ms
-                API->>PostgREST: PATCH status = 'quota_exhausted'
+                API->>PostgREST: PATCH status = 'quota_exhausted', last_processed_chunk_index = X
                 API->>API: Raise RuntimeError, Stop Job
             else Token Tersedia
                 Redis-->>API: 1, "OK", 0
-                API->>CF: POST /ai/run/@cf/qwen/qwen3-embedding-0.6b
-                CF-->>API: 1024-dimensi Float Array
-                API->>API: Buffer Payload ke Memory
-            end
-            
-            opt Jika Buffer >= 50 atau Chunk Terakhir
-                API->>PostgREST: POST /rest/v1/document_chunks (Teks Mentah)
-                API->>VectorDB: POST /upsert (Vektor + Metadata)
-                API->>API: Kosongkan Buffer
+                API->>CF: POST /ai/run/@cf/qwen/qwen3-embedding-0.6b (Array of 32 texts)
+                CF-->>API: Array of 32 x 1024-dimensi Float Array
+                API->>PostgREST: POST /rest/v1/document_chunks (Bulk Insert 32 Teks Mentah)
+                API->>VectorDB: POST /upsert (Bulk Upsert 32 Vektor + Metadata)
             end
         end
     end
     
-    API->>PostgREST: PATCH /rest/v1/documents (status='processed', description='...')
+    API->>PostgREST: PATCH /rest/v1/documents (status='processed', description='...', last_processed_chunk_index = 0)
     API->>Disk: Hapus file temp (Cleanup)
     deactivate API
 ```
 
-## 3. Deep-Dive: Slicing / Chunking Mechanism
+## 3. Deep-Dive: Slicing / Chunking & Batching Mechanism
 Saat ini sistem menggunakan teknik **Sliding Window Chunking**:
 - **Ukuran Potongan (`chunk_size`)**: 1000 token.
 - **Tumpang Tindih (`overlap`)**: 150 token.
-- **Alasan**: Ketika sebuah dokumen dipecah secara buta per 1000 token, ada kemungkinan kalimat penting atau gagasan utama terbelah dua tepat di batas pemotongan. Dengan memaksa *chunk* selanjutnya untuk "mundur" dan mengambil 150 token dari *chunk* sebelumnya (*overlap*), kita memastikan bahwa konteks di sekitar perbatasan tidak hilang (konteks terhubung/tidak terputus).
 
-## 4. Deep-Dive: Gatekeeper & Limiting
-Cloudflare Workers AI (Free) memiliki batas **10.000 Neuron per hari** yang setara dengan sekitar **9.300.000 token input per hari** untuk model `@cf/qwen/qwen3-embedding-0.6b`. Jika STB Worker membombardir Cloudflare tanpa batas:
-1. API Cloudflare akan menolak *request* dengan HTTP 429.
-2. Kuota harian akan habis dan semua pemrosesan dokumen akan gagal sampai besok.
+**Batching (BATCH_SIZE = 32)**:
+Alih-alih menembak API Embedding per satu *chunk*, worker mengelompokkan *chunk* tersebut dalam *array* berisi maksimal 32 teks. Batch ini kemudian dikirim dalam **1 HTTP Request** ke Cloudflare, dan hasilnya di-*insert* secara *bulk* ke Postgres dan Upstash Vector. Hal ini secara drastis memangkas HTTP *overhead* dan waktu *round-trip*. Jika token Gatekeeper tersisa tidak cukup untuk 32 *chunk*, worker secara dinamis memperkecil ukuran batch agar sesuai dengan kuota yang tersisa.
 
-**Solusi Arsitekturnya (TPD — Tokens Per Day):**
-- **Lua Script Gatekeeper**: STB mengeksekusi *script* atomik ke **Upstash Redis** melalui REST API. Script ini mengelola satu kuota global: `ratelimit:cloudflare:tpd:global`.
-- **Token Deduction**: Sebelum meminta vektor, STB menaksir estimasi token (panjang string / 3). Jika sisa TPD di Redis tidak cukup, Redis menolak *request* dan mengembalikan sinyal `TPD_EXHAUSTED`.
-- **Antrian ke Besok (Graceful Degradation)**: Berbeda dari sistem Gemini lama yang tidur menunggu kuota per menit, kuota harian Cloudflare tidak bisa di-*wait*. Ketika TPD habis, worker segera berhenti, mengubah status dokumen menjadi `quota_exhausted` di Postgres, dan membiarkan kuota Cloudflare *reset* sendiri di UTC 00:00 keesokan harinya. Sistem Deno Cron atau trigger database bertanggung jawab untuk me-*retry* dokumen-dokumen berstatus `quota_exhausted` ini esok harinya.
+## 4. Deep-Dive: Gatekeeper & Daily Resumption
+Cloudflare Workers AI (Free) memiliki batas harian setara dengan sekitar **9.300.000 token input per hari**.
+Jika TPD (Tokens Per Day) habis:
+1. **Gatekeeper Menolak**: Upstash Redis mengembalikan `TPD_EXHAUSTED`.
+2. **Graceful Stop & Checkpoint**: STB Worker berhenti, memperbarui database: `status = 'quota_exhausted'` dan menyimpan `last_processed_chunk_index`.
+3. **Daily Resumption (`pg_cron`)**: Pada tengah malam (UTC 00:00), Cloudflare me-reset kuota. Sebuah job `pg_cron` di Supabase secara otomatis mencari dokumen berstatus `quota_exhausted` dan mengubahnya kembali menjadi `confirmed`.
+4. **Webhook Re-triggered**: Perubahan status memicu kembali webhook `pg_net` ke STB Worker.
+5. **Resume**: STB Worker mengekstrak PDF lagi, tetapi **melewati (skip)** *chunk* dari indeks 0 hingga `last_processed_chunk_index`, melanjutkan persis di titik terakhir ia berhenti kemarin.
 
 ## 5. Document Status Lifecycle
 | Status | Makna | Dipicu oleh |

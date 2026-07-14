@@ -6,7 +6,10 @@ export interface TierLimit {
     maxSearchesPerMonth: number;
 }
 
-export const TIER_LIMITS: Record<"FREE" | "SIMULATE" | "OIL_INVESTOR" | "PRO", TierLimit> = {
+export const TIER_LIMITS: Record<
+    "FREE" | "SIMULATE" | "OIL_INVESTOR" | "PRO",
+    TierLimit
+> = {
     FREE: {
         maxFileSizeBytes: 100 * 1024 * 1024, // 10 MB (Aman untuk 30K TPM)
         maxUploadsPerMonth: 100,

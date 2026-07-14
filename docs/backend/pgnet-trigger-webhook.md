@@ -56,4 +56,4 @@ Kolom `documents.status` sekarang menggunakan **typed PostgreSQL enum** (`docume
 | `failed` | Error tak terduga — PDF corrupt, jaringan, atau storage gagal | STB Worker / Deno (`confirmUpload`) |
 
 ## 8. Completion Timestamp
-**Completed At:** 2026-07-14T19:12:00+07:00 (WIB)
+**Completed At:** 2026-07-14T20:55:00+07:00 (WIB)

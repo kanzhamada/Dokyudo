@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { MAX_DOCUMENT_SIZE_BYTES } from "../../shared/constants/documents.constant.ts";
 
-export const PresignedUrlBodySchema = z.object({
+export const FileRequestSchema = z.object({
     filename: z.string().min(1).refine((name) => {
         const ext = name.split('.').pop()?.toLowerCase();
         return ext === "pdf" || ext === "txt";
@@ -19,16 +19,23 @@ export const PresignedUrlBodySchema = z.object({
     }),
 });
 
-export type PresignedUrlBody = z.infer<typeof PresignedUrlBodySchema>;
+export const PresignedUrlBatchBodySchema = z.object({
+    files: z.array(FileRequestSchema).min(1).max(10, "Maximum of 10 files allowed per batch").openapi({
+        description: "Array of files to upload",
+    })
+});
 
-export const CreatePresignedUrlParamsSchema = PresignedUrlBodySchema.extend({
+export type PresignedUrlBatchBody = z.infer<typeof PresignedUrlBatchBodySchema>;
+
+export const CreatePresignedUrlBatchParamsSchema = PresignedUrlBatchBodySchema.extend({
     tenantId: z.string(),
     logContext: z.any().optional(),
 });
 
-export type CreatePresignedUrlParams = z.infer<typeof CreatePresignedUrlParamsSchema>;
+export type CreatePresignedUrlBatchParams = z.infer<typeof CreatePresignedUrlBatchParamsSchema>;
 
-export const PresignedUrlResponseSchema = z.object({
+export const PresignedUrlResponseItemSchema = z.object({
+    filename: z.string(),
     url: z.string().openapi({
         example: "https://s3.dokyudo.my.id/dokyudo-documents/...",
         description: "The presigned PUT URL for upload",
@@ -47,7 +54,11 @@ export const PresignedUrlResponseSchema = z.object({
     }),
 });
 
-export type PresignedUrlResponse = z.infer<typeof PresignedUrlResponseSchema>;
+export const PresignedUrlBatchResponseSchema = z.object({
+    results: z.array(PresignedUrlResponseItemSchema)
+});
+
+export type PresignedUrlBatchResponse = z.infer<typeof PresignedUrlBatchResponseSchema>;
 
 export const ConfirmUploadBodySchema = z.object({
     documentId: z.string().uuid().openapi({
@@ -100,6 +111,30 @@ export const DeleteDocumentResponseSchema = z.object({
 });
 
 export type DeleteDocumentResponse = z.infer<typeof DeleteDocumentResponseSchema>;
+
+export const BatchDeleteDocumentsBodySchema = z.object({
+    documentIds: z.array(z.string().uuid()).max(50).openapi({
+        example: ["123e4567-e89b-12d3-a456-426614174000", "123e4567-e89b-12d3-a456-426614174001"],
+        description: "Array of document IDs to delete/cancel",
+    }),
+});
+
+export const BatchDeleteDocumentsParamsSchema = z.object({
+    documentIds: z.array(z.string().uuid()),
+    tenantId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type BatchDeleteDocumentsParams = z.infer<typeof BatchDeleteDocumentsParamsSchema>;
+
+export const BatchDeleteDocumentsResponseSchema = z.object({
+    success: z.boolean().openapi({ example: true }),
+    deletedCount: z.number().openapi({ example: 2 }),
+    message: z.string().openapi({ example: "Documents successfully deleted" }),
+});
+
+export type BatchDeleteDocumentsResponse = z.infer<typeof BatchDeleteDocumentsResponseSchema>;
+
 
 export const ListDocumentsParamsSchema = z.object({
     tenantId: z.string(),

@@ -1,0 +1,36 @@
+meta {
+  name: Batch Get Presigned Upload URLs
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/documents/presigned-url/batch
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "files": [
+      {
+        "filename": "financial_report_2023.pdf",
+        "mimeType": "application/pdf",
+        "sizeBytes": 1048576
+      },
+      {
+        "filename": "employee_handbook.pdf",
+        "mimeType": "application/pdf",
+        "sizeBytes": 2048576
+      }
+    ]
+  }
+}
+
+docs {
+  Generates presigned PUT URLs directly to the self-hosted MinIO STB storage for multiple files, bypassing backend bandwidth for large uploads (max 25MB per file, max 10 files per batch). Creates pending document records and atomically deducts the quota.
+}

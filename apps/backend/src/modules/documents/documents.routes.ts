@@ -9,18 +9,18 @@ export const documentsRoutes = createApp();
 documentsRoutes.openapi(
     createRoute({
         method: "post",
-        path: "/presigned-url",
+        path: "/presigned-url/batch",
         tags: ["Documents"],
-        summary: "Generate a MinIO Presigned URL for upload",
+        summary: "Generate MinIO Presigned URLs for batch upload",
         description:
-            "Returns a secure presigned PUT URL valid for 15 minutes. " +
-            "Creates a pending document record in the database. " +
-            "The client should use this URL to directly upload the file to storage.",
+            "Returns secure presigned PUT URLs valid for 15 minutes for an array of files. " +
+            "Creates pending document records in the database. " +
+            "The client should use these URLs to directly upload the files to storage.",
         request: {
             body: {
                 content: {
                     "application/json": {
-                        schema: DocumentsSchema.PresignedUrlBodySchema,
+                        schema: DocumentsSchema.PresignedUrlBatchBodySchema,
                     },
                 },
                 required: true,
@@ -28,15 +28,15 @@ documentsRoutes.openapi(
         },
         responses: {
             201: {
-                description: "Presigned URL generated successfully",
+                description: "Presigned URLs generated successfully",
                 content: {
                     "application/json": {
-                        schema: DocumentsSchema.PresignedUrlResponseSchema,
+                        schema: DocumentsSchema.PresignedUrlBatchResponseSchema,
                     },
                 },
             },
             400: {
-                description: "Validation error (e.g., file too large)",
+                description: "Validation error (e.g., file too large, batch size exceeded)",
                 content: {
                     "application/json": {
                         schema: ErrorResponseSchema,
@@ -61,7 +61,7 @@ documentsRoutes.openapi(
             },
         },
     }),
-    documentsController.handleGeneratePresignedUrl as any,
+    documentsController.handleGeneratePresignedUrlBatch as any,
 );
 
 documentsRoutes.openapi(
@@ -262,4 +262,61 @@ documentsRoutes.openapi(
         },
     }),
     documentsController.handleGetDocumentPreview as any,
+);
+
+documentsRoutes.openapi(
+    createRoute({
+        method: "post",
+        path: "/batch-delete",
+        tags: ["Documents"],
+        summary: "Cancel or Delete a batch of documents",
+        description:
+            "Deletes multiple documents from the database, removes their vector embeddings from Upstash, " +
+            "and deletes their files from S3 storage. Also refunds the upload quota.",
+        request: {
+            body: {
+                content: {
+                    "application/json": {
+                        schema: DocumentsSchema.BatchDeleteDocumentsBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Documents deleted successfully",
+                content: {
+                    "application/json": {
+                        schema: DocumentsSchema.BatchDeleteDocumentsResponseSchema,
+                    },
+                },
+            },
+            400: {
+                description: "Validation error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    documentsController.handleBatchDeleteDocuments as any,
 );
