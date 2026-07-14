@@ -86,6 +86,25 @@ export const users = pgTable("users", {
 });
 
 // ==============================================================================
+// ENUMS
+// ==============================================================================
+export const documentStatusEnum = pgEnum("document_status_enum", [
+    "pending",
+    "confirmed",
+    "processed",
+    "quota_exhausted",
+    "failed",
+]);
+
+export const authProviderEnum = pgEnum("auth_provider_enum", [
+    "email",
+    "forget_password",
+    "register",
+    "oauth_google",
+    "oauth_github",
+]);
+
+// ==============================================================================
 // 3. LOGIN ATTEMPTS TABLE (Anti-Bruteforce)
 // ==============================================================================
 export const loginAttempts = pgTable(
@@ -102,7 +121,7 @@ export const loginAttempts = pgTable(
         ipAddress: inet("ip_address").notNull(),
         userAgent: text("user_agent"),
         isSuccess: boolean("is_success").default(false),
-        authProvider: varchar("auth_provider", { length: 50 }).default("email"),
+        authProvider: authProviderEnum("auth_provider").default("email"),
         attemptedAt: timestamp("attempted_at", {
             mode: "date",
             precision: 3,
@@ -130,7 +149,7 @@ export const documents = pgTable("documents", {
     storagePath: text("storage_path").notNull(),
     sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
     description: text("description"),
-    status: varchar("status", { length: 50 }).default("pending").notNull(),
+    status: documentStatusEnum("status").default("pending").notNull(),
     createdAt: timestamp("created_at", {
         mode: "date",
         precision: 3,

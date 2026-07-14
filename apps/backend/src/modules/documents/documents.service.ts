@@ -45,6 +45,33 @@ async function cancelIngestionOnWorker(params: {
     }
 }
 
+/**
+ * Best-effort: marks a document as 'failed' in Postgres.
+ * Called when an unexpected infrastructure error prevents successful ingestion
+ * or confirmation, so the document is never stuck in 'pending' forever.
+ */
+async function markDocumentFailed(params: {
+    documentId: string;
+    tenantId: string;
+    logContext?: Record<string, any>;
+}): Promise<void> {
+    try {
+        await db.update(documents)
+            .set({ status: "failed" })
+            .where(
+                and(
+                    eq(documents.id, params.documentId),
+                    eq(documents.tenantId, params.tenantId),
+                )
+            );
+    } catch (err: any) {
+        if (params.logContext) {
+            params.logContext.markFailedError = err.message;
+        }
+        // Best-effort — swallow to avoid masking the original error
+    }
+}
+
 export class DocumentsService {
     /**
      * Generates a presigned URL and creates a pending document record.
@@ -192,6 +219,7 @@ export class DocumentsService {
         }
 
         if (s3CheckError) {
+            await markDocumentFailed({ documentId: params.documentId, tenantId: params.tenantId, logContext: params.logContext });
             throw new AppError({
                 code: "INTERNAL_ERROR",
                 message: "Failed to communicate with storage service",
@@ -227,6 +255,7 @@ export class DocumentsService {
         }
 
         if (!dbUpdateSuccess) {
+            await markDocumentFailed({ documentId: params.documentId, tenantId: params.tenantId, logContext: params.logContext });
             throw new AppError({
                 code: "INTERNAL_ERROR",
                 message: "Failed to update document status",

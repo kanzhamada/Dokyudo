@@ -62,6 +62,23 @@ def mark_document_queued(document_id: str):
         res = client.patch(url, headers=headers, json={"status": "quota_exhausted"})
         res.raise_for_status()
 
+def mark_document_failed(document_id: str):
+    """
+    Update the document status to 'failed' when an unexpected error occurs
+    during ingestion (e.g., PDF corrupt, MinIO unreachable, network error).
+    Best-effort — swallows exceptions to avoid masking the original error.
+    """
+    url = f"{settings.SUPABASE_URL}/rest/v1/documents?id=eq.{document_id}"
+    headers = get_supabase_headers()
+    headers["Prefer"] = "return=representation"
+
+    try:
+        with httpx.Client() as client:
+            res = client.patch(url, headers=headers, json={"status": "failed"})
+            res.raise_for_status()
+    except Exception:
+        pass  # Best-effort: do not mask the original error
+
 def insert_document_chunks(chunks_payload: list[dict]):
     """
     Insert the raw text chunks into Supabase Postgres `document_chunks` table.

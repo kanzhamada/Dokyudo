@@ -76,11 +76,14 @@ async function processOAuthCallback(c: Context, provider: "google" | "github") {
     }
 
     try {
+        const { clientIp, userAgent } = extractor.extractAuditContext();
         const params: OAuthSchema.OAuthCallbackParams = {
             code,
             provider,
             error: errorParam,
             error_description: errorDescription,
+            clientIp,
+            userAgent,
             logContext,
         };
 

@@ -16,7 +16,8 @@ from services.database import (
     insert_document_chunks,
     upsert_vectors_to_upstash,
     mark_document_processed,
-    mark_document_queued
+    mark_document_queued,
+    mark_document_failed
 )
 from services.queue import ingestion_queue
 
@@ -196,8 +197,10 @@ def process_document(tenant_id: str, document_id: str):
             mark_document_queued(document_id)
         else:
             dev_print(f"[Processor ERROR] RuntimeError for {document_id}: {str(e)}")
+            mark_document_failed(document_id)
     except Exception as e:
         dev_print(f"[Processor ERROR] Failed to process {document_id}: {str(e)}")
+        mark_document_failed(document_id)
     finally:
         if os.path.exists(temp_pdf.name):
             os.remove(temp_pdf.name)

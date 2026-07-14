@@ -4,6 +4,8 @@ import { redis } from "../../../config/redis.ts";
 import { AppError } from "../../../shared/utils/errors.util.ts";
 import * as OAuthSchema from "./oauth.schema.ts";
 import { getSupabaseAdmin } from "../../../config/supabase.ts";
+import { db } from "../../../config/drizzle.ts";
+import { loginAttempts } from "../../../shared/models/db.model.ts";
 
 export interface OAuthCallbackResult {
     accessToken: string;
@@ -93,6 +95,21 @@ export class OAuthService {
                     params.logContext.authWarning =
                         "Failed to revoke unverified OAuth session: " +
                         err.message;
+                }
+            }
+
+            // Audit log: record the failed attempt for security visibility
+            try {
+                await db.insert(loginAttempts).values({
+                    emailAttempted: user.email ?? "unknown",
+                    ipAddress: params.clientIp,
+                    userAgent: params.userAgent,
+                    isSuccess: false,
+                    authProvider: `oauth_${params.provider}`,
+                });
+            } catch (logErr: any) {
+                if (params.logContext) {
+                    params.logContext.dbError_logLoginAttempt = logErr.message;
                 }
             }
 

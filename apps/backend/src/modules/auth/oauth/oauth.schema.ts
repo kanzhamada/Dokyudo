@@ -16,6 +16,8 @@ export type OAuthCallbackQuery = z.infer<typeof OAuthCallbackQuerySchema>;
 
 export const OAuthCallbackParamsSchema = OAuthCallbackQuerySchema.extend({
     provider: z.enum(["google", "github"]),
+    clientIp: z.string(),
+    userAgent: z.string().optional(),
     logContext: z.any().optional(),
 });
 
