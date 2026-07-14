@@ -17,7 +17,8 @@ from services.database import (
     upsert_vectors_to_upstash,
     mark_document_processed,
     mark_document_queued,
-    mark_document_failed
+    mark_document_failed,
+    get_last_processed_chunk_index
 )
 from services.queue import ingestion_queue
 
@@ -53,35 +54,33 @@ def is_valid_uuid(val: str) -> bool:
     pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
     return bool(pattern.match(val))
 
-def _process_chunks_loop(chunks, document_id, tenant_id):
-    upstash_payload = []
-    postgres_payload = []
+def _process_chunks_loop(chunks, document_id, tenant_id, start_chunk_idx=0):
+    BATCH_SIZE = 32
     
-    for i, chunk_data in enumerate(chunks):
-        # --- Cancellation check at each chunk boundary ---
+    chunks_to_process = chunks[start_chunk_idx:]
+    if not chunks_to_process:
+        return True
+        
+    for batch_offset in range(0, len(chunks_to_process), BATCH_SIZE):
+        batch_chunks = chunks_to_process[batch_offset:batch_offset + BATCH_SIZE]
+        
+        # --- Cancellation check at each batch boundary ---
         if ingestion_queue.is_cancelled(document_id):
-            dev_print(f"[Processor] CANCELLED at chunk {i+1}/{len(chunks)} for {document_id}. Discarding {len(upstash_payload)} buffered vectors.")
-            return False  # Signal cancellation — discard buffers, document is being deleted
-        
-        chunk_text_content = chunk_data["text"]
-        chunk_pages = chunk_data["pages"]
-        
-        chunk_id = str(uuid.uuid4())
-        estimated_tokens = max(1, len(chunk_text_content) // 3)
-        
-        if estimated_tokens > 8192:
-            dev_print(f"[PAYLOAD_TOO_LARGE] Chunk {i} rejected. Size: {estimated_tokens} tokens.")
-            continue
+            dev_print(f"[Processor] CANCELLED at batch {(start_chunk_idx + batch_offset)//BATCH_SIZE + 1}. Discarding.")
+            return False
             
+        batch_texts = [c["text"] for c in batch_chunks]
+        total_estimated_tokens = sum(max(1, len(txt) // 3) for txt in batch_texts)
+        
         gatekeeper_passed = False
         retry_count = 0
         
         while not gatekeeper_passed and retry_count < 3:
-            status, reason, reset_in_ms = execute_gatekeeper(estimated_tokens)
+            status, reason, reset_in_ms = execute_gatekeeper(total_estimated_tokens)
             
             if status == 1:
                 gatekeeper_passed = True
-                dev_print(f"[GATEKEEPER OK] Chunk {i+1}/{len(chunks)} ({estimated_tokens} tk) => Deducted. Processing...")
+                dev_print(f"[GATEKEEPER OK] Batch {batch_idx//BATCH_SIZE + 1} ({total_estimated_tokens} tk) => Deducted. Processing...")
             else:
                 if "TPD_EXHAUSTED" in reason:
                     dev_print(f"[GATEKEEPER EXHAUSTED] Daily CF Quota Exceeded. Aborting job.")
@@ -94,39 +93,43 @@ def _process_chunks_loop(chunks, document_id, tenant_id):
                 retry_count += 1
                 
         if not gatekeeper_passed:
-            dev_print(f"[Processor WARNING] Gatekeeper failed after retries for chunk {i+1}. Skipping chunk.")
+            dev_print(f"[Processor WARNING] Gatekeeper failed after retries for batch {(start_chunk_idx + batch_offset)//BATCH_SIZE + 1}. Skipping.")
             continue
-        
-        vector = generate_embedding_with_retry(chunk_text_content)
-        
-        upstash_payload.append({
-            "id": chunk_id,
-            "vector": vector,
-            "metadata": {
-                "tenantId": tenant_id,
-                "documentId": document_id,
-                "chunkIndex": i,
-                "pages": chunk_pages,
-                "content": chunk_text_content
-            }
-        })
-        
-        postgres_payload.append({
-            "id": chunk_id,
-            "tenant_id": tenant_id,
-            "document_id": document_id,
-            "chunk_index": i,
-            "metadata": { "pages": chunk_pages },
-            "content": chunk_text_content
-        })
-        
-        if len(upstash_payload) >= 50 or i == len(chunks) - 1:
-            dev_print(f"-> Flushing {len(upstash_payload)} vectors to Upstash...")
-            insert_document_chunks(postgres_payload)
-            upsert_vectors_to_upstash(upstash_payload)
             
-            upstash_payload = []
-            postgres_payload = []
+        vectors = generate_embedding_with_retry(batch_texts)
+        
+        upstash_payload = []
+        postgres_payload = []
+        
+        for i, vector in enumerate(vectors):
+            chunk_data = batch_chunks[i]
+            global_chunk_index = start_chunk_idx + batch_offset + i
+            chunk_id = str(uuid.uuid4())
+            
+            upstash_payload.append({
+                "id": chunk_id,
+                "vector": vector,
+                "metadata": {
+                    "tenantId": tenant_id,
+                    "documentId": document_id,
+                    "chunkIndex": global_chunk_index,
+                    "pages": chunk_data["pages"],
+                    "content": chunk_data["text"]
+                }
+            })
+            
+            postgres_payload.append({
+                "id": chunk_id,
+                "tenant_id": tenant_id,
+                "document_id": document_id,
+                "chunk_index": global_chunk_index,
+                "metadata": { "pages": chunk_data["pages"] },
+                "content": chunk_data["text"]
+            })
+            
+        dev_print(f"-> Flushing batch of {len(upstash_payload)} vectors to DB and Upstash...")
+        insert_document_chunks(postgres_payload)
+        upsert_vectors_to_upstash(upstash_payload)
 
     return True  # Signal completion
 
@@ -168,7 +171,13 @@ def process_document(tenant_id: str, document_id: str):
         if not settings.UPSTASH_REDIS_REST_URL or not settings.UPSTASH_REDIS_REST_TOKEN:
             raise ValueError("Missing UPSTASH_REDIS credentials in .env")
             
-        dev_print("5. Initialized Upstash Redis SDK. Starting Gatekeeper Loop...")
+        # Resume from checkpoint if this is a retry of quota_exhausted
+        last_chunk_index = get_last_processed_chunk_index(document_id)
+        start_chunk_idx = last_chunk_index + 1
+        if start_chunk_idx > 0:
+            dev_print(f"5. Found existing chunks. Resuming from chunk index {start_chunk_idx}...")
+        else:
+            dev_print("5. Initialized Upstash Redis SDK. Starting Gatekeeper Loop...")
         
         # Get the first 3000 characters from the pages for description generation
         full_text = " ".join([p["text"] for p in pages])
@@ -177,7 +186,7 @@ def process_document(tenant_id: str, document_id: str):
         # Run chunk processing and LLM description in parallel using threads
         description = ""
         with ThreadPoolExecutor(max_workers=2) as executor:
-            future_chunks = executor.submit(_process_chunks_loop, chunks, document_id, tenant_id)
+            future_chunks = executor.submit(_process_chunks_loop, chunks, document_id, tenant_id, start_chunk_idx)
             future_llm = executor.submit(generate_llm_description, head_text)
             
             # Wait for both to finish

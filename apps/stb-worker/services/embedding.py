@@ -3,9 +3,9 @@ import httpx
 from core.config import settings
 from core.logger import dev_print
 
-def generate_embedding_with_retry(text: str, max_retries: int = 5) -> list[float]:
+def generate_embedding_with_retry(texts: list[str], max_retries: int = 5) -> list[list[float]]:
     """
-    Generates a 1024-dim vector using Cloudflare Workers AI with automatic exponential backoff.
+    Generates 1024-dim vectors for a batch of texts using Cloudflare Workers AI with automatic exponential backoff.
     """
     if not settings.CLOUDFLARE_ACCOUNT_ID or not settings.CLOUDFLARE_AUTH_TOKEN:
         raise ValueError("Cloudflare credentials are not set in environment")
@@ -19,12 +19,12 @@ def generate_embedding_with_retry(text: str, max_retries: int = 5) -> list[float
     }
     
     payload = {
-        "text": [text]
+        "text": texts
     }
     
     for attempt in range(max_retries):
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=60.0) as client:
                 res = client.post(url, headers=headers, json=payload)
                 
             if res.status_code in [429, 500, 502, 503, 504]:
@@ -39,7 +39,7 @@ def generate_embedding_with_retry(text: str, max_retries: int = 5) -> list[float
             if not data.get("success"):
                 raise Exception(f"Cloudflare API returned failure: {data.get('errors')}")
             
-            return data["result"]["data"][0]
+            return data["result"]["data"]
             
         except httpx.HTTPStatusError as e:
             if e.response.status_code in [429, 500, 502, 503, 504]:

@@ -32,6 +32,20 @@ def check_document_idempotency(document_id: str) -> bool:
             return True
     return False
 
+def get_last_processed_chunk_index(document_id: str) -> int:
+    """
+    Query Supabase to find the highest chunk_index already inserted for this document.
+    Returns -1 if no chunks exist. Used for resuming 'quota_exhausted' documents.
+    """
+    url = f"{settings.SUPABASE_URL}/rest/v1/document_chunks?document_id=eq.{document_id}&select=chunk_index&order=chunk_index.desc&limit=1"
+    with httpx.Client() as client:
+        res = client.get(url, headers=get_supabase_headers())
+        res.raise_for_status()
+        data = res.json()
+        if len(data) > 0:
+            return data[0]["chunk_index"]
+    return -1
+
 def mark_document_processed(document_id: str, description: str = ""):
     """
     Update the document status to 'processed' and set the LLM generated description.

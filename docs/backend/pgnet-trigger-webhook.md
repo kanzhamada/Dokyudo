@@ -19,18 +19,26 @@ sequenceDiagram
     STB-->>STB: Background processing (Chunking & Embedding)
 ```
 
-## 3. Completion Timestamp
+## 3. Automatic Daily Resumption (pg_cron)
+Sistem ini menggunakan fitur penjadwalan native Supabase (`pg_cron`) untuk melanjutkan pemrosesan dokumen yang tertunda akibat limit Cloudflare TPD (*Tokens Per Day*).
+1. Setiap jam **00:05 UTC**, *cron job* mengeksekusi query: `UPDATE documents SET status = 'confirmed' WHERE status = 'quota_exhausted'`.
+2. Perubahan status ini secara otomatis akan memicu *trigger* `notify_document_uploaded` yang ada di atas.
+3. Webhook akan kembali dikirim ke STB Worker.
+4. STB Worker akan melakukan *checkpointing* (`get_last_processed_chunk_index`) dan melanjutkan dari titik berhentinya.
+
+## 4. Completion Timestamp
 **Completed At:** 2026-06-27T12:35:00+07:00 (WIB)
 
-## 4. File Mapping
+## 5. File Mapping
 - **Created:**
   - `apps/backend/drizzle/migrations/0002_pgnet_trigger.sql` (File migrasi SQL Drizzle kustom)
+  - `docs/management/migrations/pgcron_retry.sql` (SQL untuk mendaftarkan cron job harian)
 
-## 5. Connections
-- **Database:** Mengaktifkan ekstensi `pg_net` (native Supabase) dan membuat fungsi `notify_document_uploaded` berbasis PL/pgSQL, lalu mengaitkannya ke tabel `documents` via `AFTER UPDATE` *trigger*.
+## 6. Connections
+- **Database:** Mengaktifkan ekstensi `pg_net` dan `pg_cron` (native Supabase). Membuat fungsi `notify_document_uploaded` berbasis PL/pgSQL yang terhubung ke `AFTER UPDATE` *trigger*.
 - **Worker (STB):** Menerima webhook secara *stateless* dan *async* dengan *payload JSON* berisi identifier yang dibutuhkan.
 
-## 6. Architectural Decisions
+## 7. Architectural Decisions
 - **Event-Driven Database Triggers:** Menggunakan `pg_net` alih-alih melempar HTTP request dari Deno. Keputusan ini menjamin webhook *terjamin (guaranteed)* dikirim hanya jika transaksi database benar-benar di-*commit*, meminimalisasi inkonsistensi data.
 - **Async Execution:** Ekstensi `pg_net` berjalan sepenuhnya *asynchronous* tanpa memblokir koneksi database Deno. Transaksi Deno akan langsung ditutup meskipun webhook lambat merespons.
 - **Target URL Hardcoding:** URL webhook sementara diisi `https://worker.dokyudo.my.id/api/ingest` (akan disesuaikan dengan infrastruktur *routing* CF Tunnel STB).
