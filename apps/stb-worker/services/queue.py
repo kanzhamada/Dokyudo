@@ -11,7 +11,7 @@ if currently processing, signalled to abort via a shared set.
 import queue
 import threading
 from dataclasses import dataclass
-from core.logger import dev_print
+from core.logger import log_event
 
 
 @dataclass
@@ -45,7 +45,7 @@ class IngestionQueue:
             daemon=True,
         )
         self._worker_thread.start()
-        dev_print("[Queue] Ingestion worker thread started.")
+        log_event("queue.worker_started", "Ingestion worker thread started.")
 
     def stop(self):
         """Signal the worker to stop and wait for it to drain. Call at app shutdown."""
@@ -56,13 +56,13 @@ class IngestionQueue:
         self._queue.put(None)
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=300)
-        dev_print("[Queue] Ingestion worker thread stopped.")
+        log_event("queue.worker_stopped", "Ingestion worker thread stopped.")
 
     def enqueue(self, job: IngestionJob):
         """Add a job to the queue. Returns immediately (non-blocking)."""
         self._queue.put(job)
         depth = self._queue.qsize()
-        dev_print(f"[Queue] Enqueued {job.document_id} (queue depth: {depth})")
+        log_event("queue.job_enqueued", "Job successfully added to queue", document_id=job.document_id, tenant_id=job.tenant_id, queue_depth=depth)
 
     @property
     def depth(self) -> int:
@@ -84,7 +84,7 @@ class IngestionQueue:
         is_active = self._active_document_id == document_id
 
         status = "cancelled_active" if is_active else "cancelled_pending"
-        dev_print(f"[Queue] Cancel requested for {document_id} (status: {status})")
+        log_event("queue.job_cancelled", "Cancellation requested for document", document_id=document_id, status=status)
 
         return {
             "document_id": document_id,
@@ -127,23 +127,23 @@ class IngestionQueue:
 
             # Skip if cancelled while waiting in queue
             if self.is_cancelled(job.document_id):
-                dev_print(f"[Queue] Skipping cancelled job {job.document_id}")
+                log_event("queue.job_skipped", "Skipping cancelled job in queue", document_id=job.document_id)
                 self._clear_cancelled(job.document_id)
                 self._queue.task_done()
                 continue
 
             try:
                 self._active_document_id = job.document_id
-                dev_print(f"[Queue] Processing {job.document_id} (remaining: {self._queue.qsize()})")
+                log_event("queue.job_processing", "Started processing document from queue", document_id=job.document_id, tenant_id=job.tenant_id, remaining_depth=self._queue.qsize())
                 process_document(job.tenant_id, job.document_id)
             except Exception as exc:
-                dev_print(f"[Queue ERROR] Unhandled error for {job.document_id}: {exc}")
+                log_event("queue.worker_error", "Unhandled error in consumer loop", level="ERROR", document_id=job.document_id, error=str(exc))
             finally:
                 self._active_document_id = None
                 self._clear_cancelled(job.document_id)
                 self._queue.task_done()
 
-        dev_print("[Queue] Consumer loop exited.")
+        log_event("queue.consumer_exited", "Queue consumer loop exited.")
 
 
 # Module-level singleton

@@ -1,6 +1,6 @@
 import httpx
 from core.config import settings
-from core.logger import dev_print
+from core.logger import log_event
 
 def generate_llm_description(text: str) -> str:
     """
@@ -42,7 +42,7 @@ Introductory Document Text:
         ]
     }
 
-    dev_print("[LLM] Generating document description...")
+    log_event("llm.generation_started", "Generating document description.")
 
     try:
         with httpx.Client(timeout=30.0) as client:
@@ -54,14 +54,14 @@ Introductory Document Text:
                 candidate = data["candidates"][0]
                 if "parts" in candidate["content"]:
                     description = candidate["content"]["parts"][0]["text"].strip()
-                    dev_print(f"[LLM] Description generated: {description}")
+                    log_event("llm.generation_success", "Description generated successfully.", description=description)
                     return description
                 else:
-                    dev_print(f"[LLM ERROR] Blocked by safety or finishReason: {candidate.get('finishReason')}")
+                    log_event("llm.generation_blocked", "Generation blocked by safety or finishReason.", level="ERROR", finish_reason=candidate.get("finishReason"))
                     return ""
             else:
-                dev_print("[LLM ERROR] No candidates returned from Gemini.")
+                log_event("llm.no_candidates", "No candidates returned from Gemini.", level="ERROR")
                 return ""
     except Exception as e:
-        dev_print(f"[LLM ERROR] Failed to generate description: {str(e)}")
+        log_event("llm.fatal_error", "Failed to generate description.", level="ERROR", error=str(e))
         return ""

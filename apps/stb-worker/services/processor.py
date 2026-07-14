@@ -6,7 +6,7 @@ import tempfile
 import httpx
 from concurrent.futures import ThreadPoolExecutor
 from core.config import settings
-from core.logger import dev_print
+from core.logger import log_event
 from services.storage import download_pdf
 from services.extractor import extract_text_from_pdf, chunk_text_with_pages
 from services.embedding import generate_embedding_with_retry
@@ -66,7 +66,7 @@ def _process_chunks_loop(chunks, document_id, tenant_id, start_chunk_idx=0):
         
         # --- Cancellation check at each batch boundary ---
         if ingestion_queue.is_cancelled(document_id):
-            dev_print(f"[Processor] CANCELLED at batch {(start_chunk_idx + batch_offset)//BATCH_SIZE + 1}. Discarding.")
+            log_event("processor.batch_cancelled", "Cancellation detected at batch boundary. Discarding.", level="WARNING", document_id=document_id, tenant_id=tenant_id, batch_number=(start_chunk_idx + batch_offset)//BATCH_SIZE + 1)
             return False
             
         batch_texts = [c["text"] for c in batch_chunks]
@@ -80,20 +80,20 @@ def _process_chunks_loop(chunks, document_id, tenant_id, start_chunk_idx=0):
             
             if status == 1:
                 gatekeeper_passed = True
-                dev_print(f"[GATEKEEPER OK] Batch {(start_chunk_idx + batch_offset)//BATCH_SIZE + 1} ({total_estimated_tokens} tk) => Deducted. Processing...")
+                log_event("gatekeeper.quota_deducted", "Gatekeeper passed, token quota deducted.", document_id=document_id, tenant_id=tenant_id, batch_number=(start_chunk_idx + batch_offset)//BATCH_SIZE + 1, estimated_tokens=total_estimated_tokens)
             else:
                 if "TPD_EXHAUSTED" in reason:
-                    dev_print(f"[GATEKEEPER EXHAUSTED] Daily CF Quota Exceeded. Aborting job.")
+                    log_event("gatekeeper.quota_exhausted", "Daily CF Quota Exceeded. Aborting job.", level="ERROR", document_id=document_id, tenant_id=tenant_id)
                     raise RuntimeError("TPD_EXHAUSTED")
                     
                 wait_ms = max(100, reset_in_ms + 100)
                 wait_sec = (wait_ms + 999) // 1000
-                dev_print(f"[GATEKEEPER THROTTLE] {reason}. Sleeping for {wait_sec}s...")
+                log_event("gatekeeper.throttled", "Rate limit hit, sleeping before retry.", level="WARNING", document_id=document_id, tenant_id=tenant_id, wait_seconds=wait_sec, reason=reason)
                 time.sleep(wait_sec)
                 retry_count += 1
                 
         if not gatekeeper_passed:
-            dev_print(f"[Processor WARNING] Gatekeeper failed after retries for batch {(start_chunk_idx + batch_offset)//BATCH_SIZE + 1}. Skipping.")
+            log_event("processor.gatekeeper_failed", "Gatekeeper failed after retries. Skipping batch.", level="ERROR", document_id=document_id, tenant_id=tenant_id, batch_number=(start_chunk_idx + batch_offset)//BATCH_SIZE + 1)
             continue
             
         vectors = generate_embedding_with_retry(batch_texts)
@@ -127,7 +127,7 @@ def _process_chunks_loop(chunks, document_id, tenant_id, start_chunk_idx=0):
                 "content": chunk_data["text"]
             })
             
-        dev_print(f"-> Flushing batch of {len(upstash_payload)} vectors to DB and Upstash...")
+        log_event("processor.flush_batch", "Flushing batch of vectors to DB and Upstash.", document_id=document_id, tenant_id=tenant_id, vectors_count=len(upstash_payload))
         insert_document_chunks(postgres_payload)
         upsert_vectors_to_upstash(upstash_payload)
 
@@ -135,13 +135,13 @@ def _process_chunks_loop(chunks, document_id, tenant_id, start_chunk_idx=0):
 
 def process_document(tenant_id: str, document_id: str):
     if not is_valid_uuid(tenant_id) or not is_valid_uuid(document_id):
-        dev_print(f"[SECURITY ALERT] Path Traversal blocked! Invalid input. tenant: {tenant_id}, doc: {document_id}")
+        log_event("security.path_traversal", "Path Traversal blocked due to invalid UUID input.", level="ERROR", tenant_id=tenant_id, document_id=document_id)
         return
         
-    dev_print(f"[Processor] Starting job for {document_id} (Tenant: {tenant_id})")
+    log_event("processor.job_started", "Starting document ingestion job.", document_id=document_id, tenant_id=tenant_id)
     
     if check_document_idempotency(document_id):
-        dev_print(f"[Processor] Document {document_id} is already processed. Skipping.")
+        log_event("processor.job_skipped", "Document is already processed. Skipping.", document_id=document_id, tenant_id=tenant_id)
         return
     
     if settings.WORKER_TMP_DIR and not os.path.exists(settings.WORKER_TMP_DIR):
@@ -151,22 +151,22 @@ def process_document(tenant_id: str, document_id: str):
     temp_pdf.close()
     
     try:
-        dev_print("1. Reading PDF from disk...")
+        log_event("processor.step1_downloading", "Reading PDF from disk...", document_id=document_id, tenant_id=tenant_id)
         download_pdf(tenant_id, document_id, temp_pdf.name)
         
         pages = extract_text_from_pdf(temp_pdf.name)
         
-        dev_print(f"2. PDF Parsed. Total Pages: {len(pages)}")
+        log_event("processor.step2_parsed", "PDF Parsed successfully.", document_id=document_id, tenant_id=tenant_id, total_pages=len(pages))
         
         chunks = chunk_text_with_pages(pages, chunk_size=1000, overlap=150)
-        dev_print(f"3. Chunking complete. Processing ALL {len(chunks)} chunks!")
+        log_event("processor.step3_chunking", "Chunking complete.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(chunks))
         
         # Check cancellation before starting expensive embedding loop
         if ingestion_queue.is_cancelled(document_id):
-            dev_print(f"[Processor] CANCELLED before embedding for {document_id}")
+            log_event("processor.job_cancelled", "Cancellation detected before embedding loop.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
             return
         
-        dev_print(f"4. Document {document_id} is checked and inserted into Postgres.")
+        log_event("processor.step4_postgres", "Document checked and inserted into Postgres.", document_id=document_id, tenant_id=tenant_id)
         
         if not settings.UPSTASH_REDIS_REST_URL or not settings.UPSTASH_REDIS_REST_TOKEN:
             raise ValueError("Missing UPSTASH_REDIS credentials in .env")
@@ -175,9 +175,9 @@ def process_document(tenant_id: str, document_id: str):
         last_chunk_index = get_last_processed_chunk_index(document_id)
         start_chunk_idx = last_chunk_index + 1
         if start_chunk_idx > 0:
-            dev_print(f"5. Found existing chunks. Resuming from chunk index {start_chunk_idx}...")
+            log_event("processor.step5_resuming", "Found existing chunks. Resuming from checkpoint.", document_id=document_id, tenant_id=tenant_id, start_chunk_idx=start_chunk_idx)
         else:
-            dev_print("5. Initialized Upstash Redis SDK. Starting Gatekeeper Loop...")
+            log_event("processor.step5_gatekeeper", "Initialized Upstash Redis SDK. Starting Gatekeeper Loop.", document_id=document_id, tenant_id=tenant_id)
         
         # Get the first 3000 characters from the pages for description generation
         full_text = " ".join([p["text"] for p in pages])
@@ -194,21 +194,21 @@ def process_document(tenant_id: str, document_id: str):
             description = future_llm.result()
         
         if not completed:
-            dev_print(f"[Processor] Job {document_id} was cancelled. Skipping mark_document_processed.")
+            log_event("processor.job_cancelled_post", "Job was cancelled during execution. Skipping mark_document_processed.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
             return
             
         mark_document_processed(document_id, description)
-        dev_print("7. All chunks processed and upserted successfully!")
+        log_event("processor.step7_completed", "All chunks processed and upserted successfully.", document_id=document_id, tenant_id=tenant_id)
         
     except RuntimeError as e:
         if "TPD_EXHAUSTED" in str(e):
-            dev_print(f"[Processor] Quota exhausted for {document_id}. Marking as quota_exhausted for retry tomorrow.")
+            log_event("processor.quota_exhausted", "Quota exhausted during processing. Marking for retry tomorrow.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
             mark_document_queued(document_id)
         else:
-            dev_print(f"[Processor ERROR] RuntimeError for {document_id}: {str(e)}")
+            log_event("processor.runtime_error", "Runtime error occurred during processing.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e))
             mark_document_failed(document_id)
     except Exception as e:
-        dev_print(f"[Processor ERROR] Failed to process {document_id}: {str(e)}")
+        log_event("processor.fatal_error", "Failed to process document due to unhandled exception.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e))
         mark_document_failed(document_id)
     finally:
         if os.path.exists(temp_pdf.name):

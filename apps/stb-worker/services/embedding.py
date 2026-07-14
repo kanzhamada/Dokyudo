@@ -1,7 +1,7 @@
 import time
 import httpx
 from core.config import settings
-from core.logger import dev_print
+from core.logger import log_event
 
 def generate_embedding_with_retry(texts: list[str], max_retries: int = 5) -> list[list[float]]:
     """
@@ -29,7 +29,7 @@ def generate_embedding_with_retry(texts: list[str], max_retries: int = 5) -> lis
                 
             if res.status_code in [429, 500, 502, 503, 504]:
                 wait_ms = (2 ** attempt) * 5
-                dev_print(f"[Embedding] API Error ({res.status_code}). Sleeping for {wait_ms}s before retry...")
+                log_event("embedding.api_error", "API Error from embedding provider, retrying.", level="WARNING", status_code=res.status_code, wait_seconds=wait_ms/1000)
                 time.sleep(wait_ms)
                 continue
                 
@@ -44,7 +44,7 @@ def generate_embedding_with_retry(texts: list[str], max_retries: int = 5) -> lis
         except httpx.HTTPStatusError as e:
             if e.response.status_code in [429, 500, 502, 503, 504]:
                 wait_ms = (2 ** attempt) * 5
-                dev_print(f"[Embedding] API Error ({e.response.status_code}). Sleeping for {wait_ms}s before retry...")
+                log_event("embedding.api_error", "API Error from embedding provider, retrying.", level="WARNING", status_code=e.response.status_code, wait_seconds=wait_ms/1000)
                 time.sleep(wait_ms)
             else:
                 raise Exception(f"Cloudflare API Error: {e.response.text}")
@@ -52,7 +52,7 @@ def generate_embedding_with_retry(texts: list[str], max_retries: int = 5) -> lis
             err_str = str(e).lower()
             if "429" in err_str or "quota" in err_str or "rate limit" in err_str:
                 wait_ms = (2 ** attempt) * 5
-                dev_print(f"[Embedding] API Exception Rate Limit. Sleeping for {wait_ms}s...")
+                log_event("embedding.rate_limit", "Rate limit exceeded, retrying.", level="WARNING", wait_seconds=wait_ms/1000)
                 time.sleep(wait_ms)
             else:
                 raise Exception(f"Cloudflare API Exception: {str(e)}")

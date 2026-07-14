@@ -1,9 +1,9 @@
 import fitz
 import tiktoken
-from core.logger import dev_print
+from core.logger import log_event
 
 def extract_text_from_pdf(file_path: str) -> list[dict]:
-    dev_print(f"[Extractor] Extracting text from {file_path}")
+    log_event("extractor.start", "Extracting text from PDF.", file_path=file_path)
     doc = fitz.open(file_path)
     pages = []
     for i, page in enumerate(doc):
