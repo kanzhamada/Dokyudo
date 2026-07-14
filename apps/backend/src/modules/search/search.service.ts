@@ -6,7 +6,7 @@ import { vectorIndex } from "../../config/vector.ts";
 import { redis } from "../../config/redis.ts";
 import { RedisKeys } from "../../shared/constants/redis_keys.constant.ts";
 import { createCircuitBreaker } from "../../infra/circuit_breaker.infra.ts";
-import { gemini, GEMINI_MODELS } from "../../config/gemini.ts";
+import { cloudflare, CLOUDFLARE_MODELS } from "../../config/cloudflare.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 import { SearchParams } from "./search.schema.ts";
@@ -17,7 +17,7 @@ const embeddingCB = createCircuitBreaker("llm-embedding");
 export class SearchService {
     private static async getEmbedding(params: SearchParams): Promise<number[]> {
         const cacheKey = await RedisKeys.embeddingCache(
-            GEMINI_MODELS.embedding,
+            CLOUDFLARE_MODELS.embedding,
             params.query,
         );
         
@@ -39,7 +39,7 @@ export class SearchService {
         let safeValues: number[] | null = null;
         
         try {
-            safeValues = await gemini.generateEmbedding(params.query);
+            safeValues = await cloudflare.generateEmbedding(params.query);
         } catch (e: any) {
             if (params.logContext) {
                 params.logContext.searchEvent = "llm_embedding_failed";

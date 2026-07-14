@@ -6,7 +6,7 @@
 ## Core Logic
 The Search endpoint (`/api/search`) receives a plain text query from the user. It splits the work into two parallel paths:
 1. **FTS (Full Text Search)**: Queries Postgres `documentChunks` table directly.
-2. **Semantic Search**: Calls the LLM Embedding API to convert the query into a vector, then queries Upstash Vector.
+2. **Semantic Search**: Calls the Cloudflare Workers AI (`@cf/qwen/qwen3-embedding-0.6b`) to convert the query into a 1024-dimensional vector, then queries Upstash Vector.
 
 Before executing the search, the system validates the tenant's tier subscription. If the tenant's `searchesCount` exceeds their monthly tier limit (`maxSearchesPerMonth`), the request is rejected with a 400 validation error. If valid, the counter is atomically incremented.
 
@@ -18,7 +18,7 @@ sequenceDiagram
     participant User
     participant Gateway as API Gateway (Deno)
     participant CircuitBreaker
-    participant LLM as Gemini Embedding API
+    participant LLM as Cloudflare Workers AI
     participant Upstash as Upstash Vector
     participant DB as Postgres FTS
 
@@ -56,7 +56,8 @@ sequenceDiagram
 5. **Robust Mock Testing**: `search.service.test.ts` strictly mocks external integrations (LLM & Vector index) via `jsr:@std/testing/mock` stubs, isolating the DB behavior and RRF scoring algorithms. `search.routes.test.ts` validates the end-to-end integration path.
 6. **Chunk Deduplication (UX Driven)**: Multiple chunks often map to the same `documentId`. To prevent frontend spam, the search API groups them by document, aggregating all `metadata.pages` into a clean array and returning the highest scoring chunk's content as a preview.
 7. **Page Tracking via JSONB**: The STB Extraction worker parses documents page-by-page via PyMuPDF, inserting page coordinates into a JSONB `metadata` column in `documentChunks`.
-8. **Tier Quota Protection**: To prevent free-tier users from exhausting the LLM Embedding API limit, an atomic SQL increment and lookup on `tenant_subscriptions` is done right before executing the embedding. If the limit is reached, it throws a 400 Error.
+8. **Tier Quota Protection**: To prevent free-tier users from exhausting the Cloudflare API embedding limit, an atomic SQL increment and lookup on `tenant_subscriptions` is done right before executing the embedding. If the limit is reached, it throws a 400 Error.
+9. **Cloudflare Qwen3 Embedding**: Switched from Gemini 768-dim to Cloudflare Qwen3 1024-dim to achieve SOTA text accuracy and sync with the STB background worker's embedding dimensions.
 
 ## File Mapping
 - **Routes & Controller**: `apps/backend/src/modules/search/search.routes.ts`, `search.controller.ts`
