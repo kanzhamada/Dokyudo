@@ -228,4 +228,55 @@ describe("AuthService Isolated Tests", () => {
             );
         });
     });
+
+    describe("updateTenantName", () => {
+        let testUserId: string;
+        let testTenantId: string;
+
+        beforeAll(async () => {
+            const [user] = await db
+                .select({ id: users.id, tenantId: users.tenantId })
+                .from(users)
+                .where(eq(users.email, TEST_EMAIL));
+
+            if (user) {
+                testUserId = user.id;
+                testTenantId = user.tenantId;
+            }
+        });
+
+        it("positive: updates tenant name and returns updated record", async () => {
+            const logContext: any = {};
+            const result = await AuthService.updateTenantName({
+                userId: testUserId,
+                tenantId: testTenantId,
+                name: "Updated Workspace",
+                logContext,
+            });
+
+            assertEquals(result.tenant.name, "Updated Workspace");
+            assertEquals(typeof result.tenant.id, "string");
+            assertEquals(result.message, "Tenant name updated successfully.");
+            assertEquals(logContext.authEvent, "tenant_name_updated");
+
+            // Verify DB was actually updated
+            const [dbTenant] = await db
+                .select({ name: tenants.name })
+                .from(tenants)
+                .where(eq(tenants.id, testTenantId));
+            assertEquals(dbTenant.name, "Updated Workspace");
+        });
+
+        it("negative: throws VALIDATION_ERROR for a non-existent tenantId", async () => {
+            await assertRejects(
+                () => AuthService.updateTenantName({
+                    userId: testUserId,
+                    tenantId: crypto.randomUUID(),
+                    name: "Ghost Workspace",
+                }),
+                AppError,
+                "Tenant not found",
+            );
+        });
+    });
 });

@@ -286,3 +286,40 @@ export const ProfileResponseSchema = z
         }),
     })
     .openapi("ProfileResponse");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Update Tenant Name Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const UpdateTenantNameBodySchema = z
+    .object({
+        name: z
+            .string()
+            .min(2, "Name must be at least 2 characters")
+            .max(255, "Name is too long")
+            .trim()
+            .openapi({
+                description: "New display name for the tenant workspace",
+                example: "Acme Corporation",
+            }),
+    })
+    .openapi("UpdateTenantNameBody");
+
+export type UpdateTenantNameBody = z.infer<typeof UpdateTenantNameBodySchema>;
+
+const UpdateTenantNameParamsSchema = UpdateTenantNameBodySchema.extend({
+    tenantId: z.string().uuid(),
+    logContext: z.any().optional(),
+});
+
+export type UpdateTenantNameParams = z.infer<typeof UpdateTenantNameParamsSchema>;
+
+export const UpdateTenantNameResponseSchema = z
+    .object({
+        tenant: z.object({
+            id: z.string().uuid().openapi({ example: "9462a645-c164-4878-8171-8b35d26ace4f" }),
+            name: z.string().openapi({ example: "Acme Corporation" }),
+        }),
+        message: z.string().openapi({ example: "Tenant name updated successfully." }),
+    })
+    .openapi("UpdateTenantNameResponse");

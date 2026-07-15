@@ -1,0 +1,29 @@
+meta {
+  name: Update Tenant Name
+  type: http
+  seq: 13
+}
+
+patch {
+  url: {{baseUrl}}/api/auth/tenant/name
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "Acme Corporation"
+  }
+}
+
+docs {
+  Updates the display name of the authenticated user's tenant workspace. Requires a valid Bearer token. Name must be between 2 and 255 characters.
+}

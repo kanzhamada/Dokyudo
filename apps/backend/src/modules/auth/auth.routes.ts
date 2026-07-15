@@ -399,3 +399,61 @@ authRoutes.openapi(
     }),
     authController.handleGetProfile as any,
 );
+
+authRoutes.openapi(
+    createRoute({
+        method: "patch",
+        path: "/tenant/name",
+        tags: ["Auth"],
+        summary: "Update tenant workspace name",
+        description:
+            "Updates the display name of the authenticated user's tenant. " +
+            "Requires a valid access token. Name must be between 2 and 255 characters.",
+        middleware: [authMiddleware] as const,
+        request: {
+            body: {
+                content: {
+                    "application/json": {
+                        schema: AuthSchema.UpdateTenantNameBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Tenant name updated successfully",
+                content: {
+                    "application/json": {
+                        schema: AuthSchema.UpdateTenantNameResponseSchema,
+                    },
+                },
+            },
+            400: {
+                description: "Validation error (name too short/long)",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    authController.handleUpdateTenantName as any,
+);

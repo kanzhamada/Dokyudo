@@ -1,6 +1,6 @@
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { getSupabaseAdmin, getSupabaseAnon } from "../../config/supabase.ts";
-import { db } from "../../config/drizzle.ts";
+import { db, withAuthDb } from "../../config/drizzle.ts";
 import { redis } from "../../config/redis.ts";
 import { loginAttempts, users, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
 import { and, count, eq, gte } from "drizzle-orm";
@@ -246,7 +246,7 @@ export class AuthService {
             if (isLocked && lockExpiry && lockExpiry <= now) {
                 await db
                     .update(users)
-                    .set({ isLocked: false, lockedUntil: null })
+                    .set({ isLocked: false, lockedUntil: null, updatedAt: new Date() })
                     .where(eq(users.email, params.email));
             }
         }
@@ -329,7 +329,7 @@ export class AuthService {
 
             await db
                 .update(users)
-                .set({ isLocked: true, lockedUntil: lockUntilDate })
+                .set({ isLocked: true, lockedUntil: lockUntilDate, updatedAt: new Date() })
                 .where(eq(users.email, params.email));
 
             throw new AppError({
@@ -762,6 +762,48 @@ export class AuthService {
                 qaCount: subscription.qaCount,
                 storageUsedBytes: subscription.storageUsedBytes,
             },
+        };
+    }
+
+    static async updateTenantName(params: {
+        userId: string;
+        tenantId: string;
+        name: string;
+        logContext?: Record<string, any>;
+    }) {
+        const updated = await withAuthDb(params.userId, async (tx) => {
+            const [existing] = await tx
+                .select({ id: tenants.id })
+                .from(tenants)
+                .where(eq(tenants.id, params.tenantId));
+
+            if (!existing) {
+                throw new AppError({
+                    code: "VALIDATION_ERROR",
+                    message: "Tenant not found",
+                    status: 404,
+                });
+            }
+
+            const [result] = await tx
+                .update(tenants)
+                .set({ name: params.name, updatedAt: new Date() })
+                .where(eq(tenants.id, params.tenantId))
+                .returning({ id: tenants.id, name: tenants.name });
+
+            return result;
+        });
+
+        if (params.logContext) {
+            params.logContext.authEvent = "tenant_name_updated";
+        }
+
+        return {
+            tenant: {
+                id: updated.id,
+                name: updated.name,
+            },
+            message: "Tenant name updated successfully.",
         };
     }
 }

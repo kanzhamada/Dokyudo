@@ -46,6 +46,11 @@ export const tenants = pgTable("tenants", {
         precision: 3,
         withTimezone: true,
     }).defaultNow(),
+    updatedAt: timestamp("updated_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    }).defaultNow(),
 });
 
 // ==============================================================================
@@ -79,6 +84,11 @@ export const users = pgTable("users", {
         withTimezone: true,
     }),
     createdAt: timestamp("created_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    }).defaultNow(),
+    updatedAt: timestamp("updated_at", {
         mode: "date",
         precision: 3,
         withTimezone: true,
@@ -311,6 +321,7 @@ export const paymentTransactions = pgTable(
         
         paidAt: timestamp("paid_at", { mode: "date", precision: 3, withTimezone: true }),
         createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
+        updatedAt: timestamp("updated_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
     },
     (table) => ({
         tenantStatusIdx: index("idx_payment_trx_tenant_status").on(table.tenantId, table.status),

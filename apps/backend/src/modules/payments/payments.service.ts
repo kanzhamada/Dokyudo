@@ -201,6 +201,7 @@ export class PaymentsService {
                         stripeCustomerId: session.customer as string,
                         webhookPayload: event as any,
                         paidAt: new Date(),
+                        updatedAt: new Date(),
                     })
                     .where(eq(paymentTransactions.id, trx.id));
 

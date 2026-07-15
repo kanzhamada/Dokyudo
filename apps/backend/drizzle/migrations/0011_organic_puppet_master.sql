@@ -1,0 +1,1 @@
+ALTER TABLE "payment_transactions" ADD COLUMN "updated_at" timestamp (3) with time zone DEFAULT now();

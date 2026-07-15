@@ -71,6 +71,27 @@
       "when": 1784037677312,
       "tag": "0009_fuzzy_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784115023037,
+      "tag": "0010_strange_jane_foster",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784115241752,
+      "tag": "0011_organic_puppet_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784116176709,
+      "tag": "0012_rapid_sue_storm",
+      "breakpoints": true
     }
   ]
 }
