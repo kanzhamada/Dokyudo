@@ -11,6 +11,7 @@ import {
 } from "../../shared/utils/email.util.ts";
 import * as AuthParams from "./auth.schema.ts";
 import { AuthConstants } from "../../shared/constants/auth.constant.ts";
+import { logActivity } from "../../shared/utils/activity.util.ts";
 
 export class AuthService {
     static async registerUser(params: AuthParams.RegisterParams) {
@@ -380,6 +381,19 @@ export class AuthService {
             params.logContext.userId = authData.user.id;
         }
 
+        const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, authData.user.id));
+        if (userRecord) {
+            logActivity({
+                tenantId: userRecord.tenantId,
+                userId: authData.user.id,
+                action: "auth.login",
+                ipAddress: params.clientIp,
+                userAgent: params.userAgent,
+                requestId: params.requestId,
+                metadata: { provider: "email" },
+            });
+        }
+
         // Cleanup: Remove the unverified email cooldown cache since user is now verified and logged in
         try {
             await redis.del(`unverified_email:${params.email}`);
@@ -412,6 +426,8 @@ export class AuthService {
 
     static async logoutUser(params: AuthParams.LogoutParams) {
         const supabase = getSupabaseAdmin();
+        const { data: userData } = await supabase.auth.getUser(params.accessToken);
+        
         const { error } = await supabase.auth.admin.signOut(
             params.accessToken,
             "global",
@@ -447,6 +463,17 @@ export class AuthService {
 
         if (params.logContext) {
             params.logContext.authEvent = "logout_success";
+        }
+        
+        if (userData?.user?.id) {
+            const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, userData.user.id));
+            if (userRecord) {
+                logActivity({
+                    tenantId: userRecord.tenantId,
+                    userId: userData.user.id,
+                    action: "auth.logout",
+                });
+            }
         }
     }
 
@@ -616,6 +643,19 @@ export class AuthService {
             params.logContext.authEvent = "reset_password_success";
             params.logContext.userId = data.user.id;
         }
+
+        const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, data.user.id));
+        if (userRecord) {
+            logActivity({
+                tenantId: userRecord.tenantId,
+                userId: data.user.id,
+                action: "auth.password_reset",
+                ipAddress: params.clientIp,
+                userAgent: params.userAgent,
+                requestId: params.requestId,
+                metadata: { type: "otp_reset" },
+            });
+        }
     }
 
     static async updatePassword(params: AuthParams.UpdatePasswordParams) {
@@ -678,6 +718,16 @@ export class AuthService {
         if (params.logContext) {
             params.logContext.authEvent = "update_password_success";
             params.logContext.userId = data.user.id;
+        }
+
+        const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, data.user.id));
+        if (userRecord) {
+            logActivity({
+                tenantId: userRecord.tenantId,
+                userId: data.user.id,
+                action: "auth.password_reset",
+                metadata: { type: "update_password" },
+            });
         }
     }
 
@@ -797,6 +847,14 @@ export class AuthService {
         if (params.logContext) {
             params.logContext.authEvent = "tenant_name_updated";
         }
+
+        logActivity({
+            tenantId: params.tenantId,
+            userId: params.userId,
+            action: "tenant.name_updated",
+            metadata: { newName: updated.name },
+            requestId: params.logContext?.requestId,
+        });
 
         return {
             tenant: {

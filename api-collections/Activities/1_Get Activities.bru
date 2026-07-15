@@ -1,0 +1,20 @@
+meta {
+  name: Get Activity Logs
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/activities?page=1&limit=10
+  body: none
+  auth: bearer
+}
+
+query {
+  page: 1
+  limit: 10
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

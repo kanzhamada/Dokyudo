@@ -4,6 +4,7 @@ import {
     tenantSubscriptions,
     tenants,
 } from "../../shared/models/db.model.ts";
+import { logActivity } from "../../shared/utils/activity.util.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { stripe } from "../../config/stripe.ts";
 import { CreateCheckoutBody } from "./payments.schema.ts";
@@ -245,6 +246,15 @@ export class PaymentsService {
                             : null,
                     });
                 }
+                
+                logActivity({
+                    tenantId: trx.tenantId,
+                    action: "billing.payment_completed",
+                    resourceType: "payment",
+                    resourceId: trx.id,
+                    metadata: { amount: session.amount_total, currency: session.currency, tier: tierToUnlock },
+                    requestId: logContext?.requestId,
+                });
                 break;
             }
             case "customer.subscription.created":

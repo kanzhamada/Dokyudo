@@ -8,6 +8,7 @@ import { vectorIndex } from "../../config/vector.ts";
 import * as DocumentSchema from "./documents.schema.ts";
 import { PRESIGNED_URL_EXPIRES_IN_SECONDS, PRESIGNED_GET_URL_EXPIRES_IN_SECONDS } from "../../shared/constants/documents.constant.ts";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
+import { logActivity } from "../../shared/utils/activity.util.ts";
 
 /**
  * Sends a cancel request to the STB Worker to stop any queued or active
@@ -253,16 +254,20 @@ export class DocumentsService {
         }
 
         let dbUpdateSuccess = false;
+        let docName = "Unknown Document";
         try {
             await withAuthDb(params.tenantId, async (tx) => {
-                await tx.update(documents)
+                const [updatedDoc] = await tx.update(documents)
                     .set({ status: "confirmed", updatedAt: new Date() })
                     .where(
                         and(
                             eq(documents.id, params.documentId),
                             eq(documents.tenantId, params.tenantId)
                         )
-                    );
+                    )
+                    .returning({ title: documents.title });
+                
+                if (updatedDoc) docName = updatedDoc.title;
             });
             dbUpdateSuccess = true;
         } catch (err: any) {
@@ -279,6 +284,15 @@ export class DocumentsService {
                 status: 500,
             });
         }
+
+        logActivity({
+            tenantId: params.tenantId,
+            action: "document.uploaded",
+            resourceType: "document",
+            resourceId: params.documentId,
+            metadata: { fileName: docName },
+            requestId: params.logContext?.requestId,
+        });
 
         return {
             message: "Document uploaded and confirmed successfully",
@@ -368,14 +382,17 @@ export class DocumentsService {
         }
 
         // 3. Delete document from Postgres (Cascades to chunks in Postgres)
+        let docName = "Unknown Document";
         try {
             await withAuthDb(params.tenantId, async (tx) => {
-                await tx.delete(documents).where(
+                const [deletedDoc] = await tx.delete(documents).where(
                     and(
                         eq(documents.id, params.documentId),
                         eq(documents.tenantId, params.tenantId)
                     )
-                );
+                ).returning({ title: documents.title });
+                
+                if (deletedDoc) docName = deletedDoc.title;
             });
         } catch (err: any) {
             if (params.logContext) params.logContext.dbError = "Failed to delete document from Postgres: " + err.message;
@@ -385,6 +402,15 @@ export class DocumentsService {
                 status: 500,
             });
         }
+
+        logActivity({
+            tenantId: params.tenantId,
+            action: "document.deleted",
+            resourceType: "document",
+            resourceId: params.documentId,
+            metadata: { fileName: docName },
+            requestId: params.logContext?.requestId,
+        });
 
         return {
             success: true,
@@ -496,6 +522,18 @@ export class DocumentsService {
                 code: "INTERNAL_ERROR",
                 message: "Failed to delete document records",
                 status: 500,
+            });
+        }
+
+        // Log activity for each deleted document
+        for (const doc of docsToDelete) {
+            logActivity({
+                tenantId: params.tenantId,
+                action: "document.deleted",
+                resourceType: "document",
+                resourceId: doc.id,
+                metadata: { fileName: doc.title, batch: true },
+                requestId: params.logContext?.requestId,
             });
         }
 

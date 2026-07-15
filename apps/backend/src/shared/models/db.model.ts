@@ -329,4 +329,42 @@ export const paymentTransactions = pgTable(
         stripeSessionIdx: index("idx_payment_trx_stripe_session").on(table.stripeSessionId),
     })
 );
+// ==============================================================================
+// 11. ACTIVITY LOGS (Audit Trail)
+// ==============================================================================
+export const activityActionEnum = pgEnum("activity_action_enum", [
+    // Auth
+    "auth.login",
+    "auth.logout",
+    "auth.register",
+    "auth.password_reset",
+    // Documents
+    "document.uploaded",
+    "document.deleted",
+    "document.processed",
+    // Search & RAG
+    "search.performed",
+    "chat.started",
+    // Billing
+    "billing.checkout_initiated",
+    "billing.payment_completed",
+    // Tenant
+    "tenant.name_updated",
+]);
 
+export const activityLogs = pgTable("activity_logs", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    action: activityActionEnum("action").notNull(),
+    resourceType: varchar("resource_type", { length: 100 }), // e.g. "document", "payment"
+    resourceId: varchar("resource_id", { length: 255 }), // using varchar to support external IDs too
+    metadata: jsonb("metadata"),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    requestId: varchar("request_id", { length: 36 }),
+    createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
+}, (table) => ({
+    tenantCreatedIdx: index("idx_activity_tenant_created").on(table.tenantId, table.createdAt.desc()),
+    userCreatedIdx: index("idx_activity_user_created").on(table.userId, table.createdAt.desc()),
+}));
