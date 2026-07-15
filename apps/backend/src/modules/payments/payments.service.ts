@@ -27,9 +27,9 @@ export class PaymentsService {
         const { body, tenantId, userId, logContext } = params;
 
         const priceMap: Record<string, string> = {
-            PRO: "price_1ToIk49XAhQgRBc1B3Rx1KpL",
-            SIMULATE: "price_1ToGzM9XAhQgRBc1wmvawFCs",
-            OIL_INVESTOR: "price_1ToHBm9XAhQgRBc15Fyuc6yy",
+            PRO: getEnv("STRIPE_PRICE_PRO"),
+            SIMULATE: getEnv("STRIPE_PRICE_SIMULATE"),
+            OIL_INVESTOR: getEnv("STRIPE_PRICE_OIL_INVESTOR"),
         };
 
         const priceId = priceMap[body.tierToUnlock];

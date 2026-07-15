@@ -17,6 +17,9 @@ const REQUIRED_ENV_VARS = [
     "S3_BUCKET_NAME",
     "STB_WORKER_URL",
     "STB_WORKER_SECRET",
+    "STRIPE_PRICE_PRO",
+    "STRIPE_PRICE_SIMULATE",
+    "STRIPE_PRICE_OIL_INVESTOR",
 ] as const;
 
 /** Optional env vars with sensible defaults */
