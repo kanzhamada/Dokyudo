@@ -285,7 +285,7 @@ export class DocumentsService {
             });
         }
 
-        logActivity({
+        await logActivity({
             tenantId: params.tenantId,
             action: "document.uploaded",
             resourceType: "document",
@@ -403,7 +403,7 @@ export class DocumentsService {
             });
         }
 
-        logActivity({
+        await logActivity({
             tenantId: params.tenantId,
             action: "document.deleted",
             resourceType: "document",
@@ -527,7 +527,7 @@ export class DocumentsService {
 
         // Log activity for each deleted document
         for (const doc of docsToDelete) {
-            logActivity({
+            await logActivity({
                 tenantId: params.tenantId,
                 action: "document.deleted",
                 resourceType: "document",

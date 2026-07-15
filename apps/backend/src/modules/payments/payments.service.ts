@@ -109,6 +109,7 @@ export class PaymentsService {
             session = await stripe.checkout.sessions.create({
                 mode: checkoutMode,
                 customer: stripeCustomerId,
+                ...(checkoutMode === "payment" && !stripeCustomerId ? { customer_creation: "always" } : {}),
                 client_reference_id: externalId,
                 metadata: {
                     tenantId: tenantId,
@@ -247,7 +248,7 @@ export class PaymentsService {
                     });
                 }
                 
-                logActivity({
+                await logActivity({
                     tenantId: trx.tenantId,
                     action: "billing.payment_completed",
                     resourceType: "payment",

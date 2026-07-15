@@ -383,7 +383,7 @@ export class AuthService {
 
         const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, authData.user.id));
         if (userRecord) {
-            logActivity({
+            await logActivity({
                 tenantId: userRecord.tenantId,
                 userId: authData.user.id,
                 action: "auth.login",
@@ -468,7 +468,7 @@ export class AuthService {
         if (userData?.user?.id) {
             const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, userData.user.id));
             if (userRecord) {
-                logActivity({
+                await logActivity({
                     tenantId: userRecord.tenantId,
                     userId: userData.user.id,
                     action: "auth.logout",
@@ -646,7 +646,7 @@ export class AuthService {
 
         const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, data.user.id));
         if (userRecord) {
-            logActivity({
+            await logActivity({
                 tenantId: userRecord.tenantId,
                 userId: data.user.id,
                 action: "auth.password_reset",
@@ -722,7 +722,7 @@ export class AuthService {
 
         const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, data.user.id));
         if (userRecord) {
-            logActivity({
+            await logActivity({
                 tenantId: userRecord.tenantId,
                 userId: data.user.id,
                 action: "auth.password_reset",
@@ -848,7 +848,7 @@ export class AuthService {
             params.logContext.authEvent = "tenant_name_updated";
         }
 
-        logActivity({
+        await logActivity({
             tenantId: params.tenantId,
             userId: params.userId,
             action: "tenant.name_updated",

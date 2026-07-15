@@ -17,18 +17,18 @@ export interface LogActivityParams {
 }
 
 /**
- * Fire-and-forget helper to log user and system activities asynchronously.
- * Does not block the main request execution.
+ * Helper to log user and system activities.
+ * Awaited to ensure execution completes in serverless environments.
  */
-export function logActivity(params: LogActivityParams): void {
-    // We execute this asynchronously using a Promise without awaiting it.
-    // Use the superuser db instance (not withAuthDb) because this is a system audit trail.
-    db.insert(activityLogs).values(params).catch((err) => {
+export async function logActivity(params: LogActivityParams): Promise<void> {
+    try {
+        await db.insert(activityLogs).values(params);
+    } catch (err: any) {
         // We log the error but don't throw it, so we don't break the main request
         console.error(JSON.stringify({
             event: "activity_log.write_failed",
             error: err.message,
             context: params
         }));
-    });
+    }
 }
