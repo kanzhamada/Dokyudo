@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { getEnv } from "../../config/env.ts";
+import { type LlmProvider, isValidModelForProvider } from "./llm_models.ts";
 
 export interface StreamResponse {
     stream: AsyncIterable<{ text: string }>;
@@ -12,12 +13,20 @@ export class LlmRouterService {
      * Returns an async iterable of chunks.
      */
     static async generateStream(params: {
-        provider: "gemini" | "mistral" | "openrouter";
+        provider: LlmProvider;
         model: string;
         prompt: string;
-        apiKey?: string; // BYOK key, if provided
+        apiKey?: string;
     }): Promise<StreamResponse> {
-        
+
+        if (!isValidModelForProvider(params.provider, params.model)) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: `Model "${params.model}" is not supported for provider "${params.provider}"`,
+                status: 400,
+            });
+        }
+
         switch (params.provider) {
             case "gemini":
                 return this.streamGemini(params.model, params.prompt, params.apiKey);
