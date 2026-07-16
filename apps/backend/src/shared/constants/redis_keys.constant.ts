@@ -11,4 +11,16 @@ export const RedisKeys = {
         const hash = await hashTextSHA256(text);
         return `embedding:v2:${model}:${hash}`;
     },
+
+    // Free provider quota tracking
+    // TTL: 60s for RPM, seconds-until-midnight for RPD
+    llmRpmQuota: (provider: string, modelId: string): string =>
+        `llm:quota:rpm:${provider}:${modelId}`,
+
+    llmRpdQuota: (provider: string, modelId: string): string =>
+        `llm:quota:rpd:${provider}:${modelId}`,
+
+    // Circuit breaker: stores "OPEN" string when provider is tripped
+    llmCircuitBreaker: (provider: string, modelId: string): string =>
+        `llm:cb:${provider}:${modelId}`,
 } as const;

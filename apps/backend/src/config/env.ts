@@ -25,6 +25,10 @@ const REQUIRED_ENV_VARS = [
 /** Optional env vars with sensible defaults */
 const OPTIONAL_ENV_VARS_WITH_DEFAULTS: Record<string, string> = {
     FRONTEND_URL: "http://localhost:5173",
+    // Free provider keys — optional so server still boots without them
+    GROQ_API_KEY: "",
+    SAMBANOVA_API_KEY: "",
+    COHERE_API_KEY: "",
 };
 /**
  * Validates that all required environment variables are present and non-empty.
