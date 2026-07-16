@@ -8,14 +8,14 @@ export class KeysController {
         const { tenantId, logContext } = extractor.extractAuthContext();
         const body = extractor.extractValidJson<{ provider: string; apiKey: string }>();
 
-        await KeysService.upsertKey({
+        const { isNew } = await KeysService.upsertKey({
             tenantId,
             provider: body.provider,
             apiKey: body.apiKey,
             logContext,
         });
 
-        return c.json({ data: { success: true } }, 200);
+        return c.json({ data: { success: true } }, isNew ? 201 : 200);
     }
 
     static async getKeys(c: Context) {

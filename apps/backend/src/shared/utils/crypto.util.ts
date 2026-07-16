@@ -12,7 +12,7 @@ let memoizedMasterKey: CryptoKey | null = null;
 /**
  * Converts a hex string into a Uint8Array.
  */
-function hexToBytes(hex: string): Uint8Array {
+function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
     if (hex.length % 2 !== 0) {
         throw new AppError({
             code: "VALIDATION_ERROR",
@@ -20,7 +20,8 @@ function hexToBytes(hex: string): Uint8Array {
             status: 500,
         });
     }
-    const bytes = new Uint8Array(hex.length / 2);
+    const buffer = new ArrayBuffer(hex.length / 2);
+    const bytes = new Uint8Array(buffer);
     for (let i = 0; i < hex.length; i += 2) {
         bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
     }
@@ -47,7 +48,7 @@ async function getMasterKey(): Promise<CryptoKey> {
     const hexKey = Deno.env.get("MASTER_ENCRYPTION_KEY");
     if (!hexKey || hexKey.length !== 64) {
         throw new AppError({
-            code: "INTERNAL_SERVER_ERROR",
+            code: "INTERNAL_ERROR",
             message: "MASTER_ENCRYPTION_KEY is missing or must be exactly 32 bytes (64 hex characters)",
             status: 500,
         });

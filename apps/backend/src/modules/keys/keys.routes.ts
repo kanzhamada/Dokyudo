@@ -11,9 +11,10 @@ export const keysRoutes = new OpenAPIHono();
 
 keysRoutes.openapi(
     createRoute({
-        method: "post",
+        method: "put",
         path: "/",
         summary: "Upsert API Key",
+        description: "Creates a new API key (201) or updates an existing one (200) for the given provider.",
         request: {
             body: {
                 content: {
@@ -22,7 +23,8 @@ keysRoutes.openapi(
             },
         },
         responses: {
-            200: { description: "Success" },
+            201: { description: "Key created" },
+            200: { description: "Key updated" },
             400: {
                 description: "Validation error",
                 content: {

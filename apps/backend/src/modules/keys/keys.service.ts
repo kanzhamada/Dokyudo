@@ -10,24 +10,27 @@ export class KeysService {
         provider: string;
         apiKey: string;
         logContext?: Record<string, any>;
-    }) {
+    }): Promise<{ isNew: boolean }> {
         const { tenantId, provider, apiKey, logContext } = params;
 
         try {
             const { encryptedApiKey, iv } = await encryptApiKey(apiKey);
 
+            let isNew = false;
+
             await withAuthDb(tenantId, async (tx) => {
-                const existing = await tx
-                    .select()
+                const [existing] = await tx
+                    .select({ tenantId: tenantKeys.tenantId })
                     .from(tenantKeys)
                     .where(
                         and(
                             eq(tenantKeys.tenantId, tenantId),
                             eq(tenantKeys.provider, provider)
                         )
-                    );
+                    )
+                    .limit(1);
 
-                if (existing.length > 0) {
+                if (existing) {
                     await tx
                         .update(tenantKeys)
                         .set({ encryptedApiKey, iv, updatedAt: new Date() })
@@ -41,11 +44,12 @@ export class KeysService {
                     await tx
                         .insert(tenantKeys)
                         .values({ tenantId, provider, encryptedApiKey, iv });
+                    isNew = true;
                 }
             });
 
-            if (logContext) logContext.keyEvent = `upserted_${provider}`;
-            return { success: true };
+            if (logContext) logContext.keyEvent = `${isNew ? "created" : "updated"}_${provider}`;
+            return { isNew };
         } catch (e: any) {
             if (logContext) logContext.keyError = e.message;
             throw new AppError({
