@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { getEnv } from "../../config/env.ts";
-import { type LlmProvider, isValidModelForProvider } from "./llm_models.ts";
+import { type LlmProvider, isValidModelForProvider } from "../../shared/constants/llm_providers.constant.ts";
 
 export interface StreamResponse {
     stream: AsyncIterable<{ text: string }>;

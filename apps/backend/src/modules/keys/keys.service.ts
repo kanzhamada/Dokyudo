@@ -3,6 +3,7 @@ import { tenantKeys } from "../../shared/models/db.model.ts";
 import { encryptApiKey, decryptApiKey, maskApiKey } from "../../shared/utils/crypto.util.ts";
 import { and, eq } from "drizzle-orm";
 import { AppError } from "../../shared/utils/errors.util.ts";
+import { PROVIDER_MODELS, type LlmProvider } from "../../shared/constants/llm_providers.constant.ts";
 
 export class KeysService {
     static async upsertKey(params: {
@@ -74,17 +75,19 @@ export class KeysService {
         const keys = [];
         for (const k of results) {
             try {
-                // Decrypt purely in memory to show a realistic masked string (e.g. sk-...1234)
                 const plaintext = await decryptApiKey(k.encryptedApiKey, k.iv);
+                const models = [...(PROVIDER_MODELS[k.provider as LlmProvider] ?? [])];
                 keys.push({
                     provider: k.provider,
                     maskedKey: maskApiKey(plaintext),
+                    models,
                     updatedAt: k.updatedAt.toISOString(),
                 });
             } catch (e) {
                 keys.push({
                     provider: k.provider,
                     maskedKey: "CORRUPTED_KEY",
+                    models: [...(PROVIDER_MODELS[k.provider as LlmProvider] ?? [])],
                     updatedAt: k.updatedAt.toISOString(),
                 });
             }
