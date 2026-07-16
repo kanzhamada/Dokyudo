@@ -44,48 +44,13 @@ interface FreeModelMeta {
 // 2. MODEL REGISTRIES PER FREE PROVIDER
 // ==============================================================================
 
-/** Gemini free tier — notable for very large context window (1M tokens) */
+/** Gemini free tier — only confirmed working models from smoke test */
 export const FREE_GEMINI_MODELS = [
-    {
-        modelId: "gemini-2.5-flash",
-        rpm: 5,
-        rpd: 20,
-        tpm: 250_000,
-        tpd: null,
-        contextWindow: 1_048_576,
-    },
-    {
-        modelId: "gemini-2.5-flash-lite",
-        rpm: 10,
-        rpd: 20,
-        tpm: 250_000,
-        tpd: null,
-        contextWindow: 1_048_576,
-    },
-    {
-        modelId: "gemini-3-flash",
-        rpm: 5,
-        rpd: 20,
-        tpm: 250_000,
-        tpd: null,
-        contextWindow: 1_048_576,
-    },
-    {
-        modelId: "gemini-3.1-flash-lite",
-        rpm: 15,
-        rpd: 500,
-        tpm: 250_000,
-        tpd: null,
-        contextWindow: 1_048_576,
-    },
-    {
-        modelId: "gemini-3.5-flash",
-        rpm: 5,
-        rpd: 20,
-        tpm: 250_000,
-        tpd: null,
-        contextWindow: 1_048_576,
-    },
+    // ✅ ALIVE (smoke test 2026-07-16)
+    { modelId: "gemini-2.5-flash",      rpm: 5,   rpd: 20,  tpm: 250_000, tpd: null, contextWindow: 1_048_576 },
+    { modelId: "gemini-3.1-flash-lite", rpm: 15,  rpd: 500, tpm: 250_000, tpd: null, contextWindow: 1_048_576 },
+    // ⏱️ Kept as fallback, but prone to timeout when overloaded
+    { modelId: "gemini-3.5-flash",      rpm: 5,   rpd: 20,  tpm: 250_000, tpd: null, contextWindow: 1_048_576 },
 ] as const satisfies readonly FreeModelMeta[];
 
 /** Groq free tier — notable for very high RPM and throughput */
@@ -156,56 +121,16 @@ export const FREE_GROQ_MODELS = [
     },
 ] as const satisfies readonly FreeModelMeta[];
 
-/** Mistral free tier — notable for extreme throughput on smaller models */
+/** Mistral free tier — open-mistral-nemo excluded (capacity exceeded in smoke test) */
 export const FREE_MISTRAL_MODELS = [
-    {
-        modelId: "ministral-3b-2512",
-        rpm: 750,
-        rpd: null,
-        tpm: 1_300_000,
-        tpd: null,
-        contextWindow: 32_768,
-    },
-    {
-        modelId: "mistral-small-2506",
-        rpm: 300,
-        rpd: null,
-        tpm: 2_250_000,
-        tpd: null,
-        contextWindow: 32_768,
-    },
-    {
-        modelId: "open-mistral-nemo",
-        rpm: 30,
-        rpd: null,
-        tpm: 500_000,
-        tpd: null,
-        contextWindow: 128_000,
-    },
-    {
-        modelId: "ministral-8b-2512",
-        rpm: 188,
-        rpd: null,
-        tpm: 625_000,
-        tpd: null,
-        contextWindow: 131_072,
-    },
-    {
-        modelId: "ministral-14b-2512",
-        rpm: 30,
-        rpd: null,
-        tpm: 937_500,
-        tpd: null,
-        contextWindow: 131_072,
-    },
-    {
-        modelId: "mistral-medium-2505",
-        rpm: 25,
-        rpd: null,
-        tpm: 375_000,
-        tpd: null,
-        contextWindow: 131_072,
-    },
+    // ✅ ALIVE (smoke test 2026-07-16)
+    { modelId: "ministral-3b-2512",   rpm: 750, rpd: null, tpm: 1_300_000, tpd: null, contextWindow: 32_768  },
+    { modelId: "mistral-small-2506",  rpm: 300, rpd: null, tpm: 2_250_000, tpd: null, contextWindow: 32_768  },
+    { modelId: "ministral-8b-2512",   rpm: 188, rpd: null, tpm: 625_000,   tpd: null, contextWindow: 131_072 },
+    { modelId: "ministral-14b-2512",  rpm: 30,  rpd: null, tpm: 937_500,   tpd: null, contextWindow: 131_072 },
+    { modelId: "mistral-medium-2505", rpm: 25,  rpd: null, tpm: 375_000,   tpd: null, contextWindow: 131_072 },
+    // ⚠️  RATE-LIMITED (capacity exceeded): open-mistral-nemo — kept as last-resort
+    { modelId: "open-mistral-nemo",   rpm: 30,  rpd: null, tpm: 500_000,   tpd: null, contextWindow: 128_000 },
 ] as const satisfies readonly FreeModelMeta[];
 
 /**
@@ -239,40 +164,14 @@ export const FREE_SAMBANOVA_MODELS = [
     },
 ] as const satisfies readonly FreeModelMeta[];
 
-/** Cohere trial tier — all models share 20 RPM trial limit */
+/** Cohere trial tier — versioned model IDs required (smoke test 2026-07-16) */
 export const FREE_COHERE_MODELS = [
-    {
-        modelId: "command-r7b",
-        rpm: 20,
-        rpd: null,
-        tpm: null,
-        tpd: null,
-        contextWindow: 128_000,
-    },
-    {
-        modelId: "command-r",
-        rpm: 20,
-        rpd: null,
-        tpm: null,
-        tpd: null,
-        contextWindow: 128_000,
-    },
-    {
-        modelId: "command-r+",
-        rpm: 20,
-        rpd: null,
-        tpm: null,
-        tpd: null,
-        contextWindow: 128_000,
-    },
-    {
-        modelId: "command-a",
-        rpm: 20,
-        rpd: null,
-        tpm: null,
-        tpd: null,
-        contextWindow: 256_000,
-    },
+    // ✅ Use versioned IDs — unversioned aliases are deprecated / removed
+    { modelId: "command-a-plus-05-2026", rpm: 20, rpd: null, tpm: null, tpd: null, contextWindow: 128_000 },
+    { modelId: "command-a-03-2025",      rpm: 20, rpd: null, tpm: null, tpd: null, contextWindow: 256_000 },
+    { modelId: "command-r-plus-08-2024", rpm: 20, rpd: null, tpm: null, tpd: null, contextWindow: 128_000 },
+    { modelId: "command-r-08-2024",      rpm: 20, rpd: null, tpm: null, tpd: null, contextWindow: 128_000 },
+    { modelId: "command-r7b-12-2024",    rpm: 20, rpd: null, tpm: null, tpd: null, contextWindow: 128_000 },
 ] as const satisfies readonly FreeModelMeta[];
 
 // ==============================================================================

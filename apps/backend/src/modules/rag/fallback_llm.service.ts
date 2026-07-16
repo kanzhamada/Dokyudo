@@ -163,12 +163,17 @@ async function* parseCohereSSe(body: ReadableStream<Uint8Array>): AsyncIterable<
         buffer = lines.pop() ?? "";
         for (const line of lines) {
             const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const data = trimmed.slice(5).trim();
+            if (!trimmed) continue;
+            
+            // Handle both SSE (data: {...}) and NDJSON ({...})
+            const dataStr = trimmed.startsWith("data:") ? trimmed.slice(5).trim() : trimmed;
+            if (dataStr === "[DONE]") continue;
+
             try {
-                const parsed = JSON.parse(data);
+                const parsed = JSON.parse(dataStr);
                 if (parsed.type === "content-delta") {
-                    const text = parsed.delta?.text ?? parsed.delta?.message?.content?.[0]?.text;
+                    const text = parsed.delta?.text ?? parsed.delta?.message?.content?.text;
+                    // Note: We ignore parsed.delta?.message?.content?.thinking
                     if (text) yield { text };
                 }
             } catch { /* partial chunk — ignore */ }
@@ -228,7 +233,65 @@ async function streamGroq(
         body: JSON.stringify({ model: modelId, messages, stream: true }),
     });
     if (!res.ok || !res.body) throw Object.assign(new Error("Groq error"), { status: res.status });
-    return parseOpenAiSse(res.body);
+    
+    // Some models (like Qwen) return <think> tags. We strip them from the stream.
+    async function* stripThinkTags(source: AsyncIterable<{ text: string }>) {
+        let insideThink = false;
+        let buffer = "";
+        
+        for await (const chunk of source) {
+            buffer += chunk.text;
+            
+            while (buffer.length > 0) {
+                if (!insideThink) {
+                    const startIdx = buffer.indexOf("<think>");
+                    if (startIdx === -1) {
+                        // Check if we might be matching a partial tag at the end
+                        const possiblePartial = buffer.lastIndexOf("<");
+                        if (possiblePartial !== -1 && "<think>".startsWith(buffer.slice(possiblePartial))) {
+                            // Yield up to the partial match and wait for more
+                            if (possiblePartial > 0) {
+                                yield { text: buffer.slice(0, possiblePartial) };
+                                buffer = buffer.slice(possiblePartial);
+                            }
+                            break; 
+                        } else {
+                            // Safe to yield all
+                            yield { text: buffer };
+                            buffer = "";
+                        }
+                    } else {
+                        // Found a think tag
+                        if (startIdx > 0) {
+                            yield { text: buffer.slice(0, startIdx) };
+                        }
+                        buffer = buffer.slice(startIdx + 7); // Skip <think>
+                        insideThink = true;
+                    }
+                } else {
+                    const endIdx = buffer.indexOf("</think>");
+                    if (endIdx === -1) {
+                        // Consume buffer entirely since we are inside a think block
+                        buffer = "";
+                        break;
+                    } else {
+                        buffer = buffer.slice(endIdx + 8); // Skip </think>
+                        // Also skip a leading newline if one immediately follows the think block closing
+                        if (buffer.startsWith("\n")) {
+                            buffer = buffer.slice(1);
+                        }
+                        insideThink = false;
+                    }
+                }
+            }
+        }
+        
+        if (buffer.length > 0 && !insideThink) {
+             yield { text: buffer };
+        }
+    }
+
+    return stripThinkTags(parseOpenAiSse(res.body));
 }
 
 async function streamSambanova(
@@ -292,6 +355,16 @@ async function callProvider(
 // 6. MAIN SERVICE
 // ==============================================================================
 
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("TIMEOUT")), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => {
+        if (timer) clearTimeout(timer);
+    });
+}
+
 export class FallbackLlmService {
     /**
      * Attempts to stream a response using the free provider rotation pool.
@@ -334,7 +407,8 @@ export class FallbackLlmService {
                 if (!withinQuota) continue;
 
                 try {
-                    const stream = await callProvider(entry, messages);
+                    // Enforce 15-second connection timeout (Time-To-First-Token)
+                    const stream = await withTimeout(callProvider(entry, messages), 15_000);
                     await recordSuccess(entry.provider, entry.modelId);
 
                     if (logContext) {

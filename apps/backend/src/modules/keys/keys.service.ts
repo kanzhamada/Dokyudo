@@ -54,7 +54,7 @@ export class KeysService {
         } catch (e: any) {
             if (logContext) logContext.keyError = e.message;
             throw new AppError({
-                code: "INTERNAL_SERVER_ERROR",
+                code: "INTERNAL_ERROR",
                 message: "Failed to encrypt and store API key",
                 status: 500,
             });

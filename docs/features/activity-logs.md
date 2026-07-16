@@ -1,6 +1,6 @@
 # Activity Logs & Audit Trail
 
-**Completion Timestamp**: 2026-07-15T20:07:00+07:00 (WIB)
+**Completion Timestamp**: 2026-07-16T21:30:00+07:00 (WIB)
 
 ## Core Logic
 Sistem Activity Log berfungsi sebagai *audit trail* yang merekam berbagai aktivitas krusial pengguna (seperti login, hapus dokumen, atau pembayaran) di dalam platform Dokyudo.
@@ -44,6 +44,7 @@ sequenceDiagram
 | `apps/backend/src/modules/payments/payments.service.ts` | Menginjeksi *logging* untuk event `billing.payment_completed` (beserta data `amount`, `currency`, `tier`) |
 | `apps/backend/src/modules/documents/documents.service.ts` | Memperbarui query dengan klausa `.returning({ title: documents.title })` untuk menyimpan nama dokumen di dalam *metadata* pada event `document.uploaded` dan `document.deleted` |
 | `apps/backend/src/modules/activities/*` | Pembuatan module baru (`schema`, `controller`, `service`, `routes`) untuk endpoint `GET /api/activities` (Paginated) |
+| `apps/backend/src/modules/activities/activities.service.test.ts` | Unit tests untuk endpoint Activities, memverifikasi paginasi, RLS limitasi per tenant, dan mock error handling DB |
 | `api-collections/Activities/1_Get Activities.bru` | Request collection Bruno untuk *testing* endpoint Activities |
 
 ## Connections

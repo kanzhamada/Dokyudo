@@ -81,7 +81,7 @@ export const LIGHT_POOL: readonly PoolEntry[] = [
     { provider: "groq", modelId: "meta-llama/llama-4-scout-17b-16e-instruct" },
     { provider: "groq", modelId: "llama-3.3-70b-versatile" },
     { provider: "gemini", modelId: "gemini-3.1-flash-lite" },
-    { provider: "cohere", modelId: "command-r7b" },
+    { provider: "cohere", modelId: "command-r7b-12-2024" },
     { provider: "groq", modelId: "qwen/qwen3.6-27b" },
     {
         provider: "sambanova",
@@ -113,9 +113,8 @@ export const MEDIUM_POOL: readonly PoolEntry[] = [
     { provider: "mistral", modelId: "ministral-14b-2512" },
     { provider: "groq", modelId: "llama-3.3-70b-versatile" },
     { provider: "groq", modelId: "openai/gpt-oss-120b" },
-    { provider: "gemini", modelId: "gemini-2.5-flash-lite" },
-    { provider: "cohere", modelId: "command-r" },
-    { provider: "cohere", modelId: "command-a" },
+    { provider: "cohere", modelId: "command-r-08-2024" },
+    { provider: "cohere", modelId: "command-a-03-2025" },
     { provider: "mistral", modelId: "mistral-medium-2505" },
     {
         provider: "sambanova",
@@ -141,14 +140,12 @@ export const MEDIUM_POOL: readonly PoolEntry[] = [
  * 9. SambaNova DeepSeek    → emergency, high quality for very long prompts
  */
 export const HEAVY_POOL: readonly PoolEntry[] = [
-    { provider: "gemini", modelId: "gemini-3.1-flash-lite" },
-    { provider: "gemini", modelId: "gemini-2.5-flash" },
-    { provider: "gemini", modelId: "gemini-3.5-flash" },
-    { provider: "gemini", modelId: "gemini-3-flash" },
-    { provider: "gemini", modelId: "gemini-2.5-flash-lite" },
-    { provider: "mistral", modelId: "mistral-medium-2505" },
-    { provider: "groq", modelId: "groq/compound-mini" },
-    { provider: "cohere", modelId: "command-a" },
+    { provider: "gemini",    modelId: "gemini-3.1-flash-lite" },
+    { provider: "gemini",    modelId: "gemini-2.5-flash" },
+    { provider: "gemini",    modelId: "gemini-3.5-flash" },
+    { provider: "mistral",   modelId: "mistral-medium-2505" },
+    { provider: "groq",      modelId: "groq/compound-mini" },
+    { provider: "cohere",    modelId: "command-a-plus-05-2026" },
     { provider: "sambanova", modelId: "DeepSeek-V3.1", emergency: true },
     { provider: "sambanova", modelId: "gpt-oss-120b", emergency: true },
 ] as const;

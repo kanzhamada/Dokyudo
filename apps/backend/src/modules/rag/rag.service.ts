@@ -12,6 +12,7 @@ import {
 import { desc, eq, and, lt, sql } from "drizzle-orm";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 import { LlmRouterService } from "./llm_router.service.ts";
+import { FallbackLlmService } from "./fallback_llm.service.ts";
 import { KeysService } from "../keys/keys.service.ts";
 import { decryptApiKey } from "../../shared/utils/crypto.util.ts";
 import { tenantKeys } from "../../shared/models/db.model.ts";
@@ -279,45 +280,37 @@ ${question}
                         );
                     }
                 } else {
-                    // System Mode: Fallback chain with Gemini
-                    for (const sysModel of GEMINI_MODELS.llmFallbackChain) {
-                        try {
-                            const cb = createCircuitBreaker(
-                                `llm-gen-${sysModel}`,
-                            );
-                            const responseStream = await cb.execute(() =>
-                                gemini.generateTextStream(
-                                    augmentedPrompt,
-                                    sysModel,
-                                ),
-                            );
+                    // System Mode: Smart multi-provider Fallback
+                    try {
+                        const response = await FallbackLlmService.generateStream({
+                            messages: [{ role: "user", content: augmentedPrompt }],
+                            logContext,
+                        });
 
-                            controller.enqueue(
-                                encoder.encode(
-                                    `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
-                                ),
-                            );
+                        controller.enqueue(
+                            encoder.encode(
+                                `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
+                            ),
+                        );
 
-                            for await (const chunk of responseStream) {
-                                if (chunk.text) {
-                                    fullAnswer += chunk.text;
-                                    controller.enqueue(
-                                        encoder.encode(
-                                            `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
-                                        ),
-                                    );
-                                }
+                        for await (const chunk of response.stream) {
+                            if (chunk.text) {
+                                fullAnswer += chunk.text;
+                                controller.enqueue(
+                                    encoder.encode(
+                                        `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
+                                    ),
+                                );
                             }
+                        }
 
-                            success = true;
-                            successfulModel = sysModel;
-                            if (logContext) logContext.ragModelUsed = sysModel;
-                            break;
-                        } catch (error: any) {
-                            if (logContext) {
-                                logContext.ragEvent = `fallback_failed_${sysModel}`;
-                                logContext.ragError = error.message;
-                            }
+                        success = true;
+                        successfulModel = response.modelId;
+                        if (logContext) logContext.ragModelUsed = response.modelId;
+                    } catch (error: any) {
+                        if (logContext) {
+                            logContext.ragEvent = `fallback_failed_exhausted`;
+                            logContext.ragError = error.message;
                         }
                     }
                 }
