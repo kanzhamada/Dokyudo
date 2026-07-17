@@ -39,6 +39,7 @@
 	import { columns } from './columns.js';
 	import type { Document } from './data.js';
 	import DocumentCardActions from './document-card-actions.svelte';
+	import UploadDocumentDialog from './UploadDocumentDialog.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -48,6 +49,7 @@
 	let columnFilters = $state<ColumnFiltersState>([]);
 
 	let previewDocument = $state<Document | null>(null);
+	let uploadDialogOpen = $state(false);
 
 	const table = createSvelteTable({
 		get data() {
@@ -166,6 +168,7 @@
 
 				<Button
 					class="cursor-pointer rounded-[6px] bg-[#DB8F5E] font-normal text-white hover:bg-[#C47D4E]"
+					onclick={() => (uploadDialogOpen = true)}
 				>
 					<PlusIcon data-icon="inline-start" />
 					Add New
@@ -513,3 +516,5 @@
 		{/if}
 	</div>
 </div>
+
+<UploadDocumentDialog bind:open={uploadDialogOpen} />
