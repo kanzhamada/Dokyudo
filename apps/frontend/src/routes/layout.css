@@ -147,6 +147,7 @@
     --color-auth-error: oklch(0.672 0.164 26.5);
 
     --animate-slide-down: slide-down 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    --animate-scroll: scroll 60s linear infinite;
 }
 
 @keyframes slide-down {
@@ -157,6 +158,15 @@
     to {
         transform: translateY(0);
         opacity: 1;
+    }
+}
+
+@keyframes scroll {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
     }
 }
 

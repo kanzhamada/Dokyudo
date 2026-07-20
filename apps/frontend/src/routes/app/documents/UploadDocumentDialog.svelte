@@ -16,7 +16,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="sm:max-w-4xl border-[#302F2F] bg-[#191919] p-0 text-white sm:rounded-[22px]">
+	<Dialog.Content class="max-w-4xl border-[#302F2F] bg-[#191919] p-0 text-white sm:rounded-[22px]">
 		<!-- Close button handled by Dialog.Close inside the header if needed, but Dialog.Content has a default close. We'll use the default or a custom one. Dialog.Content usually has a built-in X, but we can customize it or just hide it and use our own if needed. Let's rely on default for now, which is top right. -->
 
 		<div class="flex flex-col gap-6 p-8 md:p-10">

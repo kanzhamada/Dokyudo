@@ -25,7 +25,6 @@
 	import paper5 from '$lib/assets/landing_pages/paper5.webp';
 	import paper6 from '$lib/assets/landing_pages/paper6.webp';
 	import paper7 from '$lib/assets/landing_pages/paper7.webp';
-	import paperBlur from '$lib/assets/landing_pages/paper blur.webp';
 	import flower1 from '$lib/assets/landing_pages/flower 1.webp';
 	import flower2 from '$lib/assets/landing_pages/flower2.webp';
 	import flower3 from '$lib/assets/landing_pages/flower3.webp';
@@ -34,7 +33,6 @@
 	import flower6 from '$lib/assets/landing_pages/flower6.webp';
 	import flower7 from '$lib/assets/landing_pages/flower7.webp';
 	import flower8 from '$lib/assets/landing_pages/flower8.webp';
-	import flowerBlur from '$lib/assets/landing_pages/flower blur.webp';
 	import dokyudoTop from '$lib/assets/landing_pages/Dokyudo Top.svg';
 	import dokyudoMiddle from '$lib/assets/landing_pages/Dokyudo Middle.svg';
 	import dokyudoBottom from '$lib/assets/landing_pages/Dokyudo Bottom.svg';
@@ -156,51 +154,62 @@
 	<div class="snap-section snap-hero">
 		<section class="hero-section" id="hero">
 			<div class="hero-content-wrapper">
-				<div class="hero-bg-elements">
-					<img src={book} class="bg-el book" alt="" aria-hidden="true" />
-					<img src={paper1} class="bg-el paper1" alt="" aria-hidden="true" />
-					<img src={paper2} class="bg-el paper2" alt="" aria-hidden="true" />
-					<img src={paper3} class="bg-el paper3" alt="" aria-hidden="true" />
-					<img src={paper4} class="bg-el paper4" alt="" aria-hidden="true" />
-					<img src={paper5} class="bg-el paper5" alt="" aria-hidden="true" />
-					<img src={paper6} class="bg-el paper6" alt="" aria-hidden="true" />
-					<img src={paper7} class="bg-el paper7" alt="" aria-hidden="true" />
-					<img src={paperBlur} class="bg-el paper-blur" alt="" aria-hidden="true" />
-					<img src={flower1} class="bg-el flower1" alt="" aria-hidden="true" />
-					<img src={flower2} class="bg-el flower2" alt="" aria-hidden="true" />
-					<img src={flower3} class="bg-el flower3" alt="" aria-hidden="true" />
-					<img src={flower4} class="bg-el flower4" alt="" aria-hidden="true" />
-					<img src={flower5} class="bg-el flower5" alt="" aria-hidden="true" />
-					<img src={flower6} class="bg-el flower6" alt="" aria-hidden="true" />
-					<img src={flower7} class="bg-el flower7" alt="" aria-hidden="true" />
-					<img src={flower8} class="bg-el flower8" alt="" aria-hidden="true" />
-					<img src={flowerBlur} class="bg-el flower-blur" alt="" aria-hidden="true" />
+				<!-- Parallax wrapper for background -->
+				<div class="hero-scroll-parallax" style="transform: translateY({scrollY * 0.15}px);">
+					<div class="hero-bg-elements hero-animate-bg">
+						<img src={book} class="bg-el book" alt="" aria-hidden="true" />
+						<img src={paper1} class="bg-el paper1" alt="" aria-hidden="true" />
+						<img src={paper2} class="bg-el paper2" alt="" aria-hidden="true" />
+						<img src={paper3} class="bg-el paper3" alt="" aria-hidden="true" />
+						<img src={paper4} class="bg-el paper4" alt="" aria-hidden="true" />
+						<img src={paper5} class="bg-el paper5" alt="" aria-hidden="true" />
+						<img src={paper6} class="bg-el paper6" alt="" aria-hidden="true" />
+						<img src={paper7} class="bg-el paper7" alt="" aria-hidden="true" />
+						<img src={flower1} class="bg-el flower1" alt="" aria-hidden="true" />
+						<img src={flower2} class="bg-el flower2" alt="" aria-hidden="true" />
+						<img src={flower3} class="bg-el flower3" alt="" aria-hidden="true" />
+						<img src={flower4} class="bg-el flower4" alt="" aria-hidden="true" />
+						<img src={flower5} class="bg-el flower5" alt="" aria-hidden="true" />
+						<img src={flower6} class="bg-el flower6" alt="" aria-hidden="true" />
+						<img src={flower7} class="bg-el flower7" alt="" aria-hidden="true" />
+						<img src={flower8} class="bg-el flower8" alt="" aria-hidden="true" />
 
-					<img src={dokyudoBottom} class="bg-el dokyudo-bottom" alt="" aria-hidden="true" />
-					<img src={dokyudoMiddle} class="bg-el dokyudo-middle" alt="" aria-hidden="true" />
-					<img src={dokyudoTop} class="bg-el dokyudo-top" alt="" aria-hidden="true" />
+						<img src={dokyudoBottom} class="bg-el dokyudo-bottom" alt="" aria-hidden="true" />
+						<img src={dokyudoMiddle} class="bg-el dokyudo-middle" alt="" aria-hidden="true" />
+						<img src={dokyudoTop} class="bg-el dokyudo-top" alt="" aria-hidden="true" />
+					</div>
 				</div>
 
-				<div class="hero-text-container">
-					<h1 class="hero-headline">
-						Search Your Documents<br />
-						with <span class="highlight-meaning">Meaning</span>
-					</h1>
-					<div class="hero-ctas">
-						<a href="/auth/register" class="btn-primary">
-							Start Free
-							<ArrowUpRight size={15} strokeWidth={2.5} />
-						</a>
-						<a href="#features" class="btn-outline">
-							See Features
-							<ArrowUpRight size={15} strokeWidth={2} />
-						</a>
+				<!-- Parallax wrapper for text -->
+				<div
+					class="hero-text-parallax"
+					style="transform: translateY({scrollY * 0.3}px); opacity: {Math.max(
+						0,
+						1 - scrollY / 500
+					)}; position: relative; z-index: 100; width: 100%;"
+				>
+					<div class="hero-text-container hero-animate-text">
+						<h1 class="hero-headline">
+							Search Your Documents<br />
+							with <span class="highlight-meaning">Meaning</span>
+						</h1>
+						<div class="hero-ctas">
+							<a href="/auth/register" class="btn-primary">
+								Start Free
+								<ArrowUpRight size={15} strokeWidth={2.5} />
+							</a>
+							<a href="#features" class="btn-outline">
+								See Features
+								<ArrowUpRight size={15} strokeWidth={2} />
+							</a>
+						</div>
+						<div style="margin-top: 48px; width: 100%;">
+							<LogoWall />
+						</div>
 					</div>
 				</div>
 			</div>
 		</section>
-
-		<LogoWall />
 	</div>
 
 	<!-- ═══════════════════════════════════════════════════════ -->
@@ -643,7 +652,7 @@
 
 	/* Hero snap: hero fills remaining space, logowall sits at bottom */
 	.snap-section.snap-hero {
-		height: 100vh;
+		min-height: max(100vh, 950px);
 	}
 
 	.snap-section.snap-hero .hero-section {
@@ -948,6 +957,12 @@
 	/* ══════════════════════════════════════════════════════ */
 	/* HERO SECTION                                          */
 	/* ══════════════════════════════════════════════════════ */
+	@property --spread-multiplier {
+		syntax: '<number>';
+		inherits: true;
+		initial-value: 1;
+	}
+
 	.hero-section {
 		background: var(--dk-bg);
 		display: flex;
@@ -957,6 +972,7 @@
 		text-align: center;
 		overflow: hidden;
 		position: relative;
+		min-height: max(100vh, 950px);
 	}
 
 	.hero-content-wrapper {
@@ -966,14 +982,31 @@
 		max-width: var(--dk-max-width);
 	}
 
+	.hero-section::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background-image:
+			linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)), url('$lib/assets/images/hero_section.webp');
+		background-size: cover;
+		background-position: center;
+		z-index: 0;
+		pointer-events: none;
+		filter: blur(6px); /* Adjust the '8px' up or down to change blur strength */
+		transform: scale(1.8);
+	}
+
 	.hero-section::after {
 		content: '';
 		position: absolute;
 		bottom: 0;
 		left: 0;
 		width: 100%;
-		height: 444px;
-		background: linear-gradient(to bottom, rgba(28, 27, 27, 0) 0%, #1c1b1b 100%);
+		height: 666px;
+		background: linear-gradient(to bottom, rgba(28, 27, 27, 0) 0%, #1c1b1b 69%);
 		z-index: 50;
 		pointer-events: none;
 	}
@@ -988,12 +1021,52 @@
 		z-index: 0;
 	}
 
+	.hero-scroll-parallax {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+	}
+
+	@keyframes heroReveal {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, 40px);
+		}
+		100% {
+			opacity: 1;
+			transform: translate(-50%, 0);
+		}
+	}
+
+	@keyframes heroFade {
+		0% {
+			opacity: 0;
+			transform: scale(0.98);
+		}
+		100% {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	.hero-animate-text {
+		opacity: 0; /* Hide initially */
+		animation: heroReveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+	}
+
+	.hero-animate-bg {
+		opacity: 0;
+		animation: heroFade 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	}
+
 	.bg-el {
 		position: absolute;
-		/* Posisi dihitung dari tengah layar (50%) + offset dari tengah */
-		left: calc(50% + calc(var(--x-offset) * 1px));
-		top: calc(var(--y) * 1px);
+		/* Spread outward from center based on multiplier */
+		left: calc(50% + calc(var(--x-offset) * var(--spread-multiplier) * 1px));
+		top: calc(475px + calc(calc(var(--y) - 475) * var(--spread-multiplier) * 1px));
 		z-index: 10; /* Default background layer */
+		transition: left 0.8s cubic-bezier(0.16, 1, 0.3, 1), top 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	/* ── Explicit Z-Index Layering ── */
@@ -1084,11 +1157,7 @@
 		--y: 448.58;
 		animation: float1 8.5s ease-in-out infinite -1.5s;
 	}
-	.bg-el.paper-blur {
-		--x-offset: 532.74;
-		--y: -3.44;
-		animation: float3 10s ease-in-out infinite 0s;
-	}
+
 	.bg-el.flower1 {
 		--x-offset: -89.54;
 		--y: 456.48;
@@ -1129,22 +1198,21 @@
 		--y: 303.98;
 		animation: float1 8.8s ease-in-out infinite -4.5s;
 	}
-	.bg-el.flower-blur {
-		--x-offset: 629.62;
-		--y: 593.05;
-		animation: float3 11s ease-in-out infinite -2s;
-	}
+
 	.bg-el.dokyudo-top {
 		--x-offset: -100;
 		--y: 239;
+		--spread-multiplier: 1 !important;
 	}
 	.bg-el.dokyudo-middle {
 		--x-offset: -100;
 		--y: 239;
+		--spread-multiplier: 1 !important;
 	}
 	.bg-el.dokyudo-bottom {
 		--x-offset: -141;
 		--y: 185;
+		--spread-multiplier: 1 !important;
 	}
 
 	.hero-text-container {
