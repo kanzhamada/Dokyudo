@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { gsap } from 'gsap';
+	import { ScrollTrigger } from 'gsap/ScrollTrigger';
 	import {
 		FileText,
 		Search,
@@ -38,6 +41,8 @@
 	import dokyudoBottom from '$lib/assets/landing_pages/Dokyudo Bottom.svg';
 	import LogoWall from '$lib/components/app/LogoWall.svelte';
 
+	gsap.registerPlugin(ScrollTrigger);
+
 	/* ── FAQ Accordion State ── */
 	let openFaq = $state(0);
 
@@ -72,22 +77,141 @@
 		}
 	];
 
-	/* ── Dynamic Island Navbar State ── */
-	let scrollY = $state(0);
-	let scrollProgress = $state(0);
-	let isCollapsed = $derived(scrollY > 80);
+	/* ── Dynamic Island Navbar & GSAP Animations ── */
+	let isCollapsed = $state(false);
 	let navHovered = $state(false);
 	let containerEl: HTMLDivElement;
 
-	$effect(() => {
+	onMount(() => {
 		if (!containerEl) return;
-		function handleScroll() {
-			scrollY = containerEl.scrollTop;
-			const scrollHeight = containerEl.scrollHeight - containerEl.clientHeight;
-			scrollProgress = scrollHeight > 0 ? Math.min(containerEl.scrollTop / scrollHeight, 1) : 0;
-		}
-		containerEl.addEventListener('scroll', handleScroll, { passive: true });
-		return () => containerEl.removeEventListener('scroll', handleScroll);
+
+		const ctx = gsap.context(() => {
+			/* A. Hero Entry Timeline */
+			const heroTl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+			heroTl
+				.fromTo(
+					'.hero-bg-elements',
+					{ autoAlpha: 0, scale: 0.98 },
+					{ autoAlpha: 1, scale: 1, duration: 1.2 }
+				)
+				.fromTo(
+					'.hero-text-container',
+					{ autoAlpha: 0, y: 40, xPercent: -50 },
+					{ autoAlpha: 1, y: 0, xPercent: -50, duration: 1 },
+					'-=0.9'
+				);
+
+			/* B. Scroll Parallax */
+			gsap.to('.hero-scroll-parallax', {
+				y: 150,
+				ease: 'none',
+				scrollTrigger: {
+					trigger: '.snap-hero',
+					scroller: containerEl,
+					start: 'top top',
+					end: 'bottom top',
+					scrub: true
+				}
+			});
+
+			gsap.to('.hero-text-parallax', {
+				y: 250,
+				opacity: 0,
+				ease: 'none',
+				scrollTrigger: {
+					trigger: '.snap-hero',
+					scroller: containerEl,
+					start: 'top top',
+					end: '70% top',
+					scrub: true
+				}
+			});
+
+			/* C. Float Animations */
+			const floatElements = [
+				{ sel: '.bg-el.book', y: -14, rot: 1.5, dur: 7, delay: 2 },
+				{ sel: '.bg-el.paper1', y: -10, rot: 0, dur: 6, delay: 1 },
+				{ sel: '.bg-el.paper2', y: -12, rot: -1.5, dur: 8, delay: 4 },
+				{ sel: '.bg-el.paper3', y: -14, rot: 1.5, dur: 6.5, delay: 3 },
+				{ sel: '.bg-el.paper4', y: -10, rot: 0, dur: 7.5, delay: 0 },
+				{ sel: '.bg-el.paper5', y: -12, rot: -1.5, dur: 9, delay: 5 },
+				{ sel: '.bg-el.paper6', y: -14, rot: 1.5, dur: 5.5, delay: 2 },
+				{ sel: '.bg-el.paper7', y: -10, rot: 0, dur: 8.5, delay: 1.5 },
+				{ sel: '.bg-el.flower1', y: -14, rot: 1.5, dur: 6.8, delay: 4 },
+				{ sel: '.bg-el.flower2', y: -10, rot: 0, dur: 7.2, delay: 0.5 },
+				{ sel: '.bg-el.flower3', y: -12, rot: -1.5, dur: 8.2, delay: 2.5 },
+				{ sel: '.bg-el.flower4', y: -14, rot: 1.5, dur: 5.8, delay: 1 },
+				{ sel: '.bg-el.flower5', y: -10, rot: 0, dur: 9.5, delay: 6 },
+				{ sel: '.bg-el.flower6', y: -12, rot: -1.5, dur: 7.7, delay: 3 },
+				{ sel: '.bg-el.flower7', y: -14, rot: 1.5, dur: 6.2, delay: 0 },
+				{ sel: '.bg-el.flower8', y: -10, rot: 0, dur: 8.8, delay: 4.5 }
+			];
+
+			floatElements.forEach((item) => {
+				const tween = gsap.to(item.sel, {
+					y: item.y,
+					rotation: item.rot,
+					duration: item.dur,
+					repeat: -1,
+					yoyo: true,
+					ease: 'sine.inOut'
+				});
+				if (item.delay > 0) {
+					tween.progress(item.delay / item.dur);
+				}
+			});
+
+			/* D. Hover Micro-Spread */
+			const bgEls = containerEl.querySelectorAll<HTMLElement>('.bg-el');
+			bgEls.forEach((el) => {
+				const computed = getComputedStyle(el);
+				const txVal = computed.getPropertyValue('--hover-tx').trim();
+				const tyVal = computed.getPropertyValue('--hover-ty').trim();
+
+				if (!txVal && !tyVal) return;
+
+				const tx = parseFloat(txVal) || 0;
+				const ty = parseFloat(tyVal) || 0;
+
+				el.addEventListener('mouseenter', () => {
+					gsap.to(el, {
+						translate: `${tx}px ${ty}px`,
+						duration: 0.5,
+						ease: 'back.out(2)',
+						overwrite: 'auto'
+					});
+				});
+
+				el.addEventListener('mouseleave', () => {
+					gsap.to(el, {
+						translate: '0px 0px',
+						duration: 0.5,
+						ease: 'power2.out',
+						overwrite: 'auto'
+					});
+				});
+			});
+
+			/* E. Dynamic Island Nav Collapse & Progress Ring */
+			const navEl = document.getElementById('landing-nav');
+
+			ScrollTrigger.create({
+				scroller: containerEl,
+				start: 'top top',
+				end: 'max',
+				onUpdate: (self) => {
+					isCollapsed = self.scroll() > 80;
+					if (navEl) {
+						navEl.style.setProperty('--progress', self.progress.toString());
+					}
+				}
+			});
+		}, containerEl);
+
+		return () => {
+			ctx.revert();
+		};
 	});
 </script>
 
@@ -114,7 +238,6 @@
 	id="landing-nav"
 	onmouseenter={() => (navHovered = true)}
 	onmouseleave={() => (navHovered = false)}
-	style="--progress: {scrollProgress};"
 >
 	<div class="nav-inner">
 		<a href="/" class="nav-logo" aria-label="Dokyudo Home">
@@ -155,8 +278,8 @@
 		<section class="hero-section" id="hero">
 			<div class="hero-content-wrapper">
 				<!-- Parallax wrapper for background -->
-				<div class="hero-scroll-parallax" style="transform: translateY({scrollY * 0.15}px);">
-					<div class="hero-bg-elements hero-animate-bg">
+				<div class="hero-scroll-parallax">
+					<div class="hero-bg-elements">
 						<img src={book} class="bg-el book" alt="" aria-hidden="true" />
 						<img src={paper1} class="bg-el paper1" alt="" aria-hidden="true" />
 						<img src={paper2} class="bg-el paper2" alt="" aria-hidden="true" />
@@ -181,14 +304,8 @@
 				</div>
 
 				<!-- Parallax wrapper for text -->
-				<div
-					class="hero-text-parallax"
-					style="transform: translateY({scrollY * 0.3}px); opacity: {Math.max(
-						0,
-						1 - scrollY / 500
-					)}; position: relative; z-index: 100; width: 100%;"
-				>
-					<div class="hero-text-container hero-animate-text">
+				<div class="hero-text-parallax z-50">
+					<div class="hero-text-container">
 						<h1 class="hero-headline">
 							Search Your Documents<br />
 							with <span class="highlight-meaning">Meaning</span>
@@ -1005,36 +1122,11 @@
 		height: 100%;
 	}
 
-	@keyframes heroReveal {
-		0% {
-			opacity: 0;
-			transform: translate(-50%, 40px);
-		}
-		100% {
-			opacity: 1;
-			transform: translate(-50%, 0);
-		}
-	}
-
-	@keyframes heroFade {
-		0% {
-			opacity: 0;
-			transform: scale(0.98);
-		}
-		100% {
-			opacity: 1;
-			transform: scale(1);
-		}
-	}
-
-	.hero-animate-text {
-		opacity: 0; /* Hide initially */
-		animation: heroReveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
-	}
-
-	.hero-animate-bg {
-		opacity: 0;
-		animation: heroFade 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	.hero-text-parallax {
+		position: relative;
+		z-index: 100;
+		width: 100%;
+		pointer-events: none;
 	}
 
 	.bg-el {
@@ -1043,12 +1135,23 @@
 		left: calc(50% + calc(var(--x-offset) * var(--spread-multiplier) * 1px));
 		top: calc(475px + calc(calc(var(--y) - 475) * var(--spread-multiplier) * 1px));
 		z-index: 10; /* Default background layer */
-		transition: left 0.8s cubic-bezier(0.16, 1, 0.3, 1), top 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+		pointer-events: auto;
+		cursor: pointer;
+		translate: 0 0;
+		transition:
+			left 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+			top 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	/* Hover micro-spread: z-index escalation */
+	.bg-el:hover {
+		z-index: 70;
 	}
 
 	/* ── Explicit Z-Index Layering ── */
 	.bg-el.dokyudo-bottom {
 		z-index: 20;
+		pointer-events: none;
 	}
 	.bg-el.book,
 	.bg-el.flower2,
@@ -1057,6 +1160,7 @@
 	}
 	.bg-el.dokyudo-middle {
 		z-index: 40;
+		pointer-events: none;
 	}
 	.bg-el.paper1,
 	.bg-el.flower1 {
@@ -1064,116 +1168,105 @@
 	}
 	.bg-el.dokyudo-top {
 		z-index: 60;
-	}
-
-	@keyframes float1 {
-		0%,
-		100% {
-			transform: translateY(0);
-		}
-		50% {
-			transform: translateY(-10px);
-		}
-	}
-	@keyframes float2 {
-		0%,
-		100% {
-			transform: translateY(0) rotate(0deg);
-		}
-		50% {
-			transform: translateY(-14px) rotate(1.5deg);
-		}
-	}
-	@keyframes float3 {
-		0%,
-		100% {
-			transform: translateY(0) rotate(0deg);
-		}
-		50% {
-			transform: translateY(-12px) rotate(-1.5deg);
-		}
+		pointer-events: none;
 	}
 
 	.bg-el.book {
 		--x-offset: -789.21;
 		--y: 150.41;
-		animation: float2 7s ease-in-out infinite -2s;
+		--hover-tx: -14px;
+		--hover-ty: -10px;
 	}
 	.bg-el.paper1 {
 		--x-offset: -255.79;
 		--y: 262.56;
-		animation: float1 6s ease-in-out infinite -1s;
+		--hover-tx: -12px;
+		--hover-ty: -6px;
 	}
 	.bg-el.paper2 {
 		--x-offset: -43.96;
 		--y: 382.25;
-		animation: float3 8s ease-in-out infinite -4s;
+		--hover-tx: -8px;
+		--hover-ty: 12px;
 	}
 	.bg-el.paper3 {
 		--x-offset: 247.54;
 		--y: 132.14;
-		animation: float2 6.5s ease-in-out infinite -3s;
+		--hover-tx: 10px;
+		--hover-ty: -14px;
 	}
 	.bg-el.paper4 {
 		--x-offset: 269.33;
 		--y: 307.27;
-		animation: float1 7.5s ease-in-out infinite 0s;
+		--hover-tx: 16px;
+		--hover-ty: 8px;
 	}
 	.bg-el.paper5 {
 		--x-offset: 385.13;
 		--y: 186.02;
-		animation: float3 9s ease-in-out infinite -5s;
+		--hover-tx: 13px;
+		--hover-ty: -11px;
 	}
 	.bg-el.paper6 {
 		--x-offset: 267.03;
 		--y: 515.94;
-		animation: float2 5.5s ease-in-out infinite -2s;
+		--hover-tx: 11px;
+		--hover-ty: 15px;
 	}
 	.bg-el.paper7 {
 		--x-offset: 474.76;
 		--y: 448.58;
-		animation: float1 8.5s ease-in-out infinite -1.5s;
+		--hover-tx: 18px;
+		--hover-ty: 10px;
 	}
 
 	.bg-el.flower1 {
 		--x-offset: -89.54;
 		--y: 456.48;
-		animation: float2 6.8s ease-in-out infinite -4s;
+		--hover-tx: -10px;
+		--hover-ty: 14px;
 	}
 	.bg-el.flower2 {
 		--x-offset: -22.35;
 		--y: 185.45;
-		animation: float1 7.2s ease-in-out infinite -0.5s;
+		--hover-tx: -6px;
+		--hover-ty: -13px;
 	}
 	.bg-el.flower3 {
 		--x-offset: 126.3;
 		--y: 271.4;
-		animation: float3 8.2s ease-in-out infinite -2.5s;
+		--hover-tx: 9px;
+		--hover-ty: -8px;
 	}
 	.bg-el.flower4 {
 		--x-offset: 170.88;
 		--y: 220.13;
-		animation: float2 5.8s ease-in-out infinite -1s;
+		--hover-tx: 12px;
+		--hover-ty: -10px;
 	}
 	.bg-el.flower5 {
 		--x-offset: 184.96;
 		--y: 440.2;
-		animation: float1 9.5s ease-in-out infinite -6s;
+		--hover-tx: 8px;
+		--hover-ty: 16px;
 	}
 	.bg-el.flower6 {
 		--x-offset: 431.38;
 		--y: 65.56;
-		animation: float3 7.7s ease-in-out infinite -3s;
+		--hover-tx: 15px;
+		--hover-ty: -12px;
 	}
 	.bg-el.flower7 {
 		--x-offset: 571.31;
 		--y: 237.15;
-		animation: float2 6.2s ease-in-out infinite 0s;
+		--hover-tx: 17px;
+		--hover-ty: 7px;
 	}
 	.bg-el.flower8 {
 		--x-offset: 608.12;
 		--y: 303.98;
-		animation: float1 8.8s ease-in-out infinite -4.5s;
+		--hover-tx: 14px;
+		--hover-ty: 11px;
 	}
 
 	.bg-el.dokyudo-top {
