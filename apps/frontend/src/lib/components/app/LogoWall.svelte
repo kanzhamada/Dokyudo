@@ -42,7 +42,7 @@
 					gsap.to(item, {
 						opacity: 0.5,
 						filter: 'grayscale(100%)',
-						color: '#8e8e8e',
+						color: 'var(--color-dk-muted-gray)',
 						duration: 0.3
 					});
 				});

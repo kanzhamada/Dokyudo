@@ -129,7 +129,7 @@
 	}
 
 	.faq-image {
-		border-radius: var(--dk-radius);
+		border-radius: 0px;
 		overflow: hidden;
 		margin-top: 28px;
 		aspect-ratio: 4/3;
@@ -157,7 +157,7 @@
 		cursor: pointer;
 		color: inherit;
 		font-family: inherit;
-		transition: background 0.2s ease;
+		transition: background 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.faq-item:last-child {
@@ -175,7 +175,7 @@
 		font-size: 16px;
 		color: var(--dk-cream);
 		font-weight: 500;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.02em;
 	}
 
 	.faq-toggle {
@@ -188,7 +188,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		transition: background 0.2s ease;
+		transition: background 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.faq-open .faq-toggle {
@@ -202,7 +202,8 @@
 	.faq-answer p {
 		font-size: 14px;
 		color: var(--dk-text-muted);
-		line-height: 1.7;
+		line-height: 1.4;
+		letter-spacing: -0.02em;
 		margin: 0;
 		max-width: 56ch;
 	}

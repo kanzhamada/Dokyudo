@@ -111,13 +111,13 @@
 		font-size: 14px;
 		font-weight: 600;
 		padding: 10px 22px;
-		border-radius: var(--dk-radius-pill);
+		border-radius: var(--dk-radius-sm);
 		background: var(--dk-copper);
 		border: none;
 		cursor: pointer;
 		transition:
-			background 0.2s ease,
-			transform 0.15s ease;
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		letter-spacing: -0.01em;
 	}
 
@@ -144,14 +144,14 @@
 		font-size: 14px;
 		font-weight: 500;
 		padding: 10px 22px;
-		border-radius: var(--dk-radius-pill);
+		border-radius: var(--dk-radius-sm);
 		background: transparent;
 		border: 1px solid var(--dk-border-strong);
 		cursor: pointer;
 		transition:
-			border-color 0.2s ease,
-			background 0.2s ease,
-			transform 0.15s ease;
+			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		letter-spacing: -0.01em;
 	}
 
@@ -220,7 +220,7 @@
 		color: var(--dk-cream);
 		font-weight: 500;
 		margin: 0 0 16px;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.02em;
 	}
 
 	.footer-col a {
@@ -229,7 +229,7 @@
 		color: var(--dk-text-muted);
 		font-size: 14px;
 		padding: 4px 0;
-		transition: color 0.2s ease;
+		transition: color 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.footer-col a:hover {
@@ -259,7 +259,7 @@
 		margin: 0 0 24px;
 		max-width: 44ch;
 		font-style: italic;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.02em;
 	}
 
 	.footer-ctas {
@@ -285,9 +285,9 @@
 		justify-content: center;
 		text-decoration: none;
 		transition:
-			border-color 0.2s ease,
-			color 0.2s ease,
-			background 0.2s ease;
+			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			color 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.social-circle:hover {

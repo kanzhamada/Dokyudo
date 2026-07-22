@@ -71,14 +71,14 @@
 		font-size: 14px;
 		font-weight: 600;
 		padding: 10px 22px;
-		border-radius: var(--dk-radius-pill);
+		border-radius: var(--dk-radius-sm);
 		background: var(--dk-copper);
 		border: none;
 		cursor: pointer;
 		transition:
-			background 0.2s ease,
-			transform 0.15s ease;
-		letter-spacing: -0.01em;
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
+		letter-spacing: -0.02em;
 	}
 
 	.btn-primary:hover {
@@ -110,7 +110,8 @@
 	.section-body {
 		font-size: 15px;
 		color: var(--dk-text-muted);
-		line-height: 1.7;
+		line-height: 1.4;
+		letter-spacing: -0.02em;
 		max-width: 50ch;
 		margin: 20px 0 28px;
 	}
@@ -134,7 +135,7 @@
 	}
 
 	.about-image {
-		border-radius: var(--dk-radius);
+		border-radius: 0px;
 		overflow: hidden;
 		aspect-ratio: 4/5;
 	}
@@ -148,18 +149,18 @@
 	.about-cards {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
-		gap: 16px;
+		gap: 20px;
 		margin-top: 36px;
 	}
 
 	.value-card {
-		padding: 24px;
-		border-radius: var(--dk-radius);
+		padding: 15px;
+		border-radius: 0px;
 		border: 1px solid var(--dk-border);
 		background: var(--dk-bg-card);
 		transition:
-			border-color 0.25s ease,
-			background 0.25s ease;
+			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.value-card:hover {
@@ -184,14 +185,15 @@
 		font-size: 15px;
 		font-weight: 600;
 		color: var(--dk-cream);
-		margin: 0 0 8px;
+		margin: 0 0 5px;
 		letter-spacing: -0.01em;
 	}
 
 	.value-card p {
 		font-size: 13px;
 		color: var(--dk-text-muted);
-		line-height: 1.55;
+		line-height: 1.4;
+		letter-spacing: -0.02em;
 		margin: 0;
 	}
 </style>

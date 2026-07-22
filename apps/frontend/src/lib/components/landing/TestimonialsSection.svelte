@@ -180,20 +180,20 @@
 	.testimonial-names {
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: 5px;
 	}
 
 	.testimonial-name-card {
-		padding: 14px 16px;
-		border-radius: var(--dk-radius-sm);
+		padding: 15px;
+		border-radius: 0px;
 		border: 1px solid var(--dk-border);
 		background: transparent;
 		display: flex;
 		align-items: center;
 		gap: 12px;
 		transition:
-			background 0.2s ease,
-			border-color 0.2s ease;
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		cursor: pointer;
 		text-align: left;
 		font-family: inherit;
@@ -234,7 +234,7 @@
 	}
 
 	.testimonial-center-image {
-		border-radius: var(--dk-radius);
+		border-radius: 0px;
 		overflow: hidden;
 		min-height: 360px;
 	}
@@ -248,8 +248,8 @@
 	.testimonial-quote-card {
 		background: rgba(232, 222, 200, 0.06);
 		border: 1px solid var(--dk-border);
-		border-radius: var(--dk-radius);
-		padding: 32px;
+		border-radius: 0px;
+		padding: 15px;
 		display: flex;
 		flex-direction: column;
 		position: relative;
@@ -276,13 +276,14 @@
 		line-height: 0.8;
 		opacity: 0.4;
 		font-family: Georgia, 'Times New Roman', serif;
-		margin-bottom: 8px;
+		margin-bottom: 5px;
 	}
 
 	.quote-text {
 		font-size: 16px;
 		color: var(--dk-cream);
-		line-height: 1.65;
+		line-height: 1.4;
+		letter-spacing: -0.02em;
 		margin: 0;
 		flex: 1;
 		font-style: normal;

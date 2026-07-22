@@ -47,7 +47,7 @@
     --sidebar-muted: #676767;
     --sidebar-muted-foreground: #989595;
     --sidebar-avatar: #D9D9D9;
-    --sidebar-brand: #C5937B;
+    --sidebar-brand: #d98e68;
 
     --dk-bg: var(--color-dk-bg);
     --dk-bg-deep: var(--color-dk-bg-deep);
@@ -63,12 +63,19 @@
     --dk-accent-glow: var(--color-dk-accent-glow);
     --dk-muted-gray: var(--color-dk-muted-gray);
     --dk-surface-dark: var(--color-dk-surface-dark);
-    --dk-radius: 14px;
-    --dk-radius-sm: 10px;
+    --s-contain: max(3vw, 15px);
+    --s-section: 80px;
+    --dk-section-py: var(--s-section);
+    --dk-section-px: var(--s-contain);
+    --dk-radius: 0px;
+    --dk-radius-sm: 6px;
     --dk-radius-pill: 100px;
+    --brand-guideline-card-padding: 15px;
+    --brand-guideline-card-gap: 5px;
+    --brand-guideline-card-group-gap: 20px;
+    --dk-transition-duration: 200ms;
+    --dk-transition-ease: cubic-bezier(0.37, 0, 0.63, 1);
     --dk-max-width: 1280px;
-    --dk-section-py: clamp(80px, 10vw, 120px);
-    --dk-section-px: clamp(20px, 5vw, 48px);
 }
 
 .dark {
@@ -119,21 +126,21 @@
     --font-playfair: 'Playfair Display', serif;
     --font-geist: 'Geist Sans', sans-serif;
 
-    /* Dokyudo Theme Color Tokens */
+    /* Dokyudo Theme Color Tokens (Refined OKLCH Palette) */
     --color-dk-bg: #1c1b1b;
-    --color-dk-bg-deep: #2a221e;
-    --color-dk-cream: #e8dec8;
-    --color-dk-copper: #c5937b;
-    --color-dk-copper-hover: #d4a48c;
-    --color-dk-light: #efefef;
-    --color-dk-card: #252220;
-    --color-dk-card-hover: #302b27;
-    --color-dk-border: rgba(232, 222, 200, 0.12);
-    --color-dk-border-strong: rgba(232, 222, 200, 0.22);
-    --color-dk-text-muted: rgba(239, 239, 239, 0.55);
-    --color-dk-accent-glow: rgba(197, 147, 123, 0.15);
-    --color-dk-muted-gray: #8e8e8e;
-    --color-dk-surface-dark: #232323;
+    --color-dk-bg-deep: #251e1b;
+    --color-dk-cream: #f4e6d4;
+    --color-dk-copper: #d98e68;
+    --color-dk-copper-hover: #eab08c;
+    --color-dk-light: #f7f4ef;
+    --color-dk-card: #262220;
+    --color-dk-card-hover: #332d29;
+    --color-dk-border: rgba(244, 230, 212, 0.12);
+    --color-dk-border-strong: rgba(244, 230, 212, 0.24);
+    --color-dk-text-muted: rgba(247, 244, 239, 0.60);
+    --color-dk-accent-glow: rgba(217, 142, 104, 0.18);
+    --color-dk-muted-gray: #9e9893;
+    --color-dk-surface-dark: #23201e;
 
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -184,7 +191,7 @@
     --color-auth-text: oklch(0.226 0 0);
     --color-auth-error: oklch(0.672 0.164 26.5);
 
-    --animate-slide-down: slide-down 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    --animate-slide-down: slide-down 200ms cubic-bezier(0.37, 0, 0.63, 1);
 }
 
 @keyframes slide-down {
@@ -232,11 +239,11 @@
     }
 
     .auth-btn-primary {
-        @apply mt-1 h-12 w-full cursor-pointer rounded-[4px] font-sans text-base font-medium;
+        @apply mt-1 h-12 w-full cursor-pointer rounded-[6px] font-sans text-base font-medium;
     }
 
     .auth-btn-oauth {
-        @apply h-12 w-full cursor-pointer rounded-[4px] font-sans text-base font-medium;
+        @apply h-12 w-full cursor-pointer rounded-[6px] font-sans text-base font-medium;
     }
 
     .auth-error-box {

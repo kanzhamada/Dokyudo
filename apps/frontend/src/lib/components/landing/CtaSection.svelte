@@ -36,13 +36,13 @@
 		font-size: 14px;
 		font-weight: 600;
 		padding: 10px 22px;
-		border-radius: var(--dk-radius-pill);
+		border-radius: var(--dk-radius-sm);
 		background: var(--dk-copper);
 		border: none;
 		cursor: pointer;
 		transition:
-			background 0.2s ease,
-			transform 0.15s ease;
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		letter-spacing: -0.01em;
 	}
 
@@ -70,7 +70,7 @@
 		margin: 0 auto;
 		display: grid;
 		grid-template-columns: 1fr 1.2fr;
-		border-radius: var(--dk-radius);
+		border-radius: 0px;
 		overflow: hidden;
 		background: var(--dk-bg-card);
 		border: 1px solid var(--dk-border);
@@ -97,8 +97,8 @@
 	.cta-mini-card {
 		background: var(--dk-bg-deep);
 		border: 1px solid var(--dk-border);
-		border-radius: var(--dk-radius-sm);
-		padding: 16px;
+		border-radius: 0px;
+		padding: 15px;
 		margin-top: 32px;
 	}
 
@@ -113,7 +113,9 @@
 	.cta-mini-card p {
 		font-size: 14px;
 		color: var(--dk-cream);
-		margin: 0 0 14px;
+		line-height: 1.3;
+		letter-spacing: -0.02em;
+		margin: 0 0 5px;
 		font-weight: 500;
 	}
 

@@ -84,13 +84,13 @@
 		font-size: 14px;
 		font-weight: 600;
 		padding: 10px 22px;
-		border-radius: var(--dk-radius-pill);
+		border-radius: var(--dk-radius-sm);
 		background: var(--dk-copper);
 		border: none;
 		cursor: pointer;
 		transition:
-			background 0.2s ease,
-			transform 0.15s ease;
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		letter-spacing: -0.01em;
 	}
 
@@ -117,14 +117,14 @@
 		font-size: 14px;
 		font-weight: 500;
 		padding: 10px 22px;
-		border-radius: var(--dk-radius-pill);
+		border-radius: var(--dk-radius-sm);
 		background: transparent;
 		border: 1px solid var(--dk-border-strong);
 		cursor: pointer;
 		transition:
-			border-color 0.2s ease,
-			background 0.2s ease,
-			transform 0.15s ease;
+			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		letter-spacing: -0.01em;
 	}
 
@@ -203,13 +203,13 @@
 	}
 
 	.feature-card {
-		border-radius: var(--dk-radius);
+		border-radius: 0px;
 		overflow: hidden;
 		position: relative;
 		display: flex;
 		flex-direction: column;
 		border: 1px solid var(--dk-border);
-		transition: border-color 0.3s ease;
+		transition: border-color 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.feature-card:hover {
@@ -225,7 +225,7 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		transition: transform 0.6s ease;
+		transition: transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.feature-card:hover .feature-card-image img {
@@ -233,7 +233,7 @@
 	}
 
 	.feature-card-overlay {
-		padding: 28px;
+		padding: 15px;
 		background: linear-gradient(180deg, rgba(37, 34, 32, 0.95), var(--dk-bg-card));
 	}
 
@@ -241,14 +241,15 @@
 		font-size: 22px;
 		font-weight: 600;
 		color: var(--dk-cream);
-		margin: 0 0 12px;
+		margin: 0 0 5px;
 		letter-spacing: -0.02em;
 	}
 
 	.feature-card-overlay p {
 		font-size: 14px;
 		color: var(--dk-text-muted);
-		line-height: 1.65;
+		line-height: 1.4;
+		letter-spacing: -0.02em;
 		margin: 0 0 20px;
 	}
 

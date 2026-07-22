@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ArrowUpRight } from '@lucide/svelte';
+	import favicon from '$lib/assets/favicon.svg?raw';
 
 	let {
 		isCollapsed = false,
@@ -18,19 +19,11 @@
 	onmouseleave={() => (navHovered = false)}
 >
 	<div class="nav-inner">
-		<a href="/" class="nav-logo" aria-label="Dokyudo Home">
-			<svg
-				width="28"
-				height="28"
-				viewBox="0 0 32 32"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<rect width="32" height="32" rx="8" fill="var(--color-dk-copper)" />
-				<path d="M8 10h6a6 6 0 0 1 0 12H8V10z" fill="var(--color-dk-bg)" />
-				<circle cx="22" cy="16" r="4" fill="var(--color-dk-cream)" />
-			</svg>
-			<span class="nav-logo-text">Dokyudo</span>
+		<a href="/" class="nav-logo gap-0.5" aria-label="Dokyudo Home">
+		<div class=" [&_path]:fill-white [&>svg]:size-6">
+			{@html favicon}
+		</div>
+			<span class="nav-logo-text">okyudo</span>
 		</a>
 		<div class="nav-links">
 			<a href="#about">About</a>
@@ -67,11 +60,11 @@
 			0 10px 15px -3px rgba(0, 0, 0, 0.3),
 			0 4px 6px -4px rgba(0, 0, 0, 0.2);
 		transition:
-			width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-			max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-			padding 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-			border-radius 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-			background 0.3s ease;
+			width 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			max-width 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			padding 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			border-radius 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	/* ── Collapsed (Dynamic Island) state ── */
@@ -106,7 +99,7 @@
 		-webkit-mask-composite: xor;
 		mask-composite: exclude;
 		z-index: -1;
-		transition: opacity 0.3s ease;
+		transition: opacity 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.landing-nav.collapsed .nav-links,
@@ -136,19 +129,18 @@
 	.nav-logo {
 		display: flex;
 		align-items: center;
-		gap: 10px;
 		text-decoration: none;
 		color: var(--dk-cream);
 		font-weight: 600;
 		font-size: 18px;
 		letter-spacing: -0.02em;
-		transition: gap 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		transition: gap 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.nav-logo-text {
 		transition:
-			opacity 0.3s ease,
-			width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+			opacity 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			width 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		white-space: nowrap;
 	}
 
@@ -156,8 +148,8 @@
 		display: flex;
 		gap: 32px;
 		transition:
-			opacity 0.3s ease,
-			width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+			opacity 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			width 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		white-space: nowrap;
 	}
 
@@ -166,8 +158,8 @@
 		color: var(--dk-text-muted);
 		font-size: 14px;
 		font-weight: 400;
-		transition: color 0.2s ease;
-		letter-spacing: -0.01em;
+		transition: color 200ms cubic-bezier(0.37, 0, 0.63, 1);
+		letter-spacing: -0.02em;
 	}
 
 	.nav-links a:hover {
@@ -179,8 +171,8 @@
 		align-items: center;
 		gap: 12px;
 		transition:
-			opacity 0.3s ease,
-			width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+			opacity 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			width 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		white-space: nowrap;
 	}
 
@@ -190,8 +182,8 @@
 		font-size: 14px;
 		font-weight: 500;
 		padding: 8px 16px;
-		border-radius: var(--dk-radius-pill);
-		transition: background 0.2s ease;
+		border-radius: var(--dk-radius-sm);
+		transition: background 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.nav-btn-ghost:hover {
@@ -207,11 +199,11 @@
 		font-size: 14px;
 		font-weight: 600;
 		padding: 8px 18px;
-		border-radius: var(--dk-radius-pill);
+		border-radius: var(--dk-radius-sm);
 		background: var(--dk-copper);
 		transition:
-			background 0.2s ease,
-			transform 0.15s ease;
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.nav-btn-accent:hover {

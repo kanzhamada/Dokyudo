@@ -233,14 +233,14 @@
 		font-size: 14px;
 		font-weight: 600;
 		padding: 10px 22px;
-		border-radius: var(--dk-radius-pill);
+		border-radius: var(--dk-radius-sm);
 		background: var(--dk-copper);
 		border: none;
 		cursor: pointer;
 		transition:
-			background 0.2s ease,
-			transform 0.15s ease;
-		letter-spacing: -0.01em;
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
+		letter-spacing: -0.02em;
 	}
 
 	.btn-primary:hover {
@@ -261,15 +261,15 @@
 		font-size: 14px;
 		font-weight: 500;
 		padding: 10px 22px;
-		border-radius: var(--dk-radius-pill);
+		border-radius: var(--dk-radius-sm);
 		background: transparent;
 		border: 1px solid var(--dk-border-strong);
 		cursor: pointer;
 		transition:
-			border-color 0.2s ease,
-			background 0.2s ease,
-			transform 0.15s ease;
-		letter-spacing: -0.01em;
+			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
+		letter-spacing: -0.02em;
 	}
 
 	.btn-outline:hover {
@@ -367,7 +367,7 @@
 		top: calc(475px + calc(calc(var(--y) - 475) * var(--spread-multiplier) * 1px));
 		z-index: 10;
 		pointer-events: auto;
-		cursor: pointer;
+		/*cursor: pointer;*/
 		translate: 0 0;
 		transition:
 			left 0.8s cubic-bezier(0.16, 1, 0.3, 1),
