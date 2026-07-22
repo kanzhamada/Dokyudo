@@ -20,21 +20,24 @@
 
 	onMount(() => {
 		if (!containerEl) return;
+		const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 		const ctx = gsap.context(() => {
 			const navEl = document.getElementById('landing-nav');
 
-			ScrollTrigger.create({
-				scroller: containerEl,
-				start: 'top top',
-				end: 'max',
-				onUpdate: (self) => {
-					isCollapsed = self.scroll() > 80;
-					if (navEl) {
-						navEl.style.setProperty('--progress', self.progress.toString());
+			if (!prefersReduced) {
+				ScrollTrigger.create({
+					scroller: containerEl,
+					start: 'top top',
+					end: 'max',
+					onUpdate: (self) => {
+						isCollapsed = self.scroll() > 80;
+						if (navEl) {
+							navEl.style.setProperty('--progress', self.progress.toString());
+						}
 					}
-				}
-			});
+				});
+			}
 		}, containerEl);
 
 		return () => ctx.revert();

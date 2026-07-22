@@ -98,7 +98,7 @@
 
 <style>
 	footer {
-		font-family: 'Geist Sans', 'Inter Variable', system-ui, sans-serif;
+		font-family: var(--font-body);
 		color: var(--dk-light);
 	}
 
@@ -108,6 +108,7 @@
 		gap: 6px;
 		text-decoration: none;
 		color: var(--dk-bg);
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		font-weight: 600;
 		padding: 10px 22px;
@@ -141,6 +142,7 @@
 		gap: 6px;
 		text-decoration: none;
 		color: var(--dk-cream);
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		font-weight: 500;
 		padding: 10px 22px;
@@ -170,6 +172,14 @@
 		padding: 8px 18px;
 	}
 
+	.btn-primary:focus-visible,
+	.btn-outline:focus-visible,
+	.social-circle:focus-visible,
+	.footer-col a:focus-visible {
+		outline: 2px solid var(--dk-copper);
+		outline-offset: 2px;
+	}
+
 	.landing-footer {
 		background: var(--dk-bg-deep);
 		padding: var(--dk-section-py) var(--dk-section-px) 32px;
@@ -189,6 +199,7 @@
 	}
 
 	.footer-logo span {
+		font-family: var(--font-display);
 		font-size: 28px;
 		font-weight: 600;
 		color: var(--dk-cream);
@@ -216,7 +227,8 @@
 	}
 
 	.footer-col h4 {
-		font-size: 14px;
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-2);
 		color: var(--dk-cream);
 		font-weight: 500;
 		margin: 0 0 16px;
@@ -227,7 +239,8 @@
 		display: block;
 		text-decoration: none;
 		color: var(--dk-text-muted);
-		font-size: 14px;
+		font-family: var(--font-body);
+		font-size: var(--t-b-2);
 		padding: 4px 0;
 		transition: color 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
@@ -252,10 +265,11 @@
 	}
 
 	.footer-quote {
-		font-size: 20px;
+		font-family: var(--font-display);
+		font-size: var(--t-h-4);
 		color: var(--dk-cream);
 		font-weight: 400;
-		line-height: 1.4;
+		line-height: 1.2;
 		margin: 0 0 24px;
 		max-width: 44ch;
 		font-style: italic;
@@ -297,6 +311,7 @@
 	}
 
 	.footer-copyright {
+		font-family: var(--font-subhead);
 		text-align: center;
 		font-size: 13px;
 		color: var(--dk-text-muted);

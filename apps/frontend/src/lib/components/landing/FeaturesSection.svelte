@@ -5,7 +5,7 @@
 <section class="features-section" id="features">
 	<div class="features-header">
 		<div>
-			<span class="section-label">✦ Core Capabilities</span>
+			<span class="section-label">Core Capabilities</span>
 			<h2 class="section-headline">Intelligence built into every layer.</h2>
 		</div>
 		<a href="/auth/register" class="btn-outline btn-outline-sm">
@@ -18,12 +18,8 @@
 
 	<div class="feature-cards-grid">
 		<div class="feature-card">
-			<div class="feature-card-image">
-				<img
-					src="/landing/feature-upload.jpg"
-					alt="Document ingestion pipeline"
-					loading="lazy"
-				/>
+			<div class="feature-card-image-placeholder">
+				<span class="placeholder-label">Ingestion Pipeline Image</span>
 			</div>
 			<div class="feature-card-overlay">
 				<h3>Semantic Document Ingestion</h3>
@@ -43,12 +39,8 @@
 		</div>
 
 		<div class="feature-card">
-			<div class="feature-card-image">
-				<img
-					src="/landing/feature-rag-chat.jpg"
-					alt="RAG Q&A streaming interface"
-					loading="lazy"
-				/>
+			<div class="feature-card-image-placeholder">
+				<span class="placeholder-label">RAG Q&A Streaming Image</span>
 			</div>
 			<div class="feature-card-overlay">
 				<h3>RAG Q&A with Streaming</h3>
@@ -71,7 +63,7 @@
 
 <style>
 	section {
-		font-family: 'Geist Sans', 'Inter Variable', system-ui, sans-serif;
+		font-family: var(--font-body);
 		color: var(--dk-light);
 	}
 
@@ -81,6 +73,7 @@
 		gap: 6px;
 		text-decoration: none;
 		color: var(--dk-bg);
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		font-weight: 600;
 		padding: 10px 22px;
@@ -114,6 +107,7 @@
 		gap: 6px;
 		text-decoration: none;
 		color: var(--dk-cream);
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		font-weight: 500;
 		padding: 10px 22px;
@@ -144,20 +138,29 @@
 		padding: 8px 18px;
 	}
 
+	.btn-primary:focus-visible,
+	.btn-outline:focus-visible {
+		outline: 2px solid var(--dk-copper);
+		outline-offset: 2px;
+	}
+
 	.section-label {
 		display: block;
-		font-size: 13px;
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-3);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 		color: var(--dk-text-muted);
-		letter-spacing: 0.02em;
 		margin-bottom: 16px;
 	}
 
 	.section-headline {
-		font-size: clamp(32px, 5vw, 48px);
-		font-weight: 500;
+		font-family: var(--font-display);
+		font-size: clamp(var(--t-h-4), 4.5vw, var(--t-h-1));
+		font-weight: 400;
 		color: var(--dk-cream);
-		line-height: 1.1;
-		letter-spacing: -0.03em;
+		line-height: 1;
+		letter-spacing: -0.02em;
 		margin: 0;
 	}
 
@@ -208,7 +211,7 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		border: 1px solid var(--dk-border);
+		border: 1px solid var(--brand-guideline-border-color);
 		transition: border-color 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
@@ -216,20 +219,27 @@
 		border-color: var(--dk-border-strong);
 	}
 
-	.feature-card-image {
-		height: 280px;
-		overflow: hidden;
+	.feature-card-image-placeholder {
+		height: 240px;
+		border-bottom: 1px dashed var(--dk-border-strong);
+		background: var(--dk-bg-card);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: background 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
-	.feature-card-image img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		transition: transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
+	.feature-card:hover .feature-card-image-placeholder {
+		background: var(--dk-bg-card-hover);
 	}
 
-	.feature-card:hover .feature-card-image img {
-		transform: scale(1.04);
+	.placeholder-label {
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-3);
+		color: var(--dk-text-muted);
+		opacity: 0.6;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
 	.feature-card-overlay {
@@ -238,18 +248,20 @@
 	}
 
 	.feature-card-overlay h3 {
-		font-size: 22px;
-		font-weight: 600;
+		font-family: var(--font-subhead);
+		font-size: var(--t-h-4);
+		font-weight: 500;
 		color: var(--dk-cream);
 		margin: 0 0 5px;
 		letter-spacing: -0.02em;
 	}
 
 	.feature-card-overlay p {
-		font-size: 14px;
+		font-family: var(--font-body);
+		font-size: var(--t-b-2);
 		color: var(--dk-text-muted);
 		line-height: 1.4;
-		letter-spacing: -0.02em;
+		letter-spacing: -0.03em;
 		margin: 0 0 20px;
 	}
 
@@ -260,6 +272,7 @@
 	}
 
 	.feature-meta {
+		font-family: var(--font-subhead);
 		font-size: 12px;
 		color: var(--dk-text-muted);
 		letter-spacing: 0.04em;

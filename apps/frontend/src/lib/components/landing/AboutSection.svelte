@@ -5,15 +5,11 @@
 <div class="snap-section">
 	<section class="about-section" id="about">
 		<div class="about-inner">
-			<div class="about-image">
-				<img
-					src="/landing/about-workspace.jpg"
-					alt="Analyst working with financial reports"
-					loading="lazy"
-				/>
+			<div class="about-image-placeholder">
+				<span class="placeholder-label">Workspace Image</span>
 			</div>
 			<div class="about-content">
-				<span class="section-label">✦ About Dokyudo</span>
+				<span class="section-label">About Dokyudo</span>
 				<h2 class="section-headline">Precise answers from dense financial reports.</h2>
 				<p class="section-body">
 					Dokyudo transforms how teams interact with financial documents. Upload annual reports,
@@ -68,6 +64,7 @@
 		gap: 6px;
 		text-decoration: none;
 		color: var(--dk-bg);
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		font-weight: 600;
 		padding: 10px 22px;
@@ -90,28 +87,37 @@
 		transform: scale(0.98);
 	}
 
+	.btn-primary:focus-visible {
+		outline: 2px solid var(--dk-copper);
+		outline-offset: 2px;
+	}
+
 	.section-label {
 		display: block;
-		font-size: 13px;
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-3);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 		color: var(--dk-text-muted);
-		letter-spacing: 0.02em;
 		margin-bottom: 16px;
 	}
 
 	.section-headline {
-		font-size: clamp(32px, 5vw, 48px);
-		font-weight: 500;
+		font-family: var(--font-display);
+		font-size: clamp(var(--t-h-4), 4.5vw, var(--t-h-1));
+		font-weight: 400;
 		color: var(--dk-cream);
-		line-height: 1.1;
-		letter-spacing: -0.03em;
+		line-height: 1;
+		letter-spacing: -0.02em;
 		margin: 0;
 	}
 
 	.section-body {
-		font-size: 15px;
+		font-family: var(--font-body);
+		font-size: var(--t-b-1);
 		color: var(--dk-text-muted);
 		line-height: 1.4;
-		letter-spacing: -0.02em;
+		letter-spacing: -0.04em;
 		max-width: 50ch;
 		margin: 20px 0 28px;
 	}
@@ -134,16 +140,23 @@
 		align-items: start;
 	}
 
-	.about-image {
-		border-radius: 0px;
-		overflow: hidden;
+	.about-image-placeholder {
 		aspect-ratio: 4/5;
+		border: 1px dashed var(--dk-border-strong);
+		background: var(--dk-bg-card);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 0px;
 	}
 
-	.about-image img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
+	.placeholder-label {
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-3);
+		color: var(--dk-text-muted);
+		opacity: 0.6;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
 	.about-cards {
@@ -156,7 +169,7 @@
 	.value-card {
 		padding: 15px;
 		border-radius: 0px;
-		border: 1px solid var(--dk-border);
+		border: 1px solid var(--brand-guideline-border-color);
 		background: var(--dk-bg-card);
 		transition:
 			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1),
@@ -182,7 +195,8 @@
 	}
 
 	.value-card h3 {
-		font-size: 15px;
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-2);
 		font-weight: 600;
 		color: var(--dk-cream);
 		margin: 0 0 5px;
@@ -190,10 +204,11 @@
 	}
 
 	.value-card p {
-		font-size: 13px;
+		font-family: var(--font-body);
+		font-size: var(--t-b-3);
 		color: var(--dk-text-muted);
 		line-height: 1.4;
-		letter-spacing: -0.02em;
+		letter-spacing: -0.03em;
 		margin: 0;
 	}
 </style>

@@ -32,6 +32,7 @@
 	let heroSectionEl = $state<HTMLElement | null>(null);
 
 	onMount(() => {
+		const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		const scroller = containerEl || heroSectionEl?.closest('.fullpage-container') || window;
 		const scope = heroSectionEl || undefined;
 
@@ -52,65 +53,67 @@
 					'-=0.9'
 				);
 
-			/* B. Scroll Parallax */
-			gsap.to('.hero-scroll-parallax', {
-				y: 150,
-				ease: 'none',
-				scrollTrigger: {
-					trigger: '.snap-hero',
-					scroller: scroller,
-					start: 'top top',
-					end: 'bottom top',
-					scrub: true
-				}
-			});
-
-			gsap.to('.hero-text-parallax', {
-				y: 250,
-				opacity: 0,
-				ease: 'none',
-				scrollTrigger: {
-					trigger: '.snap-hero',
-					scroller: scroller,
-					start: 'top top',
-					end: '70% top',
-					scrub: true
-				}
-			});
-
-			/* C. Float Animations */
-			const floatElements = [
-				{ sel: '.bg-el.book', y: -14, rot: 1.5, dur: 7, delay: 2 },
-				{ sel: '.bg-el.paper1', y: -10, rot: 0, dur: 6, delay: 1 },
-				{ sel: '.bg-el.paper2', y: -12, rot: -1.5, dur: 8, delay: 4 },
-				{ sel: '.bg-el.paper3', y: -14, rot: 1.5, dur: 6.5, delay: 3 },
-				{ sel: '.bg-el.paper4', y: -10, rot: 0, dur: 7.5, delay: 0 },
-				{ sel: '.bg-el.paper5', y: -12, rot: -1.5, dur: 9, delay: 5 },
-				{ sel: '.bg-el.paper6', y: -14, rot: 1.5, dur: 5.5, delay: 2 },
-				{ sel: '.bg-el.paper7', y: -10, rot: 0, dur: 8.5, delay: 1.5 },
-				{ sel: '.bg-el.flower1', y: -14, rot: 1.5, dur: 6.8, delay: 4 },
-				{ sel: '.bg-el.flower2', y: -10, rot: 0, dur: 7.2, delay: 0.5 },
-				{ sel: '.bg-el.flower3', y: -12, rot: -1.5, dur: 8.2, delay: 2.5 },
-				{ sel: '.bg-el.flower4', y: -14, rot: 1.5, dur: 5.8, delay: 1 },
-				{ sel: '.bg-el.flower5', y: -10, rot: 0, dur: 9.5, delay: 6 },
-				{ sel: '.bg-el.flower6', y: -12, rot: -1.5, dur: 7.7, delay: 3 },
-				{ sel: '.bg-el.flower7', y: -14, rot: 1.5, dur: 6.2, delay: 0 },
-				{ sel: '.bg-el.flower8', y: -10, rot: 0, dur: 8.8, delay: 4.5 }
-			];
-
-			floatElements.forEach((item) => {
-				const tween = gsap.to(item.sel, {
-					y: item.y,
-					rotation: item.rot,
-					duration: item.dur,
-					repeat: -1,
-					yoyo: true,
-					ease: 'sine.inOut'
+			if (!prefersReducedMotion) {
+				/* B. Scroll Parallax */
+				gsap.to('.hero-scroll-parallax', {
+					y: 150,
+					ease: 'none',
+					scrollTrigger: {
+						trigger: '.snap-hero',
+						scroller: scroller,
+						start: 'top top',
+						end: 'bottom top',
+						scrub: true
+					}
 				});
-				if (item.delay > 0) {
-					tween.progress(item.delay / item.dur);
-				}
-			});
+
+				gsap.to('.hero-text-parallax', {
+					y: 250,
+					opacity: 0,
+					ease: 'none',
+					scrollTrigger: {
+						trigger: '.snap-hero',
+						scroller: scroller,
+						start: 'top top',
+						end: '70% top',
+						scrub: true
+					}
+				});
+
+				/* C. Float Animations */
+				const floatElements = [
+					{ sel: '.bg-el.book', y: -14, rot: 1.5, dur: 7, delay: 2 },
+					{ sel: '.bg-el.paper1', y: -10, rot: 0, dur: 6, delay: 1 },
+					{ sel: '.bg-el.paper2', y: -12, rot: -1.5, dur: 8, delay: 4 },
+					{ sel: '.bg-el.paper3', y: -14, rot: 1.5, dur: 6.5, delay: 3 },
+					{ sel: '.bg-el.paper4', y: -10, rot: 0, dur: 7.5, delay: 0 },
+					{ sel: '.bg-el.paper5', y: -12, rot: -1.5, dur: 9, delay: 5 },
+					{ sel: '.bg-el.paper6', y: -14, rot: 1.5, dur: 5.5, delay: 2 },
+					{ sel: '.bg-el.paper7', y: -10, rot: 0, dur: 8.5, delay: 1.5 },
+					{ sel: '.bg-el.flower1', y: -14, rot: 1.5, dur: 6.8, delay: 4 },
+					{ sel: '.bg-el.flower2', y: -10, rot: 0, dur: 7.2, delay: 0.5 },
+					{ sel: '.bg-el.flower3', y: -12, rot: -1.5, dur: 8.2, delay: 2.5 },
+					{ sel: '.bg-el.flower4', y: -14, rot: 1.5, dur: 5.8, delay: 1 },
+					{ sel: '.bg-el.flower5', y: -10, rot: 0, dur: 9.5, delay: 6 },
+					{ sel: '.bg-el.flower6', y: -12, rot: -1.5, dur: 7.7, delay: 3 },
+					{ sel: '.bg-el.flower7', y: -14, rot: 1.5, dur: 6.2, delay: 0 },
+					{ sel: '.bg-el.flower8', y: -10, rot: 0, dur: 8.8, delay: 4.5 }
+				];
+
+				floatElements.forEach((item) => {
+					const tween = gsap.to(item.sel, {
+						y: item.y,
+						rotation: item.rot,
+						duration: item.dur,
+						repeat: -1,
+						yoyo: true,
+						ease: 'sine.inOut'
+					});
+					if (item.delay > 0) {
+						tween.progress(item.delay / item.dur);
+					}
+				});
+			}
 
 			/* D. Hover Micro-Spread */
 			if (heroSectionEl) {
@@ -245,7 +248,6 @@
 
 	.btn-primary:hover {
 		background: var(--color-dk-copper-hover);
-		transform: translateY(-1px);
 	}
 
 	.btn-primary:active {
@@ -275,7 +277,6 @@
 	.btn-outline:hover {
 		border-color: var(--dk-copper);
 		background: var(--dk-accent-glow);
-		transform: translateY(-1px);
 	}
 
 	.btn-outline:active {
@@ -533,19 +534,19 @@
 	}
 
 	.hero-headline {
-		font-family: 'Playfair Display', serif;
-		font-weight: 500;
-		font-size: 48px;
+		font-family: var(--font-display);
+		font-weight: 400;
+		font-size: clamp(2.25rem, 5vw, var(--t-h-1));
 		color: var(--color-dk-cream);
-		line-height: 1.2;
+		line-height: 1;
 		letter-spacing: -0.02em;
 		text-align: center;
-		margin: 0 0 32px 0;
+		margin: 0 0 40px 0;
 	}
 
 	.highlight-meaning {
-		font-family: 'Playfair Display', serif;
-		font-weight: 600;
+		font-family: var(--font-display);
+		font-weight: 500;
 		font-style: italic;
 		color: var(--color-dk-copper);
 	}
@@ -554,4 +555,12 @@
 		display: flex;
 		gap: 12px;
 	}
+
+	.btn-primary:focus-visible,
+	.btn-outline:focus-visible {
+		outline: 2px solid var(--dk-copper);
+		outline-offset: 2px;
+	}
+
+
 </style>

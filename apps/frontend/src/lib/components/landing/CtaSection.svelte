@@ -7,7 +7,9 @@
 		<div class="cta-content">
 			<h2 class="cta-headline">Start searching your documents intelligently.</h2>
 			<div class="cta-mini-card">
-				<img src="/landing/feature-rag-chat.jpg" alt="Dokyudo AI chat" loading="lazy" />
+				<div class="mini-card-image-placeholder">
+					<span class="placeholder-label">UI Preview Image</span>
+				</div>
 				<p>Hybrid search across all your reports.</p>
 				<a href="/auth/register" class="btn-primary btn-sm">
 					Get Started
@@ -15,15 +17,15 @@
 				</a>
 			</div>
 		</div>
-		<div class="cta-image">
-			<img src="/landing/cta-person.jpg" alt="Professional using Dokyudo" loading="lazy" />
+		<div class="cta-image-placeholder">
+			<span class="placeholder-label">Feature Overview Image</span>
 		</div>
 	</div>
 </section>
 
 <style>
 	section {
-		font-family: 'Geist Sans', 'Inter Variable', system-ui, sans-serif;
+		font-family: var(--font-body);
 		color: var(--dk-light);
 	}
 
@@ -33,6 +35,7 @@
 		gap: 6px;
 		text-decoration: none;
 		color: var(--dk-bg);
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		font-weight: 600;
 		padding: 10px 22px;
@@ -60,6 +63,11 @@
 		padding: 8px 18px;
 	}
 
+	.btn-primary:focus-visible {
+		outline: 2px solid var(--dk-copper);
+		outline-offset: 2px;
+	}
+
 	.cta-section {
 		background: var(--dk-bg);
 		padding: 0 var(--dk-section-px) var(--dk-section-py);
@@ -73,7 +81,7 @@
 		border-radius: 0px;
 		overflow: hidden;
 		background: var(--dk-bg-card);
-		border: 1px solid var(--dk-border);
+		border: 1px solid var(--brand-guideline-border-color);
 		min-height: 400px;
 		width: 100%;
 	}
@@ -86,47 +94,61 @@
 	}
 
 	.cta-headline {
-		font-size: clamp(28px, 4vw, 40px);
-		font-weight: 500;
+		font-family: var(--font-display);
+		font-size: clamp(var(--t-h-4), 4vw, var(--t-h-2));
+		font-weight: 400;
 		color: var(--dk-cream);
-		line-height: 1.1;
-		letter-spacing: -0.03em;
+		line-height: 1;
+		letter-spacing: -0.02em;
 		margin: 0;
 	}
 
 	.cta-mini-card {
 		background: var(--dk-bg-deep);
-		border: 1px solid var(--dk-border);
+		border: 1px solid var(--brand-guideline-border-color);
 		border-radius: 0px;
 		padding: 15px;
 		margin-top: 32px;
 	}
 
-	.cta-mini-card img {
+	.mini-card-image-placeholder {
 		width: 100%;
 		height: 80px;
-		object-fit: cover;
-		border-radius: 8px;
+		border: 1px dashed var(--dk-border-strong);
+		background: var(--dk-bg-card);
+		border-radius: 0px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		margin-bottom: 12px;
 	}
 
+	.placeholder-label {
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-3);
+		color: var(--dk-text-muted);
+		opacity: 0.6;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
 	.cta-mini-card p {
-		font-size: 14px;
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-2);
 		color: var(--dk-cream);
 		line-height: 1.3;
 		letter-spacing: -0.02em;
-		margin: 0 0 5px;
+		margin: 0 0 8px;
 		font-weight: 500;
 	}
 
-	.cta-image {
-		overflow: hidden;
-	}
-
-	.cta-image img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
+	.cta-image-placeholder {
+		border-left: 1px dashed var(--dk-border-strong);
+		background: var(--dk-bg-deep);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 300px;
 	}
 
 	@media (max-width: 1024px) {
@@ -134,8 +156,10 @@
 			grid-template-columns: 1fr;
 		}
 
-		.cta-image {
-			height: 280px;
+		.cta-image-placeholder {
+			min-height: 240px;
+			border-left: none;
+			border-top: 1px dashed var(--dk-border-strong);
 		}
 	}
 

@@ -38,16 +38,12 @@
 <section class="faq-section" id="faq">
 	<div class="faq-inner">
 		<div class="faq-left">
-			<span class="section-label">✦ FAQ</span>
+			<span class="section-label">FAQ</span>
 			<h2 class="section-headline">
 				Frequently Asked<br />Questions
 			</h2>
-			<div class="faq-image">
-				<img
-					src="/landing/abstract-tech.jpg"
-					alt="Neural network data visualization"
-					loading="lazy"
-				/>
+			<div class="faq-image-placeholder">
+				<span class="placeholder-label">Tech Diagram Image</span>
 			</div>
 		</div>
 
@@ -83,24 +79,27 @@
 
 <style>
 	section {
-		font-family: 'Geist Sans', 'Inter Variable', system-ui, sans-serif;
+		font-family: var(--font-body);
 		color: var(--dk-light);
 	}
 
 	.section-label {
 		display: block;
-		font-size: 13px;
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-3);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 		color: var(--dk-text-muted);
-		letter-spacing: 0.02em;
 		margin-bottom: 16px;
 	}
 
 	.section-headline {
-		font-size: clamp(32px, 5vw, 48px);
-		font-weight: 500;
+		font-family: var(--font-display);
+		font-size: clamp(var(--t-h-4), 4.5vw, var(--t-h-1));
+		font-weight: 400;
 		color: var(--dk-cream);
-		line-height: 1.1;
-		letter-spacing: -0.03em;
+		line-height: 1;
+		letter-spacing: -0.02em;
 		margin: 0;
 	}
 
@@ -128,17 +127,24 @@
 		top: 100px;
 	}
 
-	.faq-image {
+	.faq-image-placeholder {
 		border-radius: 0px;
-		overflow: hidden;
+		border: 1px dashed var(--dk-border-strong);
+		background: var(--dk-bg-card);
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		margin-top: 28px;
 		aspect-ratio: 4/3;
 	}
 
-	.faq-image img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
+	.placeholder-label {
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-3);
+		color: var(--dk-text-muted);
+		opacity: 0.6;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
 	.faq-right {
@@ -152,16 +158,21 @@
 		text-align: left;
 		background: none;
 		border: none;
-		border-top: 1px solid var(--dk-border);
+		border-top: 1px solid var(--brand-guideline-border-color);
 		padding: 24px 0;
 		cursor: pointer;
 		color: inherit;
-		font-family: inherit;
+		font-family: var(--font-subhead);
 		transition: background 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
 	.faq-item:last-child {
-		border-bottom: 1px solid var(--dk-border);
+		border-bottom: 1px solid var(--brand-guideline-border-color);
+	}
+
+	.faq-item:focus-visible {
+		outline: 2px solid var(--dk-copper);
+		outline-offset: -2px;
 	}
 
 	.faq-question {
@@ -172,7 +183,8 @@
 	}
 
 	.faq-question span {
-		font-size: 16px;
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-1);
 		color: var(--dk-cream);
 		font-weight: 500;
 		letter-spacing: -0.02em;
@@ -200,10 +212,11 @@
 	}
 
 	.faq-answer p {
-		font-size: 14px;
+		font-family: var(--font-body);
+		font-size: var(--t-b-2);
 		color: var(--dk-text-muted);
 		line-height: 1.4;
-		letter-spacing: -0.02em;
+		letter-spacing: -0.03em;
 		margin: 0;
 		max-width: 56ch;
 	}
@@ -218,7 +231,7 @@
 			position: static;
 		}
 
-		.faq-image {
+		.faq-image-placeholder {
 			display: none;
 		}
 	}

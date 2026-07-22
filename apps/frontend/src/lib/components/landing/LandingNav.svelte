@@ -146,7 +146,7 @@
 
 	.nav-links {
 		display: flex;
-		gap: 32px;
+		gap: 28px;
 		transition:
 			opacity 200ms cubic-bezier(0.37, 0, 0.63, 1),
 			width 200ms cubic-bezier(0.37, 0, 0.63, 1);
@@ -156,6 +156,7 @@
 	.nav-links a {
 		text-decoration: none;
 		color: var(--dk-text-muted);
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		font-weight: 400;
 		transition: color 200ms cubic-bezier(0.37, 0, 0.63, 1);
@@ -164,6 +165,14 @@
 
 	.nav-links a:hover {
 		color: var(--dk-cream);
+	}
+
+	.nav-links a:focus-visible,
+	.nav-btn-ghost:focus-visible,
+	.nav-btn-accent:focus-visible,
+	.nav-logo:focus-visible {
+		outline: 2px solid var(--dk-copper);
+		outline-offset: 2px;
 	}
 
 	.nav-actions {
@@ -179,10 +188,11 @@
 	.nav-btn-ghost {
 		text-decoration: none;
 		color: var(--dk-cream);
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		font-weight: 500;
 		padding: 8px 16px;
-		border-radius: var(--dk-radius-sm);
+		border-radius: 24px;
 		transition: background 200ms cubic-bezier(0.37, 0, 0.63, 1);
 	}
 
@@ -196,10 +206,11 @@
 		gap: 6px;
 		text-decoration: none;
 		color: var(--dk-bg);
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		font-weight: 600;
 		padding: 8px 18px;
-		border-radius: var(--dk-radius-sm);
+		border-radius: 24px;
 		background: var(--dk-copper);
 		transition:
 			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
@@ -208,6 +219,5 @@
 
 	.nav-btn-accent:hover {
 		background: var(--color-dk-copper-hover);
-		transform: translateY(-1px);
 	}
 </style>

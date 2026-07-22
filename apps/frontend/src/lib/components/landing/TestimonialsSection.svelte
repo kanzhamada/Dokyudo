@@ -41,7 +41,7 @@
 
 <section class="testimonials-section" id="testimonials">
 	<div class="testimonials-header">
-		<span class="section-label">✦ Testimonials</span>
+		<span class="section-label">Testimonials</span>
 		<div class="testimonials-headline-wrap">
 			<div class="features-line"></div>
 			<h2 class="section-headline testimonial-headline">What teams are saying.</h2>
@@ -68,13 +68,9 @@
 			{/each}
 		</div>
 
-		<!-- Center: Featured Image -->
-		<div class="testimonial-center-image">
-			<img
-				src="/landing/about-workspace.jpg"
-				alt="Team using Dokyudo for financial analysis"
-				loading="lazy"
-			/>
+		<!-- Center: Featured Image Placeholder -->
+		<div class="testimonial-center-image-placeholder">
+			<span class="placeholder-label">Team Workspace Image</span>
 		</div>
 
 		<!-- Right: Quote Card -->
@@ -93,7 +89,7 @@
 					<text
 						x="8"
 						y="19"
-						font-family="Geist Sans, sans-serif"
+						font-family="var(--font-subhead)"
 						font-size="11"
 						fill="var(--color-dk-copper)"
 						font-weight="600">{testimonials[activeTestimonial].avatar}</text
@@ -106,24 +102,27 @@
 
 <style>
 	section {
-		font-family: 'Geist Sans', 'Inter Variable', system-ui, sans-serif;
+		font-family: var(--font-body);
 		color: var(--dk-light);
 	}
 
 	.section-label {
 		display: block;
-		font-size: 13px;
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-3);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 		color: var(--dk-text-muted);
-		letter-spacing: 0.02em;
 		margin-bottom: 16px;
 	}
 
 	.section-headline {
-		font-size: clamp(32px, 5vw, 48px);
-		font-weight: 500;
+		font-family: var(--font-display);
+		font-size: clamp(var(--t-h-4), 4.5vw, var(--t-h-1));
+		font-weight: 400;
 		color: var(--dk-cream);
-		line-height: 1.1;
-		letter-spacing: -0.03em;
+		line-height: 1;
+		letter-spacing: -0.02em;
 		margin: 0;
 	}
 
@@ -186,7 +185,7 @@
 	.testimonial-name-card {
 		padding: 15px;
 		border-radius: 0px;
-		border: 1px solid var(--dk-border);
+		border: 1px solid var(--brand-guideline-border-color);
 		background: transparent;
 		display: flex;
 		align-items: center;
@@ -196,7 +195,7 @@
 			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1);
 		cursor: pointer;
 		text-align: left;
-		font-family: inherit;
+		font-family: var(--font-subhead);
 		width: 100%;
 	}
 
@@ -204,6 +203,11 @@
 	.testimonial-name-card.active {
 		background: var(--dk-bg-card);
 		border-color: var(--dk-border-strong);
+	}
+
+	.testimonial-name-card:focus-visible {
+		outline: 2px solid var(--dk-copper);
+		outline-offset: 2px;
 	}
 
 	.testimonial-avatar {
@@ -222,6 +226,7 @@
 	}
 
 	.testimonial-name-card strong {
+		font-family: var(--font-subhead);
 		font-size: 14px;
 		color: var(--dk-cream);
 		display: block;
@@ -229,25 +234,33 @@
 	}
 
 	.testimonial-name-card span {
+		font-family: var(--font-body);
 		font-size: 12px;
 		color: var(--dk-text-muted);
 	}
 
-	.testimonial-center-image {
+	.testimonial-center-image-placeholder {
 		border-radius: 0px;
-		overflow: hidden;
+		border: 1px dashed var(--dk-border-strong);
+		background: var(--dk-bg-card);
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		min-height: 360px;
 	}
 
-	.testimonial-center-image img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
+	.placeholder-label {
+		font-family: var(--font-subhead);
+		font-size: var(--t-b-3);
+		color: var(--dk-text-muted);
+		opacity: 0.6;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
 	.testimonial-quote-card {
 		background: rgba(232, 222, 200, 0.06);
-		border: 1px solid var(--dk-border);
+		border: 1px solid var(--brand-guideline-border-color);
 		border-radius: 0px;
 		padding: 15px;
 		display: flex;
@@ -263,6 +276,7 @@
 		border: 1px solid var(--dk-border-strong);
 		border-radius: var(--dk-radius-pill);
 		padding: 6px 14px;
+		font-family: var(--font-subhead);
 		font-size: 12px;
 		color: var(--dk-copper);
 		font-weight: 500;
@@ -275,15 +289,16 @@
 		color: var(--dk-copper);
 		line-height: 0.8;
 		opacity: 0.4;
-		font-family: Georgia, 'Times New Roman', serif;
+		font-family: var(--font-display);
 		margin-bottom: 5px;
 	}
 
 	.quote-text {
-		font-size: 16px;
+		font-family: var(--font-body);
+		font-size: var(--t-b-1);
 		color: var(--dk-cream);
 		line-height: 1.4;
-		letter-spacing: -0.02em;
+		letter-spacing: -0.04em;
 		margin: 0;
 		flex: 1;
 		font-style: normal;
@@ -312,7 +327,7 @@
 	}
 
 	@media (max-width: 768px) {
-		.testimonial-center-image {
+		.testimonial-center-image-placeholder {
 			min-height: 240px;
 		}
 	}
