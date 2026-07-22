@@ -48,6 +48,27 @@
     --sidebar-muted-foreground: #989595;
     --sidebar-avatar: #D9D9D9;
     --sidebar-brand: #C5937B;
+
+    --dk-bg: var(--color-dk-bg);
+    --dk-bg-deep: var(--color-dk-bg-deep);
+    --dk-cream: var(--color-dk-cream);
+    --dk-copper: var(--color-dk-copper);
+    --dk-copper-hover: var(--color-dk-copper-hover);
+    --dk-light: var(--color-dk-light);
+    --dk-bg-card: var(--color-dk-card);
+    --dk-bg-card-hover: var(--color-dk-card-hover);
+    --dk-border: var(--color-dk-border);
+    --dk-border-strong: var(--color-dk-border-strong);
+    --dk-text-muted: var(--color-dk-text-muted);
+    --dk-accent-glow: var(--color-dk-accent-glow);
+    --dk-muted-gray: var(--color-dk-muted-gray);
+    --dk-surface-dark: var(--color-dk-surface-dark);
+    --dk-radius: 14px;
+    --dk-radius-sm: 10px;
+    --dk-radius-pill: 100px;
+    --dk-max-width: 1280px;
+    --dk-section-py: clamp(80px, 10vw, 120px);
+    --dk-section-px: clamp(20px, 5vw, 48px);
 }
 
 .dark {
@@ -97,6 +118,23 @@
     --font-sans: 'Inter Variable', sans-serif;
     --font-playfair: 'Playfair Display', serif;
     --font-geist: 'Geist Sans', sans-serif;
+
+    /* Dokyudo Theme Color Tokens */
+    --color-dk-bg: #1c1b1b;
+    --color-dk-bg-deep: #2a221e;
+    --color-dk-cream: #e8dec8;
+    --color-dk-copper: #c5937b;
+    --color-dk-copper-hover: #d4a48c;
+    --color-dk-light: #efefef;
+    --color-dk-card: #252220;
+    --color-dk-card-hover: #302b27;
+    --color-dk-border: rgba(232, 222, 200, 0.12);
+    --color-dk-border-strong: rgba(232, 222, 200, 0.22);
+    --color-dk-text-muted: rgba(239, 239, 239, 0.55);
+    --color-dk-accent-glow: rgba(197, 147, 123, 0.15);
+    --color-dk-muted-gray: #8e8e8e;
+    --color-dk-surface-dark: #232323;
+
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);

@@ -125,9 +125,9 @@
 				fill="none"
 				xmlns="http://www.w3.org/2000/svg"
 			>
-				<rect width="32" height="32" rx="8" fill="#C5937B" />
-				<path d="M8 10h6a6 6 0 0 1 0 12H8V10z" fill="#1C1B1B" />
-				<circle cx="22" cy="16" r="4" fill="#E8DEC8" />
+				<rect width="32" height="32" rx="8" fill="var(--color-dk-copper)" />
+				<path d="M8 10h6a6 6 0 0 1 0 12H8V10z" fill="var(--color-dk-bg)" />
+				<circle cx="22" cy="16" r="4" fill="var(--color-dk-cream)" />
 			</svg>
 			<span class="nav-logo-text">Dokyudo</span>
 		</a>
@@ -399,7 +399,7 @@
 				<!-- Right: Quote Card -->
 				<div class="testimonial-quote-card">
 					<div class="quote-badge">
-						<Star size={14} fill="#C5937B" stroke="#C5937B" />
+						<Star size={14} fill="var(--color-dk-copper)" stroke="var(--color-dk-copper)" />
 						<span>4.9 Rating</span>
 					</div>
 					<div class="quote-marks">"</div>
@@ -410,13 +410,13 @@
 					</p>
 					<div class="quote-author-mark">
 						<svg width="40" height="28" viewBox="0 0 40 28" fill="none">
-							<rect width="40" height="28" rx="6" fill="#2A221E" />
+							<rect width="40" height="28" rx="6" fill="var(--color-dk-bg-deep)" />
 							<text
 								x="8"
 								y="19"
 								font-family="Geist Sans, sans-serif"
 								font-size="11"
-								fill="#C5937B"
+								fill="var(--color-dk-copper)"
 								font-weight="600">AS</text
 							>
 						</svg>
@@ -514,9 +514,9 @@
 						fill="none"
 						xmlns="http://www.w3.org/2000/svg"
 					>
-						<rect width="32" height="32" rx="8" fill="#C5937B" />
-						<path d="M8 10h6a6 6 0 0 1 0 12H8V10z" fill="#1C1B1B" />
-						<circle cx="22" cy="16" r="4" fill="#E8DEC8" />
+						<rect width="32" height="32" rx="8" fill="var(--color-dk-copper)" />
+						<path d="M8 10h6a6 6 0 0 1 0 12H8V10z" fill="var(--color-dk-bg)" />
+						<circle cx="22" cy="16" r="4" fill="var(--color-dk-cream)" />
 					</svg>
 					<span>Dokyudo</span>
 				</div>
@@ -602,29 +602,6 @@
 <!-- /.fullpage-container -->
 
 <style>
-	/* ══════════════════════════════════════════════════════ */
-	/* DESIGN TOKENS                                         */
-	/* ══════════════════════════════════════════════════════ */
-	:root {
-		--dk-bg: #1c1b1b;
-		--dk-bg-deep: #2a221e;
-		--dk-cream: #e8dec8;
-		--dk-copper: #c5937b;
-		--dk-light: #efefef;
-		--dk-bg-card: #252220;
-		--dk-bg-card-hover: #302b27;
-		--dk-border: rgba(232, 222, 200, 0.12);
-		--dk-border-strong: rgba(232, 222, 200, 0.22);
-		--dk-text-muted: rgba(239, 239, 239, 0.55);
-		--dk-accent-glow: rgba(197, 147, 123, 0.15);
-		--dk-radius: 14px;
-		--dk-radius-sm: 10px;
-		--dk-radius-pill: 100px;
-		--dk-max-width: 1280px;
-		--dk-section-py: clamp(80px, 10vw, 120px);
-		--dk-section-px: clamp(20px, 5vw, 48px);
-	}
-
 	/* ══════════════════════════════════════════════════════ */
 	/* FULLPAGE SCROLL-SNAP CONTAINER                        */
 	/* ══════════════════════════════════════════════════════ */
@@ -850,7 +827,7 @@
 	}
 
 	.nav-btn-accent:hover {
-		background: #d4a48c;
+		background: var(--color-dk-copper-hover);
 		transform: translateY(-1px);
 	}
 
@@ -877,7 +854,7 @@
 	}
 
 	.btn-primary:hover {
-		background: #d4a48c;
+		background: var(--color-dk-copper-hover);
 		transform: translateY(-1px);
 	}
 
@@ -1006,7 +983,7 @@
 		left: 0;
 		width: 100%;
 		height: 666px;
-		background: linear-gradient(to bottom, rgba(28, 27, 27, 0) 0%, #1c1b1b 69%);
+		background: linear-gradient(to bottom, rgba(28, 27, 27, 0) 0%, var(--color-dk-bg) 69%);
 		z-index: 50;
 		pointer-events: none;
 	}
@@ -1236,7 +1213,7 @@
 		font-family: 'Playfair Display', serif;
 		font-weight: 500;
 		font-size: 48px;
-		color: #e8dec8;
+		color: var(--color-dk-cream);
 		line-height: 1.2;
 		letter-spacing: -0.02em;
 		text-align: center;
@@ -1247,7 +1224,7 @@
 		font-family: 'Playfair Display', serif;
 		font-weight: 600;
 		font-style: italic;
-		color: #c5937b;
+		color: var(--color-dk-copper);
 	}
 
 	.hero-ctas {
