@@ -110,6 +110,7 @@
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 10 });
 	let sorting = $state<SortingState>([]);
 	let columnFilters = $state<ColumnFiltersState>([]);
+	let globalFilter = $state<string>('');
 
 	let previewDocument = $state<Document | null>(null);
 	let uploadDialogOpen = $state(false);
@@ -120,6 +121,9 @@
 		},
 		columns,
 		state: {
+			get globalFilter() {
+				return globalFilter;
+			},
 			get pagination() {
 				return pagination;
 			},
@@ -128,6 +132,22 @@
 			},
 			get columnFilters() {
 				return columnFilters;
+			}
+		},
+		globalFilterFn: (row, _columnId, filterValue: string) => {
+			if (!filterValue || !filterValue.trim()) return true;
+			const searchTerms = filterValue.toLowerCase().trim().split(/\s+/);
+			const title = (row.original.name || '').toLowerCase();
+			const description = (row.original.description || '').toLowerCase();
+			const fullText = `${title} ${description}`;
+
+			return searchTerms.every((term) => fullText.includes(term));
+		},
+		onGlobalFilterChange: (updater: Updater<string>) => {
+			if (typeof updater === 'function') {
+				globalFilter = updater(globalFilter);
+			} else {
+				globalFilter = updater;
 			}
 		},
 		onPaginationChange: (updater: Updater<PaginationState>) => {
@@ -156,9 +176,6 @@
 		getSortedRowModel: getSortedRowModel(),
 		getFilteredRowModel: getFilteredRowModel()
 	});
-
-	/* ── Derived search value for input binding ── */
-	let searchValue = $derived((table.getColumn('name')?.getFilterValue() as string) ?? '');
 
 	/* ── Pagination sync: bits-ui Pagination is 1-indexed, TanStack is 0-indexed ── */
 	let uiPage = $state(1);
@@ -251,9 +268,9 @@
 						class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-white/40"
 					/>
 					<Input
-						placeholder="Search"
-						value={searchValue}
-						oninput={(e) => table.getColumn('name')?.setFilterValue(e.currentTarget.value)}
+						placeholder="Search by title or description..."
+						value={globalFilter}
+						oninput={(e) => (globalFilter = e.currentTarget.value)}
 						class="h-10 rounded-full border border-white/[0.16] bg-transparent pl-10 font-normal text-white placeholder:text-white/40 focus-visible:ring-white/20"
 					/>
 				</div>
