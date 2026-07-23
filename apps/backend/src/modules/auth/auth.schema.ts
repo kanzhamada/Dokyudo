@@ -119,7 +119,15 @@ export const LoginAttemptParamsSchema = z.object({
     ipAddress: z.string(),
     userAgent: z.string(),
     isSuccess: z.boolean(),
-    authProvider: z.string().optional(),
+    authProvider: z
+        .enum([
+            "email",
+            "forget_password",
+            "register",
+            "oauth_google",
+            "oauth_github",
+        ])
+        .optional(),
     logContext: z.any().optional(),
 });
 
@@ -185,6 +193,10 @@ export const ForgetPasswordResponseSchema = z
 
 export const ResetPasswordBodySchema = z
     .object({
+        email: z.string().email().max(255, "Email is too long").openapi({
+            description: "User email address",
+            example: "user@example.com",
+        }),
         otp: z.string().length(8, "OTP must be exactly 8 digits").openapi({
             description: "8-digit OTP received via email",
             example: "12345678",

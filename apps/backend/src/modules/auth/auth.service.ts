@@ -684,10 +684,18 @@ export class AuthService {
     static async resetPassword(params: AuthParams.ResetPasswordParams) {
         const supabase = getSupabaseAnon();
 
-        const { data, error } = await supabase.auth.verifyOtp({
-            token: params.otp,
-            type: "recovery",
-        });
+        const isTokenHash = params.otp.length > 20;
+
+        const { data, error } = isTokenHash
+            ? await supabase.auth.verifyOtp({
+                  token_hash: params.otp,
+                  type: "recovery",
+              })
+            : await supabase.auth.verifyOtp({
+                  email: params.email,
+                  token: params.otp,
+                  type: "recovery",
+              });
 
         if (error || !data.user) {
             if (params.logContext) {

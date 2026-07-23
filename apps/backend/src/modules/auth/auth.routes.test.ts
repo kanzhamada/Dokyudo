@@ -497,6 +497,7 @@ describe("Auth Module", () => {
 
         it("negative: invalid OTP returns 401", async () => {
             const res = await makeRequest("/api/auth/reset-password", {
+                email: testEmail,
                 otp: "00000000",
                 newPassword: "NewSecurePassword123!",
             });

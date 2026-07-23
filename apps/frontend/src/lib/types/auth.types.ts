@@ -31,6 +31,7 @@ export interface ForgotPasswordResponse {
 
 /** Reset password (OTP path) request payload */
 export type ResetPasswordRequestPayload = {
+	email: string;
 	otp: string;
 	newPassword: string;
 };

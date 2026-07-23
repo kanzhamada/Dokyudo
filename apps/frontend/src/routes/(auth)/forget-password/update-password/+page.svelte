@@ -31,11 +31,13 @@
 			apiError = '';
 
 			console.log('[Auth Update Password] Form Submitted:', {
+				email: f.data.email,
 				otp: f.data.otp
 			});
 
 			try {
 				const result = await authResetPassword({
+					email: f.data.email,
 					otp: f.data.otp,
 					newPassword: f.data.password
 				});
@@ -70,9 +72,14 @@
 			urlParams.get('token') ||
 			urlParams.get('code') ||
 			urlParams.get('otp');
+		const emailParam =
+			urlParams.get('email') || localStorage.getItem('dokyudo_reset_email') || '';
 
 		if (tokenHash) {
 			$formData.otp = tokenHash;
+		}
+		if (emailParam) {
+			$formData.email = emailParam;
 		}
 	});
 </script>
@@ -104,6 +111,8 @@
 
 	<!-- Form -->
 	<form method="POST" use:enhance class="flex flex-col gap-4">
+		<!-- Hidden Email field -->
+		<input type="hidden" name="email" bind:value={$formData.email} />
 	<!-- 8-Digit Input OTP Component -->
         <Form.Field {form} name="otp">
             <Form.Control>

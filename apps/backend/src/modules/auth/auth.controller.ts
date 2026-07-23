@@ -137,6 +137,7 @@ export async function handleResetPassword(c: Context) {
     const body = extractor.extractValidJson<AuthSchema.ResetPasswordBody>();
 
     const params: AuthSchema.ResetPasswordParams = {
+        email: body.email,
         otp: body.otp,
         newPassword: body.newPassword,
         clientIp,

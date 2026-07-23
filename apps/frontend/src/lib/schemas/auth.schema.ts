@@ -32,6 +32,7 @@ export type ForgotPasswordSchema = typeof forgotPasswordSchema;
 
 export const updatePasswordSchema = z
 	.object({
+		email: z.string().email('Invalid email address').max(255, 'Email is too long'),
 		otp: z
 			.string()
 			.length(8, 'OTP must be exactly 8 digits')
