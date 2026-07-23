@@ -21,6 +21,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Resizable from '$lib/components/ui/resizable/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
 
 	/* ── Icons ── */
 	import PlusIcon from '@lucide/svelte/icons/plus';
@@ -31,6 +32,7 @@
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
 	import XIcon from '@lucide/svelte/icons/x';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 
 	/* ── Third-party ── */
 	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
@@ -106,23 +108,46 @@
 
 
 
-	/* ── Delete Handler ── */
-	async function handleDelete(doc: Document) {
-		console.log('[Document Delete] Outbound Payload:', { id: doc.id, name: doc.name });
-		const res = await apiRequest<{ message?: string }>(`/api/documents/${doc.id}`, {
-			method: 'DELETE'
-		});
-		console.log('[Document Delete] Backend Response:', res);
+	/* ── Delete Handler & Dialog State ── */
+	let deleteDialogOpen = $state(false);
+	let documentToDelete = $state<Document | null>(null);
+	let isDeleting = $state(false);
 
-		if (res.ok) {
-			documentsList = documentsList.filter((d) => d.id !== doc.id);
-			if (previewDocument?.id === doc.id) {
-				previewDocument = null;
+	function promptDelete(doc: Document) {
+		documentToDelete = doc;
+		deleteDialogOpen = true;
+	}
+
+	async function confirmDelete() {
+		if (!documentToDelete || isDeleting) return;
+		isDeleting = true;
+
+		const target = documentToDelete;
+		console.log('[Document Delete] Outbound Payload:', { id: target.id, name: target.name });
+
+		try {
+			const res = await apiRequest<{ message?: string }>(`/api/documents/${target.id}`, {
+				method: 'DELETE'
+			});
+			console.log('[Document Delete] Backend Response:', res);
+
+			if (res.ok) {
+				documentsList = documentsList.filter((d) => d.id !== target.id);
+				if (previewDocument?.id === target.id) {
+					previewDocument = null;
+				}
+				deleteDialogOpen = false;
+				documentToDelete = null;
+				showSuccess('Document deleted', target.name);
+			} else {
+				console.error('[Document Delete] Catch Error:', res.error);
+				showError(res.error?.message || 'Failed to delete document.');
 			}
-			showSuccess('Document deleted', doc.name);
-		} else {
-			console.error('[Document Delete] Catch Error:', res.error);
-			showError(res.error?.message || 'Failed to delete document.');
+		} catch (err) {
+			console.error('[Document Delete] Unexpected Error:', err);
+			showError('Failed to delete document.');
+		} finally {
+			isDeleting = false;
 		}
 	}
 
@@ -443,7 +468,7 @@
 								id={doc.id}
 								onPreview={() => handlePreview(doc)}
 								onDownload={() => handleDownload(doc)}
-								onDelete={() => handleDelete(doc)}
+								onDelete={() => promptDelete(doc)}
 							/>
 						</div>
 
@@ -630,3 +655,40 @@
 </div>
 
 <UploadDocumentDialog bind:open={uploadDialogOpen} />
+
+<!-- Delete Confirmation Dialog -->
+<Dialog.Root bind:open={deleteDialogOpen}>
+	<Dialog.Content
+		class="w-full max-w-md rounded-2xl border border-white/10 bg-[#2A2A2A] p-6 text-white shadow-2xl"
+	>
+		<Dialog.Header>
+			<Dialog.Title class="text-xl font-semibold text-white">Delete Document</Dialog.Title>
+			<Dialog.Description class="mt-2 text-sm text-[#959595]">
+				Are you sure you want to delete <span class="font-medium text-white">{documentToDelete?.name}</span>? This action cannot be undone.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<Dialog.Footer class="mt-6 flex items-center justify-end gap-3">
+			<Button
+				variant="ghost"
+				class="cursor-pointer text-white/70 hover:bg-white/10 hover:text-white"
+				disabled={isDeleting}
+				onclick={() => (deleteDialogOpen = false)}
+			>
+				Cancel
+			</Button>
+			<Button
+				class="cursor-pointer bg-red-600 font-normal text-white hover:bg-red-700 disabled:opacity-50"
+				disabled={isDeleting}
+				onclick={confirmDelete}
+			>
+				{#if isDeleting}
+					<Loader2Icon class="mr-2 size-4 animate-spin" />
+					Deleting...
+				{:else}
+					Delete
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
