@@ -61,7 +61,7 @@
 		}
 	});
 
-	const { form: formData, enhance } = form;
+	const { form: formData, errors, enhance } = form;
 
 	onMount(() => {
 		const urlParams = new URLSearchParams(window.location.search);
@@ -104,34 +104,52 @@
 
 	<!-- Form -->
 	<form method="POST" use:enhance class="flex flex-col gap-4">
-		<!-- 8-Digit Input OTP Component -->
-		<Form.Field {form} name="otp">
-			<Form.Control>
-				{#snippet children({ props })}
-					<div class="flex flex-col items-center gap-2">
-						<InputOTP.Root
-							{...props}
-							maxlength={8}
-							disabled={isSubmitting}
-							bind:value={$formData.otp}
-						>
-							{#snippet children({ cells })}
-								<InputOTP.Group>
-								{#each cells as cell (cell)}
-										<InputOTP.Slot
-											{cell}
-											class="h-12 w-10 border border-white/10 bg-auth-input font-sans text-base font-medium text-white  "
-										/>
-									{/each}
-								</InputOTP.Group>
-								
-							{/snippet}
-						</InputOTP.Root>
-					</div>
-				{/snippet}
-			</Form.Control>
-			<Form.FieldErrors class="text-center text-xs text-[#FB6363]" />
-		</Form.Field>
+	<!-- 8-Digit Input OTP Component -->
+        <Form.Field {form} name="otp">
+            <Form.Control>
+                {#snippet children({ props })}
+                    <div class="flex flex-col gap-2">
+                        <InputOTP.Root
+                            {...props}
+                            maxlength={8}
+                            disabled={isSubmitting}
+                            autofocus={true}
+                            class="focus-within:ring-1 focus-within:ring-auth-primary/40 rounded-md w-max"
+                            bind:value={$formData.otp}
+                        >
+                            {#snippet children({ cells })}
+                                <!-- Added focus-within styling to match your auth input variant -->
+                                <div
+                                    class="relative w-max rounded-md border border-transparent transition-all  aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                                    aria-invalid={$errors.otp ? 'true' : undefined}
+                                >
+                                    <InputOTP.Group>
+                                        {#each cells as cell}
+                                            <InputOTP.Slot
+                                                {cell}
+                                                class="h-10 w-10 border border-white/10 bg-auth-input font-sans text-base font-medium text-white"
+                                            />
+                                        {/each}
+                                    </InputOTP.Group>
+
+                                    <!-- Placeholder Overlay -->
+                                    <div class="pointer-events-none absolute inset-0 flex">
+                                        {#each cells as cell, index}
+                                            <div class="flex h-10 w-10 items-center justify-center text-base font-medium text-white/50">
+                                                {#if !cell.char && "YOUROTP!"[index]}
+                                                    {"YOUROTP!"[index]}
+                                                {/if}
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </div>
+                            {/snippet}
+                        </InputOTP.Root>
+                    </div>
+                {/snippet}
+            </Form.Control>
+            <Form.FieldErrors class="text-xs text-[#FB6363]" />
+        </Form.Field>
 
 		<!-- New Password -->
 		<Form.Field {form} name="password">
