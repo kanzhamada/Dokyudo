@@ -314,12 +314,19 @@
 /* Success toast: green-tinted glass */
 [data-sonner-toaster] [data-sonner-toast][data-type="success"] {
     border-color: rgba(34, 197, 94, 0.50);
-    background: rgba(5, 46, 22, 0.60);
+    background: rgba(20, 83, 45, 0.50);
 }
 
-[data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-title],
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-title] {
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
 [data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-description] {
     color: rgb(187, 247, 208);
+    font-size: 0.875rem;
+    line-height: 1.4;
 }
 
 /* Warning toast: amber-tinted glass */

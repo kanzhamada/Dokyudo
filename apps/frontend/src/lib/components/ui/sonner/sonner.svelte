@@ -19,7 +19,7 @@
 		<Loader2Icon class="size-5 animate-spin" />
 	{/snippet}
 	{#snippet successIcon()}
-		<CircleCheckIcon class="size-5" />
+		<CircleCheckIcon class="size-5 text-green-400" />
 	{/snippet}
 	{#snippet errorIcon()}
 		<TriangleAlertIcon class="size-5 text-red-400" />

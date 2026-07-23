@@ -38,12 +38,29 @@
 
 	/* ── Local modules ── */
 	import { apiRequest } from '$lib/api/client.js';
+	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { columns } from './columns.js';
 	import type { Document } from './data.js';
 	import DocumentCardActions from './document-card-actions.svelte';
 	import UploadDocumentDialog from './UploadDocumentDialog.svelte';
 
 	let { data }: { data: PageData } = $props();
+
+	function showError(msg: string) {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showError(msg);
+		} else {
+			toast.error('Error', { description: msg });
+		}
+	}
+
+	function showSuccess(title: string, msg: string) {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showSuccess(title, msg);
+		} else {
+			toast.success(title, { description: msg });
+		}
+	}
 
 	async function handlePreview(doc: Document) {
 		if (!doc.url) {
@@ -57,6 +74,7 @@
 				doc.url = res.data.url;
 			} else {
 				console.error('[Document Preview] Catch Error:', res.error);
+				showError(res.error?.message || 'Failed to preview document.');
 				return;
 			}
 		}
@@ -78,10 +96,10 @@
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
-			toast.success('Download started', { description: doc.name });
+			showSuccess('Download started', doc.name);
 		} else {
 			console.error('[Document Download] Catch Error:', res.error);
-			toast.error('Download failed', { description: res.error?.message || 'Could not fetch download link.' });
+			showError(res.error?.message || 'Could not fetch download link.');
 		}
 	}
 
