@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { sessionStore } from '$lib/state/session.store.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 
 	let errorMessage = $state('');
 	let dots = $state('');
@@ -73,7 +74,15 @@
 		<p class="auth-subheading text-white/80 text-center mt-2 max-w-sm">
 			{errorMessage}
 		</p>
-		<a href="/login" class="auth-btn-primary w-full max-w-xs mt-8 text-center block"> Back to Sign In </a>
+
+
+		<Button
+		    href="/login"
+			variant="authPrimary"
+			class="auth-btn-primary mt-2"
+		>
+		    Back to Sign In
+		</Button>
 	{:else}
 		<!-- Loading State -->
 		<h1 class="auth-heading text-3xl md:text-4xl text-center mt-6">
