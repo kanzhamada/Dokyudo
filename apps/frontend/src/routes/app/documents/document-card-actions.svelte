@@ -9,11 +9,13 @@
 	let {
 		id,
 		onPreview,
-		onDownload
+		onDownload,
+		onDelete
 	}: {
 		id: string;
 		onPreview?: () => void;
 		onDownload?: () => void;
+		onDelete?: () => void;
 	} = $props();
 </script>
 
@@ -53,6 +55,7 @@
 			<DropdownMenu.Separator class="bg-white/10" />
 			<DropdownMenu.Item
 				class="cursor-pointer gap-2 text-red-400 hover:text-white focus:bg-red-400 focus:text-white"
+				onclick={onDelete}
 			>
 				<Trash2Icon data-icon="inline-start" />
 				Delete

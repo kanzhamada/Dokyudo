@@ -106,6 +106,33 @@
 
 
 
+	/* ── Delete Handler ── */
+	async function handleDelete(doc: Document) {
+		console.log('[Document Delete] Outbound Payload:', { id: doc.id, name: doc.name });
+		const res = await apiRequest<{ message?: string }>(`/api/documents/${doc.id}`, {
+			method: 'DELETE'
+		});
+		console.log('[Document Delete] Backend Response:', res);
+
+		if (res.ok) {
+			documentsList = documentsList.filter((d) => d.id !== doc.id);
+			if (previewDocument?.id === doc.id) {
+				previewDocument = null;
+			}
+			showSuccess('Document deleted', doc.name);
+		} else {
+			console.error('[Document Delete] Catch Error:', res.error);
+			showError(res.error?.message || 'Failed to delete document.');
+		}
+	}
+
+	/* ── Reactive documents state for instant UI updates ── */
+	let documentsList = $state<Document[]>([]);
+
+	$effect(() => {
+		documentsList = data.documents;
+	});
+
 	/* ── TanStack Table State ── */
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 10 });
 	let sorting = $state<SortingState>([]);
@@ -117,7 +144,7 @@
 
 	const table = createSvelteTable({
 		get data() {
-			return data.documents;
+			return documentsList;
 		},
 		columns,
 		state: {
@@ -416,6 +443,7 @@
 								id={doc.id}
 								onPreview={() => handlePreview(doc)}
 								onDownload={() => handleDownload(doc)}
+								onDelete={() => handleDelete(doc)}
 							/>
 						</div>
 
