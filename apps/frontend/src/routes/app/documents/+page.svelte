@@ -150,6 +150,33 @@
 			isDeleting = false;
 		}
 	}
+	async function refreshDocuments() {
+		const res = await apiRequest<{ documents: any[] }>('/api/documents');
+		if (res.ok) {
+			documentsList = res.data.documents.map((doc) => {
+				let sizeStr = '';
+				const sizeKB = doc.sizeBytes / 1024;
+				if (sizeKB > 1024) {
+					sizeStr = (sizeKB / 1024).toFixed(1) + ' MB';
+				} else {
+					sizeStr = sizeKB.toFixed(0) + ' KB';
+				}
+
+				return {
+					id: doc.id,
+					name: doc.title,
+					description: doc.description || 'No description provided.',
+					uploadedAt: new Date(doc.createdAt).toLocaleDateString('en-US', {
+						month: 'short',
+						day: 'numeric',
+						year: 'numeric'
+					}),
+					size: sizeStr,
+					url: undefined
+				};
+			});
+		}
+	}
 
 	/* ── Reactive documents state for instant UI updates ── */
 	let documentsList = $state<Document[]>([]);
@@ -654,7 +681,7 @@
 	</div>
 </div>
 
-<UploadDocumentDialog bind:open={uploadDialogOpen} />
+<UploadDocumentDialog bind:open={uploadDialogOpen} onSuccess={refreshDocuments} />
 
 <!-- Delete Confirmation Dialog -->
 <Dialog.Root bind:open={deleteDialogOpen}>
