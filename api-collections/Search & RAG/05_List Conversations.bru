@@ -10,6 +10,10 @@ get {
   auth: bearer
 }
 
+params:query {
+  limit: 20
+}
+
 auth:bearer {
   token: {{accessToken}}
 }

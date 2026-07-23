@@ -16,8 +16,13 @@ app.use(
     "/*",
     cors({
         origin: "*",
-        allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowHeaders: ["Content-Type", "Authorization", "X-Request-ID", "X-Dokyudo-Puzzle"],
+        allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allowHeaders: [
+            "Content-Type",
+            "Authorization",
+            "X-Request-ID",
+            "X-Dokyudo-Puzzle",
+        ],
         exposeHeaders: ["X-Request-ID"],
     }),
 );

@@ -7,6 +7,8 @@
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { Avatar } from '$lib/components/ui/avatar/index.js';
 	import * as AvatarPrimitive from '$lib/components/ui/avatar/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
 
 	// Icons
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
@@ -34,12 +36,141 @@
 
 	import { onMount } from 'svelte';
 	import { authLogout, authGetMe } from '$lib/api/auth';
+	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import type { UserProfileResponse } from '$lib/types/auth.types';
+	import type { ConversationItem } from '$lib/types/rag.types';
 
 	let userProfile = $state<UserProfileResponse | null>(null);
 	let isLogoutDialogOpen = $state(false);
 	let isLoggingOut = $state(false);
+
+	let conversations = $state<ConversationItem[]>([]);
+	let nextCursor = $state<string | null>(null);
+	let isLoadingConversations = $state(false);
+	let hasLoadedInitialConversations = $state(false);
+
+	let isEditDialogOpen = $state(false);
+	let editingConversation = $state<ConversationItem | null>(null);
+	let editTitle = $state('');
+	let isUpdating = $state(false);
+
+	let isDeleteDialogOpen = $state(false);
+	let deletingConversation = $state<ConversationItem | null>(null);
+	let isDeleting = $state(false);
+
+	async function fetchConversations(cursor?: string) {
+		if (isLoadingConversations) return;
+		isLoadingConversations = true;
+
+		try {
+			const result = await getConversations({ limit: 20, cursor });
+			if (result.ok) {
+				if (cursor) {
+					conversations = [...conversations, ...result.data.conversations];
+				} else {
+					conversations = result.data.conversations;
+				}
+				nextCursor = result.data.nextCursor;
+				console.log('[Auth Conversations] Loaded conversations:', {
+					count: result.data.conversations.length,
+					nextCursor: result.data.nextCursor
+				});
+			} else {
+				console.error('[Auth Conversations] Failed to fetch conversations:', result.error);
+			}
+		} catch (err) {
+			console.error('[Auth Conversations] Catch Error:', err);
+		} finally {
+			isLoadingConversations = false;
+			hasLoadedInitialConversations = true;
+		}
+	}
+
+	function handleSidebarScroll(event: Event) {
+		const target = event.currentTarget as HTMLElement;
+		if (!target || isLoadingConversations || !nextCursor) return;
+
+		const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+		if (distanceToBottom < 50) {
+			console.log('[Auth Conversations] Infinite scroll fetching cursor:', nextCursor);
+			fetchConversations(nextCursor);
+		}
+	}
+
+	function openEditModal(item: ConversationItem) {
+		editingConversation = item;
+		editTitle = item.title;
+		isEditDialogOpen = true;
+	}
+
+	async function handleUpdateConversation() {
+		if (!editingConversation || !editTitle.trim() || isUpdating) return;
+		isUpdating = true;
+
+		console.log('[Auth Conversations] Updating conversation:', {
+			id: editingConversation.id,
+			title: editTitle.trim()
+		});
+
+		try {
+			const result = await updateConversation(editingConversation.id, {
+				title: editTitle.trim()
+			});
+
+			if (result.ok) {
+				console.log('[Auth Conversations] Update success:', result.data);
+				const targetId = editingConversation.id;
+				const updatedTitle = editTitle.trim();
+				conversations = conversations.map((c) =>
+					c.id === targetId ? { ...c, title: updatedTitle } : c
+				);
+				isEditDialogOpen = false;
+				editingConversation = null;
+			} else {
+				console.error('[Auth Conversations] Update failed:', result.error);
+			}
+		} catch (err) {
+			console.error('[Auth Conversations] Update Catch Error:', err);
+		} finally {
+			isUpdating = false;
+		}
+	}
+
+	function openDeleteModal(item: ConversationItem) {
+		deletingConversation = item;
+		isDeleteDialogOpen = true;
+	}
+
+	async function handleDeleteConversation() {
+		if (!deletingConversation || isDeleting) return;
+		isDeleting = true;
+
+		console.log('[Auth Conversations] Deleting conversation:', deletingConversation.id);
+
+		try {
+			const result = await deleteConversation(deletingConversation.id);
+
+			if (result.ok) {
+				console.log('[Auth Conversations] Delete success:', result.data);
+				const deletedId = deletingConversation.id;
+				conversations = conversations.filter((c) => c.id !== deletedId);
+
+				isDeleteDialogOpen = false;
+
+				if ($page.url.pathname === `/app/chat/${deletedId}`) {
+					await goto('/app/chat');
+				}
+				deletingConversation = null;
+			} else {
+				console.error('[Auth Conversations] Delete failed:', result.error);
+			}
+		} catch (err) {
+			console.error('[Auth Conversations] Delete Catch Error:', err);
+		} finally {
+			isDeleting = false;
+		}
+	}
 
 	onMount(async () => {
 		try {
@@ -53,6 +184,8 @@
 		} catch (err) {
 			console.error('[Auth Me] Catch Error:', err);
 		}
+
+		fetchConversations();
 	});
 
 	let displayName = $derived(
@@ -167,7 +300,7 @@
 		</div>
 	</Sidebar.Header>
 
-	<div class="no-scrollbar flex-1 overflow-y-auto">
+	<div class="no-scrollbar flex-1 overflow-y-auto" onscroll={handleSidebarScroll}>
 		<!-- CONTENT -->
 		<Sidebar.Content>
 			<!-- Main Navigation -->
@@ -213,15 +346,33 @@
 
 			<!-- Recent Chats -->
 			<!-- Hide entire group when collapsed -->
-			<Sidebar.Group class=" flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
+			<Sidebar.Group class="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
 				<Sidebar.GroupLabel class="mb-2 px-3 font-geist text-xs font-medium text-sidebar-muted">
 					Recent Chats
 				</Sidebar.GroupLabel>
 
-				<Sidebar.Menu class="gap-[2px] ">
-					{#each recentChats as chat}
-						{@render recentChatItem(chat)}
-					{/each}
+				<Sidebar.Menu class="gap-[2px]">
+					{#if !hasLoadedInitialConversations && isLoadingConversations}
+						{#each Array(4) as _}
+							<Sidebar.MenuItem class="px-3 py-1">
+								<Skeleton class="h-6 w-full rounded bg-white/5" />
+							</Sidebar.MenuItem>
+						{/each}
+					{:else if conversations.length === 0}
+						<div class="px-3 py-2 font-geist text-xs text-sidebar-muted-foreground/60">
+							No recent chats
+						</div>
+					{:else}
+						{#each conversations as item (item.id)}
+							{@render recentChatItem(item)}
+						{/each}
+
+						{#if isLoadingConversations}
+							<div class="flex items-center justify-center py-2">
+								<Spinner class="size-4 text-white/50" />
+							</div>
+						{/if}
+					{/if}
 				</Sidebar.Menu>
 			</Sidebar.Group>
 		</Sidebar.Content>
@@ -330,28 +481,33 @@
 	</Sidebar.MenuItem>
 {/snippet}
 
-{#snippet recentChatItem(chat: string)}
+{#snippet recentChatItem(item: ConversationItem)}
 	<Sidebar.MenuItem>
 		<Sidebar.MenuButton
+			isActive={$page.url.pathname === `/app/chat/${item.id}`}
 			class="h-8 cursor-pointer px-3 font-geist text-sm text-sidebar-muted-foreground"
 		>
 			{#snippet child({ props })}
-				<button {...props} class={(props.class as string) + ' w-full overflow-hidden text-left'}>
-					{#if chat.length > 25}
+				<a
+					href="/app/chat/{item.id}"
+					{...props}
+					class={(props.class as string) + ' w-full overflow-hidden text-left'}
+				>
+					{#if item.title.length > 25}
 						<Tooltip.Root>
 							<Tooltip.Trigger>
 								{#snippet child({ props: tooltipProps })}
-									<span {...tooltipProps} class="block w-full truncate text-left">{chat}</span>
+									<span {...tooltipProps} class="block w-full truncate text-left">{item.title}</span>
 								{/snippet}
 							</Tooltip.Trigger>
 							<Tooltip.Content side="right" class="max-w-xs break-words text-black">
-								<p>{chat}</p>
+								<p>{item.title}</p>
 							</Tooltip.Content>
 						</Tooltip.Root>
 					{:else}
-						<span class="block w-full truncate">{chat}</span>
+						<span class="block w-full truncate">{item.title}</span>
 					{/if}
-				</button>
+				</a>
 			{/snippet}
 		</Sidebar.MenuButton>
 
@@ -373,6 +529,7 @@
 				</DropdownMenu.Item>
 				<DropdownMenu.Item
 					class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+					onclick={() => openEditModal(item)}
 				>
 					<Edit class="mr-2 size-4" />
 					<span>Edit</span>
@@ -385,7 +542,8 @@
 				</DropdownMenu.Item>
 				<DropdownMenu.Separator class="bg-white/10" />
 				<DropdownMenu.Item
-					class="cursor-pointer text-red-400 hover:bg-red-400 hover:text-red-400 focus:bg-red-400 focus:text-red-400"
+					class="cursor-pointer text-[#FB6363] hover:bg-[#FB6363]/10 hover:text-[#FB6363] focus:bg-[#FB6363]/10 focus:text-[#FB6363]"
+					onclick={() => openDeleteModal(item)}
 				>
 					<Trash2 class="mr-2 size-4" />
 					<span>Delete</span>
@@ -424,6 +582,94 @@
 					Logging out...
 				{:else}
 					Log out
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Edit Conversation Modal -->
+<Dialog.Root bind:open={isEditDialogOpen}>
+	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title class="font-sans text-xl font-medium text-white">Edit Conversation</Dialog.Title>
+			<Dialog.Description class="text-sm text-white/70">
+				Enter a new title for this conversation.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<form
+			onsubmit={(e) => {
+				e.preventDefault();
+				handleUpdateConversation();
+			}}
+			class="mt-2 flex flex-col gap-4"
+		>
+			<Input
+				type="text"
+				placeholder="Conversation title"
+				disabled={isUpdating}
+				bind:value={editTitle}
+				variant="auth"
+				class="auth-input"
+			/>
+
+			<Dialog.Footer class="mt-2 flex gap-2 sm:justify-end">
+				<Button
+					type="button"
+					variant="outline"
+					disabled={isUpdating}
+					onclick={() => (isEditDialogOpen = false)}
+					class="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+				>
+					Cancel
+				</Button>
+				<Button
+					type="submit"
+					disabled={isUpdating || !editTitle.trim()}
+					class="bg-auth-primary text-white hover:bg-auth-primary/90"
+				>
+					{#if isUpdating}
+						<Spinner class="mr-2 size-4" />
+						Saving...
+					{:else}
+						Save Changes
+					{/if}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Delete Conversation Confirmation Dialog -->
+<Dialog.Root bind:open={isDeleteDialogOpen}>
+	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title class="font-sans text-xl font-medium text-white">Delete Conversation</Dialog.Title>
+			<Dialog.Description class="text-sm text-white/70">
+				Are you sure you want to delete <span class="font-medium text-white">"{deletingConversation?.title}"</span>? This action cannot be undone.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<Dialog.Footer class="mt-4 flex gap-2 sm:justify-end">
+			<Button
+				variant="outline"
+				disabled={isDeleting}
+				onclick={() => (isDeleteDialogOpen = false)}
+				class="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+			>
+				Cancel
+			</Button>
+			<Button
+				disabled={isDeleting}
+				onclick={handleDeleteConversation}
+				class="bg-[#FB6363] text-white hover:bg-[#FB6363]/90"
+			>
+				{#if isDeleting}
+					<Spinner class="mr-2 size-4" />
+					Deleting...
+				{:else}
+					Delete
 				{/if}
 			</Button>
 		</Dialog.Footer>
