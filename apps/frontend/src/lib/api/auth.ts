@@ -8,6 +8,7 @@ import type {
 	ResetPasswordResponse,
 	UpdatePasswordResponse,
 	VerifyEmailResponse,
+	UserProfileResponse,
 	LoginRequestPayload,
 	RegisterRequestPayload,
 	ForgotPasswordRequestPayload,
@@ -63,6 +64,10 @@ export function authVerifyEmail(
 		method: 'POST',
 		body: params
 	});
+}
+
+export function authGetMe(): Promise<ApiResult<UserProfileResponse>> {
+	return apiRequest<UserProfileResponse>('/api/auth/me', { method: 'GET' });
 }
 
 /** Initiates the Google OAuth flow via a full-page redirect. */

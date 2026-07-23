@@ -32,11 +32,48 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 
-	import { authLogout } from '$lib/api/auth';
+	import { onMount } from 'svelte';
+	import { authLogout, authGetMe } from '$lib/api/auth';
 	import { sessionStore } from '$lib/state/session.store.svelte';
+	import type { UserProfileResponse } from '$lib/types/auth.types';
 
+	let userProfile = $state<UserProfileResponse | null>(null);
 	let isLogoutDialogOpen = $state(false);
 	let isLoggingOut = $state(false);
+
+	onMount(async () => {
+		try {
+			const result = await authGetMe();
+			if (result.ok) {
+				userProfile = result.data;
+				console.log('[Auth Me] User details loaded:', result.data);
+			} else {
+				console.error('[Auth Me] Failed to fetch user profile:', result.error);
+			}
+		} catch (err) {
+			console.error('[Auth Me] Catch Error:', err);
+		}
+	});
+
+	let displayName = $derived(
+		userProfile?.tenant?.name ||
+			(userProfile?.user?.email ? userProfile.user.email.split('@')[0] : 'User')
+	);
+
+	let userInitials = $derived.by(() => {
+		if (!displayName) return 'KH';
+		const parts = displayName.trim().split(' ');
+		if (parts.length >= 2) {
+			return (parts[0][0] + parts[1][0]).toUpperCase();
+		}
+		return displayName.slice(0, 2).toUpperCase();
+	});
+
+	let subscriptionTier = $derived.by(() => {
+		const raw = userProfile?.subscription?.tier || 'FREE';
+		const cleaned = raw.replace(/_/g, ' ').toLowerCase();
+		return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+	});
 
 	async function handleLogout() {
 		if (isLoggingOut) return;
@@ -206,19 +243,29 @@
 								class="w-full cursor-pointer p-2 hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
 							>
 								<AvatarPrimitive.Root
-									class="size-8 shrink-0 rounded-md border-none bg-sidebar-avatar"
+									class="size-8 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
 								>
+									{#if userProfile?.user?.profilePictureUrl}
+										<AvatarPrimitive.Image
+											src={userProfile.user.profilePictureUrl}
+											alt={displayName}
+											class="size-full object-cover"
+										/>
+									{/if}
 									<AvatarPrimitive.Fallback
-										class="rounded-md bg-sidebar-avatar font-geist text-sm font-medium text-sidebar"
-										>KH</AvatarPrimitive.Fallback
+										class="flex size-full items-center justify-center rounded-md bg-sidebar-avatar font-geist text-sm font-medium text-sidebar"
 									>
+										{userInitials}
+									</AvatarPrimitive.Fallback>
 								</AvatarPrimitive.Root>
 								<div
 									class="ml-2 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
 								>
-									<span class="truncate font-geist text-sm font-medium text-white">Kanz Hamada</span
+									<span class="truncate font-geist text-sm font-medium text-white"
+										>{displayName}</span
 									>
-									<span class="truncate font-geist text-xs text-sidebar-muted-foreground">Free</span
+									<span class="truncate font-geist text-xs text-sidebar-muted-foreground"
+										>{subscriptionTier}</span
 									>
 								</div>
 								<ChevronsUpDown

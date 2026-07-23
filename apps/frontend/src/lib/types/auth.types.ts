@@ -80,3 +80,24 @@ export interface VerifyEmailResponse {
 		email: string;
 	};
 }
+
+/** User profile (/api/auth/me) response */
+export interface UserProfileResponse {
+	user: {
+		id: string;
+		email: string;
+		profilePictureUrl: string | null;
+	};
+	tenant: {
+		id: string;
+		name: string;
+	};
+	subscription: {
+		tier: string;
+		expiresAt: string | null;
+		uploadsCount: number;
+		searchesCount: number;
+		qaCount: number;
+		storageUsedBytes: number;
+	};
+}
