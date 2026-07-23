@@ -1,8 +1,14 @@
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { getSupabaseAdmin, getSupabaseAnon } from "../../config/supabase.ts";
+import { getEnv } from "../../config/env.ts";
 import { db, withAuthDb } from "../../config/drizzle.ts";
 import { redis } from "../../config/redis.ts";
-import { loginAttempts, users, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
+import {
+    loginAttempts,
+    users,
+    tenants,
+    tenantSubscriptions,
+} from "../../shared/models/db.model.ts";
 import { and, count, eq, gte } from "drizzle-orm";
 import { verifyRecaptcha } from "../../shared/utils/recaptcha.util.ts";
 import {
@@ -28,54 +34,60 @@ export class AuthService {
         ).toISOString();
 
         // Step B: Per-IP Rate Limiting & User-Agent Anomaly Detection
-        let ipRegData: any[] = [];
-        try {
-            ipRegData = await db
-                .select({
-                    userAgent: loginAttempts.userAgent,
-                    isSuccess: loginAttempts.isSuccess,
-                })
-                .from(loginAttempts)
-                .where(
-                    and(
-                        eq(loginAttempts.ipAddress, params.clientIp),
-                        eq(loginAttempts.authProvider, "register"),
-                        gte(loginAttempts.attemptedAt, new Date(windowStart)),
-                    ),
-                )
-                .limit(21);
-        } catch (ipCountError: any) {
-            if (params.logContext) {
-                params.logContext.authEvent = "ip_rate_limit_check_failed";
-                params.logContext.authError = ipCountError.message;
-            }
-        }
-
-        if (ipRegData && ipRegData.length > 0) {
-            const distinctUAs = new Set(ipRegData.map((row) => row.userAgent))
-                .size;
-            const successCount = ipRegData.filter(
-                (row) => row.isSuccess,
-            ).length;
-
-            const isBotAnomaly = distinctUAs > 3;
-            const ipLimit = isBotAnomaly ? 3 : 20;
-
-            if (ipRegData.length >= ipLimit || successCount >= 5) {
+        if (getEnv("NODE_ENV") === "prod") {
+            let ipRegData: any[] = [];
+            try {
+                ipRegData = await db
+                    .select({
+                        userAgent: loginAttempts.userAgent,
+                        isSuccess: loginAttempts.isSuccess,
+                    })
+                    .from(loginAttempts)
+                    .where(
+                        and(
+                            eq(loginAttempts.ipAddress, params.clientIp),
+                            eq(loginAttempts.authProvider, "register"),
+                            gte(
+                                loginAttempts.attemptedAt,
+                                new Date(windowStart),
+                            ),
+                        ),
+                    )
+                    .limit(21);
+            } catch (ipCountError: any) {
                 if (params.logContext) {
-                    params.logContext.authEvent = "ip_blocked";
-                    params.logContext.totalAttempts = ipRegData.length;
-                    params.logContext.successCount = successCount;
-                    params.logContext.anomalyDetected = isBotAnomaly;
+                    params.logContext.authEvent = "ip_rate_limit_check_failed";
+                    params.logContext.authError = ipCountError.message;
                 }
+            }
 
-                throw new AppError({
-                    code: "RATE_LIMIT_EXCEEDED",
-                    message:
-                        "Too many registration attempts from this IP address, please try again later",
-                    status: 429,
-                    retryAfter: AuthConstants.LOCKOUT_DURATION_MINUTES * 60,
-                });
+            if (ipRegData && ipRegData.length > 0) {
+                const distinctUAs = new Set(
+                    ipRegData.map((row) => row.userAgent),
+                ).size;
+                const successCount = ipRegData.filter(
+                    (row) => row.isSuccess,
+                ).length;
+
+                const isBotAnomaly = distinctUAs > 3;
+                const ipLimit = isBotAnomaly ? 3 : 20;
+
+                if (ipRegData.length >= ipLimit || successCount >= 5) {
+                    if (params.logContext) {
+                        params.logContext.authEvent = "ip_blocked";
+                        params.logContext.totalAttempts = ipRegData.length;
+                        params.logContext.successCount = successCount;
+                        params.logContext.anomalyDetected = isBotAnomaly;
+                    }
+
+                    throw new AppError({
+                        code: "RATE_LIMIT_EXCEEDED",
+                        message:
+                            "Too many registration attempts from this IP address, please try again later",
+                        status: 429,
+                        retryAfter: AuthConstants.LOCKOUT_DURATION_MINUTES * 60,
+                    });
+                }
             }
         }
 
@@ -106,6 +118,9 @@ export class AuthService {
                 type: "signup",
                 email: params.email,
                 password: params.password,
+                options: {
+                    redirectTo: getEnv("FRONTEND_URL"),
+                },
             });
 
         // Step D: Log registration attempt (success or failure) for rate-limiting calculations
@@ -165,10 +180,12 @@ export class AuthService {
         }
 
         // Step F: Send Verification Email via Resend
-        if (linkData?.properties?.action_link && linkData?.user?.id) {
+        if (linkData?.properties?.hashed_token && linkData?.user?.id) {
+            const verifyUrl = `${getEnv("FRONTEND_URL")}/auth/verify?token_hash=${linkData.properties.hashed_token}&type=signup`;
+
             await sendVerificationEmail(
                 params.email,
-                linkData.properties.action_link,
+                verifyUrl,
                 linkData.user.id,
                 params.requestId,
             );
@@ -183,7 +200,8 @@ export class AuthService {
             }
         } else {
             if (params.logContext) {
-                params.logContext.authError = "Supabase Admin API did not return an action_link or user id.";
+                params.logContext.authError =
+                    "Supabase Admin API did not return an action_link or user id.";
             }
             throw new AppError({
                 code: "INTERNAL_ERROR",
@@ -199,6 +217,56 @@ export class AuthService {
         }
     }
 
+    static async verifyEmail(params: AuthParams.VerifyEmailParams) {
+        const authClient = getSupabaseAnon();
+
+        const { data: authData, error } = await authClient.auth.verifyOtp({
+            token_hash: params.tokenHash,
+            type: params.type as any,
+        });
+
+        if (error || !authData.session || !authData.user) {
+            if (params.logContext) {
+                params.logContext.authEvent = "verify_email_failed";
+                params.logContext.authError =
+                    error?.message ?? "no session returned";
+            }
+
+            throw new AppError({
+                code: "UNAUTHORIZED",
+                message: "Invalid or expired verification link.",
+                status: 401,
+            });
+        }
+
+        const user = authData.user;
+        const session = authData.session;
+
+        if (params.logContext) {
+            params.logContext.authEvent = "verify_email_success";
+            params.logContext.userId = user.id;
+        }
+
+        const [userRecord] = await db
+            .select({ tenantId: users.tenantId })
+            .from(users)
+            .where(eq(users.id, user.id));
+
+        if (userRecord) {
+            await logActivity({
+                tenantId: userRecord.tenantId,
+                userId: user.id,
+                action: "auth.register",
+                metadata: { type: "email_verification" },
+                ipAddress: params.clientIp,
+                userAgent: params.userAgent,
+                requestId: params.requestId,
+            });
+        }
+
+        return { session, user };
+    }
+
     static async loginUser(params: AuthParams.LoginParams) {
         // Step A: Verify reCAPTCHA
         await verifyRecaptcha({
@@ -207,139 +275,154 @@ export class AuthService {
             expectedAction: "login",
         });
 
-        // Step B: Lockout check
-        let lockedUser = null;
-        try {
-            const result = await db
-                .select({
-                    isLocked: users.isLocked,
-                    lockedUntil: users.lockedUntil,
-                })
-                .from(users)
-                .where(eq(users.email, params.email))
-                .limit(1);
-            if (result.length > 0) {
-                lockedUser = result[0];
-            }
-        } catch (lockCheckError: any) {
-            if (params.logContext) {
-                params.logContext.authEvent = "lockout_check_failed";
-                params.logContext.authError = lockCheckError.message;
-            }
-        }
-
-        if (lockedUser) {
-            const isLocked = lockedUser.isLocked === true;
-            const lockExpiry = lockedUser.lockedUntil
-                ? new Date(lockedUser.lockedUntil)
-                : null;
-            const now = new Date();
-
-            if (isLocked && lockExpiry && lockExpiry > now) {
-                throw new AppError({
-                    code: "FORBIDDEN",
-                    message:
-                        "Account is temporarily locked due to too many failed login attempts, please try again later",
-                    status: 403,
-                });
+        // Step B & C: Lockout & Anti-Bruteforce checks (Prod only)
+        if (getEnv("NODE_ENV") === "prod") {
+            let lockedUser = null;
+            try {
+                const result = await db
+                    .select({
+                        isLocked: users.isLocked,
+                        lockedUntil: users.lockedUntil,
+                    })
+                    .from(users)
+                    .where(eq(users.email, params.email))
+                    .limit(1);
+                if (result.length > 0) {
+                    lockedUser = result[0];
+                }
+            } catch (lockCheckError: any) {
+                if (params.logContext) {
+                    params.logContext.authEvent = "lockout_check_failed";
+                    params.logContext.authError = lockCheckError.message;
+                }
             }
 
-            if (isLocked && lockExpiry && lockExpiry <= now) {
+            if (lockedUser) {
+                const isLocked = lockedUser.isLocked === true;
+                const lockExpiry = lockedUser.lockedUntil
+                    ? new Date(lockedUser.lockedUntil)
+                    : null;
+                const now = new Date();
+
+                if (isLocked && lockExpiry && lockExpiry > now) {
+                    throw new AppError({
+                        code: "FORBIDDEN",
+                        message:
+                            "Account is temporarily locked due to too many failed login attempts, please try again later",
+                        status: 403,
+                    });
+                }
+
+                if (isLocked && lockExpiry && lockExpiry <= now) {
+                    await db
+                        .update(users)
+                        .set({
+                            isLocked: false,
+                            lockedUntil: null,
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(users.email, params.email));
+                }
+            }
+
+            const windowStart = new Date(
+                Date.now() - AuthConstants.LOCKOUT_WINDOW_MINUTES * 60 * 1000,
+            ).toISOString();
+
+            let ipFailData: any[] = [];
+            try {
+                ipFailData = await db
+                    .select({ userAgent: loginAttempts.userAgent })
+                    .from(loginAttempts)
+                    .where(
+                        and(
+                            eq(loginAttempts.ipAddress, params.clientIp),
+                            eq(loginAttempts.isSuccess, false),
+                            gte(
+                                loginAttempts.attemptedAt,
+                                new Date(windowStart),
+                            ),
+                        ),
+                    )
+                    .limit(21);
+            } catch (ipCountError: any) {
+                if (params.logContext) {
+                    params.logContext.authEvent = "ip_rate_limit_check_failed";
+                    params.logContext.authError = ipCountError.message;
+                }
+            }
+
+            if (ipFailData && ipFailData.length > 0) {
+                const distinctUAs = new Set(
+                    ipFailData.map((row) => row.userAgent),
+                ).size;
+                const isBotAnomaly = distinctUAs > 3;
+                const ipLimit = isBotAnomaly ? 3 : 20;
+
+                if (ipFailData.length >= ipLimit) {
+                    if (params.logContext) {
+                        params.logContext.authEvent = "ip_blocked";
+                        params.logContext.failedAttempts = ipFailData.length;
+                        params.logContext.anomalyDetected = isBotAnomaly;
+                    }
+
+                    throw new AppError({
+                        code: "RATE_LIMIT_EXCEEDED",
+                        message:
+                            "Too many login attempts from this IP address, please try again later",
+                        status: 429,
+                        retryAfter: AuthConstants.LOCKOUT_DURATION_MINUTES * 60,
+                    });
+                }
+            }
+
+            let emailFailCount = 0;
+            try {
+                const result = await db
+                    .select({ count: count() })
+                    .from(loginAttempts)
+                    .where(
+                        and(
+                            eq(loginAttempts.emailAttempted, params.email),
+                            eq(loginAttempts.isSuccess, false),
+                            gte(
+                                loginAttempts.attemptedAt,
+                                new Date(windowStart),
+                            ),
+                        ),
+                    );
+                emailFailCount = result[0].count;
+            } catch (emailCountError: any) {
+                if (params.logContext) {
+                    params.logContext.authEvent =
+                        "email_rate_limit_check_failed";
+                    params.logContext.authError = emailCountError.message;
+                }
+            }
+
+            if (emailFailCount >= AuthConstants.MAX_FAILED_ATTEMPTS) {
+                const lockUntilDate = new Date(
+                    Date.now() +
+                        AuthConstants.LOCKOUT_DURATION_MINUTES * 60 * 1000,
+                );
+
                 await db
                     .update(users)
-                    .set({ isLocked: false, lockedUntil: null, updatedAt: new Date() })
+                    .set({
+                        isLocked: true,
+                        lockedUntil: lockUntilDate,
+                        updatedAt: new Date(),
+                    })
                     .where(eq(users.email, params.email));
-            }
-        }
-
-        // Step C: Advanced Anti-Bruteforce & Correlation Logic
-        const windowStart = new Date(
-            Date.now() - AuthConstants.LOCKOUT_WINDOW_MINUTES * 60 * 1000,
-        ).toISOString();
-
-        // 1. Per-IP Rate Limiting & User-Agent Anomaly Detection
-        let ipFailData: any[] = [];
-        try {
-            ipFailData = await db
-                .select({ userAgent: loginAttempts.userAgent })
-                .from(loginAttempts)
-                .where(
-                    and(
-                        eq(loginAttempts.ipAddress, params.clientIp),
-                        eq(loginAttempts.isSuccess, false),
-                        gte(loginAttempts.attemptedAt, new Date(windowStart)),
-                    ),
-                )
-                .limit(21);
-        } catch (ipCountError: any) {
-            if (params.logContext) {
-                params.logContext.authEvent = "ip_rate_limit_check_failed";
-                params.logContext.authError = ipCountError.message;
-            }
-        }
-
-        if (ipFailData && ipFailData.length > 0) {
-            const distinctUAs = new Set(ipFailData.map((row) => row.userAgent))
-                .size;
-            // If an IP rotates > 3 User-Agents, it's highly indicative of a botnet/script
-            const isBotAnomaly = distinctUAs > 3;
-            const ipLimit = isBotAnomaly ? 3 : 20;
-
-            if (ipFailData.length >= ipLimit) {
-                if (params.logContext) {
-                    params.logContext.authEvent = "ip_blocked";
-                    params.logContext.failedAttempts = ipFailData.length;
-                    params.logContext.anomalyDetected = isBotAnomaly;
-                }
 
                 throw new AppError({
                     code: "RATE_LIMIT_EXCEEDED",
                     message:
-                        "Too many login attempts from this IP address, please try again later",
+                        "Too many failed login attempts, account has been locked for 15 minutes",
                     status: 429,
                     retryAfter: AuthConstants.LOCKOUT_DURATION_MINUTES * 60,
                 });
             }
-        }
-
-        // 2. Per-Email Distributed Attack Lockout (Password Spraying)
-        let emailFailCount = 0;
-        try {
-            const result = await db
-                .select({ count: count() })
-                .from(loginAttempts)
-                .where(
-                    and(
-                        eq(loginAttempts.emailAttempted, params.email),
-                        eq(loginAttempts.isSuccess, false),
-                        gte(loginAttempts.attemptedAt, new Date(windowStart)),
-                    ),
-                );
-            emailFailCount = result[0].count;
-        } catch (emailCountError: any) {
-            if (params.logContext) {
-                params.logContext.authEvent = "email_rate_limit_check_failed";
-                params.logContext.authError = emailCountError.message;
-            }
-        }
-
-        if (emailFailCount >= AuthConstants.MAX_FAILED_ATTEMPTS) {
-            const lockUntilDate = new Date(
-                Date.now() + AuthConstants.LOCKOUT_DURATION_MINUTES * 60 * 1000,
-            );
-
-            await db
-                .update(users)
-                .set({ isLocked: true, lockedUntil: lockUntilDate, updatedAt: new Date() })
-                .where(eq(users.email, params.email));
-
-            throw new AppError({
-                code: "RATE_LIMIT_EXCEEDED",
-                message:
-                    "Too many failed login attempts, account has been locked for 15 minutes",
-                status: 429,
-                retryAfter: AuthConstants.LOCKOUT_DURATION_MINUTES * 60,
-            });
         }
 
         // Step D: Auth
@@ -381,7 +464,10 @@ export class AuthService {
             params.logContext.userId = authData.user.id;
         }
 
-        const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, authData.user.id));
+        const [userRecord] = await db
+            .select({ tenantId: users.tenantId })
+            .from(users)
+            .where(eq(users.id, authData.user.id));
         if (userRecord) {
             await logActivity({
                 tenantId: userRecord.tenantId,
@@ -399,7 +485,8 @@ export class AuthService {
             await redis.del(`unverified_email:${params.email}`);
         } catch (err: any) {
             if (params.logContext) {
-                params.logContext.redisError = "Failed to clean up unverified email cache: " + err.message;
+                params.logContext.redisError =
+                    "Failed to clean up unverified email cache: " + err.message;
             }
         }
 
@@ -409,6 +496,9 @@ export class AuthService {
     private static async logLoginAttempt(
         params: AuthParams.LoginAttemptParams,
     ): Promise<void> {
+        if (getEnv("NODE_ENV") !== "prod") {
+            return;
+        }
         try {
             await db.insert(loginAttempts).values({
                 emailAttempted: params.email,
@@ -426,8 +516,10 @@ export class AuthService {
 
     static async logoutUser(params: AuthParams.LogoutParams) {
         const supabase = getSupabaseAdmin();
-        const { data: userData } = await supabase.auth.getUser(params.accessToken);
-        
+        const { data: userData } = await supabase.auth.getUser(
+            params.accessToken,
+        );
+
         const { error } = await supabase.auth.admin.signOut(
             params.accessToken,
             "global",
@@ -464,9 +556,12 @@ export class AuthService {
         if (params.logContext) {
             params.logContext.authEvent = "logout_success";
         }
-        
+
         if (userData?.user?.id) {
-            const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, userData.user.id));
+            const [userRecord] = await db
+                .select({ tenantId: users.tenantId })
+                .from(users)
+                .where(eq(users.id, userData.user.id));
             if (userRecord) {
                 await logActivity({
                     tenantId: userRecord.tenantId,
@@ -491,34 +586,39 @@ export class AuthService {
         ).toISOString();
 
         // Step B: Basic Per-IP Rate Limiting for recovery requests
-        try {
-            const ipRegData = await db
-                .select({
-                    userAgent: loginAttempts.userAgent,
-                })
-                .from(loginAttempts)
-                .where(
-                    and(
-                        eq(loginAttempts.ipAddress, params.clientIp),
-                        eq(loginAttempts.authProvider, "forget_password"),
-                        gte(loginAttempts.attemptedAt, new Date(windowStart)),
-                    ),
-                )
-                .limit(5);
+        if (getEnv("NODE_ENV") === "prod") {
+            try {
+                const ipRegData = await db
+                    .select({
+                        userAgent: loginAttempts.userAgent,
+                    })
+                    .from(loginAttempts)
+                    .where(
+                        and(
+                            eq(loginAttempts.ipAddress, params.clientIp),
+                            eq(loginAttempts.authProvider, "forget_password"),
+                            gte(
+                                loginAttempts.attemptedAt,
+                                new Date(windowStart),
+                            ),
+                        ),
+                    )
+                    .limit(5);
 
-            if (ipRegData.length >= 5) {
-                throw new AppError({
-                    code: "RATE_LIMIT_EXCEEDED",
-                    message:
-                        "Too many password recovery requests from this IP. Please try again later.",
-                    status: 429,
-                    retryAfter: AuthConstants.LOCKOUT_DURATION_MINUTES * 60,
-                });
-            }
-        } catch (err: any) {
-            if (err instanceof AppError) throw err;
-            if (params.logContext) {
-                params.logContext.authError = err.message;
+                if (ipRegData.length >= 5) {
+                    throw new AppError({
+                        code: "RATE_LIMIT_EXCEEDED",
+                        message:
+                            "Too many password recovery requests from this IP. Please try again later.",
+                        status: 429,
+                        retryAfter: AuthConstants.LOCKOUT_DURATION_MINUTES * 60,
+                    });
+                }
+            } catch (err: any) {
+                if (err instanceof AppError) throw err;
+                if (params.logContext) {
+                    params.logContext.authError = err.message;
+                }
             }
         }
 
@@ -527,6 +627,9 @@ export class AuthService {
             await supabase.auth.admin.generateLink({
                 type: "recovery",
                 email: params.email,
+                options: {
+                    redirectTo: `${getEnv("FRONTEND_URL")}/forget-password/update-password`,
+                },
             });
 
         // Step D: Log attempt
@@ -562,9 +665,13 @@ export class AuthService {
 
         // Step E: Send Email
         if (linkData && linkData.properties) {
+            const recoveryUrl = linkData.properties.hashed_token
+                ? `${getEnv("FRONTEND_URL")}/forget-password/update-password?token_hash=${linkData.properties.hashed_token}&email=${encodeURIComponent(params.email)}`
+                : linkData.properties.action_link;
+
             await sendRecoveryEmail(
                 params.email,
-                linkData.properties.action_link,
+                recoveryUrl,
                 linkData.properties.email_otp,
                 params.requestId,
             );
@@ -577,9 +684,7 @@ export class AuthService {
     static async resetPassword(params: AuthParams.ResetPasswordParams) {
         const supabase = getSupabaseAnon();
 
-        // Verify OTP using Supabase anonymous client
         const { data, error } = await supabase.auth.verifyOtp({
-            email: params.email,
             token: params.otp,
             type: "recovery",
         });
@@ -644,7 +749,10 @@ export class AuthService {
             params.logContext.userId = data.user.id;
         }
 
-        const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, data.user.id));
+        const [userRecord] = await db
+            .select({ tenantId: users.tenantId })
+            .from(users)
+            .where(eq(users.id, data.user.id));
         if (userRecord) {
             await logActivity({
                 tenantId: userRecord.tenantId,
@@ -711,7 +819,9 @@ export class AuthService {
             );
         } catch (signOutErr: any) {
             if (params.logContext) {
-                params.logContext.authWarning = "Failed to sign out after password update: " + signOutErr.message;
+                params.logContext.authWarning =
+                    "Failed to sign out after password update: " +
+                    signOutErr.message;
             }
         }
 
@@ -720,7 +830,10 @@ export class AuthService {
             params.logContext.userId = data.user.id;
         }
 
-        const [userRecord] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, data.user.id));
+        const [userRecord] = await db
+            .select({ tenantId: users.tenantId })
+            .from(users)
+            .where(eq(users.id, data.user.id));
         if (userRecord) {
             await logActivity({
                 tenantId: userRecord.tenantId,
@@ -731,7 +844,11 @@ export class AuthService {
         }
     }
 
-    static async getProfile(params: { userId: string, tenantId: string, logContext?: any }) {
+    static async getProfile(params: {
+        userId: string;
+        tenantId: string;
+        logContext?: any;
+    }) {
         const [userRecord] = await db
             .select()
             .from(users)
@@ -787,7 +904,7 @@ export class AuthService {
                     updatedAt: new Date(),
                 })
                 .where(eq(tenantSubscriptions.tenantId, params.tenantId));
-            
+
             if (params.logContext) {
                 params.logContext.authEvent = "tier_auto_downgraded";
                 params.logContext.oldTier = subscription.tier;

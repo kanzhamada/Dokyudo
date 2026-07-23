@@ -39,11 +39,11 @@
 			apiError = '';
 
 			// Debug Log: Frontend State BEFORE hitting backend
-			// console.log('[Auth Register] Form Submitted:', {
-			// 	email: f.data.email,
-			// 	password: f.data.password,
-			// 	confirmPassword: f.data.confirmPassword
-			// });
+			console.log('[Auth Register] Form Submitted:', {
+				email: f.data.email,
+				password: f.data.password,
+				confirmPassword: f.data.confirmPassword
+			});
 
 			try {
 				const token = await executeRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY, 'register');
@@ -55,7 +55,7 @@
 				});
 
 				// Debug Log: Raw response AFTER hitting backend
-				// console.log(`[Auth Register] Backend Response (POST /api/auth/register):`, result);
+				console.log('[Auth Register] Backend Response (POST /api/auth/register):', result);
 
 				if (result.ok) {
 					localStorage.removeItem('dokyudo_register_lockout');

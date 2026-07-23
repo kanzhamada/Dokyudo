@@ -6,16 +6,17 @@
 </script>
 
 <!-- Layer 1: Full-screen background image -->
-<div class="fixed inset-0 -z-20">
-	<img src={vintageFloral} alt="" class="h-full w-full object-cover" aria-hidden="true" />
+<div class="fixed inset-0 -z-20 bg-[#141414]">
+	<!-- <img src={vintageFloral} alt="" class="h-full w-full object-cover" aria-hidden="true" /> -->
+
 </div>
 
 <!-- Layer 2: Dark overlay with blur -->
-<div
+<!-- <div
 	class="fixed inset-0 -z-10 backdrop-blur-[11px]"
 	style="background-color: rgba(25, 25, 25, 0.78);"
 	aria-hidden="true"
-></div>
+></div> -->
 
 <!-- Layer 3: Card container -->
 <div class="flex min-h-svh items-center justify-center p-4 md:p-8">

@@ -32,6 +32,10 @@ export type ForgotPasswordSchema = typeof forgotPasswordSchema;
 
 export const updatePasswordSchema = z
 	.object({
+		otp: z
+			.string()
+			.length(8, 'OTP must be exactly 8 digits')
+			.regex(/^\d+$/, 'OTP must contain only numbers'),
 		password: passwordValidation,
 		confirmPassword: z.string().min(1, 'Please confirm your password')
 	})

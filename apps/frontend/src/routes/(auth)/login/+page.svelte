@@ -3,6 +3,7 @@
 	import { zod4Client as zodClient } from 'sveltekit-superforms/adapters';
 	import { loginSchema } from '$lib/schemas/auth.schema';
 	import { authLogin } from '$lib/api/auth';
+	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { loadRecaptcha, executeRecaptcha } from '$lib/utils/recaptcha.util';
 	import { PUBLIC_RECAPTCHA_SITE_KEY } from '$env/static/public';
 	import * as Form from '$lib/components/ui/form';
@@ -38,10 +39,10 @@
 			apiError = '';
 
 			// Debug Log: Frontend State BEFORE hitting backend
-			// console.log('[Auth Login] Form Submitted:', {
-			// 	email: f.data.email,
-			// 	password: f.data.password
-			// });
+			console.log('[Auth Login] Form Submitted:', {
+				email: f.data.email,
+				password: f.data.password
+			});
 
 			try {
 				const token = await executeRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY, 'login');
@@ -53,11 +54,12 @@
 				});
 
 				// Debug Log: Raw response AFTER hitting backend
-				// console.log(`[Auth Login] Backend Response (POST /api/auth/login):`, result);
+				console.log('[Auth Login] Backend Response (POST /api/auth/login):', result);
 
 				if (result.ok) {
+					sessionStore.set(result.data);
 					localStorage.removeItem('dokyudo_login_lockout');
-					await goto('/');
+					await goto('/app/chat');
 				} else {
 					if (result.error.code === 'RATE_LIMIT_EXCEEDED' && result.error.retryAfter) {
 						const endTime = Date.now() + result.error.retryAfter * 1000;

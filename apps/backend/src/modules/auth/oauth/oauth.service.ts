@@ -98,18 +98,20 @@ export class OAuthService {
                 }
             }
 
-            // Audit log: record the failed attempt for security visibility
-            try {
-                await db.insert(loginAttempts).values({
-                    emailAttempted: user.email ?? "unknown",
-                    ipAddress: params.clientIp,
-                    userAgent: params.userAgent,
-                    isSuccess: false,
-                    authProvider: `oauth_${params.provider}`,
-                });
-            } catch (logErr: any) {
-                if (params.logContext) {
-                    params.logContext.dbError_logLoginAttempt = logErr.message;
+            // Audit log: record the failed attempt for security visibility (prod only)
+            if (getEnv("NODE_ENV") === "prod") {
+                try {
+                    await db.insert(loginAttempts).values({
+                        emailAttempted: user.email ?? "unknown",
+                        ipAddress: params.clientIp,
+                        userAgent: params.userAgent,
+                        isSuccess: false,
+                        authProvider: `oauth_${params.provider}`,
+                    });
+                } catch (logErr: any) {
+                    if (params.logContext) {
+                        params.logContext.dbError_logLoginAttempt = logErr.message;
+                    }
                 }
             }
 

@@ -279,4 +279,24 @@ describe("AuthService Isolated Tests", () => {
             );
         });
     });
+
+    describe("verifyEmail", () => {
+        it("negative: throws UNAUTHORIZED for invalid or expired tokenHash", async () => {
+            const logContext: any = {};
+            await assertRejects(
+                () =>
+                    AuthService.verifyEmail({
+                        tokenHash: "invalid_token_hash_12345",
+                        type: "signup",
+                        clientIp: TEST_IP,
+                        userAgent: "TestAgent",
+                        requestId: crypto.randomUUID(),
+                        logContext,
+                    }),
+                AppError,
+                "Invalid or expired verification link.",
+            );
+            assertEquals(logContext.authEvent, "verify_email_failed");
+        });
+    });
 });

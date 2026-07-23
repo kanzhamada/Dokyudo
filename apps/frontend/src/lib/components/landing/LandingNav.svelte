@@ -32,8 +32,8 @@
 			<a href="#faq">FAQ</a>
 		</div>
 		<div class="nav-actions">
-			<a href="/auth/login" class="nav-btn-ghost">Log In</a>
-			<a href="/auth/register" class="nav-btn-accent">
+			<a href="/login" class="nav-btn-ghost">Log In</a>
+			<a href="/register" class="nav-btn-accent">
 				Get Started
 				<ArrowUpRight size={14} strokeWidth={2.5} />
 			</a>

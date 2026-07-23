@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "jsr:@std/assert";
 import { describe, it, beforeAll } from "jsr:@std/testing/bdd";
 import app from "../../main.ts";
 
@@ -497,8 +497,7 @@ describe("Auth Module", () => {
 
         it("negative: invalid OTP returns 401", async () => {
             const res = await makeRequest("/api/auth/reset-password", {
-                email: testEmail,
-                otp: "000000",
+                otp: "00000000",
                 newPassword: "NewSecurePassword123!",
             });
 
@@ -569,7 +568,6 @@ describe("Auth Module", () => {
 
         it("negative: reset-password missing otp returns 400", async () => {
             const res = await makeRequest("/api/auth/reset-password", {
-                email: testEmail,
                 newPassword: "NewSecurePassword123!",
             });
             assertEquals(res.status, 400);
@@ -577,8 +575,7 @@ describe("Auth Module", () => {
 
         it("negative: reset-password short password returns 400", async () => {
             const res = await makeRequest("/api/auth/reset-password", {
-                email: testEmail,
-                otp: "123456",
+                otp: "12345678",
                 newPassword: "short",
             });
             assertEquals(res.status, 400);
@@ -634,6 +631,28 @@ describe("Auth Module", () => {
             assertEquals(typeof json.error.requestId, "string");
             assertEquals(json.error.code !== "", true);
             assertEquals(json.error.message !== "", true);
+        });
+    });
+
+    describe("POST /api/auth/verify-email", () => {
+        it("negative: returns 400 when tokenHash is missing", async () => {
+            const res = await makeRequest("/api/auth/verify-email", {
+                type: "signup",
+            });
+            assertEquals(res.status, 400);
+            const json = await res.json();
+            assertEquals(json.error.code, "VALIDATION_ERROR");
+        });
+
+        it("negative: returns 401 for an invalid tokenHash", async () => {
+            const res = await makeRequest("/api/auth/verify-email", {
+                tokenHash: "invalid_token_hash_99999",
+                type: "signup",
+            });
+            assertEquals(res.status, 401);
+            const json = await res.json();
+            assertEquals(json.error.code, "UNAUTHORIZED");
+            assertEquals(json.error.message, "Invalid or expired verification link.");
         });
     });
 });

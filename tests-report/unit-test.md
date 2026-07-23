@@ -1,8 +1,8 @@
 # Backend White Box Testing Report
 
-**Date of Testing:** June 28, 2026
+**Date of Testing:** July 23, 2026
 **Target Architecture:** Deno (Hono) Modular Monolith
-**Overall Status:** **PASSED** (8 Test Modules, 68 Test Steps)
+**Overall Status:** **PASSED** (8 Test Modules, 71 Test Steps)
 **Methodology:** BDD (Behavior-Driven Development) via `jsr:@std/testing/bdd`
 
 ## 1. Main App & Global Endpoints (`main.test.ts`)
@@ -42,11 +42,11 @@
 | **Logout** | `negative: invalid auth header format returns 401`| HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
 | **Recovery** | `positive: sends recovery email` | HTTP 200, "...recovery email has been sent" | HTTP 200, Match | ✅ Pass |
 | **Recovery** | `negative: missing email returns 400` | HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
-| **Recovery** | `negative: invalid OTP returns 401` | HTTP 401, `UNAUTHORIZED` or HTTP 400 | Match | ✅ Pass |
+| **Recovery** | `negative: invalid OTP returns 401 (without email)` | HTTP 401, `UNAUTHORIZED` or HTTP 400 | Match | ✅ Pass |
 | **Recovery** | `negative: update-password missing auth returns 401`| HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
 | **Recovery** | `negative: rate limit exceeded at 5 attempts` | HTTP 429, `RATE_LIMIT_EXCEEDED` | HTTP 429, Match | ✅ Pass |
-| **Recovery** | `negative: reset-password missing otp returns 400`| HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
-| **Recovery** | `negative: reset-password short password returns 400`| HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
+| **Recovery** | `negative: reset-password missing otp returns 400 (without email)`| HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
+| **Recovery** | `negative: reset-password short password returns 400 (without email)`| HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
 | **Recovery** | `negative: update-password short password returns 400`| HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
 | **OAuth** | `GET /oauth/google: positive redirect to Supabase` | HTTP 302, `provider=google` in Location | HTTP 302, Match | ✅ Pass |
 | **OAuth** | `GET /oauth/github: positive redirect to Supabase` | HTTP 302, `provider=github` in Location | HTTP 302, Match | ✅ Pass |
@@ -60,6 +60,8 @@
 | **Error Env.** | `Error responses always have the standard envelope`| JSON has `error.code`, `error.message` | Matched Schema| ✅ Pass |
 | **Get Profile**| `positive: returns profile for authenticated user`| HTTP 200, Returns JSON | HTTP 200, Match | ✅ Pass |
 | **Get Profile**| `negative: missing authorization header returns 401`| HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Verify Email**| `negative: missing tokenHash returns 400` | HTTP 400, `VALIDATION_ERROR` | HTTP 400, Match | ✅ Pass |
+| **Verify Email**| `negative: invalid tokenHash returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
 
 
 ## 3. Documents Routes (`documents.routes.test.ts`)
@@ -173,6 +175,7 @@
 | **Auth Svc** | `loginUser: rejects unverified user` | Throws "Invalid email or password" | AppError thrown | ✅ Pass |
 | **Auth Svc** | `forgetPassword: processes for existing` | logContext gets "forget_password_success"| Log matched | ✅ Pass |
 | **Auth Svc** | `forgetPassword: ignores non-existent` | logContext gets "forget_password_user_not_found"| Log matched | ✅ Pass |
+| **Auth Svc** | `verifyEmail: rejects invalid or expired tokenHash`| Throws "Invalid or expired verification link."| AppError thrown | ✅ Pass |
 | **Auth Svc** | `getProfile: returns profile & untouched tier`| Returns valid `PRO` tier | Tier unchanged | ✅ Pass |
 | **Auth Svc** | `getProfile: lazy downgrades expired tier`| Downgrades DB to `FREE` + logEvent | DB matches | ✅ Pass |
 | **Auth Svc** | `getProfile: throws NOT_FOUND if no user` | Throws "User not found" | AppError thrown| ✅ Pass |

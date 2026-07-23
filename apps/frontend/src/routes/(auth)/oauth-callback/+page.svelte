@@ -1,15 +1,51 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { sessionStore } from '$lib/state/session.store.svelte';
 
 	let errorMessage = $state('');
 	let dots = $state('');
 
-	onMount(() => {
-		// In a real implementation, this would read search params and exchange code for token
-		// For now, it just simulates a callback
+	onMount(async () => {
 		const urlParams = new URLSearchParams(window.location.search);
+
+		console.log('[Auth OAuth Callback] URL params received.');
+
 		if (urlParams.has('error')) {
-			errorMessage = urlParams.get('error_description') || 'An error occurred during authentication.';
+			errorMessage = urlParams.get('error') || 'An error occurred during authentication.';
+			console.error('[Auth OAuth Callback] Error from backend:', errorMessage);
+			return;
+		}
+
+		const accessToken = urlParams.get('access_token');
+		const refreshToken = urlParams.get('refresh_token');
+
+		if (!accessToken || !refreshToken) {
+			errorMessage = 'Missing authentication tokens. Please try again.';
+			console.error('[Auth OAuth Callback] Missing tokens in URL params.');
+			return;
+		}
+
+		try {
+			// Decode the JWT payload to extract user info (no network call needed)
+			const payloadBase64 = accessToken.split('.')[1];
+			const payload = JSON.parse(atob(payloadBase64));
+
+			console.log('[Auth OAuth Callback] Session established for user:', payload.sub);
+
+			sessionStore.set({
+				accessToken,
+				refreshToken,
+				user: {
+					id: payload.sub,
+					email: payload.email ?? ''
+				}
+			});
+
+			await goto('/app/chat');
+		} catch (err: any) {
+			errorMessage = 'Failed to process authentication. Please try again.';
+			console.error('[Auth OAuth Callback] Token parsing error:', err);
 		}
 	});
 

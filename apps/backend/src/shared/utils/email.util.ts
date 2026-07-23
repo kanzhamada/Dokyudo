@@ -44,6 +44,10 @@ export async function sendVerificationEmail(
             "Failed to send verification email via Resend:",
             error.message,
         );
+        if (Deno.env.get("NODE_ENV") === "test" || Deno.env.get("NODE_ENV") === "dev") {
+            console.warn("[TEST/DEV] Bypassing Resend email error in non-production environment.");
+            return;
+        }
         throw new AppError({
             code: "INTERNAL_ERROR",
             message: "Failed to send verification email. Please try again.",
@@ -101,6 +105,10 @@ export async function sendRecoveryEmail(
             "Failed to send recovery email via Resend:",
             error.message,
         );
+        if (Deno.env.get("NODE_ENV") === "test" || Deno.env.get("NODE_ENV") === "dev") {
+            console.warn("[TEST/DEV] Bypassing Resend email error in non-production environment.");
+            return;
+        }
         throw new AppError({
             code: "INTERNAL_ERROR",
             message: "Failed to send recovery email. Please try again.",

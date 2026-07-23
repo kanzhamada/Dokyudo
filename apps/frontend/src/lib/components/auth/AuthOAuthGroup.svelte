@@ -2,6 +2,7 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import { Button } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { initiateGoogleOAuth, initiateGithubOAuth } from '$lib/api/auth';
 </script>
 
 <!-- Separator -->
@@ -21,7 +22,7 @@
 						{...props}
 						variant="authOauth"
 						class="auth-btn-oauth"
-						onclick={() => console.log('Google OAuth not yet implemented')}
+						onclick={initiateGoogleOAuth}
 					>
 						<svg class="mr-2" width="20" height="20" viewBox="0 0 24 24">
 							<path
@@ -60,7 +61,7 @@
 						{...props}
 						variant="authOauth"
 						class="auth-btn-oauth"
-						onclick={() => console.log('GitHub OAuth not yet implemented')}
+						onclick={initiateGithubOAuth}
 					>
 						<svg class="mr-2" width="20" height="20" viewBox="0 0 24 24" fill="#1C1B1B">
 							<path

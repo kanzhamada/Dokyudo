@@ -66,6 +66,55 @@ authRoutes.openapi(
 authRoutes.openapi(
     createRoute({
         method: "post",
+        path: "/verify-email",
+        tags: ["Auth"],
+        summary: "Verify email address using token hash",
+        description:
+            "Verifies a user's email address using the token_hash passed from the custom verification link sent to their inbox. " +
+            "Returns a active JWT access token, refresh token, and user profile upon success.",
+        request: {
+            body: {
+                content: {
+                    "application/json": {
+                        schema: AuthSchema.VerifyEmailBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Verification successful — session tokens returned",
+                content: {
+                    "application/json": {
+                        schema: AuthSchema.VerifyEmailResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Invalid or expired token hash",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    authController.handleVerifyEmail as any,
+);
+
+authRoutes.openapi(
+    createRoute({
+        method: "post",
         path: "/login",
         tags: ["Auth"],
         summary: "Login with email and password",
@@ -250,7 +299,7 @@ authRoutes.openapi(
         tags: ["Auth"],
         summary: "Reset password using OTP",
         description:
-            "Verifies the 6-digit OTP from the recovery email and updates the password.",
+            "Verifies the 8-digit OTP from the recovery email and updates the password.",
         request: {
             body: {
                 content: {

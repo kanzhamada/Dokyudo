@@ -185,11 +185,7 @@ export const ForgetPasswordResponseSchema = z
 
 export const ResetPasswordBodySchema = z
     .object({
-        email: z.string().email().max(255, "Email is too long").openapi({
-            description: "User email address",
-            example: "user@example.com",
-        }),
-        otp: z.string().length(8, "OTP must be exactly 8 characters").openapi({
+        otp: z.string().length(8, "OTP must be exactly 8 digits").openapi({
             description: "8-digit OTP received via email",
             example: "12345678",
         }),
@@ -323,3 +319,45 @@ export const UpdateTenantNameResponseSchema = z
         message: z.string().openapi({ example: "Tenant name updated successfully." }),
     })
     .openapi("UpdateTenantNameResponse");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Verify Email Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const VerifyEmailBodySchema = z
+    .object({
+        tokenHash: z.string().min(1, "Token hash is required").openapi({
+            description: "Verification token hash extracted from email URL parameter",
+            example: "7f8191376dddcfd630f4cd24c4b2e5940f5a6ab89a01669ae39ab175",
+        }),
+        type: z
+            .enum(["signup", "email", "recovery", "invite"])
+            .default("signup")
+            .openapi({
+                description: "OTP verification type",
+                example: "signup",
+            }),
+    })
+    .openapi("VerifyEmailBody");
+
+export type VerifyEmailBody = z.infer<typeof VerifyEmailBodySchema>;
+
+const VerifyEmailParamsSchema = VerifyEmailBodySchema.extend({
+    clientIp: z.string(),
+    userAgent: z.string(),
+    requestId: z.string(),
+    logContext: z.any().optional(),
+});
+
+export type VerifyEmailParams = z.infer<typeof VerifyEmailParamsSchema>;
+
+export const VerifyEmailResponseSchema = z
+    .object({
+        accessToken: z.string().openapi({ example: "eyJhbGciOi..." }),
+        refreshToken: z.string().openapi({ example: "v1.mc..." }),
+        user: z.object({
+            id: z.string().uuid().openapi({ example: "3fa85f64-5717-4562-b3fc-2c963f66afa6" }),
+            email: z.string().email().openapi({ example: "user@example.com" }),
+        }),
+    })
+    .openapi("VerifyEmailResponse");

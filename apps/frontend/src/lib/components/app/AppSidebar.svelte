@@ -2,6 +2,9 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { Avatar } from '$lib/components/ui/avatar/index.js';
 	import * as AvatarPrimitive from '$lib/components/ui/avatar/index.js';
 
@@ -26,8 +29,33 @@
 	// App Logic
 	import PanelLeft from '@lucide/svelte/icons/panel-left';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
-
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+
+	import { authLogout } from '$lib/api/auth';
+	import { sessionStore } from '$lib/state/session.store.svelte';
+
+	let isLogoutDialogOpen = $state(false);
+	let isLoggingOut = $state(false);
+
+	async function handleLogout() {
+		if (isLoggingOut) return;
+		isLoggingOut = true;
+
+		console.log('[Auth Logout] Initiating sign out...');
+		try {
+			const result = await authLogout();
+			console.log('[Auth Logout] Backend Response:', result);
+		} catch (err) {
+			console.error('[Auth Logout] Catch Error:', err);
+		} finally {
+			sessionStore.clear();
+			console.log('[Auth Logout] Session cleared. Redirecting to /login');
+			isLoggingOut = false;
+			isLogoutDialogOpen = false;
+			await goto('/login');
+		}
+	}
 
 	const navItems = $derived([
 		{
@@ -225,7 +253,8 @@
 						</DropdownMenu.Group>
 						<DropdownMenu.Separator class="bg-white/10" />
 						<DropdownMenu.Item
-							class="cursor-pointer text-red-400 hover:bg-red-400 hover:text-red-400 focus:bg-red-400 focus:text-red-400"
+							class="cursor-pointer text-[#FB6363] hover:bg-[#FB6363]/10 hover:text-[#FB6363] focus:bg-[#FB6363]/10 focus:text-[#FB6363]"
+							onclick={() => (isLogoutDialogOpen = true)}
 						>
 							<LogOut class="mr-2 size-4" />
 							<span>Log out</span>
@@ -318,3 +347,38 @@
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>
 {/snippet}
+
+<!-- Confirmation Dialog for Logout -->
+<Dialog.Root bind:open={isLogoutDialogOpen}>
+	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title class="font-sans text-xl font-medium text-white">Log out</Dialog.Title>
+			<Dialog.Description class="text-sm text-white/70">
+				Are you sure you want to log out? You will need to sign in again to access your Dokyudo workspace.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<Dialog.Footer class="mt-4 flex gap-2 sm:justify-end">
+			<Button
+				variant="outline"
+				disabled={isLoggingOut}
+				onclick={() => (isLogoutDialogOpen = false)}
+				class="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+			>
+				Cancel
+			</Button>
+			<Button
+				disabled={isLoggingOut}
+				onclick={handleLogout}
+				class="bg-[#FB6363] text-white hover:bg-[#FB6363]/90"
+			>
+				{#if isLoggingOut}
+					<Spinner class="mr-2 size-4" />
+					Logging out...
+				{:else}
+					Log out
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>

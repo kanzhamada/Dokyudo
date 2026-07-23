@@ -31,6 +31,36 @@ export async function handleRegister(c: Context) {
     );
 }
 
+export async function handleVerifyEmail(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { requestId, clientIp, userAgent, logContext } =
+        extractor.extractAuditContext();
+    const body = extractor.extractValidJson<AuthSchema.VerifyEmailBody>();
+
+    const params: AuthSchema.VerifyEmailParams = {
+        tokenHash: body.tokenHash,
+        type: body.type,
+        clientIp,
+        userAgent,
+        requestId,
+        logContext,
+    };
+
+    const authData = await AuthService.verifyEmail(params);
+
+    return c.json(
+        {
+            accessToken: authData.session.access_token,
+            refreshToken: authData.session.refresh_token,
+            user: {
+                id: authData.user.id,
+                email: authData.user.email!,
+            },
+        },
+        200,
+    );
+}
+
 export async function handleLogin(c: Context) {
     const extractor = new ContextExtractor(c);
     const { requestId, clientIp, userAgent, logContext } =
@@ -107,7 +137,6 @@ export async function handleResetPassword(c: Context) {
     const body = extractor.extractValidJson<AuthSchema.ResetPasswordBody>();
 
     const params: AuthSchema.ResetPasswordParams = {
-        email: body.email,
         otp: body.otp,
         newPassword: body.newPassword,
         clientIp,

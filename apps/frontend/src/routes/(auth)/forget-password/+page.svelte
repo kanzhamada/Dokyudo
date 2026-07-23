@@ -2,19 +2,25 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client as zodClient } from 'sveltekit-superforms/adapters';
 	import { forgotPasswordSchema } from '$lib/schemas/auth.schema';
+	import { authForgotPassword } from '$lib/api/auth';
+	import { loadRecaptcha, executeRecaptcha } from '$lib/utils/recaptcha.util';
+	import { PUBLIC_RECAPTCHA_SITE_KEY } from '$env/static/public';
 	import * as Form from '$lib/components/ui/form';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { onMount } from 'svelte';
 
 	import AuthSuccessState from '$lib/components/auth/AuthSuccessState.svelte';
 	import AuthBackButton from '$lib/components/auth/AuthBackButton.svelte';
+	import AuthErrorBox from '$lib/components/auth/AuthErrorBox.svelte';
 
 	let { data } = $props();
 
 	let isSubmitting = $state(false);
 	let successMessage = $state('');
+	let apiError = $state('');
 
 	const form = superForm(data.form, {
 		validators: zodClient(forgotPasswordSchema),
@@ -23,16 +29,31 @@
 		onUpdate: async ({ form: f }) => {
 			if (!f.valid) return;
 			isSubmitting = true;
+			apiError = '';
 
-			// Simulate API call for now (just frontend implementation as requested)
-			await new Promise((r) => setTimeout(r, 1000));
+			console.log('[Auth Forgot Password] Form Submitted:', { email: f.data.email });
 
-			successMessage = 'If an account exists, a reset link has been sent to that email.';
-			isSubmitting = false;
+			try {
+				const token = await executeRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY, 'forgot_password');
+				const result = await authForgotPassword({ email: f.data.email, recaptchaToken: token });
+
+				console.log('[Auth Forgot Password] Backend Response:', result);
+				localStorage.setItem('dokyudo_reset_email', f.data.email);
+
+				// Always show success to prevent email enumeration — backend does the same
+				successMessage = 'If an account exists, a reset link has been sent to that email.';
+			} catch (err: any) {
+				apiError = 'Something went wrong. Please try again.';
+				console.error('[Auth Forgot Password] Catch Error:', err);
+			} finally {
+				isSubmitting = false;
+			}
 		}
 	});
 
 	const { form: formData, enhance } = form;
+
+	onMount(() => loadRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY));
 </script>
 
 <svelte:head>
@@ -93,6 +114,9 @@
 				Send Reset Link
 			{/if}
 		</Button>
+
+		<!-- Error box -->
+		<AuthErrorBox {apiError} />
 	</form>
 
 	<!-- Footer link -->

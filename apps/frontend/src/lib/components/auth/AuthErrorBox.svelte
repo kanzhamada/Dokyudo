@@ -1,13 +1,13 @@
 <script lang="ts">
 	let {
 		apiError,
-		lockoutEndTime = $bindable(),
-		localStorageKey,
+		lockoutEndTime = $bindable(null),
+		localStorageKey = '',
 		lockoutMessage = 'Too many requests. Try again in'
 	}: {
 		apiError: string;
-		lockoutEndTime: number | null;
-		localStorageKey: string;
+		lockoutEndTime?: number | null;
+		localStorageKey?: string;
 		lockoutMessage?: string;
 	} = $props();
 

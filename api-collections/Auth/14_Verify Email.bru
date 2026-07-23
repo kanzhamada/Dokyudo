@@ -1,0 +1,26 @@
+meta {
+  name: Verify Email
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/auth/verify-email
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "tokenHash": "7f8191376dddcfd630f4cd24c4b2e5940f5a6ab89a01669ae39ab175",
+    "type": "signup"
+  }
+}
+
+docs {
+  Verifies a user's email address using the token_hash passed from the custom verification link sent to their inbox. Returns active JWT access token, refresh token, and user profile upon success.
+}

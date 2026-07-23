@@ -1,6 +1,7 @@
 import { PUBLIC_API_URL } from '$env/static/public';
 import type { ApiErrorResponse, ApiResult } from '../types/api.types';
 import { dokyudoFetch } from '$lib/apiClient';
+import { sessionStore } from '$lib/state/session.store.svelte';
 
 interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
 	body?: Record<string, unknown> | FormData;
@@ -24,9 +25,9 @@ export async function apiRequest<T>(
 		finalHeaders.set('Content-Type', 'application/json');
 	}
 
-	// In the future, this is where you would centrally attach Auth Tokens:
-	// const token = getAuthToken();
-	// if (token) finalHeaders.set('Authorization', `Bearer ${token}`);
+	// Attach auth token from session store if available
+	const token = sessionStore.getAccessToken();
+	if (token) finalHeaders.set('Authorization', `Bearer ${token}`);
 
 	const fetchOptions: RequestInit = {
 		method: options.method || 'GET',

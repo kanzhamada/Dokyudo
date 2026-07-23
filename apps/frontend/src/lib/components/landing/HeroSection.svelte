@@ -192,7 +192,7 @@
 						with <span class="highlight-meaning">Meaning</span>
 					</h1>
 					<div class="hero-ctas">
-						<a href="/auth/register" class="btn-primary">
+						<a href="/register" class="btn-primary">
 							Start Free
 							<ArrowUpRight size={15} strokeWidth={2.5} />
 						</a>

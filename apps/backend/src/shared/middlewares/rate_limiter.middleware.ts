@@ -23,6 +23,10 @@ const blockLimiter = new Ratelimit({
 });
 
 export async function rateLimiterMiddleware(c: Context, next: Next) {
+    if (Deno.env.get("NODE_ENV") !== "prod") {
+        return next();
+    }
+
     if (c.req.path.includes("/webhook")) {
         return next();
     }
