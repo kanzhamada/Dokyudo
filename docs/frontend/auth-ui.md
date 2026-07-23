@@ -1,90 +1,165 @@
 ---
-title: Frontend Auth UI
-description: Implementation details for the SvelteKit frontend authentication flows (Sign In, Sign Up, Password Reset, OAuth)
-completed_at: 2026-06-20T00:03:00+07:00
+title: Frontend Auth UI & Integration
+description: Comprehensive documentation for SvelteKit frontend authentication architecture, Svelte 5 rune session management, custom email verification, OAuth callbacks, InputOTP password reset, and sidebar logout dialogs.
+completed_at: 2026-07-23T15:20:00+07:00
 ---
 
-# Frontend Auth UI
+# Frontend Authentication Architecture & Second Brain Reference
 
 ## Core Logic
-The frontend authentication system handles user sign-in and registration using SvelteKit, `superforms`, and Zod v4 validation. It implements a premium visual aesthetic matching the design specs (vintage floral background, translucent overlays, bespoke fonts) and integrates Google reCAPTCHA v3 on the client side before delegating form submission to the Deno API Gateway.
 
-Recently refactored to fully comply with Svelte 5 runes (`$state`, `$props`), Tailwind CSS v4 `@theme inline` variables, and strictly enforced `shadcn-svelte` variant encapsulation for cleaner CSS structure.
+The Dokyudo SvelteKit presentation layer (`apps/frontend`) provides a complete, modern authentication system designed around Svelte 5 runes (`$state`), `sveltekit-superforms`, Zod schema validation, and `shadcn-svelte` UI components. 
 
-### Reactive Security Lockout (Anti-Bruteforce UI)
-The frontend implements a secure client-side UX for backend rate limiting. When the backend returns a `429 RATE_LIMIT_EXCEEDED` or `403 FORBIDDEN` with a `retryAfter` value:
-- The UI calculates the absolute unlock time and persists it to `localStorage`.
-- Svelte 5 Runes (`$effect` and `$state`) drive a live countdown timer embedded in the form's error box.
-- All form inputs (email, password) and the submit button are natively `disabled` while the timer is active. To protect accessibility, `autofocus` on inputs is also disabled during a lockout.
-- *Security Note*: This is purely a UI convenience. If an attacker bypasses `localStorage`, the Deno backend still enforces the true cryptographic lock and rejects the request.
+The frontend acts as a presentation layer, communicating exclusively via HTTP requests to the Deno API Gateway (`/api/auth/*`) and managing authenticated user state via a centralized, rune-based session store.
+
+---
+
+## Key Feature Modules
+
+### 1. Svelte 5 Rune Session Store (`session.store.svelte.ts`)
+- **Location**: `apps/frontend/src/lib/state/session.store.svelte.ts`
+- **Logic**: Reactive session state using Svelte 5 `$state` runes. Automatically persists `accessToken`, `refreshToken`, and `user` payload to browser `localStorage` on mutation.
+- **Header Injection**: `apps/frontend/src/lib/api/client.ts` automatically reads `sessionStore.accessToken` and attaches `Authorization: Bearer <token>` to outgoing API requests.
+
+### 2. Custom Branded Email Verification (`/auth/verify`)
+- **Location**: `apps/frontend/src/routes/(auth)/auth/verify/+page.svelte`
+- **Logic**: When users click the verification link in their email (`http://localhost:5173/auth/verify?token_hash=XYZ&type=signup`), this page reads URL search parameters, calls `authVerifyEmail({ token_hash, type })`, stores the returned JWT session in `sessionStore`, and redirects the user directly to `/app/chat`.
+
+### 3. Dual-Mode OAuth Callback Handler (`/oauth-callback`)
+- **Location**: `apps/frontend/src/routes/(auth)/oauth-callback/+page.svelte`
+- **Logic**: Handles both Supabase Hash Fragment implicit redirects (`#access_token=...&refresh_token=...`) and Query String PKCE redirects (`?access_token=...`).
+- **Base64URL & UTF-8 Decoder**: Features a robust `parseJwt()` helper that handles unpadded Base64 strings (solving length modulo issues for GitHub OAuth JWTs) and UTF-8 URI decoding before saving the session and navigating to `/app/chat`.
+
+### 4. 8-Digit OTP Password Reset with `InputOTP` (`/forget-password/update-password`)
+- **Location**: `apps/frontend/src/routes/(auth)/forget-password/update-password/+page.svelte`
+- **Logic**: Streamlined reset password screen requiring only the 8-digit OTP code and new password (`{ otp, newPassword }`).
+- **UI Design**: Uses `shadcn-svelte` `InputOTP` with custom `InputOTP.Slot` styling (`h-12`, `bg-auth-input`, `border-white/10`, `rounded-md`, `font-sans text-base text-white`) that matches the dimensions and dark theme of the `AuthPasswordInput` fields. Preserves form data on error.
+
+### 5. Sidebar Logout Confirmation Dialog (`AppSidebar.svelte`)
+- **Location**: `apps/frontend/src/lib/components/app/AppSidebar.svelte`
+- **Logic**: Intercepts sign-out clicks with a dark-themed `<Dialog>` modal (`bg-[#232323]`, `border-white/10`). Upon confirmation, calls `authLogout()`, clears `sessionStore`, and navigates to `/login`.
+
+### 6. Client-Side Protected Route Guard (`/app/*`)
+- **Location**: `apps/frontend/src/routes/app/+layout.ts`
+- **Logic**: Client-side layout load function that checks `sessionStore.isAuthenticated`. Redirects unauthenticated users to `/login`.
+
+---
 
 ## Flow Diagram
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Frontend as SvelteKit UI (superforms)
-    participant reCAPTCHA as Google reCAPTCHA API
-    participant Backend as Deno API Gateway
+    actor User
+    participant Page as SvelteKit Route
+    participant Store as session.store.svelte.ts
+    participant API as Deno API Gateway (/api/auth)
+    participant Supabase as Supabase Auth Service
 
-    User->>Frontend: Fills out Email & Password (Login/Signup)
-    User->>Frontend: Clicks Submit
-    Frontend->>Frontend: Zod Schema Validation (Client-Side)
-    alt Validation Failed
-        Frontend-->>User: Displays Form Errors
-    else Validation Passed
-        Frontend->>reCAPTCHA: executeRecaptcha(siteKey, action)
-        reCAPTCHA-->>Frontend: returns recaptchaToken
-        Frontend->>Backend: POST /api/auth/login OR /register (email, password, recaptchaToken)
-        Backend-->>Frontend: 200 OK (JWT) or 429/403 (Lockout)
-        alt Success
-            Frontend->>User: Redirects to Dashboard "/"
-        else Rate Limit Exceeded
-            Frontend->>Frontend: Save 'retryAfter' to localStorage
-            Frontend-->>User: Display Reactive Countdown & Disable Form
-        else Other Error
-            Frontend-->>User: Displays error envelope message
-        end
+    box Auth Operations & Navigation
+    participant Chat as /app/chat Workspace
+    end
+
+    %% Email Verification Flow
+    rect rgb(30, 30, 30)
+    note right of User: Custom Email Verification Flow
+    User->>Page: Clicks Email Link (/auth/verify?token_hash=XYZ&type=signup)
+    Page->>API: POST /api/auth/verify-email (token_hash, type)
+    API->>Supabase: verifyOtp({ token_hash, type })
+    Supabase-->>API: 200 OK (Tokens & User Payload)
+    API-->>Page: 200 OK (Session Envelope)
+    Page->>Store: sessionStore.set(session)
+    Page->>Chat: goto('/app/chat')
+    end
+
+    %% OAuth Callback Flow
+    rect rgb(25, 25, 35)
+    note right of User: OAuth Callback Flow (Google / GitHub)
+    User->>Page: Lands on /oauth-callback#access_token=...&refresh_token=...
+    Page->>Page: parseJwt(accessToken) [Base64URL & UTF-8 Safe]
+    Page->>Store: sessionStore.set(tokens & user)
+    Page->>Chat: goto('/app/chat')
+    end
+
+    %% Password Reset Flow
+    rect rgb(35, 25, 25)
+    note right of User: 8-Digit OTP Password Reset Flow
+    User->>Page: Submits /forget-password/update-password ({ otp, newPassword })
+    Page->>API: POST /api/auth/reset-password ({ otp, newPassword })
+    API->>Supabase: verifyOtp({ token: otp, type: 'recovery' })
+    API-->>Page: 200 OK
+    Page-->>User: Displays "Password Updated" Success State
+    end
+
+    %% Logout Flow
+    rect rgb(30, 35, 30)
+    note right of User: Logout Confirmation Dialog Flow
+    User->>Page: Clicks "Log out" in AppSidebar Avatar Dropdown
+    Page->>Page: Opens Dialog.Root Confirmation Modal
+    User->>Page: Clicks "Log out" Button
+    Page->>API: POST /api/auth/logout (Bearer Token)
+    API-->>Page: 200 OK
+    Page->>Store: sessionStore.clear()
+    Page->>User: goto('/login')
     end
 ```
 
+---
+
 ## Completion Timestamp
-**Date**: 2026-06-20 00:03 (Local Time)
+**Date**: 2026-07-23 15:20 (Local Time)
+
+---
 
 ## File Mapping
 
-**Core UI Files (Pages):**
-- `apps/frontend/src/routes/(auth)/+layout.svelte` - Shared structural layout (vintage floral background, glassmorphism) for auth routes.
-- `apps/frontend/src/routes/(auth)/login/+page.svelte` - Sign-in component.
-- `apps/frontend/src/routes/(auth)/register/+page.svelte` - Sign-up component.
-- `apps/frontend/src/routes/(auth)/forget-password/+page.svelte` - Password reset request form.
-- `apps/frontend/src/routes/(auth)/forget-password/update-password/+page.svelte` - New password submission form.
-- `apps/frontend/src/routes/(auth)/oauth-callback/+page.svelte` - Loading state and error handler for OAuth redirects.
-- `apps/frontend/src/routes/layout.css` - Injected custom font stacks (Playfair Display) and Tailwind v4 OKLCH color variables (`--color-auth-*`). Retains generic layout/spacing utilities (`.auth-error-box`).
+### Pages & Controllers (`src/routes/(auth)/` & `src/routes/app/`)
+- [`src/routes/(auth)/+layout.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/routes/(auth)/+layout.svelte) - Shared layout (vintage background overlay, dark glassmorphism).
+- [`src/routes/(auth)/login/+page.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/routes/(auth)/login/+page.svelte) - Sign in page controller. Saves session and navigates to `/app/chat`.
+- [`src/routes/(auth)/register/+page.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/routes/(auth)/register/+page.svelte) - Registration page controller.
+- [`src/routes/(auth)/forget-password/+page.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/routes/(auth)/forget-password/+page.svelte) - Password recovery request form. Saves email to `localStorage`.
+- [`src/routes/(auth)/forget-password/update-password/+page.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/routes/(auth)/forget-password/update-password/+page.svelte) - 8-digit `InputOTP` password reset controller.
+- [`src/routes/(auth)/auth/verify/+page.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/routes/(auth)/auth/verify/+page.svelte) - Custom email verification link controller.
+- [`src/routes/(auth)/oauth-callback/+page.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/routes/(auth)/oauth-callback/+page.svelte) - Hash & query string OAuth token processor.
+- [`src/routes/app/+layout.ts`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/routes/app/+layout.ts) - Protected route guard for `/app/*`.
 
-**Reusable Auth Components (`src/lib/components/auth/`):**
-- `AuthPasswordInput.svelte` - Encapsulates `superforms` password bindings with an absolute-positioned toggleable eye icon.
-- `AuthOAuthGroup.svelte` - Extracts the "OR" separator and bulk SVG definitions for Google/GitHub sign-in buttons.
-- `AuthErrorBox.svelte` - Houses the reactive countdown (`$effect`) logic and lockout state UI.
-- `AuthSuccessState.svelte` - A checkmark success screen for post-registration or post-reset confirmations.
-- `AuthBackButton.svelte` - The floating top-left arrow button and tooltip.
+### Reusable Auth Components (`src/lib/components/auth/`)
+- [`src/lib/components/auth/AuthPasswordInput.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/components/auth/AuthPasswordInput.svelte) - Eye-toggle password input element.
+- [`src/lib/components/auth/AuthOAuthGroup.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/components/auth/AuthOAuthGroup.svelte) - Google & GitHub OAuth button triggers.
+- [`src/lib/components/auth/AuthErrorBox.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/components/auth/AuthErrorBox.svelte) - Error envelope and anti-bruteforce countdown UI.
+- [`src/lib/components/auth/AuthSuccessState.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/components/auth/AuthSuccessState.svelte) - Reusable success confirmation state.
+- [`src/lib/components/auth/AuthBackButton.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/components/auth/AuthBackButton.svelte) - Back arrow navigation button.
 
-**Component Variants (Shadcn-Svelte):**
-- `apps/frontend/src/lib/components/ui/button/button.svelte` - Added `authPrimary` and `authOauth` variants.
-- `apps/frontend/src/lib/components/ui/input/input.svelte` - Migrated to `tailwind-variants` (tv) and added `auth` variant.
+### App Shell Components (`src/lib/components/app/`)
+- [`src/lib/components/app/AppSidebar.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/components/app/AppSidebar.svelte) - Sidebar featuring avatar dropdown & interactive logout `<Dialog>`.
 
-**Logic & Utilities:**
-- `apps/frontend/src/lib/schemas/auth.schema.ts` - Zod validation schemas for forms.
-- `apps/frontend/src/lib/utils/recaptcha.util.ts` - Client-side reCAPTCHA wrapper.
-- `apps/frontend/src/lib/types/api.types.ts` - Shared types for API communication.
+### UI Component Library (`src/lib/components/ui/`)
+- [`src/lib/components/ui/input-otp/*`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/components/ui/input-otp/index.ts) - `shadcn-svelte` `InputOTP` (Root, Group, Slot, Separator) components.
+- [`src/lib/components/ui/dialog/*`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/components/ui/dialog/index.ts) - `shadcn-svelte` `Dialog` modal components.
+- [`src/lib/components/ui/button/button.svelte`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/components/ui/button/button.svelte) - Encapsulates `authPrimary` and `authOauth` variants.
 
-## Connections
-- **Backend API Gateway**: The frontend communicates via `fetch` directly targeting the backend API routes.
-- **Google API**: Uses `https://www.google.com/recaptcha/api.js` to execute reCAPTCHA silently.
+### State & API Client (`src/lib/`)
+- [`src/lib/state/session.store.svelte.ts`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/state/session.store.svelte.ts) - Svelte 5 `$state` session store.
+- [`src/lib/api/auth.ts`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/api/auth.ts) - Typed API helper functions for all backend endpoints.
+- [`src/lib/api/client.ts`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/api/client.ts) - Base API client with automatic `Authorization` header injection.
+- [`src/lib/schemas/auth.schema.ts`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/schemas/auth.schema.ts) - Client-side Zod validation schemas.
+- [`src/lib/types/auth.types.ts`](file:///home/kanz/Projects/Dokyudo/apps/frontend/src/lib/types/auth.types.ts) - Auth TypeScript interfaces.
 
-## Architectural Decisions
-- **Component Extraction**: To reduce duplication across 5+ authentication pages, all redundant structures (password eye-toggles, error boxes, OAuth SVGs) were aggressively extracted into `/src/lib/components/auth/`. The pages themselves now function cleanly as layout controllers and `superforms` orchestrators.
-- **`sveltekit-superforms` & Zod v4**: Chosen for robust state management. Note that `superForm(data.form)` is used without closures to preserve `sveltekit-superforms` TypeScript static types, intentionally bypassing a minor Svelte 5 AST warning for stability.
-- **Client-Side SPA Forms**: The forms use `SPA: true` and a custom `onUpdate` handler to cleanly integrate client-side reCAPTCHA execution *before* hitting the API backend.
-- **Tailwind CSS v4 Engine**: Hardcoded hex values inside `@apply` were problematic due to the strict JIT compilation in CSS files. The architecture was refactored to define semantic `--color-auth-*` variables mapped to precise `oklch()` formats within the `@theme inline` block to guarantee native CSS compilation and support for automatic opacity modifiers (e.g. `/40`).
-- **Shadcn-Svelte Variant Encapsulation**: Component stylings (colors, borders, shadows) are safely encapsulated inside their respective `shadcn-svelte` files via `tailwind-variants` (`tv`), leaving `layout.css` to solely handle layout dimensions, typography, and utility structures. This perfectly honors separation of concerns.
+---
+
+## Architectural & Design Decisions
+
+1. **Svelte 5 Runes File Extension (`.svelte.ts`)**:
+   - Svelte 5 runes (`$state`, `$derived`) in non-component files require `.svelte.ts` extension so the Svelte compiler can transform reactive state properly without runtime `ReferenceError` exceptions.
+
+2. **Presentation Layer Boundary**:
+   - `apps/frontend` contains zero database imports (`drizzle-orm`) or server secret environment variables. All state changes are dispatched as typed JSON payloads to the Deno API Gateway.
+
+3. **Base64URL & UTF-8 Safe JWT Parsing**:
+   - Decoding JWT tokens directly on the client allows instant session setup without waiting for an extra round-trip API call.
+   - Using a custom `parseJwt()` helper guarantees that unpadded Base64 strings (common in GitHub OAuth JWTs) and multi-byte UTF-8 user metadata decode cleanly in browser JavaScript.
+
+4. **Preserving Input Values on Validation Failure**:
+   - Form submission handlers retain `$formData` inputs (such as passwords and OTP entries) when backend errors occur, preventing user frustration from re-entering credentials.
+
+5. **Traceable DevTools Logging**:
+   - Complies with frontend logging guidelines by prefixing console messages with bracketed contexts (e.g., `[Auth Login]`, `[Auth OAuth Callback]`, `[Auth Logout]`).
