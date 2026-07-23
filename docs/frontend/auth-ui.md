@@ -32,7 +32,7 @@ The frontend acts as a presentation layer, communicating exclusively via HTTP re
 
 ### 4. 8-Digit OTP Password Reset with `InputOTP` (`/forget-password/update-password`)
 - **Location**: `apps/frontend/src/routes/(auth)/forget-password/update-password/+page.svelte`
-- **Logic**: Streamlined reset password screen requiring only the 8-digit OTP code and new password (`{ otp, newPassword }`).
+- **Logic**: Reset password screen requiring the 8-digit OTP code and new password. Automatically populates `email` from URL query string / `localStorage` into a hidden form field to send `{ email, otp, newPassword }` to the Deno Gateway.
 - **UI Design**: Uses `shadcn-svelte` `InputOTP` with custom `InputOTP.Slot` styling (`h-12`, `bg-auth-input`, `border-white/10`, `rounded-md`, `font-sans text-base text-white`) that matches the dimensions and dark theme of the `AuthPasswordInput` fields. Preserves form data on error.
 
 ### 5. Sidebar Logout Confirmation Dialog (`AppSidebar.svelte`)
