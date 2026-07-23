@@ -7,19 +7,56 @@
 	let errorMessage = $state('');
 	let dots = $state('');
 
+	function parseJwt(token: string) {
+		try {
+			const parts = token.split('.');
+			if (parts.length < 2) return null;
+			let base64Url = parts[1];
+			let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+			while (base64.length % 4 !== 0) {
+				base64 += '=';
+			}
+			const jsonPayload = decodeURIComponent(
+				atob(base64)
+					.split('')
+					.map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+					.join('')
+			);
+			return JSON.parse(jsonPayload);
+		} catch (e) {
+			console.error('[Auth OAuth Callback] JWT Parse Exception:', e);
+			return null;
+		}
+	}
+
 	onMount(async () => {
-		const urlParams = new URLSearchParams(window.location.search);
+		// Supabase OAuth implicit flow places tokens in hash fragment (#access_token=...)
+		// PKCE / Code exchange flow places tokens in query string (?access_token=...)
+		const hashString = window.location.hash.startsWith('#')
+			? window.location.hash.slice(1)
+			: window.location.hash;
 
-		console.log('[Auth OAuth Callback] URL params received.');
+		const hashParams = new URLSearchParams(hashString);
+		const searchParams = new URLSearchParams(window.location.search);
 
-		if (urlParams.has('error')) {
-			errorMessage = urlParams.get('error') || 'An error occurred during authentication.';
+		const getParam = (key: string) => hashParams.get(key) || searchParams.get(key);
+
+		console.log('[Auth OAuth Callback] Location received:', {
+			hasHash: !!window.location.hash,
+			hasSearch: !!window.location.search
+		});
+
+		if (getParam('error')) {
+			errorMessage =
+				getParam('error_description') ||
+				getParam('error') ||
+				'An error occurred during authentication.';
 			console.error('[Auth OAuth Callback] Error from backend:', errorMessage);
 			return;
 		}
 
-		const accessToken = urlParams.get('access_token');
-		const refreshToken = urlParams.get('refresh_token');
+		const accessToken = getParam('access_token');
+		const refreshToken = getParam('refresh_token');
 
 		if (!accessToken || !refreshToken) {
 			errorMessage = 'Missing authentication tokens. Please try again.';
@@ -27,27 +64,26 @@
 			return;
 		}
 
-		try {
-			// Decode the JWT payload to extract user info (no network call needed)
-			const payloadBase64 = accessToken.split('.')[1];
-			const payload = JSON.parse(atob(payloadBase64));
+		const payload = parseJwt(accessToken);
 
-			console.log('[Auth OAuth Callback] Session established for user:', payload.sub);
-
-			sessionStore.set({
-				accessToken,
-				refreshToken,
-				user: {
-					id: payload.sub,
-					email: payload.email ?? ''
-				}
-			});
-
-			await goto('/app/chat');
-		} catch (err: any) {
-			errorMessage = 'Failed to process authentication. Please try again.';
-			console.error('[Auth OAuth Callback] Token parsing error:', err);
+		if (!payload || !payload.sub) {
+			errorMessage = 'Invalid authentication token. Please try again.';
+			console.error('[Auth OAuth Callback] Failed to parse JWT payload.');
+			return;
 		}
+
+		console.log('[Auth OAuth Callback] Session established for user:', payload.sub);
+
+		sessionStore.set({
+			accessToken,
+			refreshToken,
+			user: {
+				id: payload.sub,
+				email: payload.email ?? ''
+			}
+		});
+
+		await goto('/app/chat');
 	});
 
 	$effect(() => {
