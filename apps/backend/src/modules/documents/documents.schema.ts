@@ -54,6 +54,8 @@ export const PresignedUrlResponseItemSchema = z.object({
     }),
 });
 
+export type PresignedUrlResponseItem = z.infer<typeof PresignedUrlResponseItemSchema>;
+
 export const PresignedUrlBatchResponseSchema = z.object({
     results: z.array(PresignedUrlResponseItemSchema)
 });

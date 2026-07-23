@@ -83,7 +83,11 @@ export class DocumentsService {
         
         // 1. Tier Quota Validation (Check file sizes, monthly uploads limit, storage limit)
         await withAuthDb(params.tenantId, async (tx) => {
-            await TierQuotaUtil.checkUploadQuotaBatch(tx, params.tenantId, params.files);
+            await TierQuotaUtil.checkUploadQuotaBatch(
+                tx,
+                params.tenantId,
+                params.files.map((file) => ({ sizeBytes: file.sizeBytes ?? 0 })),
+            );
             
             // Atomically increment upload count by the number of files
             await tx
@@ -93,7 +97,7 @@ export class DocumentsService {
         });
 
         const bucketName = getEnv("S3_BUCKET_NAME");
-        const results: DocumentSchema.PresignedUrlResponseItemSchema[] = [];
+        const results: DocumentSchema.PresignedUrlResponseItem[] = [];
         
         // Generate UUIDs and keys first
         const docsToInsert = params.files.map(file => {
@@ -124,7 +128,6 @@ export class DocumentsService {
                         code: "INTERNAL_ERROR",
                         message: "Failed to generate presigned URL from Storage Service.",
                         status: 500,
-                        cause: err,
                     });
                 })
             )
@@ -163,7 +166,6 @@ export class DocumentsService {
                 code: "INTERNAL_ERROR",
                 message: "Failed to create pending document records.",
                 status: 500,
-                cause: err,
             });
         }
 

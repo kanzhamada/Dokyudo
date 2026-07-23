@@ -45,14 +45,16 @@ describe("DocumentsService Isolated Tests", () => {
         await db.delete(tenants).where(eq(tenants.id, TEST_TENANT_ID));
     });
 
-    describe("createPresignedUrl", () => {
+    describe("createPresignedUrlBatch", () => {
         it("negative: rejects file size over tier limit", async () => {
             await assertRejects(
-                () => DocumentsService.createPresignedUrl({
+                () => DocumentsService.createPresignedUrlBatch({
                     tenantId: TEST_TENANT_ID, 
-                    filename: "big.pdf", 
-                    mimeType: "application/pdf", 
-                    sizeBytes: 15 * 1024 * 1024 // 15MB, exceeds FREE limit (10MB)
+                    files: [{
+                        filename: "big.pdf", 
+                        mimeType: "application/pdf", 
+                        sizeBytes: 15 * 1024 * 1024 // 15MB, exceeds FREE limit (10MB)
+                    }]
                 }),
                 AppError,
                 "File size exceeds maximum allowed size"
@@ -65,11 +67,13 @@ describe("DocumentsService Isolated Tests", () => {
                 .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
 
             await assertRejects(
-                () => DocumentsService.createPresignedUrl({
+                () => DocumentsService.createPresignedUrlBatch({
                     tenantId: TEST_TENANT_ID, 
-                    filename: "test.pdf", 
-                    mimeType: "application/pdf", 
-                    sizeBytes: 1024 * 1024
+                    files: [{
+                        filename: "test.pdf", 
+                        mimeType: "application/pdf", 
+                        sizeBytes: 1024 * 1024
+                    }]
                 }),
                 AppError,
                 "Upload limit exceeded"
@@ -81,21 +85,26 @@ describe("DocumentsService Isolated Tests", () => {
                 .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
         });
 
-        it("positive: creates presigned URL and pending DB record", async () => {
-            const res = await DocumentsService.createPresignedUrl({
+        it("positive: creates presigned URL batch and pending DB records", async () => {
+            const res = await DocumentsService.createPresignedUrlBatch({
                 tenantId: TEST_TENANT_ID, 
-                filename: "test.pdf", 
-                mimeType: "application/pdf", 
-                sizeBytes: 1024 * 1024
+                files: [{
+                    filename: "test.pdf", 
+                    mimeType: "application/pdf", 
+                    sizeBytes: 1024 * 1024
+                }]
             });
             
-            assertExists(res.url);
-            assertEquals(res.url.includes("X-Amz-Signature"), true);
-            assertExists(res.documentId);
-            assertEquals(res.expiresIn, 900);
+            assertExists(res.results);
+            assertEquals(res.results.length, 1);
+            const item = res.results[0];
+            assertExists(item.url);
+            assertEquals(item.url.includes("X-Amz-Signature"), true);
+            assertExists(item.documentId);
+            assertEquals(item.expiresIn, 900);
 
             // Verify it was inserted in DB
-            const docs = await db.select().from(documents).where(eq(documents.id, res.documentId));
+            const docs = await db.select().from(documents).where(eq(documents.id, item.documentId));
             assertEquals(docs.length, 1);
             assertEquals(docs[0].status, "pending");
             assertEquals(docs[0].title, "test.pdf");
