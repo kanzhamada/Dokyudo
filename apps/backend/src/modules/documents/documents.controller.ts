@@ -73,6 +73,7 @@ export async function handleGetDocumentPreview(c: Context) {
     const params: DocumentSchema.GetDocumentPreviewParams = {
         tenantId,
         documentId: c.req.param("id"),
+        download: c.req.query("download") === "true",
         logContext,
     };
 

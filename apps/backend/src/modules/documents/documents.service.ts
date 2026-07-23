@@ -630,6 +630,7 @@ export class DocumentsService {
                 bucketName,
                 objectKey,
                 PRESIGNED_GET_URL_EXPIRES_IN_SECONDS,
+                params.download ? doc.title : undefined,
             );
         } catch (err: any) {
             if (params.logContext) params.logContext.s3Error = "Failed to generate presigned GET URL: " + err.message;

@@ -34,14 +34,59 @@
 
 	/* ── Third-party ── */
 	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
+	import { toast } from 'svelte-sonner';
 
 	/* ── Local modules ── */
+	import { apiRequest } from '$lib/api/client.js';
 	import { columns } from './columns.js';
 	import type { Document } from './data.js';
 	import DocumentCardActions from './document-card-actions.svelte';
 	import UploadDocumentDialog from './UploadDocumentDialog.svelte';
 
 	let { data }: { data: PageData } = $props();
+
+	async function handlePreview(doc: Document) {
+		if (!doc.url) {
+			console.log('[Document Preview] Fetching preview URL for:', doc.id);
+			const res = await apiRequest<{ url: string; expiresIn: number }>(
+				`/api/documents/${doc.id}/preview`
+			);
+			console.log('[Document Preview] Backend Response:', res);
+
+			if (res.ok) {
+				doc.url = res.data.url;
+			} else {
+				console.error('[Document Preview] Catch Error:', res.error);
+				return;
+			}
+		}
+		previewDocument = doc;
+	}
+
+	/* ── Download Handler (Direct S3 with Attachment Disposition) ── */
+	async function handleDownload(doc: Document) {
+		console.log('[Document Download] Direct attachment download requested for:', doc.id);
+
+		const res = await apiRequest<{ url: string }>(`/api/documents/${doc.id}/preview?download=true`);
+		console.log('[Document Download] Backend Response:', res);
+
+		if (res.ok) {
+			const a = document.createElement('a');
+			a.href = res.data.url;
+			a.download = doc.name;
+			a.target = '_blank';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			toast.success('Download started', { description: doc.name });
+		} else {
+			console.error('[Document Download] Catch Error:', res.error);
+			toast.error('Download failed', { description: res.error?.message || 'Could not fetch download link.' });
+		}
+	}
+
+
+
 
 	/* ── TanStack Table State ── */
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 10 });
@@ -332,7 +377,11 @@
 								<FileTextIcon class="size-5 shrink-0 text-[#C5937B]" />
 								<span class="text-sm font-normal text-white md:text-base">{doc.name}</span>
 							</div>
-							<DocumentCardActions id={doc.id} onPreview={() => (previewDocument = doc)} />
+							<DocumentCardActions
+								id={doc.id}
+								onPreview={() => handlePreview(doc)}
+								onDownload={() => handleDownload(doc)}
+							/>
 						</div>
 
 						<!-- Card Row 2: Description -->

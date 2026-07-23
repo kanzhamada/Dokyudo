@@ -6,7 +6,15 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	let { id, onPreview }: { id: string; onPreview?: () => void } = $props();
+	let {
+		id,
+		onPreview,
+		onDownload
+	}: {
+		id: string;
+		onPreview?: () => void;
+		onDownload?: () => void;
+	} = $props();
 </script>
 
 <DropdownMenu.Root>
@@ -37,6 +45,7 @@
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				class="cursor-pointer gap-2 text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+				onclick={onDownload}
 			>
 				<DownloadIcon data-icon="inline-start" />
 				Download
@@ -51,3 +60,4 @@
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
+

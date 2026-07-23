@@ -79,12 +79,16 @@ export async function generatePresignedPutUrl(
 export async function generatePresignedGetUrl(
     bucketName: string,
     objectKey: string,
-    expiresInSecs = 900
+    expiresInSecs = 900,
+    filename?: string
 ): Promise<string> {
     const client = getS3Client();
     const command = new GetObjectCommand({
         Bucket: bucketName,
         Key: objectKey,
+        ResponseContentDisposition: filename
+            ? `attachment; filename="${encodeURIComponent(filename)}"`
+            : undefined,
     });
     
     return await getSignedUrl(client, command, { expiresIn: expiresInSecs });

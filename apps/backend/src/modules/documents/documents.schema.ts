@@ -168,9 +168,16 @@ export const GetDocumentPreviewParamSchema = z.object({
     }),
 });
 
+export const GetDocumentPreviewQuerySchema = z.object({
+    download: z.enum(["true", "false"]).optional().openapi({
+        description: "If 'true', sets Content-Disposition attachment header to prompt file download.",
+    }),
+});
+
 export const GetDocumentPreviewParamsSchema = z.object({
     documentId: z.string().uuid(),
     tenantId: z.string(),
+    download: z.boolean().optional(),
     logContext: z.any().optional(),
 });
 

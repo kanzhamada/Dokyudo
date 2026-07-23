@@ -10,6 +10,10 @@ get {
   auth: none
 }
 
+params:query {
+  ~download: true
+}
+
 params:path {
   id: {{documentId}}
 }
@@ -19,5 +23,5 @@ headers {
 }
 
 docs {
-  Generates a presigned GET URL (12 hours) that can be used directly in an iframe, PDF viewer, or downloaded.
+  Generates a presigned GET URL (12 hours) that can be used directly in an iframe, PDF viewer, or downloaded. Pass download=true to set Content-Disposition attachment header.
 }

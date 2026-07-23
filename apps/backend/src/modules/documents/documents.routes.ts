@@ -225,6 +225,7 @@ documentsRoutes.openapi(
         description: "Generates a presigned GET URL (12 hours) that can be used directly in an iframe, PDF viewer, or downloaded.",
         request: {
             params: DocumentsSchema.GetDocumentPreviewParamSchema,
+            query: DocumentsSchema.GetDocumentPreviewQuerySchema,
         },
         responses: {
             200: {
