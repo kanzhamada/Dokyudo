@@ -267,9 +267,17 @@ export class DocumentsService {
                             eq(documents.tenantId, params.tenantId)
                         )
                     )
-                    .returning({ title: documents.title });
+                    .returning({ title: documents.title, sizeBytes: documents.sizeBytes });
                 
-                if (updatedDoc) docName = updatedDoc.title;
+                if (updatedDoc) {
+                    docName = updatedDoc.title;
+                    await tx.update(tenantSubscriptions)
+                        .set({
+                            uploadsCount: sql`${tenantSubscriptions.uploadsCount} + 1`,
+                            storageUsedBytes: sql`${tenantSubscriptions.storageUsedBytes} + ${updatedDoc.sizeBytes}`
+                        })
+                        .where(eq(tenantSubscriptions.tenantId, params.tenantId));
+                }
             });
             dbUpdateSuccess = true;
         } catch (err: any) {
@@ -392,9 +400,16 @@ export class DocumentsService {
                         eq(documents.id, params.documentId),
                         eq(documents.tenantId, params.tenantId)
                     )
-                ).returning({ title: documents.title });
+                ).returning({ title: documents.title, sizeBytes: documents.sizeBytes });
                 
-                if (deletedDoc) docName = deletedDoc.title;
+                if (deletedDoc) {
+                    docName = deletedDoc.title;
+                    await tx.update(tenantSubscriptions)
+                        .set({
+                            storageUsedBytes: sql`GREATEST(${tenantSubscriptions.storageUsedBytes} - ${deletedDoc.sizeBytes}, 0)`
+                        })
+                        .where(eq(tenantSubscriptions.tenantId, params.tenantId));
+                }
             });
         } catch (err: any) {
             if (params.logContext) params.logContext.dbError = "Failed to delete document from Postgres: " + err.message;
@@ -503,9 +518,11 @@ export class DocumentsService {
             return deleteObject(bucketName, objectKey);
         }));
 
-        // 3. Delete documents from Postgres and refund quota
+        // 3. Delete documents from Postgres and refund quota & storage
         try {
             await withAuthDb(params.tenantId, async (tx) => {
+                const totalBytes = docsToDelete.reduce((sum, d) => sum + (Number(d.sizeBytes) || 0), 0);
+
                 await tx.delete(documents).where(
                     and(
                         inArray(documents.id, validDocIds),
@@ -513,9 +530,12 @@ export class DocumentsService {
                     )
                 );
 
-                // Refund the uploadsCount in tenantSubscriptions
+                // Refund the uploadsCount and storageUsedBytes in tenantSubscriptions
                 await tx.update(tenantSubscriptions)
-                    .set({ uploadsCount: sql`GREATEST(${tenantSubscriptions.uploadsCount} - ${validDocIds.length}, 0)` })
+                    .set({
+                        uploadsCount: sql`GREATEST(${tenantSubscriptions.uploadsCount} - ${validDocIds.length}, 0)`,
+                        storageUsedBytes: sql`GREATEST(${tenantSubscriptions.storageUsedBytes} - ${totalBytes}, 0)`
+                    })
                     .where(eq(tenantSubscriptions.tenantId, params.tenantId));
             });
         } catch (err: any) {

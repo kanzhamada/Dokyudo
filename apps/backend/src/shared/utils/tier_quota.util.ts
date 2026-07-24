@@ -104,7 +104,7 @@ export class TierQuotaUtil {
         if (fileSizeBytes > tierLimits.maxFileSizeBytes) {
             throw new AppError({
                 code: "VALIDATION_ERROR",
-                message: `File size exceeds maximum allowed size of ${tierLimits.maxFileSizeBytes / (1024 * 1024)}MB for your tier.`,
+                message: `File size exceeds maximum allowed size of ${(tierLimits.maxFileSizeBytes / (1024 * 1024)).toFixed(2)}MB for your tier.`,
                 status: 400,
             });
         }
@@ -119,17 +119,12 @@ export class TierQuotaUtil {
         }
 
         // 3. Check max storage capacity
-        const storageResult = await tx
-            .select({ totalBytes: sql<number>`sum(${documents.sizeBytes})` })
-            .from(documents)
-            .where(eq(documents.tenantId, tenantId));
-            
-        const currentStorageUsed = Number(storageResult[0]?.totalBytes) || 0;
+        const currentStorageUsed = Number(subscription.storageUsedBytes) || 0;
         
         if (currentStorageUsed + fileSizeBytes > tierLimits.maxStorageBytes) {
             throw new AppError({
                 code: "VALIDATION_ERROR",
-                message: `Storage limit exceeded. Your tier allows up to ${tierLimits.maxStorageBytes / (1024 * 1024)}MB.`,
+                message: `Storage limit exceeded. Your tier allows up to ${(tierLimits.maxStorageBytes / (1024 * 1024)).toFixed(2)}MB.`,
                 status: 400,
             });
         }
@@ -159,7 +154,7 @@ export class TierQuotaUtil {
             if (file.sizeBytes > tierLimits.maxFileSizeBytes) {
                 throw new AppError({
                     code: "VALIDATION_ERROR",
-                    message: `One of the files exceeds maximum allowed size of ${tierLimits.maxFileSizeBytes / (1024 * 1024)}MB for your tier.`,
+                    message: `One of the files exceeds maximum allowed size of ${(tierLimits.maxFileSizeBytes / (1024 * 1024)).toFixed(2)}MB for your tier.`,
                     status: 400,
                 });
             }
@@ -175,17 +170,15 @@ export class TierQuotaUtil {
         }
 
         // 3. Check max storage capacity
-        const storageResult = await tx
-            .select({ totalBytes: sql<number>`sum(${documents.sizeBytes})` })
-            .from(documents)
-            .where(eq(documents.tenantId, tenantId));
-            
-        const currentStorageUsed = Number(storageResult[0]?.totalBytes) || 0;
+        const currentStorageUsed = Number(subscription.storageUsedBytes) || 0;
         
         if (currentStorageUsed + totalSizeBytes > tierLimits.maxStorageBytes) {
+            const requiredMb = (totalSizeBytes / (1024 * 1024)).toFixed(2);
+            const remainingMb = Math.max(0, (tierLimits.maxStorageBytes - currentStorageUsed) / (1024 * 1024)).toFixed(2);
+
             throw new AppError({
                 code: "VALIDATION_ERROR",
-                message: `Storage limit exceeded. This batch requires ${totalSizeBytes / (1024 * 1024)}MB, but you only have ${(tierLimits.maxStorageBytes - currentStorageUsed) / (1024 * 1024)}MB remaining.`,
+                message: `Storage limit exceeded. This batch requires ${requiredMb}MB, but you only have ${remainingMb}MB remaining.`,
                 status: 400,
             });
         }
