@@ -348,11 +348,13 @@ export class DocumentsService {
             });
         }
 
-        // 0. Cancel any queued/active ingestion on STB Worker (best-effort)
-        await cancelIngestionOnWorker({
-            documentId: params.documentId,
-            logContext: params.logContext,
-        });
+        // 0. Cancel any queued/active ingestion on STB Worker ONLY if document is not yet processed
+        if (doc.status !== "processed") {
+            await cancelIngestionOnWorker({
+                documentId: params.documentId,
+                logContext: params.logContext,
+            });
+        }
 
         // 1. Fetch chunk IDs to delete from Upstash Vector
         try {
@@ -478,13 +480,16 @@ export class DocumentsService {
 
         const validDocIds = docsToDelete.map(d => d.id);
 
-        // 0. Cancel any queued/active ingestion on STB Worker for all docs
-        await Promise.allSettled(validDocIds.map(docId => 
-            cancelIngestionOnWorker({
-                documentId: docId,
-                logContext: params.logContext,
-            })
-        ));
+        // 0. Cancel any queued/active ingestion on STB Worker ONLY for documents that are not yet processed
+        const processingDocs = docsToDelete.filter(d => d.status !== "processed");
+        if (processingDocs.length > 0) {
+            await Promise.allSettled(processingDocs.map(doc => 
+                cancelIngestionOnWorker({
+                    documentId: doc.id,
+                    logContext: params.logContext,
+                })
+            ));
+        }
 
         // 1. Fetch chunk IDs to delete from Upstash Vector
         try {
