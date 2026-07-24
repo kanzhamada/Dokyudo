@@ -127,6 +127,10 @@ def _process_chunks_loop(chunks, document_id, tenant_id, start_chunk_idx=0):
                 "content": chunk_data["text"]
             })
             
+        if ingestion_queue.is_cancelled(document_id):
+            log_event("processor.batch_cancelled", "Cancellation detected right before DB flush. Discarding batch.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
+            return False
+
         log_event("processor.flush_batch", "Flushing batch of vectors to DB and Upstash.", document_id=document_id, tenant_id=tenant_id, vectors_count=len(upstash_payload))
         insert_document_chunks(postgres_payload)
         upsert_vectors_to_upstash(upstash_payload)
@@ -187,7 +191,7 @@ def process_document(tenant_id: str, document_id: str):
         description = ""
         with ThreadPoolExecutor(max_workers=2) as executor:
             future_chunks = executor.submit(_process_chunks_loop, chunks, document_id, tenant_id, start_chunk_idx)
-            future_llm = executor.submit(generate_llm_description, head_text)
+            future_llm = executor.submit(generate_llm_description, head_text, document_id)
             
             # Wait for both to finish
             completed = future_chunks.result()
@@ -208,8 +212,11 @@ def process_document(tenant_id: str, document_id: str):
             log_event("processor.runtime_error", "Runtime error occurred during processing.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e))
             mark_document_failed(document_id)
     except Exception as e:
-        log_event("processor.fatal_error", "Failed to process document due to unhandled exception.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e))
-        mark_document_failed(document_id)
+        if ingestion_queue.is_cancelled(document_id) or "409" in str(e) or "404" in str(e):
+            log_event("processor.job_cancelled_clean", "Job was cancelled by user. Discarding gracefully.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
+        else:
+            log_event("processor.fatal_error", "Failed to process document due to unhandled exception.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e))
+            mark_document_failed(document_id)
     finally:
         if os.path.exists(temp_pdf.name):
             os.remove(temp_pdf.name)

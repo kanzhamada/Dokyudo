@@ -2,7 +2,7 @@ import httpx
 from core.config import settings
 from core.logger import log_event
 
-def generate_llm_description(text: str) -> str:
+def generate_llm_description(text: str, document_id: str = "") -> str:
     """
     Generates a concise document description using Google Gemini API.
     """
@@ -42,7 +42,7 @@ Introductory Document Text:
         ]
     }
 
-    log_event("llm.generation_started", "Generating document description.")
+    log_event("llm.generation_started", "Generating document description.", document_id=document_id)
 
     try:
         with httpx.Client(timeout=30.0) as client:
@@ -54,14 +54,14 @@ Introductory Document Text:
                 candidate = data["candidates"][0]
                 if "parts" in candidate["content"]:
                     description = candidate["content"]["parts"][0]["text"].strip()
-                    log_event("llm.generation_success", "Description generated successfully.", description=description)
+                    log_event("llm.generation_success", "Description generated successfully.", document_id=document_id, description=description)
                     return description
                 else:
-                    log_event("llm.generation_blocked", "Generation blocked by safety or finishReason.", level="ERROR", finish_reason=candidate.get("finishReason"))
+                    log_event("llm.generation_blocked", "Generation blocked by safety or finishReason.", level="ERROR", document_id=document_id, finish_reason=candidate.get("finishReason"))
                     return ""
             else:
-                log_event("llm.no_candidates", "No candidates returned from Gemini.", level="ERROR")
+                log_event("llm.no_candidates", "No candidates returned from Gemini.", level="ERROR", document_id=document_id)
                 return ""
     except Exception as e:
-        log_event("llm.fatal_error", "Failed to generate description.", level="ERROR", error=str(e))
+        log_event("llm.fatal_error", "Failed to generate description.", level="ERROR", document_id=document_id, error=str(e))
         return ""
