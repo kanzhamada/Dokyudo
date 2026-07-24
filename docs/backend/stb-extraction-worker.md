@@ -6,9 +6,10 @@ Ketika Supabase Trigger mengirimkan sinyal melalui Webhook `/api/ingest`, worker
 1. **Download**: Mengunduh file PDF dari instans MinIO lokal ke penyimpanan *temporary*.
 2. **Extraction & Slicing (Chunking)**: Mengekstrak teksnya halaman per halaman menggunakan `PyMuPDF`, lalu memecah teks tersebut menjadi *chunks* (potongan teks) menggunakan *tokenizer* `tiktoken` (OpenAI cl100k_base).
 3. **Rate Limiting (Gatekeeper)**: Memeriksa kuota token harian (**TPD**) ke Upstash Redis menggunakan *script Lua* sebelum menembak API eksternal.
-4. **Embedding & LLM Description (Parallel)**: Menerjemahkan potongan teks menjadi vektor **1024-dimensi** secara sekuensial menggunakan **Cloudflare Workers AI (`@cf/qwen/qwen3-embedding-0.6b`)**. Bersamaan dengan ini, di *thread* lain, potongan awal teks sepanjang 3000 karakter diproses oleh LLM (`gemini-3.1-flash-lite`) untuk menghasilkan deskripsi/rangkuman dokumen.
-5. **Upserting & Updating**: Mem-format *payload* vektor beserta metadatanya lalu mengunggahnya secara *batch* ke Upstash Vector DB dan Supabase Postgres (`document_chunks`). Terakhir, mengirimkan 1 kali PATCH ke Postgres untuk menandai status menjadi `processed` sekaligus menanamkan `description` dari LLM.
-6. **Quota Exhausted (Antrian ke Besok)**: Jika kuota harian Cloudflare (TPD) habis di tengah proses, worker menghentikan pekerjaan secara elegan dan mengubah status dokumen menjadi `quota_exhausted` di database. Frontend dapat membaca status ini dan menampilkan pesan kepada user. Dokumen akan diproses ulang keesokan harinya ketika kuota Cloudflare di-*reset* pada UTC 00:00.
+4. **Embedding & LLM Description (Parallel)**: Menerjemahkan potongan teks menjadi vektor **1024-dimensi** secara sekuensial menggunakan **Cloudflare Workers AI (`@cf/qwen/qwen3-embedding-0.6b`)**. Bersamaan dengan ini, di *thread* lain, potongan awal teks sepanjang 3000 karakter diproses oleh LLM (`gemini-3.1-flash-lite`) untuk menghasilkan deskripsi/rangkuman dokumen. Menyertakan `document_id` pada seluruh event log LLM metadata (`llm.generation_started`, `llm.generation_success`).
+5. **Pre-Flush Cancellation Guard**: Memeriksa `ingestion_queue.is_cancelled(document_id)` tepat sebelum melakukan operasi insert ke database Postgres dan Upstash. Jika job dibatalkan oleh pengguna saat pemrosesan embedding berjalan, worker langsung membatalkan eksekusi secara elegan tanpa melempar unhandled `409 Conflict` exception.
+6. **Upserting & Updating**: Mem-format *payload* vektor beserta metadatanya lalu mengunggahnya secara *batch* ke Upstash Vector DB dan Supabase Postgres (`document_chunks`). Terakhir, mengirimkan 1 kali PATCH ke Postgres untuk menandai status menjadi `processed` sekaligus menanamkan `description` dari LLM.
+7. **Quota Exhausted (Antrian ke Besok)**: Jika kuota harian Cloudflare (TPD) habis di tengah proses, worker menghentikan pekerjaan secara elegan dan mengubah status dokumen menjadi `quota_exhausted` di database. Dokumen akan diproses ulang keesokan harinya ketika kuota Cloudflare di-*reset* pada UTC 00:00.
 
 ## 2. Flow Diagram
 ```mermaid
@@ -31,7 +32,7 @@ sequenceDiagram
     
     par LLM Summary Thread
         API->>CF: POST generateContent (gemini-3.1-flash-lite, 3000 chars awal)
-        CF-->>API: Deskripsi Paragraf Pendek
+        CF-->>API: Deskripsi Paragraf Pendek (Includes document_id metadata)
     and Embedding Thread
         loop Per Batch (Up to 32 Chunks)
             API->>Redis: POST /eval (Lua Gatekeeper: Cek & Potong TPD)
@@ -43,8 +44,13 @@ sequenceDiagram
                 Redis-->>API: 1, "OK", 0
                 API->>CF: POST /ai/run/@cf/qwen/qwen3-embedding-0.6b (Array of 32 texts)
                 CF-->>API: Array of 32 x 1024-dimensi Float Array
-                API->>PostgREST: POST /rest/v1/document_chunks (Bulk Insert 32 Teks Mentah)
-                API->>VectorDB: POST /upsert (Bulk Upsert 32 Vektor + Metadata)
+                alt Job Cancelled in Queue
+                    API->>API: Detect ingestion_queue.is_cancelled(document_id)
+                    API->>API: Abort Batch & Skip Database Flush
+                else Job Active
+                    API->>PostgREST: POST /rest/v1/document_chunks (Bulk Insert 32 Teks Mentah)
+                    API->>VectorDB: POST /upsert (Bulk Upsert 32 Vektor + Metadata)
+                end
             end
         end
     end
@@ -60,16 +66,15 @@ Saat ini sistem menggunakan teknik **Sliding Window Chunking**:
 - **Tumpang Tindih (`overlap`)**: 150 token.
 
 **Batching (BATCH_SIZE = 32)**:
-Alih-alih menembak API Embedding per satu *chunk*, worker mengelompokkan *chunk* tersebut dalam *array* berisi maksimal 32 teks. Batch ini kemudian dikirim dalam **1 HTTP Request** ke Cloudflare, dan hasilnya di-*insert* secara *bulk* ke Postgres dan Upstash Vector. Hal ini secara drastis memangkas HTTP *overhead* dan waktu *round-trip*. Jika token Gatekeeper tersisa tidak cukup untuk 32 *chunk*, worker secara dinamis memperkecil ukuran batch agar sesuai dengan kuota yang tersisa.
+Worker mengelompokkan *chunk* dalam *array* berisi maksimal 32 teks. Batch dikirim dalam **1 HTTP Request** ke Cloudflare, dan hasilnya di-*insert* secara *bulk* ke Postgres dan Upstash Vector. Jika token Gatekeeper tersisa tidak cukup untuk 32 *chunk*, worker memperkecil ukuran batch agar sesuai kuota.
 
-## 4. Deep-Dive: Gatekeeper & Daily Resumption
-Cloudflare Workers AI (Free) memiliki batas harian setara dengan sekitar **9.300.000 token input per hari**.
-Jika TPD (Tokens Per Day) habis:
-1. **Gatekeeper Menolak**: Upstash Redis mengembalikan `TPD_EXHAUSTED`.
-2. **Graceful Stop & Checkpoint**: STB Worker berhenti, memperbarui database: `status = 'quota_exhausted'` dan menyimpan `last_processed_chunk_index`.
-3. **Daily Resumption (`pg_cron`)**: Pada tengah malam (UTC 00:00), Cloudflare me-reset kuota. Sebuah job `pg_cron` di Supabase secara otomatis mencari dokumen berstatus `quota_exhausted` dan mengubahnya kembali menjadi `confirmed`.
-4. **Webhook Re-triggered**: Perubahan status memicu kembali webhook `pg_net` ke STB Worker.
-5. **Resume**: STB Worker mengekstrak PDF lagi, tetapi **melewati (skip)** *chunk* dari indeks 0 hingga `last_processed_chunk_index`, melanjutkan persis di titik terakhir ia berhenti kemarin.
+## 4. Deep-Dive: Cancellation Safety & Graceful Exit
+Saat pengguna menghentikan unggahan di tengah jalan:
+1. Backend Deno mengirim request `POST /api/cancel` ke STB Worker dan menghapus baris dokumen dari Postgres.
+2. STB Worker mencatat `document_id` ke dalam `IngestionQueue._cancelled_ids`.
+3. Sebelum batch vektor di-*flush* ke database, worker melakukan pengecekan `is_cancelled(document_id)`.
+4. Jika status terdeteksi `cancelled`, worker menghentikan siklus batch secara langsung, menghindari eksekusi `insert_document_chunks` yang dapat memicu exception `409 Conflict`.
+5. Jika exception 409/404 tertangkap akibat penghapusan dokumen oleh pengguna, worker menangkapnya secara tenang dan mencatat event warning `processor.job_cancelled_clean` tanpa melempar unhandled `processor.fatal_error`.
 
 ## 5. Document Status Lifecycle
 | Status | Makna | Dipicu oleh |
@@ -81,21 +86,11 @@ Jika TPD (Tokens Per Day) habis:
 | `quota_exhausted` | Kuota TPD Cloudflare habis di tengah proses | STB Worker (Gatekeeper) |
 | `failed` | Error tak terduga — PDF corrupt, MinIO unreachable, Cloudflare error | STB Worker / Deno (`confirmUpload`) |
 
-## 6. Architectural Decisions
-- **Cloudflare Workers AI (Qwen3-0.6B, 1024-dim):** Dipilih menggantikan Gemini `gemini-embedding-2` karena: (1) Limit harian berbasis jumlah token (9,3 Juta/hari) jauh lebih mudah diprediksi dan dikelola daripada limit per-menit Gemini; (2) Dimensi 1024 memberikan akurasi pencarian semantik yang lebih tinggi dibanding 768; (3) Qwen3 mencapai SOTA di MTEB untuk tugas pencarian teks multi-bahasa; (4) Tidak ada lagi mekanisme *sleep* per menit yang membuang uptime STB.
-- **REST API for Databases & AI:** STB Worker murni menggunakan HTTP (REST via `httpx`) untuk PostgREST, Upstash Vector, Upstash Redis, dan Cloudflare. Hal ini membuang *overhead* dependensi SDK/Driver ORM berat (seperti `psycopg2` atau `redis-py`) demi menyesuaikan kapabilitas CPU S905X di STB.
-- **Push-over-Pull & Idempotency:** STB dibangun murni digerakkan oleh webhook (Supabase Trigger `pg_net`), BUKAN dengan cara *long-polling* database setiap 5 detik. Jika webhook gagal atau *timeout*, `pg_net` akan me-*retry*. Untuk mencegah *double processing*, STB melakukan pengecekan idempoten di awal (`status == 'processed'`).
-- **Memory Constraint Mitigation:** Alih-alih melahap seluruh PDF ke dalam RAM (yang sangat langka di STB), PDF didownload murni ke SSD/External HDD (`/mnt/hdd/worker_tmp`), diproses secara berurutan, lalu *garbage file*-nya selalu dihapus di dalam block `finally`.
-- **Parallel LLM Summarization:** Untuk menghemat waktu eksekusi, pengambilan vektor per *chunk* dan pembuatan deskripsi 2-3 kalimat dokumen (menggunakan 3000 karakter pertama via `gemini-3.1-flash-lite`) diparalelisasi (*multithreaded* via `ThreadPoolExecutor`). Fitur LLM disetel agar melakukan *Graceful Degradation* (kembali kosong jika terblokir *safety filters*) agar tidak membatalkan operasi inti vektorisasi. Keduanya kemudian dirapatkan dalam **satu kali** HTTP PATCH akhir ke database untuk meminimalkan beban I/O.
-
-## 7. Files Modified / Created
+## 6. Files Modified / Created
 | File | Perubahan |
 |---|---|
-| `apps/stb-worker/core/config.py` | Hapus `GEMINI_EMBEDDING_MODEL`, tambah `CF_EMBEDDING_MODEL`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AUTH_TOKEN` |
-| `apps/stb-worker/services/embedding.py` | Ganti seluruh implementasi dari Gemini REST ke Cloudflare Workers AI REST. Response path diubah dari `data["embedding"]["values"]` ke `data["result"]["data"][0]`. Dimensi output: 768 → 1024. |
-| `apps/stb-worker/services/gatekeeper.lua` | Rombak total dari 3-bucket (TPM/RPM/RPD) menjadi 1-bucket (TPD). Kuota: 9.300.000 token/hari. |
-| `apps/stb-worker/services/processor.py` | Ubah Redis key dari `ratelimit:gemini:*` ke `ratelimit:cloudflare:tpd:global`. Ganti perilaku `TPD_EXHAUSTED` dari *sleep* ke *abort* via `RuntimeError`. Tangkap `RuntimeError` dan `Exception` secara terpisah: keduanya memanggil `mark_document_queued()` atau `mark_document_failed()`. |
-| `apps/stb-worker/services/database.py` | Tambah fungsi `mark_document_queued()` → status `quota_exhausted`. Tambah fungsi `mark_document_failed()` → status `failed` (best-effort, menelan exception sendiri). |
+| `apps/stb-worker/services/processor.py` | Tambahkan pre-flush cancellation guard `ingestion_queue.is_cancelled(document_id)`, teruskan `document_id` ke `generate_llm_description`, dan tangkap 409/404 conflict secara terisolasi. |
+| `apps/stb-worker/services/llm.py` | Terima parameter `document_id` pada `generate_llm_description` dan sertakan pada seluruh log event metadata (`llm.generation_started`, `llm.generation_success`). |
 
-## 8. Completion Timestamp
-**Completed At:** 2026-07-14T19:12:00+07:00 (WIB)
+## 7. Completion Timestamp
+**Completed At:** 2026-07-24T19:15:00+07:00 (WIB)
