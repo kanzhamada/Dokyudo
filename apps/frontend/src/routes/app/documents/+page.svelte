@@ -34,6 +34,9 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import CheckSquareIcon from '@lucide/svelte/icons/check-square';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 
 	/* ── Third-party ── */
 	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
@@ -225,15 +228,15 @@
 			});
 
 		// Smart Polling Backup: Check every 4 seconds if any document is currently vectorizing/processing
-		const pollInterval = setInterval(() => {
-			const hasProcessing = documentsList.some(
-				(d) => d.status === 'pending' || d.status === 'confirmed'
-			);
-			if (hasProcessing) {
-				console.log('[Realtime Backup] Auto-refreshing processing documents...');
-				refreshDocuments();
-			}
-		}, 4000);
+		// const pollInterval = setInterval(() => {
+		// 	const hasProcessing = documentsList.some(
+		// 		(d) => d.status === 'pending' || d.status === 'confirmed'
+		// 	);
+		// 	if (hasProcessing) {
+		// 		console.log('[Realtime Backup] Auto-refreshing processing documents...');
+		// 		refreshDocuments();
+		// 	}
+		// }, 4000);
 
 		return () => {
 			console.log('[Supabase Realtime] Unsubscribing from documents channel...');
@@ -257,6 +260,63 @@
 
 	let previewDocument = $state<Document | null>(null);
 	let uploadDialogOpen = $state(false);
+
+	/* ── Document Multi-Selection & Batch Delete State ── */
+	let selectedDocIds = $state<string[]>([]);
+	let selectedCount = $derived(selectedDocIds.length);
+
+	let isBatchDeleting = $state(false);
+	let showBatchDeleteModal = $state(false);
+
+	function toggleSelectDoc(id: string) {
+		if (selectedDocIds.includes(id)) {
+			selectedDocIds = selectedDocIds.filter((item) => item !== id);
+		} else {
+			selectedDocIds = [...selectedDocIds, id];
+		}
+	}
+
+	function selectAllPageDocuments() {
+		const currentPageIds = table.getRowModel().rows.map((row) => (row.original as Document).id);
+		const combined = new Set([...selectedDocIds, ...currentPageIds]);
+		selectedDocIds = Array.from(combined);
+	}
+
+	function selectAllTotalDocuments() {
+		selectedDocIds = documentsList.map((d) => d.id);
+	}
+
+	function clearSelection() {
+		selectedDocIds = [];
+	}
+
+	async function executeBatchDelete() {
+		if (selectedDocIds.length === 0) return;
+		isBatchDeleting = true;
+		console.log('[Batch Delete] Executing batch delete for:', selectedDocIds);
+
+		const res = await apiRequest<{ deletedCount: number }>('/api/documents/batch-delete', {
+			method: 'POST',
+			body: { documentIds: selectedDocIds }
+		});
+
+		if (res.ok) {
+			const count = selectedDocIds.length;
+			documentsList = documentsList.filter((d) => !selectedDocIds.includes(d.id));
+			if (previewDocument && selectedDocIds.includes(previewDocument.id)) {
+				previewDocument = null;
+			}
+			selectedDocIds = [];
+			showBatchDeleteModal = false;
+			showSuccess(
+				'Documents deleted',
+				`Successfully deleted ${count} ${count === 1 ? 'document' : 'documents'}`
+			);
+		} else {
+			showError(res.error?.message || 'Failed to delete documents');
+		}
+		isBatchDeleting = false;
+	}
 
 	const table = createSvelteTable({
 		get data() {
@@ -540,14 +600,90 @@
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
+
+				<!-- Select Button & Dropdown -->
+				<DropdownMenu.Root>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props: tooltipProps })}
+								<DropdownMenu.Trigger>
+									{#snippet child({ props: dropdownProps })}
+										<Button
+											{...tooltipProps}
+											{...dropdownProps}
+											variant="ghost"
+											class="h-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent px-3 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] md:px-4 {selectedCount > 0 ? 'border-white/[0.80] bg-[#B8B5B5]/[0.40]' : ''}"
+										>
+											<CheckSquareIcon class="size-4 md:mr-2" />
+											<span class="hidden md:inline">
+												{selectedCount > 0 ? `Selected (${selectedCount})` : 'Select'}
+											</span>
+										</Button>
+									{/snippet}
+								</DropdownMenu.Trigger>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content class="text-black md:hidden">
+							<p>Select Documents</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+					<DropdownMenu.Content
+						align="end"
+						class="w-56 rounded-xl border-white/10 bg-[#2A2A2A] text-white shadow-xl"
+					>
+						<DropdownMenu.Group>
+							<DropdownMenu.Item
+								class="flex cursor-pointer items-center justify-between text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+								onclick={selectAllPageDocuments}
+							>
+								<span>Select page ({table.getRowModel().rows.length})</span>
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								class="flex cursor-pointer items-center justify-between text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+								onclick={selectAllTotalDocuments}
+							>
+								<span>Select all ({documentsList.length})</span>
+							</DropdownMenu.Item>
+							{#if selectedCount > 0}
+								<DropdownMenu.Separator class="bg-white/10" />
+								<DropdownMenu.Item
+									class="flex cursor-pointer items-center justify-between text-white/70 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+									onclick={clearSelection}
+								>
+									<span>Deselect all ({selectedCount})</span>
+								</DropdownMenu.Item>
+							{/if}
+						</DropdownMenu.Group>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+
+				{#if selectedCount > 0}
+					<!-- Batch Delete Button -->
+					<Button
+						type="button"
+						variant="ghost"
+						onclick={() => (showBatchDeleteModal = true)}
+						class="h-10 cursor-pointer rounded-full border border-red-500/40 bg-red-950/40 px-4 text-sm font-medium text-red-400 hover:bg-red-900/60 hover:text-red-300"
+					>
+						<Trash2Icon class="mr-2 size-4" />
+						Delete Selected ({selectedCount})
+					</Button>
+				{/if}
 			</div>
 
 			<!-- Row 5: Card List -->
 			<div class="flex flex-col gap-4">
 				{#each table.getRowModel().rows as row (row.id)}
 					{@const doc = row.original as Document}
+					{@const isSelected = selectedDocIds.includes(doc.id)}
 					<div
-						class="group rounded-[22px] border border-[#302F2F] bg-[#191919]/[0.53] p-5 transition-all duration-200 hover:border-[#949494] hover:bg-[#525252]/[0.53] md:p-6"
+						role="button"
+						tabindex="0"
+						onclick={() => toggleSelectDoc(doc.id)}
+						onkeydown={(e) => e.key === 'Enter' && toggleSelectDoc(doc.id)}
+						class="group relative cursor-pointer rounded-[22px] border p-5 transition-all duration-200 md:p-6 {isSelected
+							? 'border-[#949494] bg-[#525252]/[0.53]'
+							: 'border-[#302F2F] bg-[#191919]/[0.53] hover:border-[#949494] hover:bg-[#525252]/[0.53]'}"
 					>
 						<!-- Card Row 1: Header -->
 						<div class="flex items-start justify-between gap-3">
@@ -555,12 +691,14 @@
 								<FileTextIcon class="size-5 shrink-0 text-[#C5937B]" />
 								<span class="text-sm font-normal text-white md:text-base">{doc.name}</span>
 							</div>
-							<DocumentCardActions
-								id={doc.id}
-								onPreview={() => handlePreview(doc)}
-								onDownload={() => handleDownload(doc)}
-								onDelete={() => promptDelete(doc)}
-							/>
+							<div onclick={(e) => e.stopPropagation()} role="none">
+								<DocumentCardActions
+									id={doc.id}
+									onPreview={() => handlePreview(doc)}
+									onDownload={() => handleDownload(doc)}
+									onDelete={() => promptDelete(doc)}
+								/>
+							</div>
 						</div>
 
 						<!-- Card Row 2: Description -->
@@ -799,6 +937,46 @@
 					Deleting...
 				{:else}
 					Delete
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Batch Delete Confirmation Modal -->
+<Dialog.Root bind:open={showBatchDeleteModal}>
+	<Dialog.Content class="border-[#302F2F] bg-[#191919] text-white sm:max-w-md sm:rounded-[22px]">
+		<Dialog.Header class="gap-2">
+			<Dialog.Title class="text-xl font-semibold text-white">
+				Delete {selectedCount} {selectedCount === 1 ? 'Document' : 'Documents'}?
+			</Dialog.Title>
+			<Dialog.Description class="text-sm text-[#767676]">
+				This action will permanently delete {selectedCount} selected {selectedCount === 1
+					? 'document'
+					: 'documents'}, their vector embeddings, and storage files. This process cannot be undone.
+			</Dialog.Description>
+		</Dialog.Header>
+		<Dialog.Footer class="mt-4 flex flex-row justify-end gap-3">
+			<Button
+				type="button"
+				variant="ghost"
+				onclick={() => (showBatchDeleteModal = false)}
+				disabled={isBatchDeleting}
+				class="cursor-pointer text-sm text-white hover:bg-white/10"
+			>
+				Cancel
+			</Button>
+			<Button
+				type="button"
+				onclick={executeBatchDelete}
+				disabled={isBatchDeleting}
+				class="cursor-pointer border border-red-500/40 bg-red-950/60 font-medium text-red-400 hover:bg-red-900/80 hover:text-red-300 disabled:opacity-50"
+			>
+				{#if isBatchDeleting}
+					<Loader2Icon class="mr-2 size-4 animate-spin" />
+					Deleting...
+				{:else}
+					Delete {selectedCount} {selectedCount === 1 ? 'Document' : 'Documents'}
 				{/if}
 			</Button>
 		</Dialog.Footer>

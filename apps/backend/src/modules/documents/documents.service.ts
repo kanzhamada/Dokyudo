@@ -181,6 +181,8 @@ export class DocumentsService {
         let doc: any = null;
         let dbQueryError = false;
 
+        if (params.logContext) params.logContext.trace = ["confirm_started"];
+
         try {
             await withAuthDb(params.tenantId, async (tx) => {
                 const results = await tx.select().from(documents).where(
@@ -196,6 +198,7 @@ export class DocumentsService {
         } catch (err: any) {
             if (params.logContext) {
                 params.logContext.dbError = "Failed to fetch document for confirmation: " + err.message;
+                params.logContext.trace.push("db_fetch_error");
             }
             dbQueryError = true;
         }
@@ -234,6 +237,7 @@ export class DocumentsService {
         } catch (err: any) {
             if (params.logContext) {
                 params.logContext.s3Error = "Failed to check object existence in S3: " + err.message;
+                params.logContext.trace.push("s3_check_error");
             }
             s3CheckError = true;
         }
@@ -283,6 +287,7 @@ export class DocumentsService {
         } catch (err: any) {
             if (params.logContext) {
                 params.logContext.dbError = "Failed to update document status: " + err.message;
+                params.logContext.trace.push("db_update_error");
             }
         }
 
@@ -303,6 +308,10 @@ export class DocumentsService {
             metadata: { fileName: docName },
             requestId: params.logContext?.requestId,
         });
+
+        if (params.logContext) {
+            params.logContext.trace.push("confirm_success");
+        }
 
         return {
             message: "Document uploaded and confirmed successfully",

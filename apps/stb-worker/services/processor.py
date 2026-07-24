@@ -4,6 +4,7 @@ import time
 import uuid
 import tempfile
 import httpx
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from core.config import settings
 from core.logger import log_event
@@ -215,7 +216,8 @@ def process_document(tenant_id: str, document_id: str):
         if ingestion_queue.is_cancelled(document_id) or "409" in str(e) or "404" in str(e):
             log_event("processor.job_cancelled_clean", "Job was cancelled by user. Discarding gracefully.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
         else:
-            log_event("processor.fatal_error", "Failed to process document due to unhandled exception.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e))
+            tb_str = traceback.format_exc()
+            log_event("processor.fatal_error", "Failed to process document due to unhandled exception.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e), traceback=tb_str)
             mark_document_failed(document_id)
     finally:
         if os.path.exists(temp_pdf.name):

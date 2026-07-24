@@ -200,21 +200,23 @@
 			}
 		};
 
-		xhr.onerror = () => {
+		xhr.onerror = (e) => {
 			item.xhr = null;
-			console.error(`[Upload S3] Network error uploading ${item.name}`);
+			console.error(`[Upload S3] Network error uploading ${item.name}. Status: ${xhr.status} ${xhr.statusText}`, e);
 			item.status = 'failed';
 			item.errorMessage = 'Network error during upload';
 		};
 
-		xhr.onabort = () => {
+		xhr.onabort = (e) => {
 			item.xhr = null;
+			console.warn(`[Upload S3] Upload aborted for ${item.name}. Status: ${xhr.status}`, e);
 			item.status = 'failed';
 			item.errorMessage = 'Upload cancelled';
 		};
 
 		xhr.open('PUT', presignedUrl, true);
 		xhr.setRequestHeader('Content-Type', item.file.type || item.mimeType);
+		console.log(`[Upload S3] Initiating PUT request for ${item.name}...`);
 		xhr.send(item.file);
 	}
 
