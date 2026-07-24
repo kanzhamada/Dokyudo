@@ -11,6 +11,7 @@ const queryClient = postgres(Deno.env.get("DATABASE_URL") as string, {
     max: 10,
     idle_timeout: 20,
     max_lifetime: 60 * 30,
+    prepare: false,
 });
 
 export const db = drizzle(queryClient, { schema });
