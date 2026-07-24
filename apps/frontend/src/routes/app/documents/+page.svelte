@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { untrack, onMount } from 'svelte';
 	import {
 		type ColumnFiltersState,
 		type PaginationState,
@@ -33,6 +33,7 @@
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
 	import XIcon from '@lucide/svelte/icons/x';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 
 	/* ── Third-party ── */
 	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
@@ -40,6 +41,7 @@
 
 	/* ── Local modules ── */
 	import { apiRequest } from '$lib/api/client.js';
+	import { supabase } from '$lib/supabase/client.js';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { columns } from './columns.js';
 	import type { Document } from './data.js';
@@ -172,11 +174,73 @@
 						year: 'numeric'
 					}),
 					size: sizeStr,
+					status: doc.status as Document['status'],
 					url: undefined
 				};
 			});
 		}
 	}
+
+	onMount(() => {
+		console.log('[Supabase Realtime] Subscribing to public:documents changes...');
+		const channel = supabase
+			.channel('public:documents')
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'documents' },
+				(payload) => {
+					console.log('[Supabase Realtime] Realtime Payload received:', payload);
+					if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+						const updated = payload.new as {
+							id: string;
+							status: Document['status'];
+							description?: string;
+						};
+						if (updated && updated.id) {
+							const idx = documentsList.findIndex((d) => d.id === updated.id);
+							if (idx !== -1) {
+								if (updated.status) {
+									documentsList[idx].status = updated.status;
+								}
+								if (updated.description) {
+									documentsList[idx].description = updated.description;
+								}
+								documentsList = [...documentsList];
+
+								if (updated.status === 'processed') {
+									showSuccess('Document processed', documentsList[idx].name);
+								} else if (updated.status === 'failed') {
+									showError(`Processing failed for ${documentsList[idx].name}`);
+								}
+							} else {
+								// New document inserted, refresh list
+								refreshDocuments();
+							}
+						}
+					}
+				}
+			)
+			.subscribe((status, err) => {
+				console.log('[Supabase Realtime] Channel Subscription Status:', status, err || '');
+			});
+
+		// Smart Polling Backup: Check every 4 seconds if any document is currently vectorizing/processing
+		const pollInterval = setInterval(() => {
+			const hasProcessing = documentsList.some(
+				(d) => d.status === 'pending' || d.status === 'confirmed'
+			);
+			if (hasProcessing) {
+				console.log('[Realtime Backup] Auto-refreshing processing documents...');
+				refreshDocuments();
+			}
+		}, 4000);
+
+		return () => {
+			console.log('[Supabase Realtime] Unsubscribing from documents channel...');
+			clearInterval(pollInterval);
+			supabase.removeChannel(channel);
+		};
+	});
 
 	/* ── Reactive documents state for instant UI updates ── */
 	let documentsList = $state<Document[]>([]);
@@ -500,14 +564,35 @@
 						</div>
 
 						<!-- Card Row 2: Description -->
-						<p class="mt-2.5 line-clamp-2 text-sm font-normal text-white/80">
-							{doc.description}
-						</p>
+						{#if (doc.status === 'pending' || doc.status === 'confirmed') && (!doc.description || doc.description === 'No description provided.')}
+							<div
+								class="mt-2.5 flex items-center gap-2 text-sm font-normal text-white/50 italic animate-pulse"
+							>
+								<SparklesIcon class="size-3.5 shrink-0 text-white/70" />
+								<span>Generating summary with AI...</span>
+							</div>
+						{:else}
+							<p class="mt-2.5 line-clamp-2 text-sm font-normal text-white/80">
+								{doc.description}
+							</p>
+						{/if}
 
-						<!-- Card Row 3: Metadata -->
-						<p class="mt-3 text-xs font-normal text-[#959595] md:text-sm">
-							Uploaded: {doc.uploadedAt}&nbsp;&nbsp;•&nbsp;&nbsp;Size: {doc.size}
-						</p>
+						<!-- Card Row 3: Metadata & Real-time Status Badge -->
+						<div class="mt-3 flex items-center justify-between gap-2">
+							<p class="text-xs font-normal text-[#959595] md:text-sm">
+								Uploaded: {doc.uploadedAt}&nbsp;&nbsp;•&nbsp;&nbsp;Size: {doc.size}
+							</p>
+
+							<!-- Vectorizing Status Badge (Monochrome Gray AI Sparkle Aesthetic) -->
+							{#if doc.status === 'pending' || doc.status === 'confirmed'}
+								<div
+									class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 shadow-sm backdrop-blur-md transition-all duration-300 group-hover:border-white/30 group-hover:bg-white/20"
+								>
+									<SparklesIcon class="size-3.5 animate-pulse text-white" />
+									<span class="tracking-wide">Vectorizing...</span>
+								</div>
+							{/if}
+						</div>
 					</div>
 				{:else}
 					<div

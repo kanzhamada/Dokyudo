@@ -64,6 +64,7 @@
 		"@fontsource/jetbrains-mono": "^5.2.8",
 		"@fontsource/lora": "^5.2.8",
 		"@fontsource/playfair-display": "^5.2.8",
+		"@supabase/supabase-js": "^2.110.8",
 		"@tanstack/svelte-table": "^9.0.0-beta.17",
 		"envcrypt": "^0.0.1",
 		"gsap": "^3.14.0",

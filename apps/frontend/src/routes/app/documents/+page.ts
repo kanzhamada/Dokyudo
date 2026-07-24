@@ -39,6 +39,7 @@ export const load: PageLoad = async () => {
 					year: 'numeric'
 				}),
 				size: sizeStr,
+				status: doc.status as Document['status'],
 				url: undefined
 			};
 		});

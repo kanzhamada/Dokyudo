@@ -246,6 +246,14 @@
 		processUploadQueue([item]);
 	}
 
+	function retryAllFailed() {
+		const failedItems = uploadFiles.filter((i) => i.status === 'failed');
+		if (failedItems.length === 0) return;
+
+		hasStartedUpload = true;
+		processUploadQueue(failedItems);
+	}
+
 	async function removeItem(item: UploadItem) {
 		if (item.xhr) {
 			item.xhr.abort();
@@ -665,6 +673,20 @@
 			</button>
 
 			<div class="flex items-center gap-3">
+				{#if hasFailedUploads}
+					<!-- Retry All Failed Button -->
+					<Button
+						type="button"
+						variant="ghost"
+						onclick={retryAllFailed}
+						disabled={isAnyUploading}
+						class="cursor-pointer border border-[#DB8F5E]/40 bg-[#DB8F5E]/10 text-sm font-medium text-[#DB8F5E] hover:bg-[#DB8F5E]/20 hover:text-white disabled:opacity-40"
+					>
+						<RotateCcwIcon class="mr-2 size-4" />
+						Retry Failed ({failedCount})
+					</Button>
+				{/if}
+
 				{#if hasStartedUpload}
 					<!-- Post-Upload Cancel All Button (Red Glass Style) -->
 					<Button
