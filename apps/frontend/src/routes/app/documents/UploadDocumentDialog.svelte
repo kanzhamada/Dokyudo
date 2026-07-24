@@ -333,7 +333,7 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content class="border-[#302F2F] bg-[#191919] p-0 text-white sm:rounded-[22px]">
-		<div class="flex flex-col gap-6 p-8 md:p-10">
+		<div class="flex flex-col gap-5 p-8 pb-0 md:p-10 md:pb-0">
 			<!-- Header Section -->
 			<div class="flex flex-col gap-2 text-center">
 				<Dialog.Title class="text-3xl font-semibold text-white md:text-4xl">
@@ -476,174 +476,176 @@
 
 			<!-- File List Area -->
 			{#if uploadFiles.length > 0}
-				<div class="flex max-h-60 flex-col gap-3 overflow-y-auto pr-1">
-					{#each uploadFiles as item (item.id)}
-						{#if item.status === 'staged'}
-							<!-- Row (Staged - Pre-upload) -->
-							<div
-								class="flex items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-4 py-3"
-							>
-								<div class="flex items-center gap-4">
-									<div
-										class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/70"
-									>
-										<FileTextIcon class="size-5" />
-									</div>
-									<div class="flex flex-col">
-										<span class="text-sm font-bold text-white">{item.name}</span>
-										<span class="text-xs text-[#959595]"
-											>{item.sizeFormatted} - <span class="text-white/60">ready to upload</span
-											></span
+				<div class="flex flex-col gap-3">
+					<div class="flex max-h-52 flex-col gap-2.5 overflow-y-auto pr-1">
+						{#each uploadFiles as item (item.id)}
+							{#if item.status === 'staged'}
+								<!-- Row (Staged - Pre-upload) -->
+								<div
+									class="flex items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-4 py-3"
+								>
+									<div class="flex items-center gap-4">
+										<div
+											class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/70"
 										>
+											<FileTextIcon class="size-5" />
+										</div>
+										<div class="flex flex-col">
+											<span class="text-sm font-bold text-white">{item.name}</span>
+											<span class="text-xs text-[#959595]"
+												>{item.sizeFormatted} - <span class="text-white/60">ready to upload</span
+												></span
+											>
+										</div>
 									</div>
-								</div>
-								<div class="flex items-center gap-4">
-									<button
-										type="button"
-										onclick={() => removeItem(item)}
-										class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-										title="Remove File"
-									>
-										<XIcon class="size-5" />
-									</button>
-								</div>
-							</div>
-						{:else if item.status === 'success'}
-							<!-- Row (Success) -->
-							<div
-								class="flex items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-4 py-3"
-							>
-								<div class="flex items-center gap-4">
-									<div
-										class="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3b82f6]/10 text-[#3b82f6]"
-									>
-										<FileTextIcon class="size-5" />
-									</div>
-									<div class="flex flex-col">
-										<span class="text-sm font-bold text-white">{item.name}</span>
-										<span class="text-xs text-[#959595]"
-											>{item.sizeFormatted} - <span class="text-[#22c55e]">successful upload</span
-											></span
+									<div class="flex items-center gap-4">
+										<button
+											type="button"
+											onclick={() => removeItem(item)}
+											class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+											title="Remove File"
 										>
+											<XIcon class="size-5" />
+										</button>
 									</div>
 								</div>
-								<div class="flex items-center gap-4">
-									<span class="text-sm font-bold text-white">100%</span>
-									<CheckCircle2Icon class="size-5 text-[#22c55e]" />
-									<button
-										type="button"
-										onclick={() => removeItem(item)}
-										class="cursor-pointer text-[#767676] transition-colors hover:text-[#ef4444]"
-										title="Delete File"
-									>
-										<Trash2Icon class="size-5" />
-									</button>
-								</div>
-							</div>
-						{:else if item.status === 'failed'}
-							<!-- Row (Failed) -->
-							<div
-								class="flex items-center justify-between rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/5 px-4 py-3 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
-							>
-								<div class="flex items-center gap-4">
-									<div
-										class="flex h-10 w-10 items-center justify-center rounded-lg bg-[#ef4444]/10 text-[#ef4444]"
-									>
-										<FileIcon class="size-5" />
-									</div>
-									<div class="flex flex-col">
-										<span class="text-sm font-bold text-white">{item.name}</span>
-										<span class="text-xs text-[#959595]"
-											>{item.sizeFormatted} -
-											<span class="font-bold text-[#ef4444]"
-												>{item.errorMessage || 'upload failed'}</span
-											></span
+							{:else if item.status === 'success'}
+								<!-- Row (Success) -->
+								<div
+									class="flex items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-4 py-3"
+								>
+									<div class="flex items-center gap-4">
+										<div
+											class="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3b82f6]/10 text-[#3b82f6]"
 										>
+											<FileTextIcon class="size-5" />
+										</div>
+										<div class="flex flex-col">
+											<span class="text-sm font-bold text-white">{item.name}</span>
+											<span class="text-xs text-[#959595]"
+												>{item.sizeFormatted} - <span class="text-[#22c55e]">successful upload</span
+												></span
+											>
+										</div>
 									</div>
-								</div>
-								<div class="flex items-center gap-4">
-									<span class="text-sm font-bold text-white">{item.progress}%</span>
-									<button
-										type="button"
-										onclick={() => retryItem(item)}
-										class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-										title="Retry Upload"
-									>
-										<RotateCcwIcon class="size-5" />
-									</button>
-									<button
-										type="button"
-										onclick={() => removeItem(item)}
-										class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-										title="Remove File"
-									>
-										<XIcon class="size-5" />
-									</button>
-								</div>
-							</div>
-						{:else}
-							<!-- Row (Uploading / Requesting / Confirming) -->
-							<div
-								class="flex items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-4 py-3"
-							>
-								<div class="flex items-center gap-4">
-									<div
-										class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/70"
-									>
-										<FileTextIcon class="size-5" />
-									</div>
-									<div class="flex flex-col">
-										<span class="text-sm font-bold text-white">{item.name}</span>
-										<span class="text-xs text-[#959595]"
-											>{item.sizeFormatted} -
-											<span class="font-medium text-white/80">
-												{#if item.status === 'requesting'}
-													preparing...
-												{:else if item.status === 'confirming'}
-													verifying...
-												{:else}
-													uploading...
-												{/if}
-											</span></span
+									<div class="flex items-center gap-4">
+										<span class="text-sm font-bold text-white">100%</span>
+										<CheckCircle2Icon class="size-5 text-[#22c55e]" />
+										<button
+											type="button"
+											onclick={() => removeItem(item)}
+											class="cursor-pointer text-[#767676] transition-colors hover:text-[#ef4444]"
+											title="Delete File"
 										>
+											<Trash2Icon class="size-5" />
+										</button>
 									</div>
 								</div>
-								<div class="flex items-center gap-4">
-									{#if item.status === 'uploading'}
+							{:else if item.status === 'failed'}
+								<!-- Row (Failed) -->
+								<div
+									class="flex items-center justify-between rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/5 px-4 py-3 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+								>
+									<div class="flex items-center gap-4">
+										<div
+											class="flex h-10 w-10 items-center justify-center rounded-lg bg-[#ef4444]/10 text-[#ef4444]"
+										>
+											<FileIcon class="size-5" />
+										</div>
+										<div class="flex flex-col">
+											<span class="text-sm font-bold text-white">{item.name}</span>
+											<span class="text-xs text-[#959595]"
+												>{item.sizeFormatted} -
+												<span class="font-bold text-[#ef4444]"
+													>{item.errorMessage || 'upload failed'}</span
+												></span
+											>
+										</div>
+									</div>
+									<div class="flex items-center gap-4">
 										<span class="text-sm font-bold text-white">{item.progress}%</span>
-									{:else}
-										<Loader2Icon class="size-4 animate-spin text-white/60" />
-									{/if}
-									<button
-										type="button"
-										onclick={() => removeItem(item)}
-										class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-										title="Cancel Upload"
-									>
-										<XIcon class="size-5" />
-									</button>
+										<button
+											type="button"
+											onclick={() => retryItem(item)}
+											class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+											title="Retry Upload"
+										>
+											<RotateCcwIcon class="size-5" />
+										</button>
+										<button
+											type="button"
+											onclick={() => removeItem(item)}
+											class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+											title="Remove File"
+										>
+											<XIcon class="size-5" />
+										</button>
+									</div>
 								</div>
+							{:else}
+								<!-- Row (Uploading / Requesting / Confirming) -->
+								<div
+									class="flex items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-4 py-3"
+								>
+									<div class="flex items-center gap-4">
+										<div
+											class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/70"
+										>
+											<FileTextIcon class="size-5" />
+										</div>
+										<div class="flex flex-col">
+											<span class="text-sm font-bold text-white">{item.name}</span>
+											<span class="text-xs text-[#959595]"
+												>{item.sizeFormatted} -
+												<span class="font-medium text-white/80">
+													{#if item.status === 'requesting'}
+														preparing...
+													{:else if item.status === 'confirming'}
+														verifying...
+													{:else}
+														uploading...
+													{/if}
+												</span></span
+											>
+										</div>
+									</div>
+									<div class="flex items-center gap-4">
+										{#if item.status === 'uploading'}
+											<span class="text-sm font-bold text-white">{item.progress}%</span>
+										{:else}
+											<Loader2Icon class="size-4 animate-spin text-white/60" />
+										{/if}
+										<button
+											type="button"
+											onclick={() => removeItem(item)}
+											class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+											title="Cancel Upload"
+										>
+											<XIcon class="size-5" />
+										</button>
+									</div>
+								</div>
+							{/if}
+						{/each}
+					</div>
+
+					<!-- Real-time Summary Bar -->
+					<div
+						class="flex items-center justify-between rounded-xl border border-white/10 bg-[#222222]/70 px-4 py-2.5 text-xs text-[#959595]"
+					>
+						<div class="flex items-center gap-2">
+							<span class="font-medium text-white/60">Total:</span>
+							<span class="font-semibold text-white">{totalFileCount} {totalFileCount === 1 ? 'file' : 'files'}</span>
+							<span class="text-white/30">•</span>
+							<span class="font-semibold text-white">{totalSizeFormatted}</span>
+						</div>
+						{#if hasSuccessfulUploads || isAnyUploading}
+							<div class="flex items-center gap-2">
+								<span class="text-white/60">Status:</span>
+								<span class="font-medium text-white">{completedCount}/{totalFileCount} completed</span>
 							</div>
 						{/if}
-					{/each}
-				</div>
-
-				<!-- Real-time Summary Bar -->
-				<div
-					class="flex items-center justify-between rounded-xl border border-white/10 bg-[#222222]/70 px-4 py-2.5 text-xs text-[#959595]"
-				>
-					<div class="flex items-center gap-2">
-						<span class="font-medium text-white/60">Total:</span>
-						<span class="font-semibold text-white">{totalFileCount} {totalFileCount === 1 ? 'file' : 'files'}</span>
-						<span class="text-white/30">•</span>
-						<span class="font-semibold text-white">{totalSizeFormatted}</span>
 					</div>
-					{#if hasSuccessfulUploads || isAnyUploading}
-						<div class="flex items-center gap-2">
-							<span class="text-white/60">Status:</span>
-							<span class="font-medium text-white">{completedCount}/{totalFileCount} completed</span>
-						</div>
-					{/if}
 				</div>
 			{/if}
 		</div>
