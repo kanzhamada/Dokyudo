@@ -52,6 +52,11 @@
 		uploadFiles.length > 0 && uploadFiles.every((i) => i.status === 'success')
 	);
 	let hasSuccessfulUploads = $derived(uploadFiles.some((i) => i.status === 'success'));
+	let completedCount = $derived(uploadFiles.filter((i) => i.status === 'success').length);
+
+	let totalFileCount = $derived(uploadFiles.length);
+	let totalSizeBytes = $derived(uploadFiles.reduce((acc, curr) => acc + curr.sizeBytes, 0));
+	let totalSizeFormatted = $derived(formatBytes(totalSizeBytes));
 
 	function formatBytes(bytes: number): string {
 		if (bytes === 0) return '0 B';
@@ -621,6 +626,24 @@
 							</div>
 						{/if}
 					{/each}
+				</div>
+
+				<!-- Real-time Summary Bar -->
+				<div
+					class="flex items-center justify-between rounded-xl border border-white/10 bg-[#222222]/70 px-4 py-2.5 text-xs text-[#959595]"
+				>
+					<div class="flex items-center gap-2">
+						<span class="font-medium text-white/60">Total:</span>
+						<span class="font-semibold text-white">{totalFileCount} {totalFileCount === 1 ? 'file' : 'files'}</span>
+						<span class="text-white/30">•</span>
+						<span class="font-semibold text-white">{totalSizeFormatted}</span>
+					</div>
+					{#if hasSuccessfulUploads || isAnyUploading}
+						<div class="flex items-center gap-2">
+							<span class="text-white/60">Status:</span>
+							<span class="font-medium text-white">{completedCount}/{totalFileCount} completed</span>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		</div>
