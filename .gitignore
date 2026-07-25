@@ -3,6 +3,7 @@ docs/research
 poc
 # taskmd
 api-collections/environments/Production.bru
+api-collections/Keys & BYOK/01_Upsert API Key.bru
 tests
 
 # Node
