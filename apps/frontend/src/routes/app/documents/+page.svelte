@@ -586,12 +586,28 @@
 						class="h-10 rounded-full border border-white/[0.16] bg-transparent pl-[88px] pr-10 font-normal text-white placeholder:text-white/40 focus-visible:ring-white/20 transition-all"
 					/>
 					
-					<!-- Loading Spinner on the right if searching -->
-					{#if isSemanticSearching}
-						<div class="absolute right-4 top-1/2 -translate-y-1/2">
+					<!-- Loading Spinner or Clear Button on the right -->
+					<div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+						{#if isSemanticSearching}
 							<Loader2Icon class="size-4 animate-spin text-[#DB8F5E]" />
-						</div>
-					{/if}
+						{:else if (searchMode === 'keyword' && globalFilter) || (searchMode === 'semantic' && semanticSearchQuery)}
+							<button
+								type="button"
+								onclick={() => {
+									if (searchMode === 'keyword') {
+										globalFilter = '';
+									} else {
+										semanticSearchQuery = '';
+										refreshDocuments();
+									}
+								}}
+								class="flex size-5 items-center justify-center rounded-full text-white/50 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+								aria-label="Clear search"
+							>
+								<XIcon class="size-3.5" />
+							</button>
+						{/if}
+					</div>
 				</div>
 
 				<!-- Filter Button -->
@@ -606,16 +622,15 @@
 											{...dropdownProps}
 											variant="ghost"
 											disabled={searchMode === 'semantic'}
-											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent px-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50 md:w-auto md:px-4"
+											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50"
 										>
-											<FilterIcon class="size-4 md:mr-2" />
-											<span class="hidden md:inline">Filter</span>
+											<FilterIcon class="size-4" />
 										</Button>
 									{/snippet}
 								</DropdownMenu.Trigger>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content class=" text-black md:hidden">
+						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
 							<p>Filter Documents</p>
 						</Tooltip.Content>
 					</Tooltip.Root>
@@ -661,16 +676,15 @@
 											{...dropdownProps}
 											variant="ghost"
 											disabled={searchMode === 'semantic'}
-											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent px-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50 md:w-auto md:px-4"
+											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50"
 										>
-											<ArrowUpDownIcon class="size-4 md:mr-2" />
-											<span class="hidden md:inline">Sort</span>
+											<ArrowUpDownIcon class="size-4" />
 										</Button>
 									{/snippet}
 								</DropdownMenu.Trigger>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content class=" text-black md:hidden">
+						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
 							<p>Sort Documents</p>
 						</Tooltip.Content>
 					</Tooltip.Root>
@@ -730,19 +744,19 @@
 											{...tooltipProps}
 											{...dropdownProps}
 											variant="ghost"
-											class="h-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent px-3 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] md:px-4 {selectedCount > 0 ? 'border-white/[0.80] bg-[#B8B5B5]/[0.40]' : ''}"
+											class="h-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] {selectedCount > 0 ? 'border-white/[0.80] bg-[#B8B5B5]/[0.40] px-3' : 'w-10 p-0 flex items-center justify-center'}"
 										>
-											<CheckSquareIcon class="size-4 md:mr-2" />
-											<span class="hidden md:inline">
-												{selectedCount > 0 ? `Selected (${selectedCount})` : 'Select'}
-											</span>
+											<CheckSquareIcon class="size-4" />
+											{#if selectedCount > 0}
+												<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
+											{/if}
 										</Button>
 									{/snippet}
 								</DropdownMenu.Trigger>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content class="text-black md:hidden">
-							<p>Select Documents</p>
+						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+							<p>{selectedCount > 0 ? `Selected Documents (${selectedCount})` : 'Select Documents'}</p>
 						</Tooltip.Content>
 					</Tooltip.Root>
 					<DropdownMenu.Content
@@ -777,15 +791,25 @@
 
 				{#if selectedCount > 0}
 					<!-- Batch Delete Button -->
-					<Button
-						type="button"
-						variant="ghost"
-						onclick={() => (showBatchDeleteModal = true)}
-						class="h-10 cursor-pointer rounded-full border border-red-500/40 bg-red-950/40 px-4 text-sm font-medium text-red-400 hover:bg-red-900/60 hover:text-red-300"
-					>
-						<Trash2Icon class="mr-2 size-4" />
-						Delete Selected ({selectedCount})
-					</Button>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									type="button"
+									variant="ghost"
+									onclick={() => (showBatchDeleteModal = true)}
+									class="h-10 cursor-pointer rounded-full border border-red-500/40 bg-red-950/40 px-3 text-sm font-medium text-red-400 hover:bg-red-900/60 hover:text-red-300 transition-colors flex items-center justify-center"
+								>
+									<Trash2Icon class="size-4" />
+									<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+							<p>Delete Selected Documents ({selectedCount})</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
 				{/if}
 			</div>
 
