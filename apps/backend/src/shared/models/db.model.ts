@@ -107,6 +107,7 @@ export const documentStatusEnum = pgEnum("document_status_enum", [
     "processed",
     "quota_exhausted",
     "failed",
+    "failed_vectorizing",
 ]);
 
 export const authProviderEnum = pgEnum("auth_provider_enum", [

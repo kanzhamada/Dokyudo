@@ -10,7 +10,7 @@ from core.config import settings
 from core.logger import log_event
 from services.storage import download_pdf
 from services.extractor import extract_text_from_pdf, chunk_text_with_pages
-from services.embedding import generate_embedding_with_retry
+from services.embedding import generate_embedding_with_retry, TransientAPIError
 from services.llm import generate_llm_description
 from services.database import (
     check_document_idempotency,
@@ -19,6 +19,7 @@ from services.database import (
     mark_document_processed,
     mark_document_queued,
     mark_document_failed,
+    mark_document_failed_vectorizing,
     get_last_processed_chunk_index
 )
 from services.queue import ingestion_queue
@@ -205,6 +206,9 @@ def process_document(tenant_id: str, document_id: str):
         mark_document_processed(document_id, description)
         log_event("processor.step7_completed", "All chunks processed and upserted successfully.", document_id=document_id, tenant_id=tenant_id)
         
+    except TransientAPIError as e:
+        log_event("processor.transient_api_failure", "Embedding API transient failure after retries. Progress checkpointed & re-queueing document for retry.", level="WARNING", document_id=document_id, tenant_id=tenant_id, error=str(e))
+        mark_document_queued(document_id)
     except RuntimeError as e:
         if "TPD_EXHAUSTED" in str(e):
             log_event("processor.quota_exhausted", "Quota exhausted during processing. Marking for retry tomorrow.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
@@ -213,12 +217,15 @@ def process_document(tenant_id: str, document_id: str):
             log_event("processor.runtime_error", "Runtime error occurred during processing.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e))
             mark_document_failed(document_id)
     except Exception as e:
-        if ingestion_queue.is_cancelled(document_id) or "409" in str(e) or "404" in str(e):
+        if isinstance(e, TransientAPIError) or "transient" in str(e).lower() or "401" in str(e) or "403" in str(e) or "429" in str(e):
+            log_event("processor.transient_error", "Transient exception detected. Re-queueing document for retry.", level="WARNING", document_id=document_id, tenant_id=tenant_id, error=str(e))
+            mark_document_queued(document_id)
+        elif ingestion_queue.is_cancelled(document_id) or "409" in str(e) or "404" in str(e):
             log_event("processor.job_cancelled_clean", "Job was cancelled by user. Discarding gracefully.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
         else:
             tb_str = traceback.format_exc()
-            log_event("processor.fatal_error", "Failed to process document due to unhandled exception.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e), traceback=tb_str)
-            mark_document_failed(document_id)
+            log_event("processor.vectorizing_failed", "Failed to process document vectors.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e), traceback=tb_str)
+            mark_document_failed_vectorizing(document_id, str(e))
     finally:
         if os.path.exists(temp_pdf.name):
             os.remove(temp_pdf.name)

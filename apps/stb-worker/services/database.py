@@ -103,6 +103,26 @@ def mark_document_failed(document_id: str):
     except Exception:
         pass  # Best-effort: do not mask the original error
 
+def mark_document_failed_vectorizing(document_id: str, error_message: str = ""):
+    """
+    Update document status to 'failed_vectorizing' when embedding/vector processing fails.
+    """
+    url = f"{settings.SUPABASE_URL}/rest/v1/documents?id=eq.{document_id}"
+    headers = get_supabase_headers()
+    headers["Prefer"] = "return=representation"
+
+    payload = {
+        "status": "failed_vectorizing",
+        "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
+    }
+
+    try:
+        with httpx.Client() as client:
+            res = client.patch(url, headers=headers, json=payload)
+            res.raise_for_status()
+    except Exception:
+        pass
+
 def insert_document_chunks(chunks_payload: list[dict]):
     """
     Insert the raw text chunks into Supabase Postgres `document_chunks` table.

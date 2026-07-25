@@ -39,6 +39,7 @@
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import DownloadIcon from '@lucide/svelte/icons/download';
+	import ClockIcon from '@lucide/svelte/icons/clock';
 	import { createZipArchive } from '$lib/utils/zip';
 
 	/* ── shadcn-svelte Components (ToggleGroup) ── */
@@ -968,6 +969,13 @@
 								<SparklesIcon class="size-3.5 shrink-0 text-white/70" />
 								<span>Generating summary with AI...</span>
 							</div>
+						{:else if doc.status === 'quota_exhausted' && (!doc.description || doc.description === 'No description provided.')}
+							<div
+								class="mt-2.5 flex items-center gap-2 text-sm font-normal text-amber-400/70 italic"
+							>
+								<ClockIcon class="size-3.5 shrink-0 text-amber-400" />
+								<span>Summary generation paused due to daily quota. Resuming tomorrow.</span>
+							</div>
 						{:else}
 							<p class="mt-2.5 line-clamp-2 text-sm font-normal text-white/80">
 								{doc.description}
@@ -1018,13 +1026,44 @@
 								{/if}
 							</div>
 
-							<!-- Vectorizing Status Badge (Monochrome Gray AI Sparkle Aesthetic) -->
+							<!-- Vectorizing / Quota / Failed Status Badge -->
 							{#if doc.status === 'pending' || doc.status === 'confirmed'}
 								<div
 									class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 shadow-sm backdrop-blur-md transition-all duration-300 group-hover:border-white/30 group-hover:bg-white/20"
 								>
 									<SparklesIcon class="size-3.5 animate-pulse text-white" />
 									<span class="tracking-wide">Vectorizing...</span>
+								</div>
+							{:else if doc.status === 'quota_exhausted'}
+								<Tooltip.Root>
+									<Tooltip.Trigger>
+										{#snippet child({ props })}
+											<div
+												{...props}
+												class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300 shadow-sm backdrop-blur-md cursor-help"
+											>
+												<ClockIcon class="size-3.5 text-amber-400" />
+												<span class="tracking-wide font-medium">Resuming Tomorrow</span>
+											</div>
+										{/snippet}
+									</Tooltip.Trigger>
+									<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md max-w-xs">
+										<p>Daily AI quota reached. Vectorizing will resume tomorrow at 00:00 UTC.</p>
+									</Tooltip.Content>
+								</Tooltip.Root>
+							{:else if doc.status === 'failed_vectorizing'}
+								<div
+									class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400 shadow-sm backdrop-blur-md"
+								>
+									<XIcon class="size-3.5 text-red-400" />
+									<span class="tracking-wide font-medium">Failed Vectorizing</span>
+								</div>
+							{:else if doc.status === 'failed'}
+								<div
+									class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400 shadow-sm backdrop-blur-md"
+								>
+									<XIcon class="size-3.5 text-red-400" />
+									<span class="tracking-wide font-medium">Processing Failed</span>
 								</div>
 							{/if}
 						</div>
