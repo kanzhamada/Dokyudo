@@ -37,6 +37,10 @@
 	import CheckSquareIcon from '@lucide/svelte/icons/check-square';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
+	import BookOpenIcon from '@lucide/svelte/icons/book-open';
+
+	/* ── shadcn-svelte Components (ToggleGroup) ── */
+	import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
 
 	/* ── Third-party ── */
 	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
@@ -400,6 +404,57 @@
 		}
 	});
 
+	/* ── Search Mode State ── */
+	let searchMode = $state('keyword');
+	let semanticSearchQuery = $state('');
+	let isSemanticSearching = $state(false);
+
+	async function executeSemanticSearch() {
+		if (!semanticSearchQuery.trim()) {
+			refreshDocuments();
+			return;
+		}
+		isSemanticSearching = true;
+		const res = await apiRequest<{ data: any[] }>(`/api/search?query=${encodeURIComponent(semanticSearchQuery)}&limit=10`);
+		isSemanticSearching = false;
+
+		if (res.ok) {
+			const searchResults = res.data.data || [];
+			
+			// Replace documentsList with mapped semantic search results
+			documentsList = searchResults.map((resultDoc: any) => {
+				const originalDoc = data.documents.find((d: any) => d.id === resultDoc.documentId);
+				
+				return {
+					id: resultDoc.documentId,
+					name: originalDoc?.name || 'Unknown Document',
+					description: originalDoc?.description || 'No description provided.',
+					uploadedAt: originalDoc?.uploadedAt || 'Unknown Date',
+					size: originalDoc?.size || '0 KB',
+					status: (originalDoc?.status || 'processed') as Document['status'],
+					url: undefined,
+					pages: resultDoc.metadata?.pages || [],
+					score: resultDoc.score,
+					semanticContent: resultDoc.content
+				};
+			});
+		} else {
+			showError(res.error?.message || 'Semantic search failed.');
+		}
+	}
+
+	let expandedDocs = $state<string[]>([]);
+
+	$effect(() => {
+		if (searchMode === 'keyword') {
+			// Restore list from latest payload or re-fetch
+			refreshDocuments();
+			semanticSearchQuery = '';
+		} else {
+			globalFilter = '';
+		}
+	});
+
 	/* ── Filter state ── */
 	let filterPdf = $state(false);
 	let filterDocx = $state(false);
@@ -465,17 +520,78 @@
 
 			<!-- Row 4: Data Table Controls -->
 			<div class="flex flex-wrap items-center gap-3 md:gap-4">
-				<!-- Search Input -->
+				<!-- Search Input with Integrated Toggle -->
 				<div class="relative flex-1">
-					<SearchIcon
-						class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-white/40"
-					/>
+					<!-- Toggle Group positioned absolutely inside the input on the left -->
+					<div class="absolute left-1.5 top-1/2 flex -translate-y-1/2 items-center z-10">
+						<ToggleGroup.Root
+							type="single"
+							bind:value={searchMode}
+							class="flex h-8 items-center rounded-full bg-[#191919]/[0.80] p-1 backdrop-blur-md border border-white/10"
+						>
+							<ToggleGroup.Item
+								value="keyword"
+								aria-label="Toggle keyword search"
+								class="h-6 w-8 flex items-center justify-center rounded-full text-white/50 hover:text-white/80 data-[state=on]:bg-[#DB8F5E] data-[state=on]:text-white transition-all cursor-pointer"
+							>
+								<Tooltip.Root>
+									<Tooltip.Trigger>
+										{#snippet child({ props })}
+											<div {...props} class="flex h-full w-full items-center justify-center">
+												<SearchIcon class="size-3.5" />
+											</div>
+										{/snippet}
+									</Tooltip.Trigger>
+									<Tooltip.Content class="rounded-md bg-white px-2 py-1 text-xs text-black">
+										Keyword Search
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</ToggleGroup.Item>
+							<ToggleGroup.Item
+								value="semantic"
+								aria-label="Toggle semantic search"
+								class="h-6 w-8 flex items-center justify-center rounded-full text-white/50 hover:text-white/80 data-[state=on]:bg-[#DB8F5E] data-[state=on]:text-white transition-all cursor-pointer"
+							>
+								<Tooltip.Root>
+									<Tooltip.Trigger>
+										{#snippet child({ props })}
+											<div {...props} class="flex h-full w-full items-center justify-center">
+												<BookOpenIcon class="size-3.5" />
+											</div>
+										{/snippet}
+									</Tooltip.Trigger>
+									<Tooltip.Content class="rounded-md bg-white px-2 py-1 text-xs text-black">
+										AI Hybrid Search
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</ToggleGroup.Item>
+						</ToggleGroup.Root>
+					</div>
+
 					<Input
-						placeholder="Search by title or description..."
-						value={globalFilter}
-						oninput={(e) => (globalFilter = e.currentTarget.value)}
-						class="h-10 rounded-full border border-white/[0.16] bg-transparent pl-10 font-normal text-white placeholder:text-white/40 focus-visible:ring-white/20"
+						placeholder={searchMode === 'keyword' ? "Search by title or description..." : "Ask AI about your documents (Press Enter)..."}
+						value={searchMode === 'keyword' ? globalFilter : semanticSearchQuery}
+						oninput={(e) => {
+							if (searchMode === 'keyword') {
+								globalFilter = e.currentTarget.value;
+							} else {
+								semanticSearchQuery = e.currentTarget.value;
+							}
+						}}
+						onkeydown={(e) => {
+							if (searchMode === 'semantic' && e.key === 'Enter') {
+								executeSemanticSearch();
+							}
+						}}
+						class="h-10 rounded-full border border-white/[0.16] bg-transparent pl-[88px] pr-10 font-normal text-white placeholder:text-white/40 focus-visible:ring-white/20 transition-all"
 					/>
+					
+					<!-- Loading Spinner on the right if searching -->
+					{#if isSemanticSearching}
+						<div class="absolute right-4 top-1/2 -translate-y-1/2">
+							<Loader2Icon class="size-4 animate-spin text-[#DB8F5E]" />
+						</div>
+					{/if}
 				</div>
 
 				<!-- Filter Button -->
@@ -489,7 +605,8 @@
 											{...tooltipProps}
 											{...dropdownProps}
 											variant="ghost"
-											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent px-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] md:w-auto md:px-4"
+											disabled={searchMode === 'semantic'}
+											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent px-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50 md:w-auto md:px-4"
 										>
 											<FilterIcon class="size-4 md:mr-2" />
 											<span class="hidden md:inline">Filter</span>
@@ -543,7 +660,8 @@
 											{...tooltipProps}
 											{...dropdownProps}
 											variant="ghost"
-											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent px-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] md:w-auto md:px-4"
+											disabled={searchMode === 'semantic'}
+											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent px-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50 md:w-auto md:px-4"
 										>
 											<ArrowUpDownIcon class="size-4 md:mr-2" />
 											<span class="hidden md:inline">Sort</span>
@@ -691,7 +809,15 @@
 								<FileTextIcon class="size-5 shrink-0 text-[#C5937B]" />
 								<span class="text-sm font-normal text-white md:text-base">{doc.name}</span>
 							</div>
-							<div onclick={(e) => e.stopPropagation()} role="none">
+							<div class="flex items-center gap-3" onclick={(e) => e.stopPropagation()} role="none">
+								{#if doc.score !== undefined}
+									<div
+										class="rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2 py-0.5 text-xs font-semibold text-[#DB8F5E]"
+										title="AI Relevance Score"
+									>
+										{(doc.score * 100).toFixed(2)}% Match
+									</div>
+								{/if}
 								<DocumentCardActions
 									id={doc.id}
 									onPreview={() => handlePreview(doc)}
@@ -715,11 +841,49 @@
 							</p>
 						{/if}
 
+						{#if doc.semanticContent}
+							<div class="mt-4 relative overflow-hidden rounded-xl border border-[#DB8F5E]/20 bg-[#1A1512] p-4">
+								<div class="absolute left-0 top-0 h-full w-1 bg-[#DB8F5E]/50"></div>
+								<div class="flex cursor-pointer items-center justify-between" onclick={(e) => {
+									e.stopPropagation();
+									if (expandedDocs.includes(doc.id)) {
+										expandedDocs = expandedDocs.filter(id => id !== doc.id);
+									} else {
+										expandedDocs = [...expandedDocs, doc.id];
+									}
+								}} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && e.stopPropagation()}>
+									<div class="flex items-center gap-2 text-[#DB8F5E]">
+										<BookOpenIcon class="size-4" />
+										<span class="text-sm font-medium">Relevant Chunk</span>
+									</div>
+									<Button variant="ghost" size="sm" class="h-6 px-2 text-xs text-[#DB8F5E] hover:bg-[#DB8F5E]/20 hover:text-[#DB8F5E]">
+										{expandedDocs.includes(doc.id) ? 'Collapse' : 'Expand'}
+									</Button>
+								</div>
+								
+								<div class="mt-3 text-sm font-normal text-white/80 transition-all duration-300 {expandedDocs.includes(doc.id) ? '' : 'line-clamp-3'}" >
+									{doc.semanticContent}
+								</div>
+							</div>
+						{/if}
+
 						<!-- Card Row 3: Metadata & Real-time Status Badge -->
 						<div class="mt-3 flex items-center justify-between gap-2">
-							<p class="text-xs font-normal text-[#959595] md:text-sm">
-								Uploaded: {doc.uploadedAt}&nbsp;&nbsp;•&nbsp;&nbsp;Size: {doc.size}
-							</p>
+							<div class="flex items-center gap-3">
+								<p class="text-xs font-normal text-[#959595] md:text-sm">
+									Uploaded: {doc.uploadedAt}&nbsp;&nbsp;•&nbsp;&nbsp;Size: {doc.size}
+								</p>
+
+								{#if doc.pages && doc.pages.length > 0}
+									<div
+										class="inline-flex items-center gap-1.5 rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2.5 py-0.5 text-xs font-medium text-[#DB8F5E]"
+										title={`Found on pages: ${doc.pages.join(', ')}`}
+									>
+										<BookOpenIcon class="size-3.5" />
+										<span>Pages: {doc.pages.slice(0, 3).join(', ')}{doc.pages.length > 3 ? '...' : ''}</span>
+									</div>
+								{/if}
+							</div>
 
 							<!-- Vectorizing Status Badge (Monochrome Gray AI Sparkle Aesthetic) -->
 							{#if doc.status === 'pending' || doc.status === 'confirmed'}
@@ -815,6 +979,20 @@
 			{#key doc.id}
 				<PDFViewer
 					class="h-full w-full"
+					onready={(registry: any) => {
+						const targetPage = doc.pages && doc.pages.length > 0 ? doc.pages[0] : undefined;
+						if (targetPage) {
+							const scrollPlugin = registry.getPlugin('scroll');
+							if (scrollPlugin && scrollPlugin.provides) {
+								const scrollCap = scrollPlugin.provides();
+								scrollCap.onLayoutReady((event: any) => {
+									if (event.isInitial) {
+										scrollCap.scrollToPage({ pageNumber: targetPage });
+									}
+								});
+							}
+						}
+					}}
 					config={{
 						src: doc.url,
 						theme: {

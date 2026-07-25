@@ -6,5 +6,8 @@ export interface Document {
 	size: string;
 	status: 'pending' | 'confirmed' | 'processed' | 'quota_exhausted' | 'failed';
 	url?: string;
+	pages?: number[];
+	score?: number;
+	semanticContent?: string;
 }
 
