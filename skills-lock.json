@@ -139,12 +139,6 @@
       "skillPath": "skills/security-review/SKILL.md",
       "computedHash": "fed88d7bfda07743a05f2a91088cd39dec65eb36fcdc6b80fdbb8590ca84d072"
     },
-    "setup-xendit": {
-      "source": "afu-it/malaysia-payment-gateway",
-      "sourceType": "github",
-      "skillPath": "setup-xendit/SKILL.md",
-      "computedHash": "c3e8e2d38ea81fcc170434a85aa9579db78fa3a95c24e0436e711044d41816a4"
-    },
     "shadcn-svelte": {
       "source": "huntabyte/shadcn-svelte",
       "sourceType": "github",
@@ -156,12 +150,6 @@
       "sourceType": "github",
       "skillPath": "skills/sql-optimization/SKILL.md",
       "computedHash": "47c930907f25d67454ac8c2d155785eae3dce72242960d0c0e9ebf2ced9cd231"
-    },
-    "stitch-design-taste": {
-      "source": "Leonxlnx/taste-skill",
-      "sourceType": "github",
-      "skillPath": "skills/stitch-skill/SKILL.md",
-      "computedHash": "3aa58992f0fd9673b975cd48cd4f8ae4b4976fd5cdd9f20e26d3d447aee317fb"
     },
     "stripe-best-practices": {
       "source": "docs.stripe.com",

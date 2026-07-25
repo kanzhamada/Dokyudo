@@ -22,7 +22,7 @@
 3. **Enterprise BYOK (Bring Your Own Key)** – Users can input their own OpenAI/Claude API keys. Keys are secured using AES-256-GCM Symmetric Encryption with an off-database Master Encryption Key (MEK).
 4. **Smart AI Gateway & Multi-Provider Fallback** – A dedicated routing service ensuring High Availability (HA) by failing over between fast inference models with an automatic circuit breaker if rate limits are hit.
 5. **Financial-Grade Embeddings & Micro-Databases** – Utilizing Gemini `gemini-embedding-2` (768-dim) for high-accuracy financial context extraction, stored in an external Serverless Vector DB (Upstash Vector) to completely offload storage pressure from the main Postgres database.
-6. **Dual-Mode Sandbox Payment Gateway** – Integration with Midtrans/Xendit (Sandbox mode) to demonstrate two distinct billing architectures: One-Time Invoices (Investor Tier) and Auto-Debit Subscriptions (Real Tier), along with webhook handling, subscription lifecycle, and multi-seat license provisioning.
+6. **Dual-Mode Sandbox Payment Gateway** – Integration with Stripe (Sandbox mode) to demonstrate two distinct billing architectures: One-Time Invoices (Investor Tier) and Auto-Debit Subscriptions (Real Tier), along with webhook handling, subscription lifecycle, and multi-seat license provisioning.
 7. **Cost-Optimized Ingestion Pipeline** – Upload → text extraction → optimized chunking (256 tokens) → rate-limited embedding → HNSW vector index, specifically designed to bypass LLM free-tier rate limits.
 8. **Self-Destructing Data & Teardown** – Automated cron jobs that wipe physical storage and database records for expired simulation accounts and aged portfolio data to permanently maintain a $0 cloud bill.
 9. **Semantic Search** – Vector search + full‑text (_hybrid_) with tenant filtering done inside the database queries.
@@ -254,7 +254,7 @@ All values can be overridden per service via environment variables.
 
 ### 5.14 Subscription Lifecycle & Payment Gateway Integration
 
-This module serves as a technical showcase of monetization architecture. The platform integrates Xendit/Midtrans (Sandbox mode) to demonstrate payment flows without real financial transactions.
+This module serves as a technical showcase of monetization architecture. The platform integrates Stripe (Sandbox mode) to demonstrate payment flows without real financial transactions.
 
 **A. PRO (SIMULATE) — Admin-Generated Access**
 
@@ -637,9 +637,9 @@ graph TD
 
 - Implement Supabase `pg_net` triggers for the Event-Driven Push pattern (Ingestion & Webhooks).
     
-- Xendit/Midtrans Sandbox integration: One-Time Invoice for the "Investor" tier.
+- Stripe Sandbox integration: One-Time Invoice for the "Investor" tier.
     
-- Xendit/Midtrans Sandbox integration: Recurring Subscriptions API for the "Real" tier.
+- Stripe Sandbox integration: Recurring Subscriptions API for the "Real" tier.
     
 - Implement Shadow Quota (FUP) logic in the backend.
     

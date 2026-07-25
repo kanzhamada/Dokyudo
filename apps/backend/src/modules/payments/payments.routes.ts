@@ -66,7 +66,6 @@ paymentsRoutes.openapi(
                 description: "Webhook processed or ignored securely",
                 // We use standard SuccessResponse schema which usually has { message: string } or loosely defined
                 // But let's just make it generic or use our custom return.
-                // For simplicity, we just use {} or a simple object, Xendit doesn't care about the response body, only the 2xx status code.
             },
             400: {
                 description: "Validation Error",
