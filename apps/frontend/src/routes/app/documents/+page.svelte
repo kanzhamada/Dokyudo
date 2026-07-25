@@ -38,6 +38,8 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
+	import DownloadIcon from '@lucide/svelte/icons/download';
+	import { createZipArchive } from '$lib/utils/zip';
 
 	/* ── shadcn-svelte Components (ToggleGroup) ── */
 	import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
@@ -269,8 +271,89 @@
 	let selectedDocIds = $state<string[]>([]);
 	let selectedCount = $derived(selectedDocIds.length);
 
-	let isBatchDeleting = $state(false);
 	let showBatchDeleteModal = $state(false);
+	let isBatchDeleting = $state(false);
+	let isBatchDownloading = $state(false);
+
+	async function handleBatchDownload() {
+		if (selectedDocIds.length === 0 || isBatchDownloading) return;
+		isBatchDownloading = true;
+
+		try {
+			const selectedDocs = documentsList.filter((d) => selectedDocIds.includes(d.id));
+
+			if (selectedDocs.length === 1) {
+				const doc = selectedDocs[0];
+				let url = doc.url;
+				if (!url) {
+					const res = await apiRequest<{ url: string }>(`/api/documents/${doc.id}/preview`);
+					if (res.ok) {
+						url = res.data.url;
+					} else {
+						showError(`Failed to get download URL for ${doc.name}`);
+						return;
+					}
+				}
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = doc.name;
+				a.target = '_blank';
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				showSuccess('Downloading file', doc.name);
+			} else {
+				showSuccess('Preparing ZIP archive...', `Downloading ${selectedDocs.length} files`);
+				const zipFiles: Array<{ name: string; data: Uint8Array }> = [];
+
+				for (const doc of selectedDocs) {
+					let url = doc.url;
+					if (!url) {
+						const res = await apiRequest<{ url: string }>(`/api/documents/${doc.id}/preview`);
+						if (res.ok) {
+							url = res.data.url;
+						} else {
+							console.error(`Failed to fetch preview URL for ${doc.name}`);
+							continue;
+						}
+					}
+					try {
+						const fileRes = await fetch(url);
+						const arrayBuffer = await fileRes.arrayBuffer();
+						zipFiles.push({
+							name: doc.name,
+							data: new Uint8Array(arrayBuffer)
+						});
+					} catch (e) {
+						console.error(`Error fetching file content for ${doc.name}`, e);
+					}
+				}
+
+				if (zipFiles.length === 0) {
+					showError('Failed to download selected documents.');
+					return;
+				}
+
+				const zipBlob = createZipArchive(zipFiles);
+				const blobUrl = URL.createObjectURL(zipBlob);
+
+				const a = document.createElement('a');
+				a.href = blobUrl;
+				a.download = `Dokyudo_Documents_${new Date().toISOString().slice(0, 10)}.zip`;
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				URL.revokeObjectURL(blobUrl);
+
+				showSuccess('ZIP Downloaded', `Successfully archived ${zipFiles.length} files`);
+			}
+		} catch (err: any) {
+			console.error('[Batch Download Error]:', err);
+			showError('An error occurred during download.');
+		} finally {
+			isBatchDownloading = false;
+		}
+	}
 
 	function toggleSelectDoc(id: string) {
 		if (selectedDocIds.includes(id)) {
@@ -790,6 +873,32 @@
 				</DropdownMenu.Root>
 
 				{#if selectedCount > 0}
+					<!-- Batch Download Button -->
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									type="button"
+									variant="ghost"
+									disabled={isBatchDownloading}
+									onclick={handleBatchDownload}
+									class="h-10 cursor-pointer rounded-full border border-blue-500/40 bg-blue-950/40 px-3 text-sm font-medium text-blue-400 hover:bg-blue-900/60 hover:text-blue-300 transition-colors flex items-center justify-center disabled:opacity-50"
+								>
+									{#if isBatchDownloading}
+										<Loader2Icon class="size-4 animate-spin" />
+									{:else}
+										<DownloadIcon class="size-4" />
+									{/if}
+									<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+							<p>{selectedCount > 1 ? `Download Selected as ZIP (${selectedCount})` : `Download Selected Document`}</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+
 					<!-- Batch Delete Button -->
 					<Tooltip.Root>
 						<Tooltip.Trigger>
