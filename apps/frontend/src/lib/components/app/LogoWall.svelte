@@ -56,7 +56,7 @@
 </script>
 
 <div bind:this={container} class="relative z-[100] flex w-full justify-center px-6">
-	<div class="mb-4 flex w-full max-w-4xl flex-col items-stretch overflow-hidden rounded-[24px] border border-white/16 bg-dk-surface-dark/40 shadow-lg backdrop-blur-[42px] md:flex-row">
+	<div class="mb-4 flex w-full max-w-4xl flex-col items-stretch overflow-hidden rounded-[6px]   bg-[#242323]  md:flex-row">
 		<div class="flex flex-1 min-w-0 flex-col items-center gap-4 px-6 py-6 md:h-14 md:flex-row md:gap-8 md:py-0 overflow-hidden">
 			<span class="shrink-0 whitespace-nowrap font-sans text-[11px] font-semibold uppercase tracking-[0.05em] text-dk-muted-gray">
 				Build With

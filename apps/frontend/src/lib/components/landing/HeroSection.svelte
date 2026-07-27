@@ -322,8 +322,8 @@
 		background-position: center;
 		z-index: 0;
 		pointer-events: none;
-		filter: blur(6px);
-		transform: scale(1.8);
+		filter: blur(0px);
+		transform: scale(1);
 	}
 
 	.hero-section::after {
