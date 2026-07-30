@@ -141,8 +141,12 @@
         - poster: Fallback image preview shown before video loads or if video is empty
         ============================================================
       -->
-      <video class="hero__video" autoplay loop muted playsinline poster="assets/hero/itulah.webp">
-        <source src="assets/hero/itulah.mp4" type="video/mp4" />
+      <video class="hero__video" autoplay loop muted playsinline poster="assets/hero/thumbnail-hero.webp">
+        <!-- Format WebM untuk Chrome & Firefox -->
+        <source src="https://res.cloudinary.com/mnkj9dve/video/upload/f_auto,q_auto/hero-bg-webm" type="video/webm" />
+
+        <!-- Format MP4 untuk Safari & iOS -->
+        <source src="https://res.cloudinary.com/mnkj9dve/video/upload/f_auto,q_auto/hero-bg-mp4" type="video/mp4" />
       </video>
       <div class="hero__video-overlay"></div>
     </div>
