@@ -562,11 +562,13 @@
 
       if (REDUCED) { paintPhoto(btn); paintQuote(btn); return; }
       swap.classList.add('swap');
+      if (photo) photo.classList.add('swap');
       setTimeout(() => {
         paintPhoto(btn);
         paintQuote(btn);
         swap.classList.remove('swap');
-      }, 170);
+        if (photo) photo.classList.remove('swap');
+      }, 200);
     }
 
     function startAuto() {
