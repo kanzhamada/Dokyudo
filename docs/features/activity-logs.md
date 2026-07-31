@@ -82,6 +82,7 @@ sequenceDiagram
 | `apps/backend/src/modules/auth/auth.service.ts` | Passed `clientIp` and `userAgent` to `logActivity()` for `tenant.name_updated`. Updated `updateTenantName` signature to use `AuthParams.UpdateTenantNameParams`. |
 | `apps/backend/src/modules/payments/payments.controller.ts` | Extracted audit context in `handleCheckout`, `handleWebhook`, and `handlePortal`. |
 | `apps/backend/src/modules/payments/payments.service.ts` | Added `clientIp` and `userAgent` params to `handleWebhook`. Fixed payment status enum values (`SUCCEEDED`) and added webhook handlers for `checkout.session.async_payment_failed` and `invoice.payment_failed` to log `billing.payment_failed`. |
+| `api-collections/Activities/1_Get Activities.bru` | Updated Bruno collection request for Activity Logs to include query params (`category`, `startDate`, `endDate`, `search`). |
 
 ---
 
