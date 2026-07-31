@@ -1,81 +1,87 @@
-# Stripe Payment Gateway (Hybrid Architecture)
+# Stripe Payment Gateway Documentation
 
-**Completion Timestamp**: 2026-07-01T15:15:00+07:00 (WIB)
+**Completion Timestamp**: 2026-07-31T16:43:00+07:00 (WIB)
 
 ## Core Logic
-Fitur ini mengintegrasikan Dokyudo dengan **Stripe Payment Gateway** untuk mensimulasikan pembelian paket langganan dan sekali bayar.
-Arsitektur pembayaran dirancang menggunakan pendekatan **Hybrid**:
-1. **One-time Purchase (`payment` mode)**: Digunakan untuk tier `SIMULATE` (kedaluwarsa dalam 1 hari) dan `OIL_INVESTOR` (Lifetime / seumur hidup).
-2. **Recurring Subscription (`subscription` mode)**: Digunakan untuk tier `PRO` (berlangganan bulanan).
 
-Sistem secara penuh bergantung pada harga yang dikonfigurasi di Dashboard Stripe (`price_id`), bukan mengatur nominal secara *hardcode* di Backend.
+The Stripe Payment Gateway integration handles tier upgrades, subscriptions, and single purchases within Dokyudo. It utilizes a **Hybrid Architecture**:
+1. **One-Time Purchase (`payment` mode)**: Used for `SIMULATE` (24-hour expiration) and `OIL_INVESTOR` (Lifetime access) tiers.
+2. **Recurring Subscription (`subscription` mode)**: Used for the `PRO` monthly subscription tier.
+
+Pricing and currencies are managed directly within the Stripe Dashboard (`price_id`), ensuring the backend never hardcodes transaction amounts. Upon successful or failed transactions, the service emits audit entries into `activity_logs` (`billing.payment_completed` or `billing.payment_failed`) enriched with `clientIp`, `userAgent`, and `requestId` extracted via `ContextExtractor.extractAuditContext()`.
+
+---
 
 ## Flow Diagram
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
+    actor User as Client / User
     participant Frontend as SvelteKit UI
     participant Backend as Dokyudo API
-    participant DB as Postgres (Drizzle)
+    participant Extractor as ContextExtractor
+    participant DB as PostgreSQL
     participant Stripe as Stripe API
 
-    User->>Frontend: Klik "Upgrade Tier"
+    User->>Frontend: Click "Upgrade Tier"
     Frontend->>Backend: POST /api/payments/checkout { tierToUnlock }
+    Backend->>Extractor: extractAuditContext(c)
+    Extractor-->>Backend: { clientIp, userAgent, requestId }
     
-    Backend->>DB: Cek Data Tenant & stripeCustomerId
-    Note over Backend: Pilih Mode: "payment" (SIMULATE/OIL_INVESTOR) atau "subscription" (PRO)
-    
-    Backend->>Stripe: POST /v1/checkout/sessions (Kirim Price ID)
+    Backend->>DB: Query Tenant & tenantSubscriptions
+    Backend->>Stripe: POST /v1/checkout/sessions (Price ID)
     Stripe-->>Backend: Return JSON (Session ID, url)
-    Backend->>DB: Insert `payment_transactions` (PENDING)
+    Backend->>DB: Insert payment_transactions (SUCCEEDED / PENDING)
     Backend-->>Frontend: Return checkoutUrl
-    Frontend-->>User: Buka tab baru ke Stripe Checkout URL
+    Frontend-->>User: Redirect to Stripe Checkout
 
-    Note over User,Stripe: User melakukan pembayaran...
+    Note over User,Stripe: User completes or cancels payment...
 
     Stripe->>Backend: POST /api/payments/webhook
-    Note over Stripe,Backend: Event: checkout.session.completed
-    Backend->>Backend: Verifikasi Webhook Signature (Stripe-Signature)
+    Note over Stripe,Backend: Event: checkout.session.completed OR payment_failed
+    Backend->>Backend: Verify Webhook Signature (Stripe-Signature)
     
-    Backend->>DB: Update `payment_transactions` (SUCCEEDED) & Record Amount dari Stripe
-    Backend->>DB: Upsert `tenant_subscriptions` (Tier Baru)
-    
-    alt SIMULATE
-        Backend->>DB: Set expires_at = now + 1 hari
-    else OIL_INVESTOR
-        Backend->>DB: Set expires_at = NULL (Lifetime)
-    else PRO
-        Note over Stripe,Backend: Event terpisah: customer.subscription.updated mengatur expires_at
+    alt Checkout Succeeded
+        Backend->>DB: Update payment_transactions status to SUCCEEDED
+        Backend->>DB: Upsert tenant_subscriptions (New Tier)
+        Backend->>DB: INSERT INTO activity_logs (billing.payment_completed)
+    else Payment Failed / Expired
+        Backend->>DB: Update payment_transactions status to FAILED
+        Backend->>DB: INSERT INTO activity_logs (billing.payment_failed)
     end
     
     Backend-->>Stripe: 200 OK
 ```
 
+---
+
 ## File Mapping
 
 - **Database Models**: 
-  - `apps/backend/src/shared/models/db.model.ts` (Tabel `tenant_subscriptions`, `payment_transactions`, enum `tierEnum` yang baru: `FREE`, `SIMULATE`, `OIL_INVESTOR`, `PRO`).
+  - `apps/backend/src/shared/models/db.model.ts` (`tenant_subscriptions`, `payment_transactions`, `activity_logs`, `tierEnum`: `FREE`, `SIMULATE`, `OIL_INVESTOR`, `PRO`, `paymentStatusEnum`: `PENDING`, `SUCCEEDED`, `FAILED`, `CANCELED`, `EXPIRED`).
 - **Configuration**:
-  - `apps/backend/src/config/stripe.ts` (Inisialisasi `Stripe` instance).
-  - `apps/backend/src/config/env.ts` (Validasi `STRIPE_SECRET_KEY` & `STRIPE_WEBHOOK_SECRET`).
+  - `apps/backend/src/config/stripe.ts` (Stripe instance initialization).
+  - `apps/backend/src/config/env.ts` (`STRIPE_SECRET_KEY` & `STRIPE_WEBHOOK_SECRET` validation).
 - **Payments Module** (`apps/backend/src/modules/payments/`):
-  - `payments.schema.ts` (Validasi Zod input checkout dan webhook body `text`).
-  - `payments.service.ts` (Logika *Checkout* dinamis dan *Webhook event router*).
-  - `payments.controller.ts` (Validasi JWT dan *Stripe Signature*).
-  - `payments.routes.ts` (Definisi OpenAPI endpoints).
-- **Documentation**:
-  - Dihapus: `sandbox-payments.md` (Xendit kuno).
-  - Ditambahkan: `stripe-payment-gateway.md`.
+  - `payments.schema.ts` (Zod schemas for checkout and portal requests).
+  - `payments.service.ts` (Dynamic checkout sessions, webhook handlers for `checkout.session.completed`, `checkout.session.async_payment_failed`, `invoice.payment_failed`, and audit log emissions).
+  - `payments.controller.ts` (Context extraction via `ContextExtractor.extractAuditContext()`, JWT validation, and Stripe signature verification).
+  - `payments.routes.ts` (OpenAPI endpoint definitions).
+
+---
 
 ## Connections
-- **Database**: Terpisah antara riwayat transaksi `payment_transactions` (Audit log) dan keadaan langganan saat ini `tenant_subscriptions` (Single Source of Truth).
-- **Stripe API**: Terhubung menggunakan SDK resmi `stripe-node`. Semua perhitungan nominal dan *currency* dilakukan di *Dashboard Stripe*, *Backend* hanya mengirim `price_id`.
-- **Frontend URL**: Webhook dan *Checkout Session* terhubung kembali ke *Frontend* melalui `FRONTEND_URL` yang dikonfigurasi secara dinamis.
+
+- **Database**: Separated between `payment_transactions` (immutable transaction ledger) and `tenant_subscriptions` (current active tier state).
+- **Stripe API**: Connected via official `stripe-node` SDK using dashboard-configured `price_id` references.
+- **Audit Logging**: Webhook and checkout handlers extract `clientIp` and `userAgent` metadata to record `billing.payment_completed` or `billing.payment_failed` activity logs.
+
+---
 
 ## Architectural Decisions
-1. **Hybrid Checkout Modes**: Memisahkan logika mode `payment` dan `subscription` agar Stripe tidak menolak transaksi *One-Time Purchase*.
-2. **Dashboard-Driven Pricing**: Nominal pembayaran (Rp vs $) dicabut seluruhnya dari *Backend*. *Backend* murni menggunakan *Price ID* dan membaca hasil nominal yang ditagihkan (*amount_total*) dari respons Sesi Stripe untuk direkam di *Database*. Ini menjamin konsistensi 100%.
-3. **Resilient Webhook Parsing**: `customer.subscription.updated` terkadang tidak menyertakan `current_period_end` di level atas pada lingkungan tertentu. Sistem direfaktor untuk mencegah *RangeError (Invalid Date)* dengan aman.
-4. **Lazy Evaluation Architecture**: Dokyudo tidak menggunakan *cron job* atau *long-polling* untuk mencabut *tier* langganan yang sudah kedaluwarsa. Validasi akan dilakukan pada level *Middleware* saat pengguna melakukan interaksi dengan sistem, menghemat 100% biaya komputasi *idle*.
+
+1. **Hybrid Checkout Modes**: Separates `payment` and `subscription` modes so Stripe does not reject one-time purchase attempts.
+2. **Dashboard-Driven Pricing**: Amounts and currency codes are read directly from Stripe event payloads (`amount_total`, `currency`) and saved into database records and activity log metadata.
+3. **Resilient Status Tracking**: `paymentTransactions.status` enum strictly uses `"PENDING" | "SUCCEEDED" | "FAILED" | "CANCELED" | "EXPIRED"`.
+4. **Audit Context Extraction**: Webhook and portal controllers call `ContextExtractor.extractAuditContext()` to attach IP and client user-agent metadata to billing logs.

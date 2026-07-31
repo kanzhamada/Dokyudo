@@ -1,57 +1,65 @@
-# Update Tenant Name Endpoint
+# Update Tenant Name Endpoint Documentation
 
-**Completion Timestamp**: 2026-07-15T18:53:00+07:00 (WIB)
+**Completion Timestamp**: 2026-07-31T16:43:00+07:00 (WIB)
 
 ## Core Logic
 
-Endpoint `PATCH /api/auth/tenant/name` allows an authenticated user to update their tenant's display name. The operation runs inside a `withAuthDb` transaction to enforce Supabase Row-Level Security (RLS), ensuring a tenant can only modify their own row in the `tenants` table.
+The `PATCH /api/auth/tenant/name` endpoint allows an authenticated user to update their workspace's display name. The operation executes inside a `withAuthDb` transaction to enforce Supabase Row-Level Security (RLS), ensuring users can only modify their own tenant record in the `tenants` table.
 
-The `tenants` table also received a new `updated_at` column as part of this feature, consistent with `users`, `payment_transactions`, `documents`, and `tenant_keys` tables.
+Upon completion, an audit log entry (`tenant.name_updated`) is recorded in `activity_logs` with `clientIp` and `userAgent` metadata extracted via `ContextExtractor.extractAuditContext()`.
+
+---
 
 ## Flow Diagram
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
+    actor User as Client / User
     participant Frontend as SvelteKit UI
-    participant Backend as Dokyudo API (authMiddleware)
-    participant DB as Postgres (Drizzle + RLS)
+    participant Backend as Dokyudo API
+    participant Extractor as ContextExtractor
+    participant DB as Postgres (RLS)
 
     User->>Frontend: Submit new workspace name
     Frontend->>Backend: PATCH /api/auth/tenant/name { name }
-    Backend->>Backend: authMiddleware validates JWT, extracts userId + tenantId
+    Backend->>Extractor: extractAuthContext(c) & extractAuditContext(c)
+    Extractor-->>Backend: { userId, tenantId, clientIp, userAgent }
 
-    Backend->>DB: withAuthDb(userId) — set role authenticated + JWT claims
-    DB->>DB: RLS evaluates: can this userId write to tenants row?
-    DB->>DB: SELECT tenants WHERE id = tenantId (guard clause)
+    Backend->>DB: withAuthDb(userId) — set role authenticated
+    DB->>DB: Check tenant existence
     DB->>DB: UPDATE tenants SET name, updated_at WHERE id = tenantId RETURNING id, name
+    Backend->>DB: INSERT INTO activity_logs (tenant.name_updated, clientIp, userAgent)
 
-    Backend-->>Frontend: 200 { tenant: { id, name }, message }
+    Backend-->>Frontend: 200 OK { tenant: { id, name }, message }
 ```
+
+---
 
 ## File Mapping
 
-| File | Change |
+| File | Purpose / Changes |
 |---|---|
-| `apps/backend/src/shared/models/db.model.ts` | Added `updated_at` column to `tenants` table |
-| `apps/backend/src/modules/auth/auth.schema.ts` | Added `UpdateTenantNameBodySchema`, `UpdateTenantNameParams`, `UpdateTenantNameResponseSchema` |
-| `apps/backend/src/modules/auth/auth.service.ts` | Added `static async updateTenantName(params)` using `withAuthDb` |
-| `apps/backend/src/modules/auth/auth.controller.ts` | Added `handleUpdateTenantName` — extracts `userId` + `tenantId` from Hono context |
-| `apps/backend/src/modules/auth/auth.routes.ts` | Added `PATCH /tenant/name` OpenAPI route with `authMiddleware` |
-| `apps/backend/src/modules/auth/auth.service.test.ts` | Added `updateTenantName` describe block (positive + negative tests) |
-| `api-collections/Auth/13_Update Tenant Name.bru` | Bruno collection file for the new endpoint |
-| `drizzle/migrations/0012_rapid_sue_storm.sql` | Migration: `ALTER TABLE tenants ADD COLUMN updated_at` |
+| `apps/backend/src/shared/models/db.model.ts` | `tenants` table definition with `updated_at` column. |
+| `apps/backend/src/modules/auth/auth.schema.ts` | Defined `UpdateTenantNameBodySchema`, `UpdateTenantNameParamsSchema` (including optional `clientIp` and `userAgent`), and `UpdateTenantNameResponseSchema`. |
+| `apps/backend/src/modules/auth/auth.service.ts` | Implemented `static async updateTenantName(params: AuthParams.UpdateTenantNameParams)` using `withAuthDb` and `logActivity()`. |
+| `apps/backend/src/modules/auth/auth.controller.ts` | Implemented `handleUpdateTenantName` using `ContextExtractor` to pull `userId`, `tenantId`, `clientIp`, and `userAgent`. |
+| `apps/backend/src/modules/auth/auth.routes.ts` | Exposed `PATCH /tenant/name` route protected by `authMiddleware`. |
+| `apps/backend/src/modules/auth/auth.service.test.ts` | Unit tests covering `updateTenantName` (positive and negative execution paths). |
+| `api-collections/Auth/13_Update Tenant Name.bru` | Bruno collection request file for the endpoint. |
+
+---
 
 ## Connections
 
-- **Database**: The `tenants` table update is wrapped in `withAuthDb(userId)` which sets `role = authenticated` and injects `request.jwt.claims = { sub: userId }`. This allows Supabase RLS policies (if defined on the tenants table) to validate write access.
-- **Auth Middleware**: The route is protected by `authMiddleware` which populates `c.get("userId")` and `c.get("tenantId")` from the verified JWT.
-- **Observability**: On success, `logContext.authEvent = "tenant_name_updated"` is injected, which is picked up by the `loggerMiddleware` wide event.
+- **Database**: The update is executed inside `withAuthDb(userId)` which sets `role = authenticated` and injects `request.jwt.claims = { sub: userId }`.
+- **Audit Trail**: Emissions to `activity_logs` record `tenant.name_updated` alongside `clientIp` and `userAgent` extracted from request proxy headers.
+
+---
 
 ## Architectural Decisions
 
-1. **`withAuthDb` over bare `db`**: All tenant-scoped mutations must run inside an `authenticated` RLS session. Using the bare `db` (superuser role) would bypass RLS entirely and violate the multi-tenancy isolation contract.
-2. **Guard Clause Pattern**: The service checks tenant existence before updating, throwing a `VALIDATION_ERROR` (not `NOT_FOUND`) to avoid leaking information about other tenants' IDs to a potential attacker.
-3. **`.returning()`**: Used to atomically retrieve the updated name in the same DB round-trip, avoiding a redundant `SELECT` after the `UPDATE`.
-4. **Schema-First**: The endpoint follows the project's `schema-first-contract` rule — Zod schemas in `auth.schema.ts` are the single source of truth, consumed by both the route definition and the OpenAPI spec auto-generation via `@hono/zod-openapi`.
+1. **`withAuthDb` over bare `db`**: All tenant-scoped mutations run inside an `authenticated` RLS session to maintain multi-tenancy isolation contracts.
+2. **Audit Context Extraction**: `handleUpdateTenantName` extracts `clientIp` and `userAgent` via `ContextExtractor.extractAuditContext()` and passes `AuthParams.UpdateTenantNameParams` to `AuthService.updateTenantName`.
+3. **`.returning()`**: Retrieves the updated name in the same DB round-trip, avoiding redundant `SELECT` queries after `UPDATE`.
+4. **Schema-First**: Zod schemas in `auth.schema.ts` serve as the single source of truth for both runtime validation and auto-generated OpenAPI specs.
