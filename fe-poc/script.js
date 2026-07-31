@@ -40,7 +40,7 @@
     'section .arch-node', 'section .chunkcard', 'section .cap-item',
     'section .fb-stage', 'section .console', 'section img', 'section figure'
   ];
-  
+
   autoRevealSelectors.forEach((sel) => {
     $$(sel).forEach((el) => {
       if (!el.hasAttribute('data-reveal')) {
@@ -50,7 +50,7 @@
   });
 
   const revealEls = $$('[data-reveal]');
-  
+
   const containers = $$('.hero__copy, .cap-list, .cap-stage, .console__side, .console__main, .arch__row, .arch__data, .fb-toolbar, .tier-grid, .faq-grid, .cta-grid');
   containers.forEach((container) => {
     const items = $$('[data-reveal]', container);
@@ -997,4 +997,7 @@
       }));
     }
   })();
+
+
+
 })();

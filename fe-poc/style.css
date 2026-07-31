@@ -1168,6 +1168,11 @@ ul {
     background-size: 24px 24px;
 }
 
+.sec-cap > .container {
+    position: relative;
+    z-index: 2;
+}
+
 .cap-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
@@ -1231,6 +1236,7 @@ ul {
 }
 .btn--white:hover .btn__box {
     background: var(--color-terracotta);
+    box-shadow: 0 0 16px rgba(240, 78, 35, 0.45);
 }
 .btn--white:hover .btn__box .ic {
     transform: translateX(2px);
@@ -1256,15 +1262,25 @@ ul {
     gap: 14px;
 }
 .cap-item__ico {
-    width: 22px;
-    height: 22px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
     flex: none;
+    display: grid;
+    place-items: center;
+    background: rgba(250, 250, 250, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--color-warm-gray);
-    transition: color var(--dur) var(--ease);
+    transition:
+        background-color var(--dur) var(--ease),
+        border-color var(--dur) var(--ease),
+        color var(--dur) var(--ease),
+        box-shadow var(--dur) var(--ease),
+        transform var(--dur) var(--ease);
 }
 .cap-item__ico .ic {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
 }
 .cap-item__title {
     font: 500 1.06rem/1.2 var(--font-body);
@@ -1278,8 +1294,14 @@ ul {
 .cap-item.is-on .cap-item__title {
     color: var(--color-offwhite);
 }
+.cap-item:hover .cap-item__ico,
 .cap-item.is-on .cap-item__ico {
+    background: rgba(240, 78, 35, 0.18);
+    border-color: rgba(240, 78, 35, 0.5);
     color: var(--color-terracotta);
+    box-shadow:
+        0 0 20px rgba(240, 78, 35, 0.4),
+        inset 0 0 10px rgba(240, 78, 35, 0.2);
 }
 
 /* smooth expand via grid-rows (interactive accordion; same family as the FAQ) */
@@ -2194,6 +2216,16 @@ ul {
 }
 
 /* ---------- architecture ---------- */
+#architecture {
+    position: relative;
+    background-image:
+        linear-gradient(180deg, rgba(14, 14, 14, 0.85) 0%, rgba(14, 14, 14, 0.65) 50%, rgba(14, 14, 14, 0.88) 100%),
+        url('./Gemini_Generated_Image_x3ryvvx3ryvvx3ry.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
 .arch {
     display: flex;
     flex-direction: column;
