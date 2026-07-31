@@ -7,18 +7,16 @@ import { getStripeWebhookSecret, stripe } from "../../config/stripe.ts";
 
 export async function handleCheckout(c: Context) {
     const extractor = new ContextExtractor(c);
-    const { logContext, clientIp } = extractor.extractAuditContext();
+    const { logContext, clientIp, userAgent } = extractor.extractAuditContext();
     const { tenantId, userId } = extractor.extractAuthContext();
     const body = extractor.extractValidJson<PaymentsSchema.CreateCheckoutBody>();
-
-    const countryCode = c.req.header("CF-IPCountry") || "US";
 
     const result = await PaymentsService.createCheckoutSession({
         body,
         tenantId,
         userId,
         clientIp,
-        countryCode,
+        userAgent,
         logContext,
     });
 
@@ -27,7 +25,7 @@ export async function handleCheckout(c: Context) {
 
 export async function handleWebhook(c: Context) {
     const extractor = new ContextExtractor(c);
-    const { logContext } = extractor.extractAuditContext();
+    const { logContext, clientIp, userAgent } = extractor.extractAuditContext();
     
     // 1. Stripe Webhooks require raw text body for signature verification
     const sig = c.req.header("stripe-signature");
@@ -56,6 +54,8 @@ export async function handleWebhook(c: Context) {
     // 3. Process via Service
     const result = await PaymentsService.handleWebhook({
         event,
+        clientIp,
+        userAgent,
         logContext,
     });
 
@@ -66,11 +66,13 @@ export async function handleWebhook(c: Context) {
 export async function handlePortal(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, userId } = extractor.extractAuthContext();
-    const { logContext } = extractor.extractAuditContext();
+    const { logContext, clientIp, userAgent } = extractor.extractAuditContext();
 
     const result = await PaymentsService.createPortalSession({
         tenantId,
         userId,
+        clientIp,
+        userAgent,
         logContext,
     });
 

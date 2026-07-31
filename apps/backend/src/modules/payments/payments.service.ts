@@ -21,7 +21,7 @@ export class PaymentsService {
         tenantId: string;
         userId: string;
         clientIp: string;
-        countryCode: string;
+        userAgent?: string;
         logContext?: Record<string, any>;
     }) {
         const { body, tenantId, userId, logContext } = params;
@@ -163,6 +163,8 @@ export class PaymentsService {
      */
     static async handleWebhook(params: {
         event: Stripe.Event;
+        clientIp?: string;
+        userAgent?: string;
         logContext?: Record<string, any>;
     }) {
         const { event, logContext } = params;
@@ -173,44 +175,44 @@ export class PaymentsService {
             case "checkout.session.completed": {
                 const session = event.data.object as Stripe.Checkout.Session;
 
-                // 1. Fetch transaction
-                const externalId = session.client_reference_id;
-                if (!externalId)
-                    return {
-                        acknowledged: true,
-                        reason: "no_client_reference_id",
-                    };
+                // 1. Validate custom metadata attached during checkout session creation
+                const tenantId = session.metadata?.tenantId;
+                const externalId = session.metadata?.externalId;
+                const tierToUnlock = session.metadata?.tierToUnlock;
 
+                if (!tenantId || !externalId || !tierToUnlock) {
+                    if (logContext) logContext.webhookWarning = "Missing metadata in checkout.session.completed";
+                    break;
+                }
+
+                // 2. Query payment transaction record to avoid duplicate fulfillment
                 const [trx] = await db
                     .select()
                     .from(paymentTransactions)
                     .where(eq(paymentTransactions.externalId, externalId));
 
                 if (!trx) {
-                    if (logContext)
-                        logContext.webhookWarning = `Unknown reference_id: ${externalId}`;
-                    return {
-                        acknowledged: true,
-                        reason: "unknown_transaction",
-                    };
+                    if (logContext) logContext.webhookWarning = `Payment transaction not found for externalId: ${externalId}`;
+                    break;
                 }
 
-                // 2. Update Transaction
+                if (trx.status === "SUCCEEDED") {
+                    if (logContext) logContext.webhookInfo = `Payment transaction ${externalId} already completed. Skipping.`;
+                    break;
+                }
+
+                // 3. Mark payment transaction as SUCCEEDED
                 await db
                     .update(paymentTransactions)
                     .set({
                         status: "SUCCEEDED",
                         stripeCustomerId: session.customer as string,
-                        webhookPayload: event as any,
                         paidAt: new Date(),
                         updatedAt: new Date(),
                     })
                     .where(eq(paymentTransactions.id, trx.id));
 
-                // 3. Upgrade Tenant Subscription
-                const tierToUnlock =
-                    session.metadata?.tierToUnlock || trx.tierToUnlock;
-
+                // 4. Provision / Upgrade Tenant Subscription
                 const [sub] = await db
                     .select()
                     .from(tenantSubscriptions)
@@ -254,6 +256,8 @@ export class PaymentsService {
                     resourceType: "payment",
                     resourceId: trx.id,
                     metadata: { amount: session.amount_total, currency: session.currency, tier: tierToUnlock },
+                    ipAddress: params.clientIp,
+                    userAgent: params.userAgent,
                     requestId: logContext?.requestId,
                 });
                 break;
@@ -270,41 +274,37 @@ export class PaymentsService {
                         ? new Date(subscription.cancel_at * 1000)
                         : null;
 
+                const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+
                 await db
                     .update(tenantSubscriptions)
-                    .set({ expiresAt, updatedAt: new Date() })
-                    .where(
-                        eq(
-                            tenantSubscriptions.stripeSubscriptionId,
-                            subscription.id,
-                        ),
-                    );
+                    .set({
+                        stripeSubscriptionId: subscription.id,
+                        expiresAt: expiresAt,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(tenantSubscriptions.stripeCustomerId, customerId));
+
                 break;
             }
             case "customer.subscription.deleted": {
                 const subscription = event.data.object as Stripe.Subscription;
-                // Downgrade to FREE when subscription is completely canceled/deleted by Stripe
+                const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+
+                // Revert to FREE / SIMULATE tier upon cancellation expiration
                 await db
                     .update(tenantSubscriptions)
                     .set({
-                        tier: "FREE",
-                        expiresAt: null,
+                        tier: "SIMULATE",
                         updatedAt: new Date(),
                     })
-                    .where(
-                        eq(
-                            tenantSubscriptions.stripeSubscriptionId,
-                            subscription.id,
-                        ),
-                    );
+                    .where(eq(tenantSubscriptions.stripeCustomerId, customerId));
+
                 break;
             }
-            default:
-                if (logContext) logContext.unhandledEvent = true;
-                break;
         }
 
-        return { acknowledged: true, eventType: event.type };
+        return { received: true };
     }
 
     /**
@@ -313,6 +313,8 @@ export class PaymentsService {
     static async createPortalSession(params: {
         tenantId: string;
         userId: string;
+        clientIp?: string;
+        userAgent?: string;
         logContext?: Record<string, any>;
     }) {
         const { tenantId, userId, logContext } = params;
