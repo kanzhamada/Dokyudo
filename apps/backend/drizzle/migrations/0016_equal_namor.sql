@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "idx_activity_tenant_action_created" ON "activity_logs" USING btree ("tenant_id","action","created_at" DESC NULLS LAST);

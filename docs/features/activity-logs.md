@@ -1,6 +1,6 @@
 # Activity Logs & Audit Trail Feature Documentation
 
-**Completion Timestamp**: 2026-07-31T16:43:00+07:00 (WIB)
+**Completion Timestamp**: 2026-07-31T16:56:00+07:00 (WIB)
 
 ## Core Logic
 
@@ -10,8 +10,8 @@ The Activity Logs system provides a comprehensive audit trail and user activity 
 1. **Audit Context Extraction**: Every backend controller extracts client IP addresses (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`), user-agent strings, and request IDs via `ContextExtractor.extractAuditContext()` and passes them down to the service layer.
 2. **Denormalization via Metadata (JSONB)**: Specific event snapshot metadata (e.g., file names, subscription tiers, payment amounts, failure reasons) is stored in a JSONB column at event emission time, guaranteeing log immutability even if the target resource is deleted later.
 3. **Selective Business Failure Audit Logging**: In addition to successful operations (`document.uploaded`, `billing.payment_completed`), business-level processing failures (`document.failed`, `document.quota_exhausted`, `billing.payment_failed`) are recorded so users have visibility into background pipeline outcomes.
-4. **Tenant Isolation**: Every query and insert is strictly scoped to `tenant_id` to enforce multi-tenancy data isolation.
-5. **Interactive Frontend Presentation**: The Svelte 5 frontend renders logs using TanStack Table and shadcn-svelte `Table` primitives, parsing raw User-Agent strings into clean client labels (e.g., `Firefox 152.0`, `Bruno 3.4.2`), displaying relative timestamps with full date-time tooltips, and rendering color-coded event dot indicators.
+4. **Tenant Isolation & SQL-Indexed Filtering**: Every query is strictly scoped to `tenant_id` to enforce multi-tenancy data isolation. Supports server-side dynamic SQL filtering by category (`auth`, `document`, `billing`, `tenant`), date range (`startDate`, `endDate`), and search query (`action`, `metadata`, `ipAddress`) backed by a composite index `(tenant_id, action, created_at DESC)`.
+5. **Interactive Frontend Presentation**: The Svelte 5 frontend renders logs using TanStack Table and shadcn-svelte `Table` primitives, complete with a filter toolbar (Search input, category buttons, date range inputs, reset trigger), parsed User-Agent strings, relative timestamps with tooltips, and status dot indicators.
 
 ---
 
@@ -39,15 +39,17 @@ sequenceDiagram
     end
 
     rect rgb(15, 23, 42)
-    note over User,DB: 2. Activity Feed Retrieval & Rendering Flow
-    User->>FE: Navigate to /app/activity
-    FE->>API: GET /api/activities?page=1&limit=15
-    API->>Extractor: extractAuthContext(c)
-    API->>DB: SELECT * FROM activity_logs WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 15
-    DB-->>API: Paginated ActivityLog rows + total count
+    note over User,DB: 2. Activity Feed Retrieval & Filter Flow
+    User->>FE: Select Category "Documents" & Enter Search Query
+    FE->>API: GET /api/activities?page=1&limit=15&category=document&search=harum
+    API->>Extractor: extractAuthContext(c) & extractValidQuery()
+    API->>Service: getActivities({ tenantId, page: 1, limit: 15, category, search })
+    Service->>DB: SELECT * FROM activity_logs WHERE tenant_id = ? AND action LIKE 'document.%' AND LOWER(metadata::text) LIKE '%harum%' ORDER BY created_at DESC
+    DB-->>Service: Filtered ActivityLog rows + total count
+    Service-->>API: Data & Meta Envelope
     API-->>FE: JSON { data: ActivityLog[], meta: { page, limit, total, totalPages } }
-    FE->>FE: Parse UA & timestamps, render TanStack Table with status dot indicators
-    FE-->>User: Display Audit Trail Table
+    FE->>FE: Render TanStack Table with filtered results
+    FE-->>User: Display Filtered Audit Trail
     end
 ```
 
@@ -58,7 +60,7 @@ sequenceDiagram
 ### Frontend Files (`apps/frontend/`)
 | File | Purpose / Changes |
 |---|---|
-| `apps/frontend/src/routes/app/activity/+page.svelte` | Main Activity Log page component. Configures page breadcrumbs, header, and connects `DataTable` to `GET /api/activities`. Handles server-side pagination and URL sync. |
+| `apps/frontend/src/routes/app/activity/+page.svelte` | Main Activity Log page component. Configures breadcrumbs, header, and filter toolbar (Search bar, Category buttons, Date Range inputs, Reset button). Handles reactive server-side search and URL param sync. |
 | `apps/frontend/src/routes/app/activity/+page.ts` | Page load script setting `export const ssr = false;` for client-side API fetching with bearer auth tokens. |
 | `apps/frontend/src/routes/app/activity/columns.ts` | TanStack ColumnDef definitions. Defines event dot color mappings (`bg-emerald-400`, `bg-[#DB8F5E]`, `bg-red-400`, `bg-amber-400`), User-Agent parser, relative timestamp calculator, and tooltip formatting helpers. |
 | `apps/frontend/src/routes/app/activity/data-table.svelte` | Reactive TanStack Table component wrapping shadcn-svelte `Table.*` primitives (`Table.Root`, `Table.Header`, `Table.Row`, `Table.Cell`). Renders skeleton loaders, empty states, and pagination controls. |
@@ -66,9 +68,12 @@ sequenceDiagram
 ### Backend Files (`apps/backend/`)
 | File | Purpose / Changes |
 |---|---|
-| `apps/backend/src/shared/models/db.model.ts` | Updated `activityActionEnum` with `document.failed`, `document.quota_exhausted`, and `billing.payment_failed`. Defines `activity_logs` table schema and index on `(tenantId, createdAt DESC)`. |
+| `apps/backend/src/shared/models/db.model.ts` | Updated `activityActionEnum` with `document.failed`, `document.quota_exhausted`, and `billing.payment_failed`. Added composite index `idx_activity_tenant_action_created` on `(tenantId, action, createdAt DESC)`. |
 | `apps/backend/src/shared/utils/activity.util.ts` | Fixed `activityActionEnum` import from `import type` to value import. Exports `logActivity()` helper function. |
 | `apps/backend/src/shared/utils/context.util.ts` | Provides `ContextExtractor.extractAuditContext()` to parse client IP headers (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`), user agents, and request IDs from Hono context. |
+| `apps/backend/src/modules/activities/activities.schema.ts` | Updated `GetActivitiesQuerySchema` with optional `category`, `startDate`, `endDate`, and `search` query parameters. |
+| `apps/backend/src/modules/activities/activities.controller.ts` | Updated `handleGetActivities` to extract and pass query filters to `ActivitiesService.getActivities()`. |
+| `apps/backend/src/modules/activities/activities.service.ts` | Updated `getActivities` to construct dynamic Drizzle SQL `WHERE` clauses (`and()`, `like()`, `gte()`, `lte()`, `sql`) for category, date range, and text search while respecting tenant isolation. |
 | `apps/backend/src/modules/documents/documents.schema.ts` | Added optional `clientIp` and `userAgent` fields to `ConfirmUploadParamsSchema`, `DeleteDocumentParamsSchema`, and `BatchDeleteDocumentsParamsSchema`. |
 | `apps/backend/src/modules/documents/documents.controller.ts` | Extracted audit context via `extractor.extractAuditContext()` in `handleConfirmUpload`, `handleDeleteDocument`, and `handleBatchDeleteDocuments`. |
 | `apps/backend/src/modules/documents/documents.service.ts` | Passed `clientIp` and `userAgent` into `logActivity()` calls for `document.uploaded` and `document.deleted`. Added `logActivity` for `document.failed` inside `markDocumentFailed()`. |
@@ -82,16 +87,15 @@ sequenceDiagram
 
 ## Connections
 
-- **Database**: All read and write queries against `activity_logs` in PostgreSQL are strictly filtered by `tenantId`. An index on `(tenant_id, created_at DESC)` ensures efficient pagination.
+- **Database**: All queries against `activity_logs` in PostgreSQL are strictly filtered by `tenantId`. Composite indexes `(tenant_id, created_at DESC)` and `(tenant_id, action, created_at DESC)` guarantee low P95 query latencies for pagination, category filtering, and date range scans.
 - **API Gateway**: Endpoint `GET /api/activities` is served by Hono and protected by `authMiddleware`.
-- **Frontend Presentation**: SvelteKit fetches activity data via `apiRequest` from `$lib/api/client.ts` and renders clean UI elements formatted with Inter typography and theme design tokens.
+- **Frontend Presentation**: SvelteKit fetches activity data via `apiRequest` from `$lib/api/client.ts` with query string parameters and renders clean UI elements formatted with Inter typography and theme design tokens.
 
 ---
 
 ## Architectural Decisions
 
-1. **Option 1 Frontend UI Presentation**: Rather than exposing raw, unformatted technical data directly, the UI parses raw User-Agent strings into recognizable browser/client names (`Firefox 152.0`, `Bruno 3.4.2`) and hides full timestamps / raw user-agents inside hover tooltips.
-2. **Selective Business Failure Audit Logging**: 
-   - **Logged in `activity_logs`**: Business-level outcome failures (e.g., `document.failed`, `document.quota_exhausted`, `billing.payment_failed`) so workspace members understand why an operation or background pipeline failed.
-   - **Not logged in `activity_logs`**: Generic HTTP 4xx syntax validation errors (e.g., malformed JSON) and 5xx infrastructure crashes, which are handled by application logging middleware (Loki / stdout) to prevent PostgreSQL disk exhaustion.
-3. **Standardized ContextExtractor Audit Propagation**: All controllers extract client IP and user-agent metadata via `ContextExtractor.extractAuditContext()` and propagate them down the service layer inside single structured parameter objects.
+1. **Option 1 Backend SQL Filtering & Composite Indexing**: Server-side pagination mandates that date range, category, and search filters execute in SQL. Client-side filtering on a paginated 10-15 row subset would produce broken pagination counts and incomplete search results.
+2. **Composite Indexing**: Added `idx_activity_tenant_action_created` on `(tenantId, action, createdAt DESC)` to support prefix category filtering (`action LIKE 'auth.%'`) without triggering full table scans.
+3. **Option 1 Frontend UI Presentation**: Parses raw User-Agent strings into recognizable browser/client names (`Firefox 152.0`, `Bruno 3.4.2`) and hides full timestamps / raw user-agents inside hover tooltips.
+4. **Selective Business Failure Audit Logging**: Logged business-level outcome failures (`document.failed`, `document.quota_exhausted`, `billing.payment_failed`) in `activity_logs` while keeping generic 4xx/5xx errors out of PostgreSQL to prevent disk exhaustion.

@@ -9,6 +9,22 @@ export const GetActivitiesQuerySchema = z.object({
         description: "Items per page",
         example: "10",
     }),
+    category: z.enum(["auth", "document", "billing", "tenant", "search"]).optional().openapi({
+        description: "Filter by action category",
+        example: "document",
+    }),
+    startDate: z.string().optional().openapi({
+        description: "Filter by start date (ISO string)",
+        example: "2026-07-01T00:00:00.000Z",
+    }),
+    endDate: z.string().optional().openapi({
+        description: "Filter by end date (ISO string)",
+        example: "2026-07-31T23:59:59.999Z",
+    }),
+    search: z.string().optional().openapi({
+        description: "Search keyword for action, metadata, or IP",
+        example: "harum_energy",
+    }),
 });
 
 export const ActivityItemSchema = z.object({

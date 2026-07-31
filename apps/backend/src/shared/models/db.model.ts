@@ -373,5 +373,6 @@ export const activityLogs = pgTable("activity_logs", {
     createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
 }, (table) => ({
     tenantCreatedIdx: index("idx_activity_tenant_created").on(table.tenantId, table.createdAt.desc()),
+    tenantActionCreatedIdx: index("idx_activity_tenant_action_created").on(table.tenantId, table.action, table.createdAt.desc()),
     userCreatedIdx: index("idx_activity_user_created").on(table.userId, table.createdAt.desc()),
 }));

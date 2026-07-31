@@ -16,6 +16,10 @@ export class ActivitiesController {
             tenantId,
             page: isNaN(page) || page < 1 ? 1 : page,
             limit: isNaN(limit) || limit < 1 ? 10 : limit,
+            category: query.category,
+            startDate: query.startDate,
+            endDate: query.endDate,
+            search: query.search,
         });
 
         return c.json(result, 200);
