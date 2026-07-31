@@ -73,6 +73,8 @@ export type ConfirmUploadBody = z.infer<typeof ConfirmUploadBodySchema>;
 
 export const ConfirmUploadParamsSchema = ConfirmUploadBodySchema.extend({
     tenantId: z.string(),
+    clientIp: z.string().optional(),
+    userAgent: z.string().optional(),
     logContext: z.any().optional(),
 });
 
@@ -102,6 +104,8 @@ export const DeleteDocumentParamSchema = z.object({
 export const DeleteDocumentParamsSchema = z.object({
     documentId: z.string().uuid(),
     tenantId: z.string(),
+    clientIp: z.string().optional(),
+    userAgent: z.string().optional(),
     logContext: z.any().optional(),
 });
 
@@ -124,6 +128,8 @@ export const BatchDeleteDocumentsBodySchema = z.object({
 export const BatchDeleteDocumentsParamsSchema = z.object({
     documentIds: z.array(z.string().uuid()),
     tenantId: z.string(),
+    clientIp: z.string().optional(),
+    userAgent: z.string().optional(),
     logContext: z.any().optional(),
 });
 

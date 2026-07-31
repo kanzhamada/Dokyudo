@@ -198,24 +198,17 @@ export const handleGetProfile = async (c: Context) => {
 };
 
 export const handleUpdateTenantName = async (c: Context) => {
-    const userId = c.get("userId");
-    const tenantId = c.get("tenantId");
-
-    if (!userId || !tenantId) {
-        throw new AppError({
-            code: "UNAUTHORIZED",
-            message: "Missing authentication context",
-            status: 401,
-        });
-    }
-
-    const logContext = c.get("logContext") || {};
-    const body = new ContextExtractor(c).extractValidJson<AuthSchema.UpdateTenantNameBody>();
+    const extractor = new ContextExtractor(c);
+    const { userId, tenantId, logContext } = extractor.extractAuthContext();
+    const { clientIp, userAgent } = extractor.extractAuditContext();
+    const body = extractor.extractValidJson<AuthSchema.UpdateTenantNameBody>();
 
     const result = await AuthService.updateTenantName({
         userId,
         tenantId,
         name: body.name,
+        clientIp,
+        userAgent,
         logContext,
     });
 

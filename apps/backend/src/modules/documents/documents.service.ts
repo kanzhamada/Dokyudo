@@ -306,6 +306,8 @@ export class DocumentsService {
             resourceType: "document",
             resourceId: params.documentId,
             metadata: { fileName: docName },
+            ipAddress: params.clientIp,
+            userAgent: params.userAgent,
             requestId: params.logContext?.requestId,
         });
 
@@ -437,6 +439,8 @@ export class DocumentsService {
             resourceType: "document",
             resourceId: params.documentId,
             metadata: { fileName: docName },
+            ipAddress: params.clientIp,
+            userAgent: params.userAgent,
             requestId: params.logContext?.requestId,
         });
 
@@ -569,6 +573,8 @@ export class DocumentsService {
                 resourceType: "document",
                 resourceId: doc.id,
                 metadata: { fileName: doc.title, batch: true },
+                ipAddress: params.clientIp,
+                userAgent: params.userAgent,
                 requestId: params.logContext?.requestId,
             });
         }

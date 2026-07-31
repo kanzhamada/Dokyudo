@@ -23,12 +23,15 @@ export async function handleGeneratePresignedUrlBatch(c: Context) {
 export async function handleConfirmUpload(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, logContext } = extractor.extractAuthContext();
+    const { clientIp, userAgent } = extractor.extractAuditContext();
 
     const body = extractor.extractValidJson<DocumentSchema.ConfirmUploadBody>();
     
     const params: DocumentSchema.ConfirmUploadParams = {
         tenantId,
         documentId: body.documentId,
+        clientIp,
+        userAgent,
         logContext,
     };
 
@@ -40,10 +43,13 @@ export async function handleConfirmUpload(c: Context) {
 export async function handleDeleteDocument(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, logContext } = extractor.extractAuthContext();
+    const { clientIp, userAgent } = extractor.extractAuditContext();
 
     const params: DocumentSchema.DeleteDocumentParams = {
         tenantId,
         documentId: c.req.param("id"),
+        clientIp,
+        userAgent,
         logContext,
     };
 
@@ -85,11 +91,14 @@ export async function handleGetDocumentPreview(c: Context) {
 export async function handleBatchDeleteDocuments(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, logContext } = extractor.extractAuthContext();
+    const { clientIp, userAgent } = extractor.extractAuditContext();
     const body = extractor.extractValidJson<any>(); // Will be validated by OpenAPI middleware
 
     const params: DocumentSchema.BatchDeleteDocumentsParams = {
         tenantId,
         documentIds: body.documentIds,
+        clientIp,
+        userAgent,
         logContext,
     };
 

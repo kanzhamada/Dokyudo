@@ -317,6 +317,9 @@ export type UpdateTenantNameBody = z.infer<typeof UpdateTenantNameBodySchema>;
 
 const UpdateTenantNameParamsSchema = UpdateTenantNameBodySchema.extend({
     tenantId: z.string().uuid(),
+    userId: z.string().uuid(),
+    clientIp: z.string().optional(),
+    userAgent: z.string().optional(),
     logContext: z.any().optional(),
 });
 

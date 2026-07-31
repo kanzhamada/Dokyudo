@@ -940,12 +940,7 @@ export class AuthService {
         };
     }
 
-    static async updateTenantName(params: {
-        userId: string;
-        tenantId: string;
-        name: string;
-        logContext?: Record<string, any>;
-    }) {
+    static async updateTenantName(params: AuthParams.UpdateTenantNameParams) {
         const updated = await withAuthDb(params.userId, async (tx) => {
             const [existing] = await tx
                 .select({ id: tenants.id })
@@ -978,6 +973,8 @@ export class AuthService {
             userId: params.userId,
             action: "tenant.name_updated",
             metadata: { newName: updated.name },
+            ipAddress: params.clientIp,
+            userAgent: params.userAgent,
             requestId: params.logContext?.requestId,
         });
 
