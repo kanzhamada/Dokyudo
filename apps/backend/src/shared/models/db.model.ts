@@ -346,12 +346,15 @@ export const activityActionEnum = pgEnum("activity_action_enum", [
     "document.uploaded",
     "document.deleted",
     "document.processed",
+    "document.failed",
+    "document.quota_exhausted",
     // Search & RAG
     "search.performed",
     "chat.started",
     // Billing
     "billing.checkout_initiated",
     "billing.payment_completed",
+    "billing.payment_failed",
     // Tenant
     "tenant.name_updated",
 ]);

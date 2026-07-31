@@ -1,6 +1,5 @@
 import { db } from "../../config/drizzle.ts";
-import { activityLogs } from "../models/db.model.ts";
-import type { activityActionEnum } from "../models/db.model.ts";
+import { activityLogs, activityActionEnum } from "../models/db.model.ts";
 
 export type ActivityAction = typeof activityActionEnum.enumValues[number];
 

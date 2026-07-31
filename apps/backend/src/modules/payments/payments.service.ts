@@ -302,6 +302,64 @@ export class PaymentsService {
 
                 break;
             }
+            case "checkout.session.async_payment_failed": {
+                const session = event.data.object as Stripe.Checkout.Session;
+                const tenantId = session.metadata?.tenantId;
+                const externalId = session.metadata?.externalId;
+                const tierToUnlock = session.metadata?.tierToUnlock;
+
+                if (externalId) {
+                    await db
+                        .update(paymentTransactions)
+                        .set({
+                            status: "FAILED",
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(paymentTransactions.externalId, externalId));
+                }
+
+                if (tenantId) {
+                    await logActivity({
+                        tenantId,
+                        action: "billing.payment_failed",
+                        resourceType: "payment",
+                        resourceId: externalId || undefined,
+                        metadata: { tier: tierToUnlock, reason: "Async payment failed" },
+                        ipAddress: params.clientIp,
+                        userAgent: params.userAgent,
+                        requestId: logContext?.requestId,
+                    });
+                }
+                break;
+            }
+            case "invoice.payment_failed": {
+                const invoice = event.data.object as Stripe.Invoice;
+                const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+
+                if (customerId) {
+                    const [sub] = await db
+                        .select({ tenantId: tenantSubscriptions.tenantId })
+                        .from(tenantSubscriptions)
+                        .where(eq(tenantSubscriptions.stripeCustomerId, customerId));
+
+                    if (sub) {
+                        await logActivity({
+                            tenantId: sub.tenantId,
+                            action: "billing.payment_failed",
+                            resourceType: "payment",
+                            metadata: {
+                                amount: invoice.amount_due,
+                                currency: invoice.currency,
+                                reason: invoice.last_finalization_error?.message || "Invoice payment failed",
+                            },
+                            ipAddress: params.clientIp,
+                            userAgent: params.userAgent,
+                            requestId: logContext?.requestId,
+                        });
+                    }
+                }
+                break;
+            }
         }
 
         return { received: true };

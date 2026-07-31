@@ -27,7 +27,10 @@ function getActionConfig(action: string): { label: string; dotColor: string } {
 		'tenant.name_updated': { label: 'Tenant Updated', dotColor: 'bg-sky-400' },
 		'document.uploaded': { label: 'Document Uploaded', dotColor: 'bg-[#DB8F5E]' },
 		'document.deleted': { label: 'Document Deleted', dotColor: 'bg-red-400' },
-		'billing.payment_completed': { label: 'Payment Completed', dotColor: 'bg-emerald-400' }
+		'document.failed': { label: 'Document Failed', dotColor: 'bg-red-400' },
+		'document.quota_exhausted': { label: 'Quota Exhausted', dotColor: 'bg-amber-400' },
+		'billing.payment_completed': { label: 'Payment Completed', dotColor: 'bg-emerald-400' },
+		'billing.payment_failed': { label: 'Payment Failed', dotColor: 'bg-red-400' }
 	};
 
 	if (map[action]) return map[action];

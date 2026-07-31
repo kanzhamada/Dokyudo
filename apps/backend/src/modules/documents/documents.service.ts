@@ -65,6 +65,15 @@ async function markDocumentFailed(params: {
                     eq(documents.tenantId, params.tenantId),
                 )
             );
+
+        await logActivity({
+            tenantId: params.tenantId,
+            action: "document.failed",
+            resourceType: "document",
+            resourceId: params.documentId,
+            metadata: { reason: "Processing or upload confirmation failed" },
+            requestId: params.logContext?.requestId,
+        });
     } catch (err: any) {
         if (params.logContext) {
             params.logContext.markFailedError = err.message;
