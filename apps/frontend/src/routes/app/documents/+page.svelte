@@ -247,7 +247,7 @@
 
 		return () => {
 			console.log('[Supabase Realtime] Unsubscribing from documents channel...');
-			clearInterval(pollInterval);
+			// clearInterval(pollInterval);
 			supabase.removeChannel(channel);
 		};
 	});
@@ -504,11 +504,11 @@
 
 		if (res.ok) {
 			const searchResults = res.data.data || [];
-			
+
 			// Replace documentsList with mapped semantic search results
 			documentsList = searchResults.map((resultDoc: any) => {
 				const originalDoc = data.documents.find((d: any) => d.id === resultDoc.documentId);
-				
+
 				return {
 					id: resultDoc.documentId,
 					name: originalDoc?.name || 'Unknown Document',
@@ -669,7 +669,7 @@
 						}}
 						class="h-10 rounded-full border border-white/[0.16] bg-transparent pl-[88px] pr-10 font-normal text-white placeholder:text-white/40 focus-visible:ring-white/20 transition-all"
 					/>
-					
+
 					<!-- Loading Spinner or Clear Button on the right -->
 					<div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
 						{#if isSemanticSearching}
@@ -1001,7 +1001,7 @@
 										{expandedDocs.includes(doc.id) ? 'Collapse' : 'Expand'}
 									</Button>
 								</div>
-								
+
 								<div class="mt-3 text-sm font-normal text-white/80 transition-all duration-300 {expandedDocs.includes(doc.id) ? '' : 'line-clamp-3'}" >
 									{doc.semanticContent}
 								</div>
