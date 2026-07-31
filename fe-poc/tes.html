@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dokyudo — System Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Space+Grotesk:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ==========================================================
+   Dokyudo Visual Identity v1.0  (tokens preserved verbatim)
+   ========================================================== */
+:root{
+  --color-black: oklch(17.5% 0.01 65);
+  --color-offblack: oklch(26% 0.02 68);
+  --color-offwhite: oklch(94.5% 0.014 85);
+  --color-white: oklch(98.3% 0.005 87);
+  --color-terracotta: oklch(67.4% 0.15 52);
+  --color-terracotta-deep: oklch(53.2% 0.134 48);
+  --color-graphite: oklch(38% 0.028 66);
+  --color-gray: oklch(54.4% 0.033 66);
+  --color-warm-gray: oklch(69.8% 0.03 68);
+  --color-gray-light: oklch(82.6% 0.023 69);
+  --color-ash: oklch(91.7% 0.017 71);
+  --c-yellow: oklch(76% 0.08 82);
+  --c-amber: oklch(46% 0.08 71);
+  --c-lavender: oklch(76% 0.08 19);
+  --c-purple: oklch(46% 0.08 18);
+  --c-periwinkle: oklch(76% 0.04 235);
+  --c-navy: oklch(46% 0.04 240);
+  --c-lime: oklch(76% 0.07 128);
+  --c-olive: oklch(46% 0.07 128);
+  --border-fade: oklch(from var(--color-gray-light) l c h / 0.4);
+  --border-dark: oklch(from var(--color-offwhite) l c h / 0.14);
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-interface: "Space Grotesk", "Trebuchet MS", sans-serif;
+  --font-body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --ease: cubic-bezier(0.37, 0, 0.63, 1);
+  --dur: 200ms;
+  --r-ctl: 8px; --r-ctl-s: 6px; --r-pill: 9999px;
+  --s-contain: max(3vw, 15px);
+  --s-section: 80px;
+  --card-pad: 15px; --card-gap: 5px; --group-gap: 20px;
+  --hh: 64px;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-black);color:var(--color-offwhite);
+  font:400 1rem/1.5 var(--font-body);-webkit-font-smoothing:antialiased}
+.ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- section shell : layered blueprint backdrop ---------- */
+#architecture{
+  position:relative;overflow:hidden;
+  padding:var(--s-section) 0 calc(var(--s-section) + 12px);
+  border-top:1px solid var(--border-dark);
+  background-color:var(--color-black);
+  background-image:
+    radial-gradient(120% 75% at 50% -8%, oklch(from var(--color-terracotta-deep) l c h / .12), transparent 60%),
+    radial-gradient(95% 60% at 102% 104%, oklch(from var(--c-navy) l c h / .12), transparent 55%),
+    radial-gradient(70% 50% at -5% 40%, oklch(from var(--c-purple) l c h / .08), transparent 60%),
+    radial-gradient(circle at 1px 1px, oklch(from var(--color-offwhite) l c h / .05) 1px, transparent 0);
+  background-size:auto,auto,auto,22px 22px;
+}
+.container{width:100%;max-width:1280px;margin-inline:auto;padding-inline:var(--s-contain)}
+
+/* ---------- section header (left-anchored, not a centred trio) ---------- */
+.shead{max-width:54rem}
+.kicker{display:inline-flex;align-items:center;gap:10px;
+  font:500 .62rem/1 var(--font-interface);letter-spacing:.18em;text-transform:uppercase;
+  color:var(--color-terracotta);border:1px solid oklch(from var(--color-terracotta) l c h / .45);
+  padding:6px 12px;border-radius:var(--r-pill)}
+.live{display:inline-flex;align-items:center;gap:7px;color:var(--color-warm-gray);
+  border-color:var(--border-dark)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--color-terracotta)}
+@media (prefers-reduced-motion:no-preference){.live i{animation:blink 2.2s var(--ease) infinite}}
+@keyframes blink{0%,100%{opacity:1}45%{opacity:.2}}
+.shead h2{margin:22px 0 0;font:400 clamp(2rem,5.2vw,3.5rem)/1.04 var(--font-display);
+  color:var(--color-offwhite);letter-spacing:-.01em}
+.shead h2 em{font-style:italic;color:var(--color-terracotta)}
+.shead__lead{margin:16px 0 0;max-width:46rem;color:var(--color-warm-gray);
+  font:400 1.02rem/1.55 var(--font-body)}
+
+/* ---------- flow block + head ---------- */
+.fblock{margin-top:var(--s-section)}
+.fhead{display:flex;align-items:baseline;gap:16px;margin-bottom:26px}
+.fhead__i{font:500 .72rem/1 var(--font-interface);letter-spacing:.16em;
+  color:var(--color-terracotta);flex:none}
+.fhead__t{margin:0;font:400 clamp(1.4rem,3vw,2.1rem)/1 var(--font-display);
+  color:var(--color-offwhite);flex:none}
+.fhead__rule{flex:1;height:1px;background:var(--border-dark);transform:translateY(-3px)}
+.fhead__hint{display:none;font:500 .58rem/1 var(--font-interface);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--color-gray);flex:none;white-space:nowrap}
+.fblock.can-scroll .fhead__hint{display:inline-flex;align-items:center;gap:6px}
+
+/* ---------- scroll canvas ---------- */
+.flow{position:relative;overflow-x:auto;overflow-y:visible;
+  scrollbar-width:thin;scrollbar-color:var(--color-graphite) transparent;padding-bottom:6px}
+.flow::-webkit-scrollbar{height:8px}
+.flow::-webkit-scrollbar-thumb{background:var(--color-graphite);border-radius:var(--r-pill)}
+.flow::-webkit-scrollbar-track{background:transparent}
+.fblock.can-scroll .flow::after{content:"";position:absolute;top:0;right:0;bottom:8px;width:54px;
+  background:linear-gradient(90deg,transparent,var(--color-black));pointer-events:none;z-index:5}
+
+.flow__canvas{
+  position:relative;display:grid;
+  grid-template-columns:repeat(5,1fr);
+  grid-template-rows:repeat(3,max-content);
+  column-gap:48px;row-gap:78px;
+  padding:30px 26px 10px;
+  min-width:1040px;max-width:1280px;width:100%;margin-inline:auto;
+  justify-items:center;align-items:start;
+}
+.flow-svg{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:visible}
+
+/* ---------- node (frame + caption), echoes the device mock-up ---------- */
+.fn{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;
+  grid-column:var(--c);grid-row:var(--r);cursor:pointer;background:none;border:0;padding:0;
+  font:inherit;color:inherit;transition:opacity var(--dur) var(--ease)}
+.fn-frame{position:relative;width:138px;height:120px;padding:9px;
+  border:1px solid var(--border-dark);background:var(--color-black);
+  display:flex;transition:border-color var(--dur) var(--ease),transform var(--dur) var(--ease),
+  box-shadow var(--dur) var(--ease)}
+.fn-screen{position:relative;flex:1;overflow:hidden;border:1px solid var(--border-dark);
+  background:oklch(from var(--color-offwhite) l c h / .022);display:flex;
+  transition:box-shadow var(--dur) var(--ease)}
+.fn-screen__tag{position:absolute;top:5px;left:6px;z-index:2;
+  font:500 .42rem/1 var(--font-interface);letter-spacing:.16em;color:var(--color-gray)}
+/* watch-crown style port nub on the right edge */
+.fn-crown{position:absolute;right:-5px;top:30px;width:5px;height:24px;
+  border:1px solid var(--border-dark);border-left:0;background:var(--color-offblack);
+  border-radius:0 var(--r-ctl-s) var(--r-ctl-s) 0}
+.fn-crown::after{content:"";position:absolute;right:-1px;top:-15px;width:4px;height:9px;
+  border:1px solid var(--border-dark);border-left:0;background:var(--color-offblack);
+  border-radius:0 var(--r-ctl-s) var(--r-ctl-s) 0}
+
+.fn:hover .fn-frame{transform:translateY(-2px);
+  border-color:oklch(from var(--color-terracotta) l c h / .6)}
+.fn.is-active .fn-frame{border-color:var(--color-terracotta);
+  box-shadow:0 0 0 1px oklch(from var(--color-terracotta) l c h / .35)}
+.fn.is-active .fn-screen{box-shadow:inset 0 0 0 1px oklch(from var(--na) l c h / .55)}
+
+/* caption under the frame : numbered badge + title + desc */
+.fn-cap{display:flex;gap:10px;align-items:flex-start;width:138px;margin-top:13px;text-align:left}
+.fn-num{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
+  font:600 .68rem/1 var(--font-interface);background:var(--na);color:var(--color-black);
+  transition:box-shadow var(--dur) var(--ease)}
+.fn-num.paper{color:var(--color-white)}
+.fn.is-active .fn-num{box-shadow:0 0 0 3px oklch(from var(--na) l c h / .28)}
+.fn-cap strong{display:block;font:500 .82rem/1.2 var(--font-body);color:var(--color-offwhite)}
+.fn-cap p{margin:4px 0 0;font:400 .66rem/1.35 var(--font-interface);
+  letter-spacing:.02em;color:var(--color-warm-gray)}
+
+/* ---------- mini screen schematics ---------- */
+.mini{width:100%;height:100%;display:grid;place-items:center;padding:12px 10px 8px}
+.mini--dots{display:grid;grid-template-columns:repeat(4,9px);gap:6px;place-content:center}
+.mini--dots i{width:9px;height:9px;border-radius:50%;background:var(--color-gray);display:block}
+.mini--dots i:nth-child(6){background:var(--na)}
+.mini--dots i:nth-child(1){opacity:.55}
+.mini--card{display:grid;grid-template-columns:18px 1fr;grid-auto-rows:5px;gap:5px 8px;align-content:center}
+.mc-av{grid-row:span 2;width:18px;height:18px;border-radius:50%;background:var(--na);align-self:center}
+.mc-ln{height:5px;background:var(--color-gray);border-radius:2px}
+.mc-ln.s{width:55%}
+.mini--wave{width:80%;height:60%}
+.mini--wave .w1{fill:none;stroke:var(--na);stroke-width:1.6}
+.mini--wave .w2{fill:none;stroke:var(--color-graphite);stroke-width:1.4}
+.mini--rows{display:flex;flex-direction:column;gap:7px;width:80%}
+.mr{display:flex;align-items:center;gap:6px}
+.mr i{width:7px;height:7px;border-radius:50%;background:var(--color-warm-gray);flex:none}
+.mr b{height:6px;flex:1;background:var(--color-graphite);border-radius:2px}
+.mr:first-child i{background:var(--na)}
+.mini--tog{display:flex;flex-direction:column;gap:8px;width:80%}
+.mt{display:flex;align-items:center;gap:6px}
+.mt i{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--color-warm-gray);flex:none}
+.mt b{height:6px;flex:1;background:var(--color-graphite);border-radius:2px}
+.mt:first-child i{border-color:var(--na);background:var(--na)}
+.mini--stack{position:relative;width:48px;height:42px}
+.mini--stack span{position:absolute;width:34px;height:11px;background:var(--color-black);
+  border:1px solid var(--color-gray)}
+.mini--stack span:nth-child(1){top:0;left:0;border-color:var(--na)}
+.mini--stack span:nth-child(2){top:13px;left:7px}
+.mini--stack span:nth-child(3){top:26px;left:14px;border-color:var(--color-warm-gray)}
+.mini--gear{display:flex;flex-direction:column;gap:9px;align-items:center}
+.mg{width:22px;height:22px;border-radius:50%;border:2px dashed var(--na);position:relative}
+.mg::after{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--color-gray)}
+.mg-bar{width:62%;height:5px;background:var(--color-graphite);border-radius:2px;overflow:hidden}
+.mg-bar::after{content:"";display:block;height:100%;width:100%;background:var(--na);
+  transform-origin:left;transform:scaleX(.3)}
+.mini--eq{display:flex;align-items:flex-end;gap:5px;height:34px}
+.mini--eq i{width:6px;height:100%;background:var(--na);border-radius:2px;transform-origin:bottom;
+  transform:scaleY(.3)}
+.mini--eq i:nth-child(even){opacity:.5}
+
+@media (prefers-reduced-motion:no-preference){
+  .mg{animation:spin 9s linear infinite}
+  .mg-bar::after{animation:gearbar 2.4s var(--ease) infinite}
+  .mini--eq i{animation:eq 1.2s var(--ease) infinite}
+  .mini--eq i:nth-child(2){animation-delay:.15s}
+  .mini--eq i:nth-child(3){animation-delay:.3s}
+  .mini--eq i:nth-child(4){animation-delay:.45s}
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes gearbar{0%,100%{transform:scaleX(.2)}50%{transform:scaleX(.92)}}
+@keyframes eq{0%,100%{transform:scaleY(.22)}50%{transform:scaleY(1)}}
+
+/* ---------- connectors (SVG) ---------- */
+.conn-line{fill:none;stroke:oklch(from var(--color-offwhite) l c h / .16);stroke-width:1;
+  transition:stroke var(--dur) var(--ease)}
+.conn-arrow{fill:oklch(from var(--color-offwhite) l c h / .3);transition:fill var(--dur) var(--ease)}
+.conn-pulse{fill:none;stroke:var(--color-terracotta);stroke-width:2;stroke-linecap:round;
+  stroke-dasharray:6 94;opacity:.45}
+.conn-group.hot .conn-line{stroke:oklch(from var(--color-terracotta) l c h / .7)}
+.conn-group.hot .conn-arrow{fill:var(--color-terracotta)}
+.conn-group.hot .conn-pulse{opacity:1}
+.flow.has-sel .conn-group:not(.hot){opacity:.16}
+@media (prefers-reduced-motion:no-preference){
+  .conn-pulse{animation:dash 2.6s linear infinite;animation-delay:var(--d,0s)}
+}
+@keyframes dash{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+
+/* interaction glyph on a path (the "swipe/tap" echo, re-themed) */
+.conn-glyph{position:absolute;z-index:3;width:30px;height:30px;border-radius:50%;
+  transform:translate(-50%,-50%);display:grid;place-items:center;
+  background:var(--color-black);border:1px solid var(--color-terracotta);color:var(--color-terracotta);
+  pointer-events:none;transition:opacity var(--dur) var(--ease)}
+.conn-glyph::after{content:"";position:absolute;inset:-5px;border-radius:50%;
+  border:1px solid oklch(from var(--color-terracotta) l c h / .4)}
+.flow.has-sel .conn-glyph:not(.hot){opacity:.16}
+@media (prefers-reduced-motion:no-preference){
+  .conn-glyph::after{animation:ring 2.4s var(--ease) infinite}
+}
+@keyframes ring{0%{transform:scale(.85);opacity:.7}70%,100%{transform:scale(1.5);opacity:0}}
+
+/* ---------- legend ---------- */
+.arch__legend{margin:34px auto 0;max-width:52rem;text-align:center;color:var(--color-warm-gray);
+  font:500 .66rem/1.6 var(--font-interface);letter-spacing:.06em;text-transform:uppercase}
+.arch__legend b{color:var(--color-terracotta);font-weight:600}
+
+/* ---------- inspector panel ---------- */
+.arch-detail{margin-top:40px;background:var(--color-black);border:1px solid var(--border-dark);
+  padding:24px var(--card-pad);transition:opacity 170ms var(--ease),transform 170ms var(--ease)}
+.arch-detail.swap{opacity:0;transform:translateY(6px)}
+.ad-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.ad-zone{font:500 .62rem/1 var(--font-interface);letter-spacing:.12em;text-transform:uppercase;
+  border:1px solid currentColor;padding:5px 11px;border-radius:var(--r-pill)}
+.ad-title{margin:0;font:400 1.75rem/1.1 var(--font-display);color:var(--color-offwhite)}
+.ad-grid{display:grid;grid-template-columns:1.3fr .7fr;gap:var(--group-gap)}
+.ad-bullets{list-style:none;margin:0;padding:0}
+.ad-bullets li{position:relative;padding-left:20px;margin-top:11px;
+  font:400 .9rem/1.5 var(--font-body);color:oklch(from var(--color-offwhite) l c h / .78)}
+.ad-bullets li::before{content:"";position:absolute;left:0;top:7px;width:8px;height:8px;
+  border-radius:50%;border:1.5px solid var(--color-terracotta)}
+.ad-side{border-left:1px solid var(--border-dark);padding-left:var(--group-gap)}
+.ad-side h4{margin:0;font:500 .64rem/1 var(--font-interface);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--color-warm-gray)}
+.ad-deps{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.ad-deps span{font:500 .62rem/1 var(--font-interface);letter-spacing:.08em;text-transform:uppercase;
+  border:1px solid var(--border-dark);color:oklch(from var(--color-offwhite) l c h / .8);
+  padding:5px 9px;border-radius:var(--r-pill)}
+.ad-budget{margin-top:22px}
+.ad-budget b{display:block;margin-top:7px;font:400 1.6rem/1 var(--font-display);color:var(--color-offwhite)}
+
+@media (max-width:760px){
+  .ad-grid{grid-template-columns:1fr}
+  .ad-side{border-left:0;border-top:1px solid var(--border-dark);padding-left:0;padding-top:18px;margin-top:6px}
+}
+@media (prefers-reduced-motion:reduce){
+  .live i,.mg,.mg-bar::after,.mini--eq i,.conn-pulse,.conn-glyph::after{animation:none!important}
+}
+</style>
+</head>
+<body>
+
+<section class="section section--dark" id="architecture">
+  <div class="container">
+
+    <div class="shead" data-reveal>
+      <span class="kicker">Architecture · v1.0
+        <span class="live"><i></i> live topology</span>
+      </span>
+      <h2>Edge compute, bare-metal storage, <em>a&nbsp;$0&nbsp;bill.</em></h2>
+      <p class="shead__lead">The full hybrid stack drawn as two journeys — the read path and the ingestion path. Tap any node to trace its wires and inspect what it actually does.</p>
+    </div>
+
+    <!-- ===================== FLOW 1 — READ / QUERY PATH ===================== -->
+    <div class="fblock" data-reveal>
+      <div class="fhead">
+        <span class="fhead__i">01</span>
+        <h3 class="fhead__t">Read / Query Path</h3>
+        <span class="fhead__rule"></span>
+        <span class="fhead__hint">geser untuk pan ▸</span>
+      </div>
+
+      <div class="flow" id="flow-read">
+        <div class="flow__canvas">
+          <svg class="flow-svg" aria-hidden="true"></svg>
+
+          <button class="fn" data-node="client" style="--c:1;--r:2;--na:var(--c-periwinkle)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">EDGE</span>
+                <span class="mini mini--dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">1</span><span><strong>Client Layer</strong><p>Submits query · edge SSR</p></span></span>
+          </button>
+
+          <button class="fn" data-node="gateway" style="--c:2;--r:2;--na:var(--color-terracotta)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HONO</span>
+                <span class="mini mini--card"><span class="mc-av"></span><span class="mc-ln"></span><span class="mc-ln s"></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">2</span><span><strong>API Gateway</strong><p>JWT auth · sliding-window limit</p></span></span>
+          </button>
+
+          <button class="fn" data-node="vector" style="--c:3;--r:2;--na:var(--c-lavender)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HNSW</span>
+                <svg class="mini mini--wave" viewBox="0 0 60 24" preserveAspectRatio="none">
+                  <polyline class="w2" points="0,12 8,9 16,15 24,7 32,17 40,10 48,14 60,12"/>
+                  <polyline class="w1" points="0,12 8,4 16,19 24,2 32,21 40,6 48,16 60,12"/>
+                </svg>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">3</span><span><strong>Vector Index</strong><p>Semantic recall · 768-d</p></span></span>
+          </button>
+
+          <button class="fn" data-node="postgres" style="--c:4;--r:2;--na:var(--c-olive)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">PG · RRF</span>
+                <span class="mini mini--rows"><span class="mr"><i></i><b></b></span><span class="mr"><i></i><b></b></span><span class="mr"><i></i><b></b></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">4</span><span><strong>Relational Core</strong><p>Full-text + RRF fusion · hydrate</p></span></span>
+          </button>
+
+          <button class="fn" data-node="redis" style="--c:5;--r:1;--na:var(--c-amber)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">KV</span>
+                <span class="mini mini--tog"><span class="mt"><i></i><b></b></span><span class="mt"><i></i><b></b></span><span class="mt"><i></i><b></b></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">5</span><span><strong>Control Plane</strong><p>Cache write-back · flags</p></span></span>
+          </button>
+
+          <button class="fn" data-node="stream" style="--c:5;--r:3;--na:var(--c-lime)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">SSE</span>
+                <span class="mini mini--eq"><i></i><i></i><i></i><i></i></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">6</span><span><strong>Streaming Reply</strong><p>SSE answer · token-by-token</p></span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== FLOW 2 — INGESTION / WRITE PATH ===================== -->
+    <div class="fblock" data-reveal>
+      <div class="fhead">
+        <span class="fhead__i">02</span>
+        <h3 class="fhead__t">Ingestion / Write Path</h3>
+        <span class="fhead__rule"></span>
+        <span class="fhead__hint">geser untuk pan ▸</span>
+      </div>
+
+      <div class="flow" id="flow-ingest">
+        <div class="flow__canvas">
+          <svg class="flow-svg" aria-hidden="true"></svg>
+
+          <button class="fn" data-node="client" style="--c:1;--r:2;--na:var(--c-periwinkle)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">UPLOAD</span>
+                <span class="mini mini--dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">1</span><span><strong>Client Layer</strong><p>Presigned upload · no proxy</p></span></span>
+          </button>
+
+          <button class="fn" data-node="gateway" style="--c:2;--r:2;--na:var(--color-terracotta)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HONO</span>
+                <span class="mini mini--card"><span class="mc-av"></span><span class="mc-ln"></span><span class="mc-ln s"></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">2</span><span><strong>API Gateway</strong><p>Validate · enqueue job</p></span></span>
+          </button>
+
+          <button class="fn" data-node="redis" style="--c:3;--r:1;--na:var(--c-amber)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">BUCKET</span>
+                <span class="mini mini--tog"><span class="mt"><i></i><b></b></span><span class="mt"><i></i><b></b></span><span class="mt"><i></i><b></b></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">3</span><span><strong>Control Plane</strong><p>Token bucket · job queue</p></span></span>
+          </button>
+
+          <button class="fn" data-node="minio" style="--c:3;--r:2;--na:var(--c-navy)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">S3</span>
+                <span class="mini mini--stack"><span></span><span></span><span></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">4</span><span><strong>Object Storage</strong><p>Raw doc lake · 100 GB</p></span></span>
+          </button>
+
+          <button class="fn" data-node="postgres" style="--c:2;--r:3;--na:var(--c-olive)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">META</span>
+                <span class="mini mini--rows"><span class="mr"><i></i><b></b></span><span class="mr"><i></i><b></b></span><span class="mr"><i></i><b></b></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">8</span><span><strong>Relational Core</strong><p>Register doc metadata</p></span></span>
+          </button>
+
+          <button class="fn" data-node="worker" style="--c:4;--r:2;--na:var(--c-purple)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">JOB</span>
+                <span class="mini mini--gear"><span class="mg"></span><span class="mg-bar"></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">5</span><span><strong>Ingestion Worker</strong><p>Extract · chunk · embed</p></span></span>
+          </button>
+
+          <button class="fn" data-node="vector" style="--c:5;--r:1;--na:var(--c-lavender)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HNSW</span>
+                <svg class="mini mini--wave" viewBox="0 0 60 24" preserveAspectRatio="none">
+                  <polyline class="w2" points="0,12 8,9 16,15 24,7 32,17 40,10 48,14 60,12"/>
+                  <polyline class="w1" points="0,12 8,4 16,19 24,2 32,21 40,6 48,16 60,12"/>
+                </svg>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">6</span><span><strong>Vector Index</strong><p>Store embeddings</p></span></span>
+          </button>
+
+          <button class="fn" data-node="stream" style="--c:5;--r:3;--na:var(--c-lime)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HOOK</span>
+                <span class="mini mini--eq"><i></i><i></i><i></i><i></i></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">7</span><span><strong>Streaming & Sync</strong><p>Progress webhook · status</p></span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="arch__legend" data-reveal>
+      <b>terracotta</b> = jalur terpilih &nbsp;·&nbsp; <b>pulsa</b> = traffic hidup &nbsp;·&nbsp;
+      ingest bersifat event-driven: pg_net mendorong dari Postgres ke worker on-prem, sehingga komputasi berat tak pernah membakar CPU edge
+    </p>
+
+    <!-- inspector -->
+    <div class="arch-detail" id="archDetail" data-reveal tabindex="-1"></div>
+
+  </div>
+</section>
+
+<script>
+(function(){
+  "use strict";
+  const $  = (s,r=document)=>r.querySelector(s);
+  const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const ns = t => document.createElementNS(SVGNS, t);
+  const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---- connector topology per flow: [from, to, fromSide, toSide, opts] ---- */
+  const FLOW_CONNS = {
+    "flow-read": [
+      ["client","gateway","right","left",{}],
+      ["gateway","vector","right","left",{glyph:true}],
+      ["vector","postgres","right","left",{}],
+      ["postgres","redis","right","left",{}],
+      ["postgres","stream","right","left",{}]
+    ],
+    "flow-ingest": [
+      ["client","gateway","right","left",{}],
+      ["gateway","redis","right","left",{}],
+      ["gateway","minio","right","left",{}],
+      ["gateway","postgres","bottom","top",{}],
+      ["minio","worker","right","left",{}],
+      ["worker","vector","right","left",{}],
+      ["worker","stream","right","left",{}]
+    ]
+  };
+
+  /* ---- inspector content ---- */
+  const NODES = {
+    client:{zone:"Client edge",zoneColor:"var(--c-periwinkle)",title:"Client Layer",
+      bullets:["SvelteKit frontend rendered globally on Cloudflare Pages.","Uploads go straight to MinIO over presigned URLs; the API never proxies file bytes.","SSE answers render token by token into reserved space, so the layout never shifts."],
+      deps:["Cloudflare Pages","SvelteKit","Tailwind"],budgetLabel:"Server time billed",budget:"0 ms"},
+    gateway:{zone:"Edge compute",zoneColor:"var(--color-terracotta)",title:"API Gateway + Core",
+      bullets:["Supabase JWT auth with sliding-window rate limiting, pipelined through Redis in one call.","Tenant context injected into every query; feature flags enforced at a single point.","Search scatter-gathers vector and full-text IDs, fuses them with RRF, then lazy-hydrates the top 3 chunks.","RAG answers stream through the native Web Streams API, never buffered in memory."],
+      deps:["Deno Deploy","Hono","Upstash Redis","All services"],budgetLabel:"Free-tier CPU budget",budget:"15 hrs / mo"},
+    vector:{zone:"Data plane",zoneColor:"var(--c-lavender)",title:"Vector Index",
+      bullets:["768-dimension gemini-embedding-2 vectors stored in an HNSW index.","Queries return IDs only; chunk text is hydrated after ranking to keep payloads lean.","Completely offloads embedding storage pressure from the Postgres database."],
+      deps:["Upstash Vector","HNSW","REST API"],budgetLabel:"Embedding dimensions",budget:"768 forced"},
+    postgres:{zone:"Data plane",zoneColor:"var(--c-olive)",title:"Relational Core",
+      bullets:["Source of truth for tenants, documents, conversations, webhooks, and activity.","Row-level isolation: every tenant table carries a tenant_id column.","pg_net triggers push ingestion jobs outward; pg_cron runs quota resets and teardown."],
+      deps:["Supabase","PostgreSQL","pg_net","pg_cron"],budgetLabel:"Isolation rule",budget:"tenant_id on every table"},
+    redis:{zone:"Control plane",zoneColor:"var(--c-amber)",title:"Control Plane",
+      bullets:["Distributed token bucket guards the embedding API: 30,000 TPM, 100 RPM, 1,000 RPD.","Rate limiting and circuit breaker state evaluated atomically via Lua scripts.","Backs the job queue, DLQ, and feature flag cache with a 30-second TTL."],
+      deps:["Upstash Redis","Lua scripts","Job queue"],budgetLabel:"Token bucket",budget:"30K TPM / 100 RPM / 1K RPD"},
+    minio:{zone:"On-premise",zoneColor:"var(--c-navy)",title:"Object Storage Node",
+      bullets:["Amlogic S905X ARM64 set-top box running Armbian and MinIO, exposed only through a Cloudflare Zero Trust tunnel.","Holds the 100 GB document lake; orphaned uploads are swept after 24 hours.","Hosts the pg_net worker that extracts text, chunks it, and pushes embeddings."],
+      deps:["MinIO","Armbian","CF Tunnel","pg_net worker"],budgetLabel:"Cloud egress cost",budget:"$0"},
+    worker:{zone:"On-prem worker",zoneColor:"var(--c-purple)",title:"Ingestion Worker",
+      bullets:["Runs on the same Amlogic STB as MinIO; triggered by pg_net the moment a new object lands.","Downloads the raw doc over localhost, extracts text (pdf / docx / html), and chunks at ~512 tokens with overlap.","Calls the embedding API in batches guarded by the Redis token bucket; failures drop into the DLQ."],
+      deps:["pg_net","Armbian","Embedding API","Redis DLQ"],budgetLabel:"Where heavy compute runs",budget:"On-prem, not edge"},
+    stream:{zone:"Response plane",zoneColor:"var(--c-lime)",title:"Streaming & Sync",
+      bullets:["Read answers stream as SSE events, token by token, into pre-reserved space.","Ingestion progress and completion fire webhooks and update document status in Postgres.","Clients resume streams via Last-Event-ID; no response is ever fully buffered."],
+      deps:["Web Streams","SSE","Webhooks","Postgres status"],budgetLabel:"Buffering",budget:"0 bytes held"}
+  };
+
+  /* ---------- geometry : orthogonal router ---------- */
+  function routeFlow(flow){
+    const canvas = $(".flow__canvas", flow);
+    const svg    = $(".flow-svg", flow);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    $$(".conn-glyph", canvas).forEach(e=>e.remove());
+
+    const cr = canvas.getBoundingClientRect();
+    const W = canvas.offsetWidth, H = canvas.offsetHeight;
+    svg.setAttribute("width", W); svg.setAttribute("height", H);
+    svg.setAttribute("viewBox", "0 0 "+W+" "+H);
+
+    const anchor = (key, side) => {
+      const fn = $('.fn[data-node="'+key+'"]', flow);
+      const fr = $(".fn-frame", fn);
+      const r  = (side==="top"||side==="bottom") ? fn.getBoundingClientRect() : fr.getBoundingClientRect();
+      const x = r.left - cr.left, y = r.top - cr.top;
+      if (side==="right")  return {x:x+r.width,     y:y+r.height/2};
+      if (side==="left")   return {x:x,             y:y+r.height/2};
+      if (side==="top")    return {x:x+r.width/2,   y:y};
+      return {x:x+r.width/2, y:y+r.height};
+    };
+
+    (FLOW_CONNS[flow.id]||[]).forEach((c,i)=>{
+      const [from,to,fs,ts,opt] = c;
+      const p0 = anchor(from,fs), p1 = anchor(to,ts);
+      let pts;
+      if (fs==="right" && ts==="left"){
+        pts = Math.abs(p0.y-p1.y) < 2 ? [p0,p1]
+              : (()=>{const mx=(p0.x+p1.x)/2; return [p0,{x:mx,y:p0.y},{x:mx,y:p1.y},p1];})();
+      } else {
+        pts = Math.abs(p0.x-p1.x) < 2 ? [p0,p1]
+              : (()=>{const my=(p0.y+p1.y)/2; return [p0,{x:p0.x,y:my},{x:p1.x,y:my},p1];})();
+      }
+
+      const d = pts.map((p,j)=>(j?"L":"M")+p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" ");
+
+      const g = ns("g"); g.setAttribute("class","conn-group"); g.dataset.link = from+" "+to;
+      const line = ns("path"); line.setAttribute("class","conn-line"); line.setAttribute("d",d); g.appendChild(line);
+      const pulse = ns("path"); pulse.setAttribute("class","conn-pulse"); pulse.setAttribute("d",d);
+      pulse.setAttribute("pathLength","100"); pulse.style.setProperty("--d",(i*0.32)+"s"); g.appendChild(pulse);
+
+      const a=pts[pts.length-1], b=pts[pts.length-2];
+      let dx=a.x-b.x, dy=a.y-b.y; const len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
+      const bx=a.x-dx*7, by=a.y-dy*7, px=-dy, py=dx, w=4;
+      const ar = ns("path"); ar.setAttribute("class","conn-arrow");
+      ar.setAttribute("d","M"+a.x+" "+a.y+" L"+(bx+px*w)+" "+(by+py*w)+" L"+(bx-px*w)+" "+(by-py*w)+" Z");
+      g.appendChild(ar);
+      svg.appendChild(g);
+
+      if (opt && opt.glyph){
+        const mx = pts.length===2 ? (p0.x+p1.x)/2 : (p0.x+pts[1].x)/2;
+        const gl = document.createElement("div");
+        gl.className="conn-glyph"; gl.dataset.link = from+" "+to;
+        gl.style.left = mx+"px"; gl.style.top = p0.y+"px";
+        gl.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>';
+        canvas.appendChild(gl);
+      }
+    });
+  }
+
+  function routeAll(){
+    $$(".flow").forEach(routeFlow);
+    $$(".fblock").forEach(fb=>{
+      const flow=$(".flow",fb), canvas=$(".flow__canvas",fb);
+      fb.classList.toggle("can-scroll", canvas.offsetWidth > flow.clientWidth + 2);
+    });
+  }
+
+  /* ---------- selection / highlight ---------- */
+  let activeKey = "gateway";
+  const detailEl = $("#archDetail");
+
+  function applySel(key, render){
+    activeKey = key;
+    $$(".flow").forEach(f=>f.classList.add("has-sel"));
+    $$(".fn").forEach(n=>n.classList.toggle("is-active", n.dataset.node===key));
+    $$("[data-link]").forEach(el=>{
+      const lk = el.dataset.link.split(" ");
+      el.classList.toggle("hot", lk.indexOf(key) > -1);
+    });
+    if (render===false) return;
+    const n = NODES[key]; if (!n || !detailEl) return;
+    const paint = ()=>{
+      detailEl.innerHTML =
+        '<div class="ad-head"><span class="ad-zone" style="color:'+n.zoneColor+'">'+n.zone+'</span>'+
+        '<h3 class="ad-title">'+n.title+'</h3></div>'+
+        '<div class="ad-grid"><ul class="ad-bullets">'+
+          n.bullets.map(b=>"<li>"+b+"</li>").join("")+
+        '</ul><div class="ad-side"><h4>Dependencies</h4><div class="ad-deps">'+
+          n.deps.map(d=>"<span>"+d+"</span>").join("")+
+        '</div><div class="ad-budget"><h4>'+n.budgetLabel+'</h4><b>'+n.budget+'</b></div></div></div>';
+    };
+    if (REDUCED){ paint(); return; }
+    detailEl.classList.add("swap");
+    setTimeout(()=>{ paint(); detailEl.classList.remove("swap"); }, 170);
+  }
+
+  /* ---------- wire up ---------- */
+  $$(".fn").forEach(btn=>btn.addEventListener("click", ()=>applySel(btn.dataset.node)));
+
+  let rt;
+  addEventListener("resize", ()=>{ clearTimeout(rt); rt=setTimeout(()=>{ routeAll(); applySel(activeKey,false); }, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ routeAll(); applySel(activeKey,false); });
+
+  requestAnimationFrame(()=>{ routeAll(); applySel(activeKey); });
+  addEventListener("load", ()=>{ routeAll(); applySel(activeKey,false); });
+})();
+</script>
+</body>
+</html>

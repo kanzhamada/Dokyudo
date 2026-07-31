@@ -546,73 +546,203 @@
         <p class="t-b1 shead__lead shead__lead--dark">The full hybrid stack, free tier by free tier. Click any node to inspect its responsibilities.</p>
       </div>
 
-      <div class="arch" id="arch" data-reveal>
-        <!-- client -->
-        <div class="arch__row">
-          <button class="arch-node" type="button" data-node="client" style="--na:var(--c-periwinkle)">
-            <span class="arch-node__ico"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg></span>
-            <span><strong>Client Layer</strong><em>Cloudflare Pages · SvelteKit</em></span>
-          </button>
-        </div>
-
-        <div class="wire-v" data-link="client gateway" aria-hidden="true"><i class="spark" style="--sd:0s"></i><i class="spark" style="--sd:.9s"></i></div>
-
-        <!-- gateway -->
-        <div class="arch__row">
-          <button class="arch-node arch-node--wide" type="button" data-node="gateway" style="--na:var(--color-orange)">
-            <span class="arch-node__ico"><svg class="ic" aria-hidden="true"><use href="#i-gateway"/></svg></span>
-            <span><strong>API Gateway + Core</strong><em>Deno Deploy · Hono modular monolith</em></span>
-            <span class="arch-node__tags"><i>JWT auth</i><i>rate limit</i><i>RRF search</i><i>SSE RAG</i></span>
-          </button>
-        </div>
-
-        <div class="wire-v" data-link="gateway client" aria-hidden="true"><i class="spark" style="--sd:.3s"></i><i class="spark" style="--sd:1.2s"></i></div>
-
-        <!-- bus + drops -->
-        <div class="arch__buswrap" aria-hidden="true">
-          <div class="arch__bus" data-link="gateway minio postgres vector redis">
-            <i class="seg" style="--x:8%;--sd:0s"></i>
-            <i class="seg" style="--x:30%;--sd:.35s"></i>
-            <i class="seg" style="--x:50%;--sd:.7s"></i>
-            <i class="seg" style="--x:70%;--sd:1.05s"></i>
-            <i class="seg" style="--x:88%;--sd:1.4s"></i>
-          </div>
-          <div class="arch__drops">
-            <div class="drop" data-link="gateway minio"><i class="spark" style="--sd:.2s"></i></div>
-            <div class="drop" data-link="gateway postgres"><i class="spark" style="--sd:.5s"></i></div>
-            <div class="drop" data-link="gateway vector"><i class="spark" style="--sd:.8s"></i></div>
-            <div class="drop" data-link="gateway redis"><i class="spark" style="--sd:1.1s"></i></div>
-          </div>
-        </div>
-
-        <!-- data layer -->
-        <div class="arch__data">
-          <button class="arch-node" type="button" data-node="minio" style="--na:var(--c-navy)">
-            <span class="arch-node__ico"><svg class="ic" aria-hidden="true"><use href="#i-server"/></svg></span>
-            <span><strong>Object Storage</strong><em>On-prem STB · MinIO</em></span>
-            <span class="arch-node__badge"><svg class="ic" aria-hidden="true"><use href="#i-tunnel"/></svg> CF tunnel</span>
-          </button>
-          <button class="arch-node" type="button" data-node="postgres" style="--na:var(--c-olive)">
-            <span class="arch-node__ico"><svg class="ic" aria-hidden="true"><use href="#i-db"/></svg></span>
-            <span><strong>Relational Core</strong><em>Supabase · PostgreSQL</em></span>
-          </button>
-          <button class="arch-node" type="button" data-node="vector" style="--na:var(--c-lavender)">
-            <span class="arch-node__ico"><svg class="ic" aria-hidden="true"><use href="#i-vector"/></svg></span>
-            <span><strong>Vector Index</strong><em>Upstash Vector · HNSW</em></span>
-          </button>
-          <button class="arch-node" type="button" data-node="redis" style="--na:var(--c-amber)">
-            <span class="arch-node__ico"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg></span>
-            <span><strong>Control Plane</strong><em>Upstash Redis</em></span>
-          </button>
-        </div>
-
-        <p class="arch__legend t-tag">orange = selected path / pulse = live traffic / ingestion is event-driven: pg_net pushes from Postgres to the on-prem worker, so heavy compute never burns edge CPU</p>
+      <!-- Architecture Flow Tab Toggle -->
+      <div class="arch-tabs" role="tablist" aria-label="Architecture Flow Tabs" data-reveal>
+        <button class="arch-tab is-active" id="tab-read" type="button" role="tab" aria-selected="true" aria-controls="flowblock-read" data-flow="read">
+          <span class="arch-tab__num">01</span>
+          <span>Read / Query Path</span>
+        </button>
+        <button class="arch-tab" id="tab-ingest" type="button" role="tab" aria-selected="false" aria-controls="flowblock-ingest" data-flow="ingest">
+          <span class="arch-tab__num">02</span>
+          <span>Ingestion / Write Path</span>
+        </button>
       </div>
 
-      <!-- node detail panel -->
-      <div class="arch-detail" id="archDetail" data-reveal tabindex="-1">
-        <!-- populated by script.js -->
+    <!-- ===================== FLOW 1 — READ / QUERY PATH ===================== -->
+    <div class="fblock is-active" id="flowblock-read" data-reveal>
+      <div class="fhead">
+        <span class="fhead__i">01</span>
+        <h3 class="fhead__t">Read / Query Path</h3>
+        <span class="fhead__rule"></span>
+        <span class="fhead__hint">geser untuk pan ▸</span>
       </div>
+
+      <div class="flow" id="flow-read">
+        <div class="flow__canvas">
+          <svg class="flow-svg" aria-hidden="true"></svg>
+
+          <button class="fn" data-node="client" style="--c:1;--r:2;--na:var(--c-periwinkle)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">EDGE</span>
+                <span class="mini mini--dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">1</span><span><strong>Client Layer</strong><p>Submits query · edge SSR</p></span></span>
+          </button>
+
+          <button class="fn" data-node="gateway" style="--c:2;--r:2;--na:var(--color-terracotta)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HONO</span>
+                <span class="mini mini--card"><span class="mc-av"></span><span class="mc-ln"></span><span class="mc-ln s"></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">2</span><span><strong>API Gateway</strong><p>JWT auth · sliding-window limit</p></span></span>
+          </button>
+
+          <button class="fn" data-node="vector" style="--c:3;--r:2;--na:var(--c-lavender)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HNSW</span>
+                <svg class="mini mini--wave" viewBox="0 0 60 24" preserveAspectRatio="none">
+                  <polyline class="w2" points="0,12 8,9 16,15 24,7 32,17 40,10 48,14 60,12"/>
+                  <polyline class="w1" points="0,12 8,4 16,19 24,2 32,21 40,6 48,16 60,12"/>
+                </svg>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">3</span><span><strong>Vector Index</strong><p>Semantic recall · 768-d</p></span></span>
+          </button>
+
+          <button class="fn" data-node="postgres" style="--c:4;--r:2;--na:var(--c-olive)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">PG · RRF</span>
+                <span class="mini mini--rows"><span class="mr"><i></i><b></b></span><span class="mr"><i></i><b></b></span><span class="mr"><i></i><b></b></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">4</span><span><strong>Relational Core</strong><p>Full-text + RRF fusion · hydrate</p></span></span>
+          </button>
+
+          <button class="fn" data-node="redis" style="--c:5;--r:1;--na:var(--c-amber)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">KV</span>
+                <span class="mini mini--tog"><span class="mt"><i></i><b></b></span><span class="mt"><i></i><b></b></span><span class="mt"><i></i><b></b></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">5</span><span><strong>Control Plane</strong><p>Cache write-back · flags</p></span></span>
+          </button>
+
+          <button class="fn" data-node="stream" style="--c:5;--r:3;--na:var(--c-lime)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">SSE</span>
+                <span class="mini mini--eq"><i></i><i></i><i></i><i></i></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">6</span><span><strong>Streaming Reply</strong><p>SSE answer · token-by-token</p></span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== FLOW 2 — INGESTION / WRITE PATH ===================== -->
+    <div class="fblock" id="flowblock-ingest" data-reveal>
+      <div class="fhead">
+        <span class="fhead__i">02</span>
+        <h3 class="fhead__t">Ingestion / Write Path</h3>
+        <span class="fhead__rule"></span>
+        <span class="fhead__hint">geser untuk pan ▸</span>
+      </div>
+
+      <div class="flow" id="flow-ingest">
+        <div class="flow__canvas">
+          <svg class="flow-svg" aria-hidden="true"></svg>
+
+          <button class="fn" data-node="client" style="--c:1;--r:2;--na:var(--c-periwinkle)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">UPLOAD</span>
+                <span class="mini mini--dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">1</span><span><strong>Client Layer</strong><p>Presigned upload · no proxy</p></span></span>
+          </button>
+
+          <button class="fn" data-node="gateway" style="--c:2;--r:2;--na:var(--color-terracotta)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HONO</span>
+                <span class="mini mini--card"><span class="mc-av"></span><span class="mc-ln"></span><span class="mc-ln s"></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">2</span><span><strong>API Gateway</strong><p>Validate · enqueue job</p></span></span>
+          </button>
+
+          <button class="fn" data-node="redis" style="--c:3;--r:1;--na:var(--c-amber)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">BUCKET</span>
+                <span class="mini mini--tog"><span class="mt"><i></i><b></b></span><span class="mt"><i></i><b></b></span><span class="mt"><i></i><b></b></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">3</span><span><strong>Control Plane</strong><p>Token bucket · job queue</p></span></span>
+          </button>
+
+          <button class="fn" data-node="minio" style="--c:3;--r:2;--na:var(--c-navy)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">S3</span>
+                <span class="mini mini--stack"><span></span><span></span><span></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">4</span><span><strong>Object Storage</strong><p>Raw doc lake · 100 GB</p></span></span>
+          </button>
+
+          <button class="fn" data-node="postgres" style="--c:2;--r:3;--na:var(--c-olive)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">META</span>
+                <span class="mini mini--rows"><span class="mr"><i></i><b></b></span><span class="mr"><i></i><b></b></span><span class="mr"><i></i><b></b></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">8</span><span><strong>Relational Core</strong><p>Register doc metadata</p></span></span>
+          </button>
+
+          <button class="fn" data-node="worker" style="--c:4;--r:2;--na:var(--c-purple)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">JOB</span>
+                <span class="mini mini--gear"><span class="mg"></span><span class="mg-bar"></span></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num paper">5</span><span><strong>Ingestion Worker</strong><p>Extract · chunk · embed</p></span></span>
+          </button>
+
+          <button class="fn" data-node="vector" style="--c:5;--r:1;--na:var(--c-lavender)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HNSW</span>
+                <svg class="mini mini--wave" viewBox="0 0 60 24" preserveAspectRatio="none">
+                  <polyline class="w2" points="0,12 8,9 16,15 24,7 32,17 40,10 48,14 60,12"/>
+                  <polyline class="w1" points="0,12 8,4 16,19 24,2 32,21 40,6 48,16 60,12"/>
+                </svg>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">6</span><span><strong>Vector Index</strong><p>Store embeddings</p></span></span>
+          </button>
+
+          <button class="fn" data-node="stream" style="--c:5;--r:3;--na:var(--c-lime)" type="button">
+            <span class="fn-frame">
+              <span class="fn-screen">
+                <span class="fn-screen__tag">HOOK</span>
+                <span class="mini mini--eq"><i></i><i></i><i></i><i></i></span>
+              </span><span class="fn-crown"></span>
+            </span>
+            <span class="fn-cap"><span class="fn-num">7</span><span><strong>Streaming & Sync</strong><p>Progress webhook · status</p></span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="arch__legend" data-reveal>
+      <b>terracotta</b> = jalur terpilih &nbsp;·&nbsp; <b>pulsa</b> = traffic hidup &nbsp;·&nbsp;
+      ingest bersifat event-driven: pg_net mendorong dari Postgres ke worker on-prem, sehingga komputasi berat tak pernah membakar CPU edge
+    </p>
+
+    <!-- inspector -->
+    <div class="arch-detail" id="archDetail" data-reveal tabindex="-1"></div>
     </div>
   </section>
 

@@ -242,132 +242,241 @@
       routeLine.textContent = on
         ? 'your key / openai gpt-4o-mini / decrypted in-memory only'
         : 'platform gateway / groq → gemini → cohere fallback';
-    });
-  }
+    });  /* ---------- architecture topology flow routing & inspector ---------- */
+  const FLOW_CONNS = {
+    'flow-read': [
+      ['client', 'gateway', 'right', 'left', {}],
+      ['gateway', 'vector', 'right', 'left', { glyph: true }],
+      ['vector', 'postgres', 'right', 'left', {}],
+      ['postgres', 'redis', 'right', 'left', {}],
+      ['postgres', 'stream', 'right', 'left', {}]
+    ],
+    'flow-ingest': [
+      ['client', 'gateway', 'right', 'left', {}],
+      ['gateway', 'redis', 'right', 'left', {}],
+      ['gateway', 'minio', 'right', 'left', {}],
+      ['gateway', 'postgres', 'bottom', 'top', {}],
+      ['minio', 'worker', 'right', 'left', {}],
+      ['worker', 'vector', 'right', 'left', {}],
+      ['worker', 'stream', 'right', 'left', {}]
+    ]
+  };
 
-  /* ---------- architecture inspector ---------- */
   const NODES = {
     client: {
-      zone: 'Client edge', zoneColor: 'var(--c-periwinkle)',
-      title: 'Client Layer',
+      zone: 'Client edge', zoneColor: 'var(--c-periwinkle)', title: 'Client Layer',
       bullets: [
         'SvelteKit frontend rendered globally on Cloudflare Pages.',
         'Uploads go straight to MinIO over presigned URLs; the API never proxies file bytes.',
         'SSE answers render token by token into reserved space, so the layout never shifts.'
       ],
-      deps: ['Cloudflare Pages', 'SvelteKit', 'Tailwind'],
-      budgetLabel: 'Server time billed', budget: '0 ms'
+      deps: ['Cloudflare Pages', 'SvelteKit', 'Tailwind'], budgetLabel: 'Server time billed', budget: '0 ms'
     },
     gateway: {
-      zone: 'Edge compute', zoneColor: 'var(--color-orange)',
-      title: 'API Gateway + Core',
+      zone: 'Edge compute', zoneColor: 'var(--color-terracotta)', title: 'API Gateway + Core',
       bullets: [
         'Supabase JWT auth with sliding-window rate limiting, pipelined through Redis in one call.',
         'Tenant context injected into every query; feature flags enforced at a single point.',
         'Search scatter-gathers vector and full-text IDs, fuses them with RRF, then lazy-hydrates the top 3 chunks.',
         'RAG answers stream through the native Web Streams API, never buffered in memory.'
       ],
-      deps: ['Deno Deploy', 'Hono', 'Upstash Redis', 'All services'],
-      budgetLabel: 'Free-tier CPU budget', budget: '15 hrs / mo'
-    },
-    minio: {
-      zone: 'On-premise', zoneColor: 'var(--c-navy)',
-      title: 'Object Storage Node',
-      bullets: [
-        'Amlogic S905X ARM64 set-top box running Armbian and MinIO, exposed only through a Cloudflare Zero Trust tunnel.',
-        'Holds the 100 GB document lake; orphaned uploads are swept after 24 hours.',
-        'Hosts the pg_net worker that extracts text, chunks it, and pushes embeddings.'
-      ],
-      deps: ['MinIO', 'Armbian', 'CF Tunnel', 'pg_net worker'],
-      budgetLabel: 'Cloud egress cost', budget: '$0'
-    },
-    postgres: {
-      zone: 'Data plane', zoneColor: 'var(--c-olive)',
-      title: 'Relational Core',
-      bullets: [
-        'Source of truth for tenants, documents, conversations, webhooks, and activity.',
-        'Row-level isolation: every tenant table carries a tenant_id column.',
-        'pg_net triggers push ingestion jobs outward; pg_cron runs quota resets and teardown.'
-      ],
-      deps: ['Supabase', 'PostgreSQL', 'pg_net', 'pg_cron'],
-      budgetLabel: 'Isolation rule', budget: 'tenant_id on every table'
+      deps: ['Deno Deploy', 'Hono', 'Upstash Redis', 'All services'], budgetLabel: 'Free-tier CPU budget', budget: '15 hrs / mo'
     },
     vector: {
-      zone: 'Data plane', zoneColor: 'var(--c-lavender)',
-      title: 'Vector Index',
+      zone: 'Data plane', zoneColor: 'var(--c-lavender)', title: 'Vector Index',
       bullets: [
         '768-dimension gemini-embedding-2 vectors stored in an HNSW index.',
         'Queries return IDs only; chunk text is hydrated after ranking to keep payloads lean.',
         'Completely offloads embedding storage pressure from the Postgres database.'
       ],
-      deps: ['Upstash Vector', 'HNSW', 'REST API'],
-      budgetLabel: 'Embedding dimensions', budget: '768 forced'
+      deps: ['Upstash Vector', 'HNSW', 'REST API'], budgetLabel: 'Embedding dimensions', budget: '768 forced'
+    },
+    postgres: {
+      zone: 'Data plane', zoneColor: 'var(--c-olive)', title: 'Relational Core',
+      bullets: [
+        'Source of truth for tenants, documents, conversations, webhooks, and activity.',
+        'Row-level isolation: every tenant table carries a tenant_id column.',
+        'pg_net triggers push ingestion jobs outward; pg_cron runs quota resets and teardown.'
+      ],
+      deps: ['Supabase', 'PostgreSQL', 'pg_net', 'pg_cron'], budgetLabel: 'Isolation rule', budget: 'tenant_id on every table'
     },
     redis: {
-      zone: 'Control plane', zoneColor: 'var(--c-amber)',
-      title: 'Control Plane',
+      zone: 'Control plane', zoneColor: 'var(--c-amber)', title: 'Control Plane',
       bullets: [
         'Distributed token bucket guards the embedding API: 30,000 TPM, 100 RPM, 1,000 RPD.',
         'Rate limiting and circuit breaker state evaluated atomically via Lua scripts.',
         'Backs the job queue, DLQ, and feature flag cache with a 30-second TTL.'
       ],
-      deps: ['Upstash Redis', 'Lua scripts', 'Job queue'],
-      budgetLabel: 'Token bucket', budget: '30K TPM / 100 RPM / 1K RPD'
+      deps: ['Upstash Redis', 'Lua scripts', 'Job queue'], budgetLabel: 'Token bucket', budget: '30K TPM / 100 RPM / 1K RPD'
+    },
+    minio: {
+      zone: 'On-premise', zoneColor: 'var(--c-navy)', title: 'Object Storage Node',
+      bullets: [
+        'Amlogic S905X ARM64 set-top box running Armbian and MinIO, exposed only through a Cloudflare Zero Trust tunnel.',
+        'Holds the 100 GB document lake; orphaned uploads are swept after 24 hours.',
+        'Hosts the pg_net worker that extracts text, chunks it, and pushes embeddings.'
+      ],
+      deps: ['MinIO', 'Armbian', 'CF Tunnel', 'pg_net worker'], budgetLabel: 'Cloud egress cost', budget: '$0'
+    },
+    worker: {
+      zone: 'On-prem worker', zoneColor: 'var(--c-purple)', title: 'Ingestion Worker',
+      bullets: [
+        'Runs on the same Amlogic STB as MinIO; triggered by pg_net the moment a new object lands.',
+        'Downloads the raw doc over localhost, extracts text (pdf / docx / html), and chunks at ~512 tokens with overlap.',
+        'Calls the embedding API in batches guarded by the Redis token bucket; failures drop into the DLQ.'
+      ],
+      deps: ['pg_net', 'Armbian', 'Embedding API', 'Redis DLQ'], budgetLabel: 'Where heavy compute runs', budget: 'On-prem, not edge'
+    },
+    stream: {
+      zone: 'Response plane', zoneColor: 'var(--c-lime)', title: 'Streaming & Sync',
+      bullets: [
+        'Read answers stream as SSE events, token by token, into pre-reserved space.',
+        'Ingestion progress and completion fire webhooks and update document status in Postgres.',
+        'Clients resume streams via Last-Event-ID; no response is ever fully buffered.'
+      ],
+      deps: ['Web Streams', 'SSE', 'Webhooks', 'Postgres status'], budgetLabel: 'Buffering', budget: '0 bytes held'
     }
   };
 
-  const archEl = $('#arch');
-  const detailEl = $('#archDetail');
-  let activeNode = 'gateway';
+  function routeFlow(flow) {
+    const canvas = $('.flow__canvas', flow);
+    const svg = $('.flow-svg', flow);
+    if (!canvas || !svg) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    $$('.conn-glyph', canvas).forEach((e) => e.remove());
 
-  function renderNode(key) {
-    const n = NODES[key];
-    if (!n || !detailEl) return;
-    detailEl.innerHTML =
-      '<div class="ad-head">' +
-        '<span class="ad-zone" style="color:' + n.zoneColor + '">' + n.zone + '</span>' +
-        '<h3 class="ad-title">' + n.title + '</h3>' +
-      '</div>' +
-      '<div class="ad-grid">' +
-        '<ul class="ad-bullets">' +
-          n.bullets.map((b) => '<li>' + b + '</li>').join('') +
-        '</ul>' +
-        '<div class="ad-side">' +
-          '<h4>Dependencies</h4>' +
-          '<div class="ad-deps">' + n.deps.map((d) => '<span>' + d + '</span>').join('') + '</div>' +
-          '<div class="ad-budget"><h4>Key constraint</h4><b>' + n.budget + '</b></div>' +
-        '</div>' +
-      '</div>';
-  }
+    const cr = canvas.getBoundingClientRect();
+    const W = canvas.offsetWidth, H = canvas.offsetHeight;
+    svg.setAttribute('width', W);
+    svg.setAttribute('height', H);
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 
-  function selectNode(key) {
-    activeNode = key;
-    archEl.classList.add('has-sel');
-    $$('.arch-node', archEl).forEach((btn) =>
-      btn.classList.toggle('is-active', btn.dataset.node === key)
-    );
-    $$('[data-link]', archEl).forEach((el) => {
-      const links = el.dataset.link.split(' ');
-      el.classList.toggle('hot', links.indexOf(key) > -1);
+    const anchor = (key, side) => {
+      const fn = $('.fn[data-node="' + key + '"]', flow);
+      if (!fn) return { x: 0, y: 0 };
+      const fr = $('.fn-frame', fn);
+      const r = (side === 'top' || side === 'bottom') ? fn.getBoundingClientRect() : fr.getBoundingClientRect();
+      const x = r.left - cr.left, y = r.top - cr.top;
+      if (side === 'right') return { x: x + r.width, y: y + r.height / 2 };
+      if (side === 'left') return { x: x, y: y + r.height / 2 };
+      if (side === 'top') return { x: x + r.width / 2, y: y };
+      return { x: x + r.width / 2, y: y + r.height };
+    };
+
+    (FLOW_CONNS[flow.id] || []).forEach((c, i) => {
+      const [from, to, fs, ts, opt] = c;
+      const p0 = anchor(from, fs), p1 = anchor(to, ts);
+      let pts;
+      if (fs === 'right' && ts === 'left') {
+        pts = Math.abs(p0.y - p1.y) < 2 ? [p0, p1]
+          : (() => { const mx = (p0.x + p1.x) / 2; return [p0, { x: mx, y: p0.y }, { x: mx, y: p1.y }, p1]; })();
+      } else {
+        pts = Math.abs(p0.x - p1.x) < 2 ? [p0, p1]
+          : (() => { const my = (p0.y + p1.y) / 2; return [p0, { x: p0.x, y: my }, { x: p1.x, y: my }, p1]; })();
+      }
+
+      const SVGNS = 'http://www.w3.org/2000/svg';
+      const ns = (t) => document.createElementNS(SVGNS, t);
+      const d = pts.map((p, j) => (j ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join(' ');
+
+      const g = ns('g'); g.setAttribute('class', 'conn-group'); g.dataset.link = from + ' ' + to;
+      const line = ns('path'); line.setAttribute('class', 'conn-line'); line.setAttribute('d', d); g.appendChild(line);
+      const pulse = ns('path'); pulse.setAttribute('class', 'conn-pulse'); pulse.setAttribute('d', d);
+      pulse.setAttribute('pathLength', '100'); pulse.style.setProperty('--d', (i * 0.32) + 's'); g.appendChild(pulse);
+
+      const a = pts[pts.length - 1], b = pts[pts.length - 2];
+      let dx = a.x - b.x, dy = a.y - b.y; const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+      const bx = a.x - dx * 7, by = a.y - dy * 7, px = -dy, py = dx, w = 4;
+      const ar = ns('path'); ar.setAttribute('class', 'conn-arrow');
+      ar.setAttribute('d', 'M' + a.x + ' ' + a.y + ' L' + (bx + px * w) + ' ' + (by + py * w) + ' L' + (bx - px * w) + ' ' + (by - py * w) + ' Z');
+      g.appendChild(ar);
+      svg.appendChild(g);
+
+      if (opt && opt.glyph) {
+        const mx = pts.length === 2 ? (p0.x + p1.x) / 2 : (p0.x + pts[1].x) / 2;
+        const gl = document.createElement('div');
+        gl.className = 'conn-glyph'; gl.dataset.link = from + ' ' + to;
+        gl.style.left = mx + 'px'; gl.style.top = p0.y + 'px';
+        gl.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>';
+        canvas.appendChild(gl);
+      }
     });
-    if (REDUCED) {
-      renderNode(key);
-      return;
-    }
-    detailEl.classList.add('swap');
-    setTimeout(() => {
-      renderNode(key);
-      detailEl.classList.remove('swap');
-    }, 170);
   }
 
-  if (archEl && detailEl) {
-    $$('.arch-node', archEl).forEach((btn) =>
-      btn.addEventListener('click', () => selectNode(btn.dataset.node))
-    );
-    renderNode(activeNode);
-    selectNode(activeNode);
+  function routeAll() {
+    $$('.flow').forEach(routeFlow);
+    $$('.fblock').forEach((fb) => {
+      const flow = $('.flow', fb), canvas = $('.flow__canvas', fb);
+      if (flow && canvas) {
+        fb.classList.toggle('can-scroll', canvas.offsetWidth > flow.clientWidth + 2);
+      }
+    });
   }
+
+  /* ---------- selection / highlight ---------- */
+  let activeKey = 'gateway';
+  const detailEl = $('#archDetail');
+
+  function applySel(key, render) {
+    activeKey = key;
+    $$('.flow').forEach((f) => f.classList.add('has-sel'));
+    $$('.fn').forEach((n) => n.classList.toggle('is-active', n.dataset.node === key));
+    $$('[data-link]').forEach((el) => {
+      const lk = el.dataset.link.split(' ');
+      el.classList.toggle('hot', lk.indexOf(key) > -1);
+    });
+    if (render === false) return;
+    const n = NODES[key]; if (!n || !detailEl) return;
+    const paint = () => {
+      detailEl.innerHTML =
+        '<div class="ad-head"><span class="ad-zone" style="color:' + n.zoneColor + '">' + n.zone + '</span>' +
+        '<h3 class="ad-title">' + n.title + '</h3></div>' +
+        '<div class="ad-grid"><ul class="ad-bullets">' +
+          n.bullets.map((b) => '<li>' + b + '</li>').join('') +
+        '</ul><div class="ad-side"><h4>Dependencies</h4><div class="ad-deps">' +
+          n.deps.map((d) => '<span>' + d + '</span>').join('') +
+        '</div><div class="ad-budget"><h4>' + n.budgetLabel + '</h4><b>' + n.budget + '</b></div></div></div>';
+    };
+    if (REDUCED) { paint(); return; }
+    detailEl.classList.add('swap');
+    setTimeout(() => { paint(); detailEl.classList.remove('swap'); }, 170);
+  }
+
+  /* ---------- wire up ---------- */
+  $$('.fn').forEach((btn) => btn.addEventListener('click', () => applySel(btn.dataset.node)));
+
+  let rt;
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { routeAll(); applySel(activeKey, false); }, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { routeAll(); applySel(activeKey, false); });
+
+  requestAnimationFrame(() => { routeAll(); applySel(activeKey); });
+  window.addEventListener('load', () => { routeAll(); applySel(activeKey, false); });
+
+  /* ---------- architecture flow tabs toggle ---------- */
+  const archTabs = $$('.arch-tab');
+  const fblocks = $$('.fblock');
+
+  function switchArchTab(flowKey) {
+    archTabs.forEach((tab) => {
+      const active = tab.dataset.flow === flowKey;
+      tab.classList.toggle('is-active', active);
+      tab.setAttribute('aria-selected', String(active));
+    });
+
+    fblocks.forEach((fb) => {
+      const active = fb.id === `flowblock-${flowKey}`;
+      fb.classList.toggle('is-active', active);
+    });
+
+    setTimeout(() => {
+      routeAll();
+      applySel(activeKey, false);
+    }, 60);
+  }
+
+  archTabs.forEach((tab) => {
+    tab.addEventListener('click', () => switchArchTab(tab.dataset.flow));
+  });
 
   /* ---------- tier unlock simulation (PRD: global event trigger) ---------- */
   const flagLine = $('.flag-line');
@@ -999,5 +1108,5 @@
   })();
 
 
-
+}
 })();
