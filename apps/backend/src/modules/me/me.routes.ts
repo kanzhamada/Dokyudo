@@ -9,6 +9,44 @@ export const meRoutes = createApp();
 meRoutes.openapi(
     createRoute({
         method: "get",
+        path: "/",
+        tags: ["Me"],
+        summary: "Get current user profile and subscription tier",
+        description:
+            "Returns user details, tenant info, and current subscription status. Automatically handles lazy-downgrade if subscription is expired.",
+        responses: {
+            200: {
+                description: "Profile returned successfully",
+                content: {
+                    "application/json": {
+                        schema: MeSchema.ProfileResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    meController.handleGetProfile as any,
+);
+
+meRoutes.openapi(
+    createRoute({
+        method: "get",
         path: "/usage",
         tags: ["Me"],
         summary: "Get realtime tenant usage statistics",

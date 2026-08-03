@@ -1,6 +1,30 @@
 import { z } from "@hono/zod-openapi";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Profile Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ProfileResponseSchema = z
+    .object({
+        user: z.object({
+            id: z.string().uuid(),
+            email: z.string().email(),
+            profilePictureUrl: z.string().nullable().optional(),
+        }),
+        tenant: z.object({
+            id: z.string().uuid(),
+            name: z.string(),
+        }),
+        subscription: z.object({
+            tier: z.enum(["FREE", "SIMULATE", "OIL_INVESTOR", "PRO"]),
+            expiresAt: z.string().nullable().optional(),
+        }),
+    })
+    .openapi("ProfileResponse");
+
+export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Usage Schemas
 // ─────────────────────────────────────────────────────────────────────────────
 

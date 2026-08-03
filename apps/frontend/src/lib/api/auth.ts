@@ -66,10 +66,6 @@ export function authVerifyEmail(
 	});
 }
 
-export function authGetMe(): Promise<ApiResult<UserProfileResponse>> {
-	return apiRequest<UserProfileResponse>('/api/auth/me', { method: 'GET' });
-}
-
 /** Initiates the Google OAuth flow via a full-page redirect. */
 export function initiateGoogleOAuth(): void {
 	window.location.href = `${PUBLIC_API_URL}/api/auth/oauth/google`;

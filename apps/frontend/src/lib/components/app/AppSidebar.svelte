@@ -35,7 +35,8 @@
 	import { goto } from '$app/navigation';
 
 	import { onMount } from 'svelte';
-	import { authLogout, authGetMe } from '$lib/api/auth';
+	import { authLogout } from '$lib/api/auth';
+	import { getMe } from '$lib/api/me';
 	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import type { UserProfileResponse } from '$lib/types/auth.types';
@@ -174,7 +175,7 @@
 
 	onMount(async () => {
 		try {
-			const result = await authGetMe();
+			const result = await getMe();
 			if (result.ok) {
 				userProfile = result.data;
 				console.log('[Auth Me] User details loaded:', result.data);
