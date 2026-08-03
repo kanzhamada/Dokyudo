@@ -59,8 +59,8 @@ sequenceDiagram
 | `apps/frontend/src/lib/types/auth.types.ts` | Updated `UserProfileResponse` and `UserUsageResponse`. |
 | `apps/frontend/src/lib/components/app/AppSidebar.svelte` | Updated to call `getMe()` from `$lib/api/me`. |
 | `apps/frontend/src/routes/app/chat/+page.svelte` | Calls `getMeUsage()` on mount and calculates tier constraints via `TIER_LIMITS`. |
-| `api-collections/Auth/05_Get Profile.bru` | Updated request URL to `GET {{baseUrl}}/api/me`. |
-| `api-collections/Webhooks & Quotas/06_Get Realtime Usage.bru` | Added request file for `GET {{baseUrl}}/api/me/usage`. |
+| `api-collections/Me/01_Get Profile.bru` | Updated request URL to `GET {{baseUrl}}/api/me`. |
+| `api-collections/Me/02_Get Realtime Usage.bru` | Added request file for `GET {{baseUrl}}/api/me/usage`. |
 | `tests-report/unit-test.md` | Updated with test suite execution results for the `Me` module. |
 
 ---
