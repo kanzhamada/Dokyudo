@@ -52,10 +52,14 @@
 			const docIdx = Number(docIdxStr);
 			let docDisplayName = `Doc ${docIdx}`;
 			let tooltipTitle = `Doc ${docIdx}`;
+			let docId = '';
+			let docFullName = '';
 
 			if (references && references.length > 0) {
 				const refDoc = references.find((r) => r.index === docIdx || r.id === docIdxStr) || references[docIdx - 1];
 				if (refDoc && refDoc.name) {
+					docId = refDoc.id;
+					docFullName = refDoc.name;
 					tooltipTitle = refDoc.name;
 					const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
 					docDisplayName = cleanName.length > 5 ? cleanName.slice(0, 5) + '...' : cleanName;
@@ -63,7 +67,7 @@
 			}
 
 			const label = pageInfo ? `${docDisplayName} • Hlm. ${pageInfo}` : docDisplayName;
-			return `<span class="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300 transition-colors hover:bg-amber-400/25 cursor-pointer" title="${tooltipTitle}">${label}</span>`;
+			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageInfo || ''}" class="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300 transition-colors hover:bg-amber-400/25 cursor-pointer" title="${tooltipTitle}">${label}</span>`;
 		});
 	}
 
@@ -524,10 +528,51 @@
 						isGenerating = false;
 						isTitleLoading = false;
 
-						// If the AI response text does NOT contain any inline sentence citations ([Doc ...]), clear references
 						const textContent = messages[asstIndex].content;
-						if (!/\[Doc \d+/i.test(textContent)) {
-							messages[asstIndex].references = [];
+						const currentRefs = messages[asstIndex].references;
+
+						if (currentRefs && currentRefs.length > 0) {
+							// Parse all inline citation tags: [Doc N: Hlm. X, Y]
+							const citationMatches = [...textContent.matchAll(/\[Doc (\d+)(?:: (?:Hlm\.|Pages?|Page) ([^\]]+))?\]/gi)];
+							
+							if (citationMatches.length === 0) {
+								messages[asstIndex].references = [];
+							} else {
+								const citedPagesMap = new Map<number, Set<number>>();
+
+								for (const match of citationMatches) {
+									const docIdx = Number(match[1]);
+									const pagesStr = match[2];
+
+									if (!citedPagesMap.has(docIdx)) {
+										citedPagesMap.set(docIdx, new Set());
+									}
+
+									if (pagesStr) {
+										const numMatches = pagesStr.match(/\d+/g);
+										if (numMatches) {
+											for (const n of numMatches) {
+												citedPagesMap.get(docIdx)!.add(Number(n));
+											}
+										}
+									}
+								}
+
+								// Filter references: only keep documents that were cited, and set pages to cited pages
+								const filteredRefs: DocReference[] = [];
+								for (const ref of currentRefs) {
+									const docIdx = ref.index || 1;
+									const citedSet = citedPagesMap.get(docIdx);
+									if (citedSet) {
+										const sortedCitedPages = Array.from(citedSet).sort((a, b) => a - b);
+										filteredRefs.push({
+											...ref,
+											pages: sortedCitedPages.length > 0 ? sortedCitedPages : ref.pages
+										});
+									}
+								}
+								messages[asstIndex].references = filteredRefs;
+							}
 						}
 
 						console.log('[Chat Detail] Backend Response (Stream Complete):', {
@@ -571,7 +616,8 @@
 	}
 
 	function copyToClipboard(text: string, msgId: string) {
-		navigator.clipboard.writeText(text);
+		const cleanText = text.replace(/\s*\[Doc \d+(?:: (?:Hlm\.|Pages?|Page) [^\]]+)?\]/g, '').trim();
+		navigator.clipboard.writeText(cleanText);
 		copiedMessageId = msgId;
 		toast.success('Copied to clipboard');
 		setTimeout(() => {
