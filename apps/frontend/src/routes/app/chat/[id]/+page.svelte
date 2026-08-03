@@ -39,6 +39,21 @@
 	import { dokyudoFetch } from '$lib/apiClient';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
+	import { marked } from 'marked';
+
+	marked.setOptions({
+		gfm: true,
+		breaks: true
+	});
+
+	function renderMarkdown(text: string): string {
+		if (!text) return '';
+		try {
+			return marked.parse(text) as string;
+		} catch (e) {
+			return text;
+		}
+	}
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
 	import cohereIcon from '$lib/assets/llm/cohere.svg';
@@ -592,11 +607,11 @@
 		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-40">
 			{#each messages as msg (msg.id)}
 				{#if msg.role === 'user'}
-					<!-- User Message Bubble -->
+					<!-- User Message (Clean Pill) -->
 					<div class="flex w-full justify-end">
 						<div class="flex max-w-[85%] flex-col items-end gap-1.5 md:max-w-[70%]">
 							<div
-								class="rounded-2xl rounded-tr-xs border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md"
+								class="rounded-2xl bg-[#2B2A29] px-4 py-2.5 text-sm text-white/90 shadow-sm"
 							>
 								{#if msg.attachments && msg.attachments.length > 0}
 									<div class="mb-2 flex flex-wrap gap-1.5">
@@ -613,130 +628,92 @@
 
 								<p class="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
 							</div>
-							<span class="text-[10px] text-white/40">{msg.timestamp}</span>
 						</div>
 					</div>
 				{:else}
-					<!-- Assistant Response Bubble -->
-					<div class="flex w-full justify-start">
-						<div class="flex max-w-[95%] gap-3 md:max-w-[85%]">
-							<!-- AI Icon Avatar -->
+					<!-- Assistant Response (Flat & Clean, No Card Bubble, No Avatar, No Timestamps) -->
+					<div class="flex w-full justify-start py-2">
+						<div class="flex w-full flex-col gap-3">
+							<!-- Markdown Content View -->
 							<div
-								class="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-gradient-to-b from-[#4b3117] to-[#232323] shadow-md"
+								class="prose prose-invert prose-sm max-w-none text-white/90 prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-amber-300 prose-code:before:content-none prose-code:after:content-none prose-a:text-amber-400 prose-li:my-1"
 							>
-								<Sparkles class="size-4 text-amber-400" />
+								{@html renderMarkdown(msg.content)}
+
+								{#if msg.isStreaming}
+									<span
+										class="inline-block h-4 w-1.5 animate-pulse bg-amber-400 align-middle ml-1"
+									></span>
+								{/if}
 							</div>
 
-							<div class="flex flex-col gap-2">
-								<!-- Message Container -->
-								<div
-									class="relative rounded-2xl rounded-tl-xs border border-white/[0.12] bg-[#232323]/[0.75] p-5 text-sm text-white/90 shadow-xl backdrop-blur-md"
+							<!-- Document Reference Chips -->
+							{#if msg.references && msg.references.length > 0}
+								<div class="mt-2 border-t border-white/10 pt-3">
+									<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
+										<BookOpen class="size-3.5 text-amber-400" />
+										<span>Source References ({msg.references.length})</span>
+									</div>
+									<div class="flex flex-wrap gap-2">
+										{#each msg.references as ref}
+											<Tooltip.Provider delayDuration={100}>
+												<Tooltip.Root>
+													<Tooltip.Trigger
+														class="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#1A1918] px-3 py-1 text-xs text-amber-300/90 transition-colors hover:border-amber-400/50 hover:bg-[#2B2A29]"
+													>
+														<FileText class="size-3 text-amber-400" />
+														<span class="font-medium">{ref.name}</span>
+														{#if ref.page}
+															<span class="text-white/40">• Page {ref.page}</span>
+														{/if}
+													</Tooltip.Trigger>
+													<Tooltip.Content
+														class="border border-white/15 bg-[#232323] text-white text-xs max-w-xs"
+													>
+														<p class="font-semibold text-amber-400">{ref.name}</p>
+														{#if ref.snippet}
+															<p class="mt-1 text-white/70 italic">"{ref.snippet}"</p>
+														{/if}
+														<p class="mt-1 text-[10px] text-white/40">ID: {ref.id}</p>
+													</Tooltip.Content>
+												</Tooltip.Root>
+											</Tooltip.Provider>
+										{/each}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Action Toolbar (Copy, Thumbs Up/Down) -->
+							<div class="flex items-center gap-1 pt-1 text-white/40">
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
+									onclick={() => copyToClipboard(msg.content, msg.id)}
+									aria-label="Copy response"
 								>
-									<!-- Header Row inside Bubble -->
-									<div class="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
-										<div class="flex items-center gap-2">
-											<span class="text-xs font-semibold text-white/90">Dokyudo AI</span>
-											{#if msg.modelName}
-												<span
-													class="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/60"
-												>
-													{msg.modelName}
-												</span>
-											{/if}
-										</div>
-
-										{#if msg.isStreaming}
-											<div class="flex items-center gap-1.5 text-xs text-amber-400">
-												<Spinner class="size-3 text-amber-400" />
-												<span class="text-[11px] animate-pulse">Generating...</span>
-											</div>
-										{/if}
-									</div>
-
-									<!-- Markdown Content View -->
-									<div class="prose prose-invert max-w-none text-sm leading-relaxed text-white/90">
-										<p class="whitespace-pre-wrap">{msg.content}</p>
-
-										{#if msg.isStreaming}
-											<span
-												class="inline-block h-4 w-1.5 animate-pulse bg-amber-400 align-middle"
-											></span>
-										{/if}
-									</div>
-
-									<!-- Document Reference Chips -->
-									{#if msg.references && msg.references.length > 0}
-										<div class="mt-4 border-t border-white/10 pt-3">
-											<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
-												<BookOpen class="size-3.5 text-amber-400" />
-												<span>Source References ({msg.references.length})</span>
-											</div>
-											<div class="flex flex-wrap gap-2">
-												{#each msg.references as ref}
-													<Tooltip.Provider delayDuration={100}>
-														<Tooltip.Root>
-															<Tooltip.Trigger
-																class="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#1A1918] px-3 py-1 text-xs text-amber-300/90 transition-colors hover:border-amber-400/50 hover:bg-[#2B2A29]"
-															>
-																<FileText class="size-3 text-amber-400" />
-																<span class="font-medium">{ref.name}</span>
-																{#if ref.page}
-																	<span class="text-white/40">• Page {ref.page}</span>
-																{/if}
-															</Tooltip.Trigger>
-															<Tooltip.Content
-																class="border border-white/15 bg-[#232323] text-white text-xs max-w-xs"
-															>
-																<p class="font-semibold text-amber-400">{ref.name}</p>
-																{#if ref.snippet}
-																	<p class="mt-1 text-white/70 italic">"{ref.snippet}"</p>
-																{/if}
-																<p class="mt-1 text-[10px] text-white/40">ID: {ref.id}</p>
-															</Tooltip.Content>
-														</Tooltip.Root>
-													</Tooltip.Provider>
-												{/each}
-											</div>
-										</div>
+									{#if copiedMessageId === msg.id}
+										<Check class="size-3.5 text-green-400" />
+									{:else}
+										<Copy class="size-3.5" />
 									{/if}
-								</div>
-
-								<!-- Action Toolbar for Assistant Bubble -->
-								<div class="flex items-center justify-between px-1 text-xs text-white/40">
-									<span class="text-[10px]">{msg.timestamp}</span>
-
-									<div class="flex items-center gap-1">
-										<Button
-											variant="ghost"
-											size="icon"
-											class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
-											onclick={() => copyToClipboard(msg.content, msg.id)}
-											aria-label="Copy response"
-										>
-											{#if copiedMessageId === msg.id}
-												<Check class="size-3.5 text-green-400" />
-											{:else}
-												<Copy class="size-3.5" />
-											{/if}
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon"
-											class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
-											aria-label="Helpful"
-										>
-											<ThumbsUp class="size-3.5" />
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon"
-											class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
-											aria-label="Not helpful"
-										>
-											<ThumbsDown class="size-3.5" />
-										</Button>
-									</div>
-								</div>
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
+									aria-label="Helpful"
+								>
+									<ThumbsUp class="size-3.5" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
+									aria-label="Not helpful"
+								>
+									<ThumbsDown class="size-3.5" />
+								</Button>
 							</div>
 						</div>
 					</div>
