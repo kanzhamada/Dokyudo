@@ -100,6 +100,7 @@
 		id: string;
 		name: string;
 		page?: number;
+		pages?: number[];
 		snippet?: string;
 	}
 
@@ -466,7 +467,7 @@
 							if (parsed.references) {
 								messages[asstIndex].references = parsed.references.map((r: any) => ({
 									id: r.documentId,
-									name: r.documentId,
+									name: r.title || r.documentId,
 									pages: r.pages
 								}));
 							}
@@ -688,8 +689,10 @@
 													>
 														<FileText class="size-3 text-amber-400" />
 														<span class="font-medium">{ref.name}</span>
-														{#if ref.page}
-															<span class="text-white/40">• Page {ref.page}</span>
+														{#if ref.pages && ref.pages.length > 0}
+															<span class="text-white/40">• Hlm. {ref.pages.join(', ')}</span>
+														{:else if ref.page}
+															<span class="text-white/40">• Hlm. {ref.page}</span>
 														{/if}
 													</Tooltip.Trigger>
 													<Tooltip.Content

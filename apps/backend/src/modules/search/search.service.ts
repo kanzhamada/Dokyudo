@@ -1,5 +1,5 @@
 import { withAuthDb } from "../../config/drizzle.ts";
-import { documentChunks, tenantSubscriptions } from "../../shared/models/db.model.ts";
+import { documentChunks, documents, tenantSubscriptions } from "../../shared/models/db.model.ts";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { TIER_LIMITS } from "../../shared/constants/tiers.constant.ts";
 import { vectorIndex } from "../../config/vector.ts";
@@ -182,10 +182,12 @@ export class SearchService {
                 .select({
                     id: documentChunks.id,
                     documentId: documentChunks.documentId,
+                    documentTitle: documents.title,
                     metadata: documentChunks.metadata,
                     content: documentChunks.content,
                 })
                 .from(documentChunks)
+                .innerJoin(documents, eq(documentChunks.documentId, documents.id))
                 .where(inArray(documentChunks.id, topIds));
         });
 

@@ -229,25 +229,27 @@ ${question}
                 let successfulModel = "";
                 const startMs = Date.now();
 
-                // Group unique pages per document ID
-                const referencesMap = new Map<string, Set<number>>();
+                // Group unique pages per document ID & title
+                const referencesMap = new Map<string, { title: string; pages: Set<number> }>();
                 for (const doc of searchResults) {
                     const docId = doc.documentId;
+                    const docTitle = doc.documentTitle || docId;
                     if (!referencesMap.has(docId))
-                        referencesMap.set(docId, new Set());
+                        referencesMap.set(docId, { title: docTitle, pages: new Set() });
 
                     const meta = doc.metadata as { pages?: number[] } | null;
                     if (meta && Array.isArray(meta.pages)) {
                         for (const p of meta.pages) {
-                            referencesMap.get(docId)!.add(p);
+                            referencesMap.get(docId)!.pages.add(p);
                         }
                     }
                 }
 
                 const references = Array.from(referencesMap.entries()).map(
-                    ([docId, pagesSet]) => ({
+                    ([docId, { title, pages }]) => ({
                         documentId: docId,
-                        pages: Array.from(pagesSet).sort((a, b) => a - b),
+                        title,
+                        pages: Array.from(pages).sort((a, b) => a - b),
                     }),
                 );
 
@@ -313,11 +315,13 @@ ${question}
                             }),
                         );
 
-                        controller.enqueue(
-                            encoder.encode(
-                                `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
-                            ),
-                        );
+                        if (references.length > 0) {
+                            controller.enqueue(
+                                encoder.encode(
+                                    `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
+                                ),
+                            );
+                        }
 
                         for await (const chunk of responseStream.stream) {
                             fullAnswer += chunk.text;
@@ -346,11 +350,13 @@ ${question}
                             logContext,
                         });
 
-                        controller.enqueue(
-                            encoder.encode(
-                                `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
-                            ),
-                        );
+                        if (references.length > 0) {
+                            controller.enqueue(
+                                encoder.encode(
+                                    `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
+                                ),
+                            );
+                        }
 
                         for await (const chunk of response.stream) {
                             if (chunk.text) {
