@@ -46,10 +46,35 @@
 		breaks: true
 	});
 
+	function wrapWordsInHtml(html: string): string {
+		if (!html) return '';
+		const parts = html.split(/(<[^>]+>)/g);
+		let inCode = false;
+
+		for (let i = 0; i < parts.length; i++) {
+			const part = parts[i];
+			if (!part) continue;
+
+			if (part.startsWith('<')) {
+				const lower = part.toLowerCase();
+				if (lower.startsWith('<code') || lower.startsWith('<pre')) {
+					inCode = true;
+				} else if (lower.startsWith('</code') || lower.startsWith('</pre')) {
+					inCode = false;
+				}
+			} else if (!inCode) {
+				parts[i] = part.replace(/(\S+)/g, '<span class="animate-word-fade-in">$1</span>');
+			}
+		}
+
+		return parts.join('');
+	}
+
 	function renderMarkdown(text: string): string {
 		if (!text) return '';
 		try {
-			return marked.parse(text) as string;
+			const rawHtml = marked.parse(text) as string;
+			return wrapWordsInHtml(rawHtml);
 		} catch (e) {
 			return text;
 		}
@@ -334,13 +359,19 @@
 	async function streamChatTurn(questionText: string, modelChoice: LlmOption) {
 		if (!questionText || isGenerating) return;
 
-		console.log('[Chat Detail] Form Submitted (Outbound Payload):', {
+		const useByok = modelChoice.provider !== 'auto';
+		const bodyPayload: Record<string, any> = {
 			question: questionText,
 			conversation_id: chatId,
-			provider: modelChoice.provider === 'auto' ? 'gemini' : modelChoice.provider,
-			model: modelChoice.model === 'auto' ? 'gemini-2.5-flash' : modelChoice.model,
-			useByok: modelChoice.provider !== 'auto'
-		});
+			useByok
+		};
+
+		if (useByok) {
+			bodyPayload.provider = modelChoice.provider;
+			bodyPayload.model = modelChoice.model;
+		}
+
+		console.log('[Chat Detail] Form Submitted (Outbound Payload):', bodyPayload);
 
 		const userMsg: ChatMessage = {
 			id: `user-${Date.now()}`,
@@ -381,13 +412,7 @@
 			const res = await dokyudoFetch(`${PUBLIC_API_URL}/api/rag/chat`, {
 				method: 'POST',
 				headers,
-				body: JSON.stringify({
-					question: questionText,
-					conversation_id: chatId,
-					provider: modelChoice.provider === 'auto' ? 'gemini' : modelChoice.provider,
-					model: modelChoice.model === 'auto' ? 'gemini-2.5-flash' : modelChoice.model,
-					useByok: modelChoice.provider !== 'auto'
-				})
+				body: JSON.stringify(bodyPayload)
 			});
 
 			if (!res.ok) {
@@ -611,7 +636,7 @@
 					<div class="flex w-full justify-end">
 						<div class="flex max-w-[85%] flex-col items-end gap-1.5 md:max-w-[70%]">
 							<div
-								class="rounded-2xl bg-[#2B2A29] px-4 py-2.5 text-sm text-white/90 shadow-sm"
+								class="rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md"
 							>
 								{#if msg.attachments && msg.attachments.length > 0}
 									<div class="mb-2 flex flex-wrap gap-1.5">
@@ -891,3 +916,22 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	@keyframes wordFadeIn {
+		0% {
+			opacity: 0;
+			filter: blur(4px);
+			transform: translateY(2px);
+		}
+		100% {
+			opacity: 1;
+			filter: blur(0);
+			transform: translateY(0);
+		}
+	}
+	:global(.animate-word-fade-in) {
+		display: inline-block;
+		animation: wordFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	}
+</style>

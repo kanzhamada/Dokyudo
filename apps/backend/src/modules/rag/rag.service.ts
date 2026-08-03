@@ -255,6 +255,14 @@ ${question}
                 let byokKey: string | undefined = undefined;
                 if (useByok) {
                     try {
+                        if (!provider || !model) {
+                            throw new AppError({
+                                code: "VALIDATION_ERROR",
+                                message: "provider and model are required when useByok is true",
+                                status: 400,
+                            });
+                        }
+
                         let encryptedRecord: any = null;
                         await withAuthDb(tenantId, async (tx) => {
                             const res = await tx
@@ -284,7 +292,7 @@ ${question}
                     } catch (e: any) {
                         controller.enqueue(
                             encoder.encode(
-                                `event: error\ndata: ${JSON.stringify({ code: "UNAUTHORIZED", message: e.message || "Failed to load BYOK key" })}\n\n`,
+                                `event: error\ndata: ${JSON.stringify({ code: e.code || "UNAUTHORIZED", message: e.message || "Failed to load BYOK key" })}\n\n`,
                             ),
                         );
                         controller.close();
@@ -298,8 +306,8 @@ ${question}
                         const cb = createCircuitBreaker(`llm-gen-${model}`);
                         const responseStream = await cb.execute(() =>
                             LlmRouterService.generateStream({
-                                provider,
-                                model,
+                                provider: provider!,
+                                model: model!,
                                 prompt: augmentedPrompt,
                                 apiKey: byokKey,
                             }),
@@ -548,7 +556,6 @@ ${question}
                 id: t.id,
                 question: t.question,
                 answer: t.answer,
-                modelUsed: t.modelUsed,
                 contextReferences: t.contextReferences,
                 createdAt: t.createdAt.toISOString(),
             })),
