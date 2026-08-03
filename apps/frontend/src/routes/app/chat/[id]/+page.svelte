@@ -46,6 +46,27 @@
 		breaks: true
 	});
 
+	function transformCitationTags(html: string, references?: DocReference[]): string {
+		if (!html) return '';
+		return html.replace(/\[Doc (\d+)(?:: (?:Hlm\.|Pages?|Page) ([^\]]+))?\]/g, (_match, docIdxStr, pageInfo) => {
+			const docIdx = Number(docIdxStr);
+			let docDisplayName = `Doc ${docIdx}`;
+			let tooltipTitle = `Doc ${docIdx}`;
+
+			if (references && references.length > 0) {
+				const refDoc = references.find((r) => r.index === docIdx || r.id === docIdxStr) || references[docIdx - 1];
+				if (refDoc && refDoc.name) {
+					tooltipTitle = refDoc.name;
+					const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
+					docDisplayName = cleanName.length > 5 ? cleanName.slice(0, 5) + '...' : cleanName;
+				}
+			}
+
+			const label = pageInfo ? `${docDisplayName} • Hlm. ${pageInfo}` : docDisplayName;
+			return `<span class="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300 transition-colors hover:bg-amber-400/25 cursor-pointer" title="${tooltipTitle}">${label}</span>`;
+		});
+	}
+
 	function wrapWordsInHtml(html: string): string {
 		if (!html) return '';
 		const parts = html.split(/(<[^>]+>)/g);
@@ -70,11 +91,12 @@
 		return parts.join('');
 	}
 
-	function renderMarkdown(text: string): string {
+	function renderMarkdown(text: string, references?: DocReference[]): string {
 		if (!text) return '';
 		try {
 			const rawHtml = marked.parse(text) as string;
-			return wrapWordsInHtml(rawHtml);
+			const citedHtml = transformCitationTags(rawHtml, references);
+			return wrapWordsInHtml(citedHtml);
 		} catch (e) {
 			return text;
 		}
@@ -98,6 +120,7 @@
 
 	interface DocReference {
 		id: string;
+		index?: number;
 		name: string;
 		page?: number;
 		pages?: number[];
@@ -465,8 +488,9 @@
 						try {
 							const parsed = JSON.parse(dataStr);
 							if (parsed.references) {
-								messages[asstIndex].references = parsed.references.map((r: any) => ({
+								messages[asstIndex].references = parsed.references.map((r: any, idx: number) => ({
 									id: r.documentId,
+									index: r.index || (idx + 1),
 									name: r.title || r.documentId,
 									pages: r.pages
 								}));
@@ -499,6 +523,13 @@
 						messages[asstIndex].isStreaming = false;
 						isGenerating = false;
 						isTitleLoading = false;
+
+						// If the AI response text does NOT contain any inline sentence citations ([Doc ...]), clear references
+						const textContent = messages[asstIndex].content;
+						if (!/\[Doc \d+/i.test(textContent)) {
+							messages[asstIndex].references = [];
+						}
+
 						console.log('[Chat Detail] Backend Response (Stream Complete):', {
 							id: assistantMsgId,
 							answerLength: messages[asstIndex].content.length
@@ -664,7 +695,7 @@
 							<div
 								class="prose prose-invert prose-sm max-w-none text-white/90 prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-amber-300 prose-code:before:content-none prose-code:after:content-none prose-a:text-amber-400 prose-li:my-1"
 							>
-								{@html renderMarkdown(msg.content)}
+								{@html renderMarkdown(msg.content, msg.references)}
 
 								{#if msg.isStreaming}
 									<span
