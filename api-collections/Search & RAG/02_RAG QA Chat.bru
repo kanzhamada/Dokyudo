@@ -27,5 +27,5 @@ body:json {
 }
 
 docs {
-  Streams answer tokens back using Server-Sent Events (SSE). Retrieves top 5 chunks, builds context prompt, and calls AI Gateway. Emits event: title for new conversations (turn 1) with an LLM-summarized title (max 7 words). Emits event: references conditionally when relevant context documents match (including documentId, title, and pages array).
+  Streams answer tokens back using Server-Sent Events (SSE). Retrieves top chunks, maps document-level indices [Doc 1..M], and enforces Single-Pass In-Context Sentence Citations [Doc N: Hlm. X]. Emits event: title for new conversations (turn 1) with an LLM-summarized title (max 7 words). Emits event: references conditionally when relevant context documents match (including 1-based index, documentId, title, and pages array).
 }
