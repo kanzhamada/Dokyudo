@@ -17,7 +17,11 @@
 		Check,
 		ThumbsUp,
 		ThumbsDown,
-		BookOpen
+		BookOpen,
+		Ellipsis,
+		GitBranch,
+		Volume2,
+		Pencil
 	} from 'lucide-svelte';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -637,77 +641,12 @@
 		style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
 	></div>
 
-	<!-- Top Area: Conversation Header -->
-	<header
-		class="relative z-20 flex h-16 shrink-0 items-center justify-between border-b border-white/[0.10] bg-[#1F1E1D]/[0.85] px-4 md:px-8 backdrop-blur-md"
-	>
-		<div class="flex items-center gap-3">
-			<!-- Back Button to /app/chat -->
-			<Button
-				variant="ghost"
-				size="icon"
-				class="h-9 w-9 text-white/70 hover:bg-white/10 hover:text-white"
-				onclick={() => goto('/app/chat')}
-				aria-label="Back to chat list"
-			>
-				<ArrowLeft class="size-4" />
-			</Button>
-
-			<!-- Breadcrumb & Title -->
-			<div class="flex flex-col">
-				<Breadcrumb.Root class="hidden sm:block">
-					<Breadcrumb.List class="text-xs text-white/40">
-						<Breadcrumb.Item>
-							<Breadcrumb.Link href="/app/dashboard" class="text-white/40 hover:text-white/70">
-								Home
-							</Breadcrumb.Link>
-						</Breadcrumb.Item>
-						<Breadcrumb.Separator class="text-white/30" />
-						<Breadcrumb.Item>
-							<Breadcrumb.Link href="/app/chat" class="text-white/40 hover:text-white/70">
-								Chat
-							</Breadcrumb.Link>
-						</Breadcrumb.Item>
-						<Breadcrumb.Separator class="text-white/30" />
-						<Breadcrumb.Item>
-							<Breadcrumb.Page class="font-medium text-white/80">
-								{chatId.slice(0, 8)}
-							</Breadcrumb.Page>
-						</Breadcrumb.Item>
-					</Breadcrumb.List>
-				</Breadcrumb.Root>
-
-				<h1 class="flex h-6 items-center text-sm font-semibold text-white md:text-base">
-					{#if isTitleLoading || !conversationTitle}
-						<Skeleton class="h-4 w-36 rounded bg-white/20 animate-pulse" />
-					{:else}
-						{conversationTitle}
-					{/if}
-				</h1>
-			</div>
-		</div>
-
-		<!-- Right Side: Model Badge Indicator -->
-		<div class="flex items-center gap-3">
-			<div
-				class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-medium text-white/70 backdrop-blur-sm"
-			>
-				<img
-					src={selectedModel.icon}
-					alt={selectedModel.name}
-					class="size-3.5 brightness-0 invert opacity-80"
-				/>
-				<span class="hidden sm:inline">{selectedModel.name}</span>
-			</div>
-		</div>
-	</header>
-
 	<!-- Center Scrollable Chat Area -->
 	<div
 		bind:this={chatContainer}
-		class="relative z-10 flex flex-1 flex-col overflow-y-auto px-4 py-6 md:px-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+		class="relative z-10 flex flex-1 flex-col overflow-y-auto px-4 py-8 md:px-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
 	>
-		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-40">
+		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-48">
 			{#each messages as msg (msg.id)}
 				{#if msg.role === 'user'}
 					<!-- User Message (Clean Pill) -->
@@ -730,6 +669,32 @@
 								{/if}
 
 								<p class="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+							</div>
+
+							<!-- Action Toolbar for User Question (Copy & Edit) -->
+							<div class="flex items-center gap-1 pr-1 text-white/40">
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-6 w-6 text-white/40 hover:bg-white/10 hover:text-white"
+									onclick={() => copyToClipboard(msg.content, msg.id)}
+									aria-label="Copy question"
+								>
+									{#if copiedMessageId === msg.id}
+										<Check class="size-3 text-green-400" />
+									{:else}
+										<Copy class="size-3" />
+									{/if}
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-6 w-6 text-white/40 hover:bg-white/10 hover:text-white"
+									onclick={() => toast.info('Edit question feature coming soon')}
+									aria-label="Edit question"
+								>
+									<Pencil class="size-3" />
+								</Button>
 							</div>
 						</div>
 					</div>
@@ -788,7 +753,7 @@
 								</div>
 							{/if}
 
-							<!-- Action Toolbar (Copy, Thumbs Up/Down) -->
+							<!-- Action Toolbar (Copy, Thumbs Up/Down, Dropdown Menu) -->
 							<div class="flex items-center gap-1 pt-1 text-white/40">
 								<Button
 									variant="ghost"
@@ -819,6 +784,32 @@
 								>
 									<ThumbsDown class="size-3.5" />
 								</Button>
+
+								<!-- Triple Dot Dropdown Menu -->
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger
+										class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+										aria-label="More options"
+									>
+										<Ellipsis class="size-3.5" />
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Content align="start" class="w-48 border-white/15 bg-[#232323] text-white">
+										<DropdownMenu.Item
+											class="flex cursor-pointer items-center gap-2 text-xs text-white/80 hover:bg-white/10 hover:text-white"
+											onclick={() => toast.info('Branch in new chat coming soon')}
+										>
+											<GitBranch class="size-3.5 text-amber-400" />
+											<span>Branch in new chat</span>
+										</DropdownMenu.Item>
+										<DropdownMenu.Item
+											class="flex cursor-pointer items-center gap-2 text-xs text-white/80 hover:bg-white/10 hover:text-white"
+											onclick={() => toast.info('Read aloud coming soon')}
+										>
+											<Volume2 class="size-3.5 text-amber-400" />
+											<span>Read aloud</span>
+										</DropdownMenu.Item>
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
 							</div>
 						</div>
 					</div>
@@ -827,15 +818,16 @@
 		</div>
 	</div>
 
-	<!-- Bottom Area: Floating Input Capsule -->
+	<!-- Bottom Area: Floating Input Capsule with Gradient Mask -->
 	<div
-		class="absolute bottom-4 left-1/2 z-30 flex w-full max-w-5xl -translate-x-1/2 flex-col items-center gap-3 px-4"
-		style="font-family: 'Inter', sans-serif;"
+		class="pointer-events-none fixed bottom-0 right-0 z-30 flex flex-col items-center justify-end pb-4 pt-20 bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent"
+		style="left: var(--sidebar-width, 16rem); font-family: 'Inter', sans-serif;"
 	>
-		<!-- Main Input Capsule -->
-		<div
-			class="group flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.85] px-4 py-2 shadow-2xl backdrop-blur-[42px] transition-all"
-		>
+		<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">
+			<!-- Main Input Capsule -->
+			<div
+				class="group flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.85] px-4 py-2 shadow-2xl backdrop-blur-[42px] transition-all"
+			>
 			<!-- Row 1: Attached Files -->
 			{#if attachedFiles.length > 0}
 				<div class="flex flex-wrap gap-2 pt-1 pb-1">
@@ -993,6 +985,7 @@
 				<Keyboard class="size-3" />
 				<span>{inputValue.length}/690</span>
 			</div>
+		</div>
 		</div>
 	</div>
 </div>
