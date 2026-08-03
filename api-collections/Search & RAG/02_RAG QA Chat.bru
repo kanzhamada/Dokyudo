@@ -27,5 +27,5 @@ body:json {
 }
 
 docs {
-  Streams answer tokens back using Server-Sent Events (SSE). Retrieves top 5 chunks, builds context prompt, and calls AI Gateway.
+  Streams answer tokens back using Server-Sent Events (SSE). Retrieves top 5 chunks, builds context prompt, and calls AI Gateway. Emits event: title for new conversations (turn 1) with an LLM-summarized title (max 7 words).
 }

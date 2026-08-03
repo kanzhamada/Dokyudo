@@ -5,6 +5,8 @@ This feature encompasses the conversational memory capabilities and management o
 
 Key capabilities:
 - **Conversation Memory (Sliding Window):** Automatically fetches up to 3 of the most recent conversation turns when a `conversationId` is provided.
+- **Smart Title Generation (Turn 1 Only):** Automatically generates a concise 1-sentence title (max 7 words) using `gemini-3.1-flash-lite` upon completion of the initial turn.
+- **Real-Time SSE Title Event:** Emits `event: title` over the active SSE stream so the client updates header title and sidebar in real-time with an animated `<Skeleton>` loading state.
 - **Standalone Query Rewriting:** Uses a high-speed LLM (Gemini Flash Lite) to rewrite follow-up questions contextually, ensuring hybrid searches remain highly accurate and do not match against vague pronouns.
 - **Prompt Guardrails:** Protects against document-based prompt injection by isolating the context documents inside the augmented prompt.
 - **Tier Quota Validation (Soft Lock):** Enforces monthly Q&A limits based on the tenant's subscription tier. Blocks requests with HTTP 400 if limits are exceeded.
@@ -17,7 +19,7 @@ sequenceDiagram
     actor Client
     participant API Gateway
     participant RagService
-    participant LLM (Query Rewriter)
+    participant LLM (Title & Rewriter)
     participant Hybrid Search
     participant LLM (Main Generator)
     participant Database
@@ -31,38 +33,32 @@ sequenceDiagram
     end
     RagService->>Database: Fetch max 3 recent turns
     Database-->>RagService: Return conversation_turns
-    RagService->>LLM (Query Rewriter): Rewrite question with History
-    LLM (Query Rewriter)-->>RagService: Standalone Query
+    RagService->>LLM (Title & Rewriter): Rewrite question with History
+    LLM (Title & Rewriter)-->>RagService: Standalone Query
     RagService->>Hybrid Search: Search using Standalone Query
     Hybrid Search-->>RagService: Top 5 Context Documents
     RagService->>Database: UPDATE tenant_subscriptions (qaCount + 1)
     RagService->>LLM (Main Generator): Augmented Prompt (History + Guardrails + Docs)
     LLM (Main Generator)-->>Client: SSE Token Stream
+    opt Turn 1 (New Conversation)
+        RagService->>LLM (Title & Rewriter): Summarize Q&A into Title (Max 7 Words)
+        LLM (Title & Rewriter)-->>RagService: Smart Title
+        RagService->>Database: UPDATE conversations SET title = smartTitle
+        RagService-->>Client: SSE Event (event: title)
+    end
+    RagService-->>Client: SSE Event (event: done)
     RagService->>Database: Async Save new conversation_turn
-
-    %% Management Flow
-    Client->>API Gateway: PATCH /api/rag/conversations/:id
-    API Gateway->>RagService: Validate Zod Schema
-    RagService->>Database: UPDATE title WHERE tenantId = tenantId
-    Database-->>Client: 200 OK
-
-    Client->>API Gateway: DELETE /api/rag/conversations/:id
-    API Gateway->>RagService: Validate Auth
-    RagService->>Database: DELETE WHERE tenantId = tenantId
-    Database-->>Client: 200 OK
 ```
 
 ## Completion Timestamp
-**Date:** 2026-07-01
-**Time:** 16:55 (UTC+7)
+**Date:** 2026-08-03
+**Time:** 11:23 (UTC+7)
 
 ## File Mapping
-- `apps/backend/src/modules/rag/rag.service.ts`: Implemented tier quota checking, `streamChat` query rewriting, `updateConversationTitle`, and `deleteConversation`.
-- `apps/backend/src/modules/rag/rag.controller.ts`: Added request validation and execution handlers for the new routes.
-- `apps/backend/src/modules/rag/rag.routes.ts`: Registered OpenAPI schemas for `PATCH` and `DELETE`.
-- `apps/backend/src/modules/rag/rag.schema.ts`: Added Zod validations (`UpdateConversationBodySchema`, `ConversationParamSchema`, and max length limits to chat input).
-- `apps/backend/src/config/gemini.ts`: Added synchronous `generateText` method for query rewriting and gatekeeping.
-- `apps/backend/src/shared/constants/tiers.constant.ts`: Source of truth for all Tier limits and `maxQnaPerMonth` constraints.
+- `apps/backend/src/modules/rag/rag.service.ts`: Implemented `isNewConversation` detection, `gemini.generateText` smart title generation (max 7 words), and `event: title` SSE emission.
+- `apps/frontend/src/routes/app/chat/[id]/+page.svelte`: Built dark background UI, SSE stream block parser (`event: title`), and animated `<Skeleton>` header title loader.
+- `apps/frontend/src/lib/state/conversations.store.svelte.ts`: Created reactive Svelte 5 conversation store for real-time sidebar synchronization.
+- `apps/frontend/src/lib/components/app/AppSidebar.svelte`: Connected recent chats list to `conversationsStore` for instant live updates.
 
 ## Connections
 - **Client (Frontend):** Sends `conversation_id` in subsequent chat requests to maintain memory. Can send HTTP requests to rename or remove chats.
