@@ -202,6 +202,12 @@
 | **Payments Svc**| `handleWebhook: positive downgrades sub on deleted` | Tier updated to `FREE`, expiresAt to null | DB matched | ✅ Pass |
 | **Payments Svc**| `createPortalSession: positive creates portal session` | Returns `portalUrl` | Matched URL | ✅ Pass |
 | **Payments Svc**| `createPortalSession: negative rejects if no stripe_cust`| Throws "No active Stripe customer found" | AppError thrown | ✅ Pass |
+| **Me Svc** | `getProfile: rejects when user/tenant missing` | Throws AppError / Drizzle query rejection | Exception thrown | ✅ Pass |
+| **Me Svc** | `getUsage: rejects when subscription missing` | Throws AppError / Drizzle query rejection | Exception thrown | ✅ Pass |
+| **Me Routes** | `GET /api/me: missing authorization returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Me Routes** | `GET /api/me: invalid bearer token returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Me Routes** | `GET /api/me/usage: missing authorization returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
+| **Me Routes** | `GET /api/me/usage: invalid bearer token returns 401` | HTTP 401, `UNAUTHORIZED` | HTTP 401, Match | ✅ Pass |
 
 ---
 *Report auto-generated after applying BDD refactoring and strict isolation testing.*
