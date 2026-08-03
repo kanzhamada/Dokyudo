@@ -287,10 +287,6 @@ export const ProfileResponseSchema = z
         subscription: z.object({
             tier: z.enum(["FREE", "SIMULATE", "OIL_INVESTOR", "PRO"]),
             expiresAt: z.string().nullable().optional(),
-            uploadsCount: z.number(),
-            searchesCount: z.number(),
-            qaCount: z.number(),
-            storageUsedBytes: z.number(),
         }),
     })
     .openapi("ProfileResponse");

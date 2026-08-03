@@ -194,7 +194,6 @@
 				/>
 			</div>
 
-			{#if hasActiveFilters}
 				<Button
 					variant="ghost"
 					size="sm"
@@ -204,7 +203,6 @@
 					<RotateCcw class="mr-1 h-3.5 w-3.5" />
 					Reset
 				</Button>
-			{/if}
 		</div>
 	</div>
 

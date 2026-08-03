@@ -20,6 +20,8 @@
 	import { toast } from 'svelte-sonner';
 	import { onMount } from 'svelte';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
+	import { getMeUsage } from '$lib/api/me';
+	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
 	import cohereIcon from '$lib/assets/llm/cohere.svg';
@@ -48,22 +50,61 @@
 	let selectedModel = $state(llmOptions[0]);
 	let attachedFiles: File[] = $state([]);
 
-	// Global Usage Constraints
-	let baseUploads = 0; // Mock base count from server
-	let maxUploads = 5;
+	// Global Usage Constraints (Dynamic based on Tenant Tier)
+	let baseUploads = $state(0);
+	let maxUploads = $state(10);
 
-	let baseStorage = 0.3 * 1024 * 1024 * 1024; // 0.3GB mock base from server
-	let maxStorage = 5 * 1024 * 1024 * 1024; // 5GB limit
+	let baseStorage = $state(0);
+	let maxStorage = $state(100 * 1024 * 1024); // 100MB default
+
+	let maxFileSizeBytes = $state(10 * 1024 * 1024); // 10MB default
+
+	let searchesCount = $state(0);
+	let maxSearches = $state(100);
+
+	let qaCount = $state(0);
+	let maxQa = $state(50);
 
 	// Derived UI states
 	let currentUploadCount = $derived(baseUploads + attachedFiles.length);
 	let currentStorageBytes = $derived(
 		baseStorage + attachedFiles.reduce((acc, file) => acc + file.size, 0)
 	);
-	let currentStorageGB = $derived((currentStorageBytes / (1024 * 1024 * 1024)).toFixed(1));
 
-	onMount(() => {
+	let storageDisplay = $derived.by(() => {
+		if (maxStorage >= 1024 * 1024 * 1024) {
+			const usedGB = (currentStorageBytes / (1024 * 1024 * 1024)).toFixed(1);
+			const maxGB = (maxStorage / (1024 * 1024 * 1024)).toFixed(1);
+			return `${usedGB}/${maxGB}GB`;
+		}
+		const usedMB = (currentStorageBytes / (1024 * 1024)).toFixed(1);
+		const maxMB = (maxStorage / (1024 * 1024)).toFixed(0);
+		return `${usedMB}/${maxMB}MB`;
+	});
+
+	let maxFileSizeMB = $derived((maxFileSizeBytes / (1024 * 1024)).toFixed(0));
+
+	onMount(async () => {
 		if (textInput) textInput.focus();
+		try {
+			const res = await getMeUsage();
+			if (res.ok) {
+				baseUploads = res.data.uploadsCount;
+				baseStorage = res.data.storageUsedBytes;
+				searchesCount = res.data.searchesCount;
+				qaCount = res.data.qaCount;
+				
+				const userTier: TierType = (res.data.tier as TierType) ?? 'FREE';
+				const limits = TIER_LIMITS[userTier] ?? TIER_LIMITS.FREE;
+				maxUploads = limits.maxUploadsPerMonth;
+				maxStorage = limits.maxStorageBytes;
+				maxFileSizeBytes = limits.maxFileSizeBytes;
+				maxSearches = limits.maxSearchesPerMonth;
+				maxQa = limits.maxQnaPerMonth;
+			}
+		} catch (err) {
+			console.error('[Chat Page] Failed to fetch usage:', err);
+		}
 	});
 
 	$effect(() => {
@@ -88,7 +129,6 @@
 	function handleFileChange(e: Event) {
 		const target = e.target as HTMLInputElement;
 		if (target.files && target.files.length > 0) {
-			const maxFileSize = 25 * 1024 * 1024; // 25MB
 			const validFiles: File[] = [];
 
 			for (let i = 0; i < target.files.length; i++) {
@@ -102,9 +142,9 @@
 					continue;
 				}
 
-				// 1. Individual 25MB check
-				if (file.size > maxFileSize) {
-					showError(`File "${file.name}" exceeds the 25MB limit and was rejected.`);
+				// 1. Individual size check per tier limit
+				if (file.size > maxFileSizeBytes) {
+					showError(`File "${file.name}" exceeds the ${maxFileSizeMB}MB limit for your plan and was rejected.`);
 					continue;
 				}
 
@@ -119,7 +159,7 @@
 				// 3. Global size check
 				const upcomingSize = currentStorageBytes + validFiles.reduce((acc, f) => acc + f.size, 0) + file.size;
 				if (upcomingSize > maxStorage) {
-					showError(`Cannot attach "${file.name}": Exceeds 5GB storage limit.`);
+					showError(`Cannot attach "${file.name}": Exceeds storage limit for your plan.`);
 					continue;
 				}
 
@@ -284,7 +324,7 @@
 							>
 								<p>Attach Document (PDF, TXT, DOCX)</p>
 								<p class="text-xs text-white/[0.69]">
-									{maxUploads - currentUploadCount} uploads remaining • Max 25MB/file
+									{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
 								</p>
 							</Tooltip.Content>
 						</Tooltip.Root>
@@ -445,24 +485,24 @@
 					)}
 					{@render desktopUsageMetric(
 						Database,
-						`${currentStorageGB}/5GB`,
-						`Document Storage (${currentStorageGB} of 5 GB used)`,
+						storageDisplay,
+						`Document Storage (${storageDisplay} used)`,
 						baseStorage / maxStorage,
 						currentStorageBytes / maxStorage
 					)}
 					{@render desktopUsageMetric(
 						Search,
-						'4/50',
-						'Semantic Searches (4 of 50 used)',
-						4 / 50,
-						4 / 50
+						`${searchesCount}/${maxSearches}`,
+						`Semantic Searches (${searchesCount} of ${maxSearches} used)`,
+						searchesCount / maxSearches,
+						searchesCount / maxSearches
 					)}
 					{@render desktopUsageMetric(
 						MessageSquare,
-						'9/10',
-						'Chat Messages (9 of 10 used)',
-						9 / 10,
-						9 / 10
+						`${qaCount}/${maxQa}`,
+						`Chat Messages (${qaCount} of ${maxQa} used)`,
+						qaCount / maxQa,
+						qaCount / maxQa
 					)}
 				</div>
 
@@ -490,12 +530,24 @@
 								{@render mobileUsageMetric(
 									Database,
 									'Document Storage',
-									`${currentStorageGB}/5GB`,
+									storageDisplay,
 									baseStorage / maxStorage,
 									currentStorageBytes / maxStorage
 								)}
-								{@render mobileUsageMetric(Search, 'Semantic Searches', '4/50', 4 / 50, 4 / 50)}
-								{@render mobileUsageMetric(MessageSquare, 'Chat Messages', '9/10', 9 / 10, 9 / 10)}
+								{@render mobileUsageMetric(
+									Search,
+									'Semantic Searches',
+									`${searchesCount}/${maxSearches}`,
+									searchesCount / maxSearches,
+									searchesCount / maxSearches
+								)}
+								{@render mobileUsageMetric(
+									MessageSquare,
+									'Chat Messages',
+									`${qaCount}/${maxQa}`,
+									qaCount / maxQa,
+									qaCount / maxQa
+								)}
 							</div>
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>

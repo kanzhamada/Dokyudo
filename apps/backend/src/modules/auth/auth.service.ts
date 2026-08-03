@@ -932,10 +932,6 @@ export class AuthService {
             subscription: {
                 tier: currentTier,
                 expiresAt: expiresAt?.toISOString() || null,
-                uploadsCount: subscription.uploadsCount,
-                searchesCount: subscription.searchesCount,
-                qaCount: subscription.qaCount,
-                storageUsedBytes: subscription.storageUsedBytes,
             },
         };
     }

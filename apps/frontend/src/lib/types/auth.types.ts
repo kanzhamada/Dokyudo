@@ -95,9 +95,14 @@ export interface UserProfileResponse {
 	subscription: {
 		tier: string;
 		expiresAt: string | null;
-		uploadsCount: number;
-		searchesCount: number;
-		qaCount: number;
-		storageUsedBytes: number;
 	};
+}
+
+/** Realtime usage metrics (/api/me/usage) response */
+export interface UserUsageResponse {
+	tier: 'FREE' | 'SIMULATE' | 'OIL_INVESTOR' | 'PRO';
+	uploadsCount: number;
+	searchesCount: number;
+	qaCount: number;
+	storageUsedBytes: number;
 }

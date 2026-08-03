@@ -7,6 +7,7 @@ import { ragRoutes } from "../modules/rag/mod.ts";
 import { paymentsRoutes } from "../modules/payments/mod.ts";
 import { keysRoutes } from "../modules/keys/mod.ts";
 import { activitiesRoutes } from "../modules/activities/mod.ts";
+import { meRoutes } from "../modules/me/mod.ts";
 // import { pocRoutes } from "../modules/poc/poc_routes.ts";
 
 const router = createApp();
@@ -21,6 +22,7 @@ router.use("*", async (c, next) => {
 });
 
 router.route("/auth", authRoutes);
+router.route("/me", meRoutes);
 router.route("/documents", documentsRoutes);
 router.route("/search", searchRoutes);
 router.route("/rag", ragRoutes);
