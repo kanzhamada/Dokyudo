@@ -30,3 +30,27 @@ export interface DeleteConversationResponse {
 		success: boolean;
 	};
 }
+
+export interface ContextReference {
+	documentId: string;
+	title?: string;
+	pages: number[];
+}
+
+export interface ConversationTurn {
+	id: string;
+	question: string;
+	answer: string;
+	modelUsed: string | null;
+	contextReferences: ContextReference[] | null;
+	createdAt: string;
+}
+
+export interface GetConversationResponse {
+	id: string;
+	title: string;
+	createdAt: string;
+	updatedAt: string;
+	turns: ConversationTurn[];
+}
+

@@ -3,6 +3,7 @@ import type { ApiResult } from '../types/api.types';
 import type {
 	GetConversationsParams,
 	GetConversationsResponse,
+	GetConversationResponse,
 	UpdateConversationParams,
 	UpdateConversationResponse,
 	DeleteConversationResponse
@@ -22,6 +23,13 @@ export function getConversations(
 	const path = `/api/rag/conversations${queryString ? `?${queryString}` : ''}`;
 
 	return apiRequest<GetConversationsResponse>(path, { method: 'GET' });
+}
+
+/**
+ * Fetches a single conversation by ID including its turns.
+ */
+export function getConversation(id: string): Promise<ApiResult<GetConversationResponse>> {
+	return apiRequest<GetConversationResponse>(`/api/rag/conversations/${id}`, { method: 'GET' });
 }
 
 /**
@@ -47,3 +55,4 @@ export function deleteConversation(
 		method: 'DELETE'
 	});
 }
+

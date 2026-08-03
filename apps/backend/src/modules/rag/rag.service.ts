@@ -170,6 +170,57 @@ ${question}
             await TierQuotaUtil.incrementQa(tx, tenantId);
         });
 
+        // Resolve parent conversation existence & isNewConversation flag before streaming
+        let isNewConversation = false;
+        let cid = conversationId;
+
+        if (cid) {
+            const existingConv = await withAuthDb(
+                userId,
+                async (tx) => {
+                    return await tx
+                        .select({ id: conversations.id })
+                        .from(conversations)
+                        .where(
+                            and(
+                                eq(conversations.id, cid!),
+                                eq(conversations.tenantId, tenantId),
+                            ),
+                        );
+                },
+            );
+
+            if (existingConv.length === 0) {
+                await withAuthDb(userId, async (tx) => {
+                    await tx.insert(conversations).values({
+                        id: cid,
+                        tenantId,
+                        title:
+                            question.substring(0, 50) ||
+                            "New Conversation",
+                    });
+                });
+                isNewConversation = true;
+            }
+        } else {
+            const [newConv] = await withAuthDb(
+                userId,
+                async (tx) => {
+                    return await tx
+                        .insert(conversations)
+                        .values({
+                            tenantId,
+                            title:
+                                question.substring(0, 50) ||
+                                "New Conversation",
+                        })
+                        .returning({ id: conversations.id });
+                },
+            );
+            cid = newConv.id;
+            isNewConversation = true;
+        }
+
         const stream = new ReadableStream({
             async start(controller) {
                 const encoder = new TextEncoder();
@@ -322,6 +373,34 @@ ${question}
                         ),
                     );
                 } else if (success) {
+                    if (isNewConversation) {
+                        let smartTitle = question.substring(0, 50);
+                        try {
+                            const titlePrompt = `Summarize the following user question and AI answer into a single, concise conversation title (maximum 7 words, clear and direct, no quotes, no period):\nUser Question: ${question}\nAI Answer: ${fullAnswer.substring(0, 300)}`;
+                            const titleRes = await gemini.generateText(titlePrompt, GEMINI_MODELS.llmDefault);
+                            if (titleRes?.text) {
+                                smartTitle = titleRes.text.trim().replace(/^["']|["']$/g, '');
+                            }
+                        } catch (_tErr) {
+                            // fallback to default question substring
+                        }
+
+                        try {
+                            await withAuthDb(userId, async (tx) => {
+                                await tx
+                                    .update(conversations)
+                                    .set({ title: smartTitle, updatedAt: new Date() })
+                                    .where(eq(conversations.id, cid!));
+                            });
+                        } catch (_dbErr) {
+                            // ignore title DB update failure
+                        }
+
+                        controller.enqueue(
+                            encoder.encode(`event: title\ndata: ${JSON.stringify({ title: smartTitle })}\n\n`),
+                        );
+                    }
+
                     controller.enqueue(
                         encoder.encode("event: done\ndata: [DONE]\n\n"),
                     );
@@ -334,25 +413,6 @@ ${question}
                 if (success) {
                     try {
                         const latencyMs = Date.now() - startMs;
-                        let cid = conversationId;
-
-                        if (!cid) {
-                            const [newConv] = await withAuthDb(
-                                userId,
-                                async (tx) => {
-                                    return await tx
-                                        .insert(conversations)
-                                        .values({
-                                            tenantId,
-                                            title:
-                                                question.substring(0, 50) ||
-                                                "New Conversation",
-                                        })
-                                        .returning({ id: conversations.id });
-                                },
-                            );
-                            cid = newConv.id;
-                        }
 
                         await withAuthDb(userId, async (tx) => {
                             await tx.insert(conversationTurns).values({
@@ -370,7 +430,12 @@ ${question}
                             await tx
                                 .update(conversations)
                                 .set({ updatedAt: new Date() })
-                                .where(eq(conversations.id, cid!));
+                                .where(
+                                    and(
+                                        eq(conversations.id, cid!),
+                                        eq(conversations.tenantId, tenantId),
+                                    ),
+                                );
                         });
 
                         if (logContext) {

@@ -101,10 +101,9 @@ export function createZipArchive(files: ZipFileEntry[]): Blob {
 	eView.setUint16(6, 0, true); // Start disk
 	eView.setUint16(8, files.length, true); // Disk entries
 	eView.setUint16(10, files.length, true); // Total entries
-	eView.setUint32(12, centralDirSize, true); // Central dir size
-	eView.setUint32(16, centralDirOffset, true); // Central dir offset
-	eView.setUint16(20, 0, true); // Comment length
-
-	const zipParts = [...localHeaders, ...centralHeaders, eocd];
-	return new Blob(zipParts, { type: 'application/zip' });
+	eView.setUint32(12, centralDirSize, true); // Central directory size
+	eView.setUint32(16, centralDirOffset, true); // Central directory offset
+	return new Blob([...localHeaders, ...centralHeaders, eocd] as any);
 }
+
+

@@ -19,9 +19,12 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { toast } from 'svelte-sonner';
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
+	import { getKeys } from '$lib/api/keys';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
+
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
 	import cohereIcon from '$lib/assets/llm/cohere.svg';
@@ -32,22 +35,33 @@
 	import openaiIcon from '$lib/assets/llm/openai.svg';
 	import openrouterIcon from '$lib/assets/llm/openrouter.svg';
 
-	const llmOptions = [
-		{ name: 'Gemini 3.1 Pro', icon: geminiIcon },
-		{ name: 'GPT-4o', icon: openaiIcon },
-		{ name: 'Claude 3.5 Sonnet', icon: claudeIcon },
-		{ name: 'Meta Llama 3', icon: metaIcon },
-		{ name: 'Mistral Large', icon: mistralIcon },
-		{ name: 'Cohere Command R', icon: cohereIcon },
-		{ name: 'Groq', icon: groqIcon },
-		{ name: 'OpenRouter', icon: openrouterIcon }
-	];
+	interface LlmOption {
+		name: string;
+		provider: string;
+		model: string;
+		icon: string;
+	}
+
+	const PROVIDER_ICONS: Record<string, string> = {
+		gemini: geminiIcon,
+		mistral: mistralIcon,
+		openrouter: openrouterIcon,
+		openai: openaiIcon,
+		claude: claudeIcon,
+		cohere: cohereIcon,
+		groq: groqIcon,
+		meta: metaIcon
+	};
+
+	let llmOptions: LlmOption[] = $state([
+		{ name: 'Free Auto', provider: 'auto', model: 'auto', icon: geminiIcon }
+	]);
 
 	let activeMode = $state('chat');
 	let fileInput: HTMLInputElement | null = $state(null);
 	let textInput: HTMLTextAreaElement | null = $state(null);
 	let inputValue = $state('');
-	let selectedModel = $state(llmOptions[0]);
+	let selectedModel: LlmOption = $state(llmOptions[0]);
 	let attachedFiles: File[] = $state([]);
 
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
@@ -104,6 +118,37 @@
 			}
 		} catch (err) {
 			console.error('[Chat Page] Failed to fetch usage:', err);
+		}
+
+		try {
+			console.log('[Chat Page] Fetching BYOK Keys');
+			const keysRes = await getKeys();
+			console.log('[Chat Page] Keys Response:', keysRes);
+
+			if (keysRes.ok && keysRes.data?.data && keysRes.data.data.length > 0) {
+				const dynamicOptions: LlmOption[] = [
+					{ name: 'Free Auto', provider: 'auto', model: 'auto', icon: geminiIcon }
+				];
+
+				for (const item of keysRes.data.data) {
+					const icon = PROVIDER_ICONS[item.provider.toLowerCase()] || geminiIcon;
+					if (Array.isArray(item.models)) {
+						for (const model of item.models) {
+							dynamicOptions.push({
+								name: model,
+								provider: item.provider,
+								model: model,
+								icon
+							});
+						}
+					}
+				}
+
+				llmOptions = dynamicOptions;
+				selectedModel = llmOptions[0];
+			}
+		} catch (err) {
+			console.error('[Chat Page] Failed to fetch keys:', err);
 		}
 	});
 
@@ -175,6 +220,32 @@
 
 	function removeFile(index: number) {
 		attachedFiles.splice(index, 1);
+	}
+
+	function handleSubmit() {
+		if (!inputValue.trim()) return;
+
+		if (activeMode === 'chat') {
+			const newId = crypto.randomUUID();
+			console.log('[Chat Page] Initial Chat Submit:', {
+				newId,
+				question: inputValue.trim(),
+				selectedModel
+			});
+			goto(`/app/chat/${newId}`, {
+				state: {
+					initialQuestion: inputValue.trim(),
+					selectedModel: $state.snapshot(selectedModel)
+				}
+			});
+		}
+	}
+
+	function handleKeyDown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			handleSubmit();
+		}
 	}
 </script>
 
@@ -350,6 +421,7 @@
 						? 'Search documents using semantic search...'
 						: 'Ask a question about your documents...'}
 					class="max-h-32 min-h-[36px] flex-1 resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 text-white/[0.40] shadow-none ring-0 transition-colors outline-none placeholder:text-white/[0.40] focus-within:text-white/[0.69] focus-within:placeholder-white/[0.69] hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+					onkeydown={handleKeyDown}
 					oninput={(e) => {
 						const target = e.currentTarget as HTMLTextAreaElement;
 						if (target) {
@@ -375,7 +447,7 @@
 								<ChevronDown class="size-4" />
 							</DropdownMenu.Trigger>
 							<DropdownMenu.Content
-								class="w-52 border border-white/[0.16] bg-[#232323]/40 text-white backdrop-blur-[42px]"
+								class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] bg-[#232323]/40 text-white backdrop-blur-[42px]"
 							>
 								{#each llmOptions as option}
 									<DropdownMenu.Item
@@ -383,7 +455,7 @@
 										onclick={() => (selectedModel = option)}
 									>
 										<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
-										<span>{option.name}</span>
+										<span class="truncate">{option.name}</span>
 									</DropdownMenu.Item>
 								{/each}
 							</DropdownMenu.Content>
@@ -394,6 +466,7 @@
 				<!-- Element 1.4: Send Button -->
 				<button
 					class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-[#B8B5B5]/[0] text-white/[0.80] backdrop-blur-[31.16px]"
+					onclick={handleSubmit}
 				>
 					<SendHorizontal class="size-5 -rotate-90" />
 				</button>

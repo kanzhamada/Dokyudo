@@ -39,6 +39,7 @@
 	import { getMe } from '$lib/api/me';
 	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
 	import { sessionStore } from '$lib/state/session.store.svelte';
+	import { conversationsStore } from '$lib/state/conversations.store.svelte';
 	import type { UserProfileResponse } from '$lib/types/auth.types';
 	import type { ConversationItem } from '$lib/types/rag.types';
 
@@ -72,6 +73,7 @@
 				} else {
 					conversations = result.data.conversations;
 				}
+				conversationsStore.set(conversations);
 				nextCursor = result.data.nextCursor;
 				console.log('[Auth Conversations] Loaded conversations:', {
 					count: result.data.conversations.length,
@@ -359,12 +361,12 @@
 								<Skeleton class="h-6 w-full rounded bg-white/5" />
 							</Sidebar.MenuItem>
 						{/each}
-					{:else if conversations.length === 0}
+					{:else if (conversationsStore.list.length > 0 ? conversationsStore.list : conversations).length === 0}
 						<div class="px-3 py-2 font-geist text-xs text-sidebar-muted-foreground/60">
 							No recent chats
 						</div>
 					{:else}
-						{#each conversations as item (item.id)}
+						{#each (conversationsStore.list.length > 0 ? conversationsStore.list : conversations) as item (item.id)}
 							{@render recentChatItem(item)}
 						{/each}
 
