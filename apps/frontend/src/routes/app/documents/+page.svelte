@@ -57,6 +57,7 @@
 	import type { Document } from './data.js';
 	import DocumentCardActions from './document-card-actions.svelte';
 	import UploadDocumentDialog from './UploadDocumentDialog.svelte';
+	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -1126,102 +1127,6 @@
 	</Tooltip.Provider>
 {/snippet}
 
-{#snippet pdfViewer(doc: Document)}
-	<div class=" flex h-full w-full flex-col bg-[#191919] p-6">
-		<div class="mt-16 mb-4 flex items-start justify-between gap-4 md:mt-0">
-			<div class="flex flex-col gap-1">
-				<h3 class="line-clamp-1 text-lg font-medium text-white" title={doc.name}>
-					{doc.name}
-				</h3>
-				<p class="text-xs text-[#DB8F5E]/90">
-					* Note: Edits made here won't be saved to the database. Please export the document to keep
-					your changes.
-				</p>
-			</div>
-			<Button
-				variant="ghost"
-				size="icon"
-				class="cursor-pointer text-white/60 hover:bg-white/5 hover:text-white"
-				onclick={() => (previewDocument = null)}
-			>
-				<XIcon class="size-5" />
-			</Button>
-		</div>
-		<div class="flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
-			{#key doc.id}
-				<PDFViewer
-					class="h-full w-full"
-					onready={(registry: any) => {
-						const targetPage = doc.pages && doc.pages.length > 0 ? doc.pages[0] : undefined;
-						if (targetPage) {
-							const scrollPlugin = registry.getPlugin('scroll');
-							if (scrollPlugin && scrollPlugin.provides) {
-								const scrollCap = scrollPlugin.provides();
-								scrollCap.onLayoutReady((event: any) => {
-									if (event.isInitial) {
-										scrollCap.scrollToPage({ pageNumber: targetPage });
-									}
-								});
-							}
-						}
-					}}
-					config={{
-						src: doc.url,
-						theme: {
-							preference: 'dark',
-							dark: {
-								background: {
-									app: '#191919',
-									surface: '#2A2A2A',
-									surfaceAlt: '#1F1E1D',
-									elevated: '#2A2A2A',
-									overlay: 'rgba(0, 0, 0, 0.5)',
-									input: 'rgba(255, 255, 255, 0.05)'
-								},
-								foreground: {
-									primary: '#ffffff',
-									secondary: 'rgba(255, 255, 255, 0.6)',
-									muted: 'rgba(255, 255, 255, 0.4)',
-									disabled: 'rgba(255, 255, 255, 0.2)',
-									onAccent: '#ffffff'
-								},
-								border: {
-									default: 'rgba(255, 255, 255, 0.1)',
-									subtle: 'rgba(255, 255, 255, 0.05)',
-									strong: 'rgba(255, 255, 255, 0.2)'
-								},
-								accent: {
-									primary: '#DB8F5E',
-									primaryHover: '#E59C6D',
-									primaryActive: '#F0AA81',
-									primaryLight: '#4a2f20',
-									primaryForeground: '#ffffff'
-								},
-								interactive: {
-									hover: 'rgba(255, 255, 255, 0.1)',
-									active: 'rgba(255, 255, 255, 0.15)',
-									selected: 'rgba(219, 143, 94, 0.2)',
-									focus: '#DB8F5E',
-									focusRing: 'rgba(219, 143, 94, 0.5)'
-								},
-								state: {
-									error: '#ef4444',
-									errorLight: 'rgba(239, 68, 68, 0.1)',
-									warning: '#eab308',
-									warningLight: 'rgba(234, 179, 8, 0.1)',
-									success: '#22c55e',
-									successLight: 'rgba(34, 197, 94, 0.1)',
-									info: '#3b82f6',
-									infoLight: 'rgba(59, 130, 246, 0.1)'
-								}
-							}
-						}
-					}}
-				/>
-			{/key}
-		</div>
-	</div>
-{/snippet}
 
 <div class="absolute inset-0 h-full w-full">
 	<div class="h-full w-full md:hidden">
@@ -1230,7 +1135,12 @@
 		</div>
 		{#if previewDocument}
 			<div class="h-full w-full">
-				{@render pdfViewer(previewDocument)}
+				<PdfPreviewPanel
+					src={previewDocument.url ?? ''}
+					name={previewDocument.name}
+					initialPages={previewDocument.pages ?? []}
+					onclose={() => (previewDocument = null)}
+				/>
 			</div>
 		{/if}
 	</div>
@@ -1245,7 +1155,12 @@
 					class="w-1 bg-white/10 hover:bg-[#DB8F5E]/50 active:bg-[#DB8F5E]"
 				/>
 				<Resizable.Pane defaultSize={40}>
-					{@render pdfViewer(previewDocument)}
+					<PdfPreviewPanel
+						src={previewDocument.url ?? ''}
+						name={previewDocument.name}
+						initialPages={previewDocument.pages ?? []}
+						onclose={() => (previewDocument = null)}
+					/>
 				</Resizable.Pane>
 			</Resizable.PaneGroup>
 		{:else}
