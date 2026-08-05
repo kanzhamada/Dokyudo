@@ -71,7 +71,7 @@
 				}
 			}
 
-			const label = `${docDisplayName} • Hlm. ${pageInfo}`;
+			const label = `${docDisplayName} • ${pageInfo}`;
 			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageInfo || ''}" class="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300 transition-colors hover:bg-amber-400/25 cursor-pointer" title="${tooltipTitle}">${label}</span>`;
 		});
 
@@ -581,7 +581,7 @@
 						const currentRefs = messages[asstIndex].references;
 
 						if (currentRefs && currentRefs.length > 0) {
-							// Parse all inline citation tags: [Doc N: Hlm. X, Y]
+							// Parse all inline citation tags: [Doc N: X, Y]
 							const citationMatches = [...textContent.matchAll(/\[Doc (\d+)(?:: (?:Hlm\.|Pages?|Page) ([^\]]+))?\]/gi)];
 							
 							if (citationMatches.length === 0) {
@@ -691,7 +691,7 @@
 		bind:this={chatContainer}
 		class="relative z-10 flex flex-1 min-h-0 flex-col overflow-y-auto px-4 pt-16 md:pt-8 md:px-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
 	>
-		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-48">
+		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
 			{#each messages as msg (msg.id)}
 				{#if msg.role === 'user'}
 					<!-- User Message (Clean Pill) -->
@@ -777,9 +777,9 @@
 														<FileText class="size-3 text-amber-400" />
 														<span class="font-medium">{ref.name}</span>
 														{#if ref.pages && ref.pages.length > 0}
-															<span class="text-white/40">• Hlm. {ref.pages.join(', ')}</span>
+															<span class="text-white/40">• {ref.pages.join(', ')}</span>
 														{:else if ref.page}
-															<span class="text-white/40">• Hlm. {ref.page}</span>
+															<span class="text-white/40">• {ref.page}</span>
 														{/if}
 													</Tooltip.Trigger>
 													<Tooltip.Content
@@ -874,7 +874,7 @@
 
 	<!-- Bottom Area: Floating Input Capsule with Gradient Mask -->
 	<div
-		class="pointer-events-none absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center justify-end pb-4 pt-20 bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent"
+		class="pointer-events-none absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center justify-end pb-4 pt-6 bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent"
 		style="font-family: 'Inter', sans-serif;"
 	>
 		<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">
@@ -943,9 +943,7 @@
 					bind:value={inputValue}
 					maxlength={690}
 					rows={1}
-					placeholder={activeMode === 'search'
-						? 'Search documents in this conversation...'
-						: 'Ask a follow-up question...'}
+					placeholder="Ask a follow-up question..."
 					class="max-h-32 min-h-[36px] flex-1 resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 text-white shadow-none ring-0 transition-colors outline-none placeholder:text-white/[0.40] focus-within:text-white hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
 					onkeydown={(e) => {
 						if (e.key === 'Enter' && !e.shiftKey) {
@@ -965,36 +963,34 @@
 				/>
 
 				<!-- Model Switcher Dropdown -->
-				{#if activeMode === 'chat'}
-					<div class="relative flex h-9 items-center">
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger
-								class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
-							>
-								<img
-									src={selectedModel.icon}
-									alt={selectedModel.name}
-									class="size-5 opacity-40 brightness-0 invert transition-opacity focus-within:opacity-[0.69] hover:opacity-[0.69]"
-								/>
-								<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
-								<ChevronDown class="size-4" />
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Content
-								class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] bg-[#232323]/90 text-white backdrop-blur-[42px]"
-							>
-								{#each llmOptions as option}
-									<DropdownMenu.Item
-										class="flex cursor-pointer items-center gap-2 focus:bg-white/[0.16] focus:text-white"
-										onclick={() => (selectedModel = option)}
-									>
-										<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
-										<span class="truncate">{option.name}</span>
-									</DropdownMenu.Item>
-								{/each}
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
-					</div>
-				{/if}
+				<div class="relative flex h-9 items-center">
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger
+							class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
+						>
+							<img
+								src={selectedModel.icon}
+								alt={selectedModel.name}
+								class="size-5 opacity-40 brightness-0 invert transition-opacity focus-within:opacity-[0.69] hover:opacity-[0.69]"
+							/>
+							<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
+							<ChevronDown class="size-4" />
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content
+							class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] bg-[#232323]/90 text-white backdrop-blur-[42px]"
+						>
+							{#each llmOptions as option}
+								<DropdownMenu.Item
+									class="flex cursor-pointer items-center gap-2 focus:bg-white/[0.16] focus:text-white"
+									onclick={() => (selectedModel = option)}
+								>
+									<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
+									<span class="truncate">{option.name}</span>
+								</DropdownMenu.Item>
+							{/each}
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+				</div>
 
 				<!-- Send Button -->
 				<button
@@ -1008,28 +1004,11 @@
 			</div>
 		</div>
 
-		<!-- Lower Row: Mode Toggles & Counter -->
+		<!-- Lower Row: Disclaimer & Counter -->
 		<div class="flex w-full items-center justify-between px-2 text-xs text-white/40">
-			<div class="flex items-center gap-2">
-				<Tabs.Root bind:value={activeMode}>
-					<Tabs.List class="flex items-center gap-2 bg-transparent p-0">
-						<Tabs.Trigger
-							value="chat"
-							class="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all data-[state=active]:border border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50"
-						>
-							<MessageSquare class="size-3.5" />
-							<span>Chat</span>
-						</Tabs.Trigger>
-						<Tabs.Trigger
-							value="search"
-							class="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all data-[state=active]:border border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50"
-						>
-							<Search class="size-3.5" />
-							<span>Search</span>
-						</Tabs.Trigger>
-					</Tabs.List>
-				</Tabs.Root>
-			</div>
+			<p class="text-[11px] text-white/40 select-none">
+				Dokyudo can make mistakes. Check important info.
+			</p>
 
 			<!-- Keyboard length counter -->
 			<div
