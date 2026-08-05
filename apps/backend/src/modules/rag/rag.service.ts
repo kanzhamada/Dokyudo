@@ -59,11 +59,21 @@ ${question}`;
             if (guardDecision?.includes("INJECTION")) {
                 if (logContext)
                     logContext.ragEvent = "prompt_injection_blocked";
-                throw new AppError({
-                    code: "VALIDATION_ERROR",
-                    message:
-                        "Input rejected: Detected potential prompt injection or policy violation.",
-                    status: 400,
+
+                // Return a graceful SSE stream with a warning event — HTTP 200.
+                // Avoids crashing the frontend with a non-2xx status code.
+                return new ReadableStream({
+                    start(controller) {
+                        const encode = (data: string) =>
+                            new TextEncoder().encode(data);
+                        controller.enqueue(
+                            encode(
+                                `event: warning\ndata: ${JSON.stringify({ code: "PROMPT_INJECTION" })}\n\n`,
+                            ),
+                        );
+                        controller.enqueue(encode(`event: done\ndata: {}\n\n`));
+                        controller.close();
+                    },
                 });
             }
         } catch (e: any) {

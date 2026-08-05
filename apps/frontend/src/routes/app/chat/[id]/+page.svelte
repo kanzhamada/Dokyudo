@@ -660,28 +660,14 @@
 			if (!res.ok) {
 				const errorData = await res.json().catch(() => ({ message: 'Failed to start chat stream' }));
 				console.error('[Chat Detail] Backend Response Error:', errorData);
-
-				const errorCode = errorData?.error?.code ?? errorData?.code ?? null;
-				const errorMessage: string = errorData?.error?.message ?? errorData?.message ?? '';
-				const isPromptInjection =
-					errorCode === 'VALIDATION_ERROR' &&
-					/prompt injection|policy violation/i.test(errorMessage);
-
-				if (isPromptInjection) {
-					// Display a hardcoded response in the assistant bubble — not saved to DB
-					streamBuffer = "Nice try, Diddy.";
-					isStreamDone = true;
-					messages[asstIndex].isRejection = true;
-					console.log('[Chat Detail] Prompt injection detected, displaying rejection message.');
-				} else {
-					showError(errorMessage || 'Error executing chat request');
-					messages[asstIndex].isStreaming = false;
-					isGenerating = false;
-					isTitleLoading = false;
-					stopThinkingTimer();
-					if (typewriterTimer) clearInterval(typewriterTimer);
-					return;
-				}
+				const errorMessage: string = errorData?.error?.message ?? errorData?.message ?? 'Error executing chat request';
+				showError(errorMessage);
+				messages[asstIndex].isStreaming = false;
+				isGenerating = false;
+				isTitleLoading = false;
+				stopThinkingTimer();
+				if (typewriterTimer) clearInterval(typewriterTimer);
+				return;
 			}
 
 			if (!res.body) {
@@ -755,6 +741,18 @@
 							}
 						} catch (e) {
 							console.error('[Chat Detail] Failed to parse title event:', e);
+						}
+					} else if (eventName === 'warning' && dataStr) {
+						try {
+							const parsed = JSON.parse(dataStr);
+							if (parsed.code === 'PROMPT_INJECTION') {
+								// Inject funny message into typewriter buffer — not saved to DB
+								streamBuffer = 'Nice try, Diddy.';
+								messages[asstIndex].isRejection = true;
+								console.log('[Chat Detail] Prompt injection detected via SSE warning event.');
+							}
+						} catch (e) {
+							console.error('[Chat Detail] Failed to parse warning event:', e);
 						}
 					} else if (eventName === 'done') {
 						isStreamDone = true;

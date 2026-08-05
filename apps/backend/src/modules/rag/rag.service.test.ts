@@ -41,7 +41,7 @@ describe("RagService Isolated Tests", () => {
     });
 
     describe("streamChat", () => {
-        it("negative: throws error if prompt injection is detected", async () => {
+        it("positive: returns SSE warning stream (not a throw) if prompt injection is detected", async () => {
             // Mock LLM Gatekeeper to return INJECTION
             using geminiStub = stub(gemini, "generateText", () => Promise.resolve({ text: "INJECTION" }) as any);
             
@@ -53,11 +53,26 @@ describe("RagService Isolated Tests", () => {
                 logContext: {},
             };
 
-            await assertRejects(
-                () => RagService.streamChat(params),
-                AppError,
-                "Input rejected: Detected potential prompt injection or policy violation."
-            );
+            const stream = await RagService.streamChat(params);
+
+            // Should return a ReadableStream (HTTP 200 SSE), not throw
+            assertEquals(stream instanceof ReadableStream, true);
+
+            // Read the SSE payload and verify it contains the warning event
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            let fullPayload = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                fullPayload += decoder.decode(value, { stream: true });
+            }
+
+            // Verify the SSE warning event is present
+            assertEquals(fullPayload.includes("event: warning"), true);
+            assertEquals(fullPayload.includes("PROMPT_INJECTION"), true);
+            assertEquals(fullPayload.includes("event: done"), true);
         });
 
         // testing successful streaming is complex due to SSE ReadableStream mock, so we focus on unit test DB operations next.
