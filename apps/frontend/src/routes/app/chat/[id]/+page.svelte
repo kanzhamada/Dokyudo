@@ -249,6 +249,7 @@
 	let isMobileTitleActionsOpen = $state(false);
 	let pulseCheckpointId = $state<string | null>(null);
 	let pulseCheckpointTimeout: ReturnType<typeof setTimeout> | null = null;
+	let checkpointVisibilityTimeout: ReturnType<typeof setTimeout> | null = null;
 	let isConfigureDialogOpen = $state(false);
 	let configureProvider = $state<ByokProvider>('gemini');
 	let configureApiKey = $state('');
@@ -440,6 +441,7 @@
 		cancelActiveStream?.();
 		stopThinkingTimer();
 		if (pulseCheckpointTimeout) clearTimeout(pulseCheckpointTimeout);
+		if (checkpointVisibilityTimeout) clearTimeout(checkpointVisibilityTimeout);
 	});
 
 	// Auto-reset textarea height when input is cleared
@@ -705,16 +707,37 @@
 
 	function scrollToCheckpoint(messageId: string) {
 		activeCheckpointId = messageId;
-		pulseCheckpointId = messageId;
 		if (pulseCheckpointTimeout) clearTimeout(pulseCheckpointTimeout);
-		pulseCheckpointTimeout = setTimeout(() => {
-			pulseCheckpointId = null;
-			pulseCheckpointTimeout = null;
-		}, 1000);
+		if (checkpointVisibilityTimeout) clearTimeout(checkpointVisibilityTimeout);
 		document.getElementById(`chat-message-${messageId}`)?.scrollIntoView({
 			behavior: 'smooth',
 			block: 'center'
 		});
+		waitForCheckpointVisibility(messageId);
+	}
+
+	function waitForCheckpointVisibility(messageId: string, attempt = 0) {
+		const element = document.getElementById(`chat-message-${messageId}`);
+		if (!element || !chatContainer) return;
+
+		const elementRect = element.getBoundingClientRect();
+		const containerRect = chatContainer.getBoundingClientRect();
+		const isVisible =
+			elementRect.top >= containerRect.top && elementRect.bottom <= containerRect.bottom;
+
+		if (isVisible || attempt >= 24) {
+			pulseCheckpointId = messageId;
+			pulseCheckpointTimeout = setTimeout(() => {
+				pulseCheckpointId = null;
+				pulseCheckpointTimeout = null;
+			}, 1000);
+			return;
+		}
+
+		checkpointVisibilityTimeout = setTimeout(
+			() => waitForCheckpointVisibility(messageId, attempt + 1),
+			50
+		);
 	}
 
 	function toggleMobileReferences() {
@@ -1582,7 +1605,7 @@
 		{#if !citationPreview && conversationCheckpoints.length > 0}
 			<!-- Wide-screen conversation checkpoints -->
 			<aside
-				class="group/checkpoints pointer-events-auto absolute top-1/2 right-6 z-20 hidden w-4 -translate-y-1/2 2xl:block"
+				class="group/checkpoints pointer-events-auto absolute top-1/2 right-6 z-20 hidden w-4 -translate-y-1/2 xl:block"
 				aria-label="Conversation checkpoints"
 			>
 				<div
