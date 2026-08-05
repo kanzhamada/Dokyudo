@@ -153,6 +153,7 @@
 		attachments?: { name: string; size?: number }[];
 		references?: DocReference[];
 		isStreaming?: boolean;
+		isRejection?: boolean;
 	}
 
 	const PROVIDER_ICONS: Record<string, string> = {
@@ -659,13 +660,28 @@
 			if (!res.ok) {
 				const errorData = await res.json().catch(() => ({ message: 'Failed to start chat stream' }));
 				console.error('[Chat Detail] Backend Response Error:', errorData);
-				showError(errorData.message || 'Error executing chat request');
-				messages[asstIndex].isStreaming = false;
-				isGenerating = false;
-				isTitleLoading = false;
-				stopThinkingTimer();
-				if (typewriterTimer) clearInterval(typewriterTimer);
-				return;
+
+				const errorCode = errorData?.error?.code ?? errorData?.code ?? null;
+				const errorMessage: string = errorData?.error?.message ?? errorData?.message ?? '';
+				const isPromptInjection =
+					errorCode === 'VALIDATION_ERROR' &&
+					/prompt injection|policy violation/i.test(errorMessage);
+
+				if (isPromptInjection) {
+					// Display a hardcoded response in the assistant bubble — not saved to DB
+					streamBuffer = "Nice try, Diddy.";
+					isStreamDone = true;
+					messages[asstIndex].isRejection = true;
+					console.log('[Chat Detail] Prompt injection detected, displaying rejection message.');
+				} else {
+					showError(errorMessage || 'Error executing chat request');
+					messages[asstIndex].isStreaming = false;
+					isGenerating = false;
+					isTitleLoading = false;
+					stopThinkingTimer();
+					if (typewriterTimer) clearInterval(typewriterTimer);
+					return;
+				}
 			}
 
 			if (!res.body) {
@@ -948,57 +964,59 @@
 										<Copy class="size-3.5" />
 									{/if}
 								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-									onclick={() => toast.info('Regenerate response coming soon')}
-									aria-label="Retry response"
-								>
-									<RotateCw class="size-3.5" />
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-									aria-label="Helpful"
-								>
-									<ThumbsUp class="size-3.5" />
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-									aria-label="Not helpful"
-								>
-									<ThumbsDown class="size-3.5" />
-								</Button>
-
-								<!-- Triple Dot Dropdown Menu -->
-								<DropdownMenu.Root>
-									<DropdownMenu.Trigger
-										class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
-										aria-label="More options"
+								{#if !msg.isRejection}
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+										onclick={() => toast.info('Regenerate response coming soon')}
+										aria-label="Retry response"
 									>
-										<Ellipsis class="size-3.5" />
-									</DropdownMenu.Trigger>
-									<DropdownMenu.Content align="start" class="w-48 border-white/15 bg-[#232323] text-white">
-										<DropdownMenu.Item
-											class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-											onclick={() => toast.info('Branch in new chat coming soon')}
+										<RotateCw class="size-3.5" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+										aria-label="Helpful"
+									>
+										<ThumbsUp class="size-3.5" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+										aria-label="Not helpful"
+									>
+										<ThumbsDown class="size-3.5" />
+									</Button>
+
+									<!-- Triple Dot Dropdown Menu -->
+									<DropdownMenu.Root>
+										<DropdownMenu.Trigger
+											class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+											aria-label="More options"
 										>
-											<GitBranch class="size-3.5 text-white/70" />
-											<span>Branch in new chat</span>
-										</DropdownMenu.Item>
-										<DropdownMenu.Item
-											class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-											onclick={() => toast.info('Read aloud coming soon')}
-										>
-											<Volume2 class="size-3.5 text-white/70" />
-											<span>Read aloud</span>
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Root>
+											<Ellipsis class="size-3.5" />
+										</DropdownMenu.Trigger>
+										<DropdownMenu.Content align="start" class="w-48 border-white/15 bg-[#232323] text-white">
+											<DropdownMenu.Item
+												class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
+												onclick={() => toast.info('Branch in new chat coming soon')}
+											>
+												<GitBranch class="size-3.5 text-white/70" />
+												<span>Branch in new chat</span>
+											</DropdownMenu.Item>
+											<DropdownMenu.Item
+												class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
+												onclick={() => toast.info('Read aloud coming soon')}
+											>
+												<Volume2 class="size-3.5 text-white/70" />
+												<span>Read aloud</span>
+											</DropdownMenu.Item>
+										</DropdownMenu.Content>
+									</DropdownMenu.Root>
+								{/if}
 							</div>
 						</div>
 					</div>
