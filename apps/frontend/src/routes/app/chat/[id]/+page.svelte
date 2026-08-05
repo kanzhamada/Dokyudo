@@ -175,6 +175,13 @@
 	let copiedMessageId: string | null = $state(null);
 	let isGenerating = $state(false);
 
+	// Auto-reset textarea height when input is cleared
+	$effect(() => {
+		if (!inputValue && textInput) {
+			textInput.style.height = 'auto';
+		}
+	});
+
 	// Conversation metadata
 	let chatId = $derived(page.params.id || 'chat-default');
 	let conversationTitle = $state('New Conversation');
@@ -903,7 +910,9 @@
 						const target = e.currentTarget as HTMLTextAreaElement;
 						if (target) {
 							target.style.height = 'auto';
-							target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+							if (target.value) {
+								target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+							}
 						}
 					}}
 				/>

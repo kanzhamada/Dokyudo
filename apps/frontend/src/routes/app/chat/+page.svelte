@@ -64,6 +64,13 @@
 	let selectedModel: LlmOption = $state(llmOptions[0]);
 	let attachedFiles: File[] = $state([]);
 
+	// Auto-reset textarea height when input is cleared
+	$effect(() => {
+		if (!inputValue && textInput) {
+			textInput.style.height = 'auto';
+		}
+	});
+
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
 	let maxUploads = $state(10);
@@ -426,7 +433,9 @@
 						const target = e.currentTarget as HTMLTextAreaElement;
 						if (target) {
 							target.style.height = 'auto';
-							target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+							if (target.value) {
+								target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+							}
 						}
 					}}
 				/>
