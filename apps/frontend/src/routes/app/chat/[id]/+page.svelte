@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
@@ -176,6 +176,82 @@
 	let attachedFiles: File[] = $state([]);
 	let copiedMessageId: string | null = $state(null);
 	let isGenerating = $state(false);
+
+	const THINKING_STATUS_MESSAGES = [
+		'Chudmaxxing...',
+		'Aura-farming...',
+		'Redeeming...',
+		'Clodding...',
+		'Tokenmaxxing...',
+		'Slopping...',
+		'Clanking...',
+		'Ignoring GPL...',
+		'Increasing ram prices...',
+		'Hallucinating...',
+		'Selling your data...',
+		'Outsourcing to Mossad...',
+		'Gemming it up...',
+		'Absolute coaling...',
+		'Truth-nuking...',
+		'Fakecelling...',
+		'Truecelling...',
+		'Mogging...',
+		'Rizzing...',
+		'Dumbing it down...',
+		'Enshittifying...',
+		'Going full retard...',
+		'Summoning Cheesy Michael...',
+		'Degenerating...',
+		'Running "sudo rm -rf --no-preserve-root /"...',
+		'Virtual insanitying...',
+		'Bomboclating...',
+		'Gambling...',
+		'Ending it all...',
+		'Rebooting...',
+		'Unicycling...',
+		'Horsing around...',
+		'Calling Mahoraga...',
+		'Calling Kevin...',
+		'Calling Saul...',
+		'Nuking SF...',
+		'Spellcasting...',
+		'Hexing...',
+		'Prompt-injecting...',
+		'Installing Windows...',
+		'Ultrathinking...',
+		'Nuking prod...',
+		'Tokenmining...',
+		'Questioning...',
+		'Chinesing...',
+		'Selling the wife and kids...',
+		'Increasing shareholder value...',
+		'Winging it...',
+		'Cooking...'
+	];
+
+	let currentThinkingStatus = $state(THINKING_STATUS_MESSAGES[0]);
+	let thinkingTimer: ReturnType<typeof setInterval> | null = null;
+
+	function startThinkingTimer() {
+		if (thinkingTimer) clearInterval(thinkingTimer);
+		const getRandomStatus = () =>
+			THINKING_STATUS_MESSAGES[Math.floor(Math.random() * THINKING_STATUS_MESSAGES.length)];
+		currentThinkingStatus = getRandomStatus();
+		thinkingTimer = setInterval(() => {
+			currentThinkingStatus = getRandomStatus();
+		}, 1400);
+	}
+
+	function stopThinkingTimer() {
+		if (thinkingTimer) {
+			clearInterval(thinkingTimer);
+			thinkingTimer = null;
+		}
+	}
+
+	onDestroy(() => {
+		stopThinkingTimer();
+	});
 
 	// Auto-reset textarea height when input is cleared
 	$effect(() => {
@@ -462,6 +538,7 @@
 		inputValue = '';
 		attachedFiles = [];
 		isGenerating = true;
+		startThinkingTimer();
 
 		const assistantMsgId = `asst-${Date.now()}`;
 		const assistantMsg: ChatMessage = {
@@ -646,6 +723,7 @@
 			console.error('[Chat Detail] Stream Catch Error:', err);
 			showError(err.message || 'Network error streaming chat');
 		} finally {
+			stopThinkingTimer();
 			messages[asstIndex].isStreaming = false;
 			isGenerating = false;
 			isTitleLoading = false;
@@ -751,12 +829,19 @@
 							<div
 								class="prose prose-invert prose-sm max-w-none text-white/90 prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-li:my-1"
 							>
-								{@html renderMarkdown(msg.content, msg.references)}
+								{#if msg.content}
+									{@html renderMarkdown(msg.content, msg.references)}
 
-								{#if msg.isStreaming}
-									<span
-										class="inline-block h-4 w-1.5 animate-pulse bg-white/80 align-middle ml-1"
-									></span>
+									{#if msg.isStreaming}
+										<span
+											class="inline-block h-4 w-1.5 animate-pulse bg-white/80 align-middle ml-1"
+										></span>
+									{/if}
+								{:else if msg.isStreaming}
+									<div class="flex items-center gap-2 text-xs font-medium text-white/50 italic animate-pulse py-1 select-none">
+										<Sparkles class="size-3.5 text-white/40 animate-spin" />
+										<span>{currentThinkingStatus}</span>
+									</div>
 								{/if}
 							</div>
 
