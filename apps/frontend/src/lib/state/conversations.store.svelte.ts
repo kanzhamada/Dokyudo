@@ -27,6 +27,9 @@ function createConversationsStore() {
 					...items
 				];
 			}
+		},
+		remove(id: string) {
+			items = items.filter((conversation) => conversation.id !== id);
 		}
 	};
 }

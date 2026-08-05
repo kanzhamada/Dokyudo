@@ -2,6 +2,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import AppSidebar from '$lib/components/app/AppSidebar.svelte';
 	import MobileHeader from '$lib/components/app/MobileHeader.svelte';
+	import { page } from '$app/state';
 
 	let { children } = $props();
 </script>
@@ -17,7 +18,9 @@
 		></div>
 
 		<div class="relative z-10 flex h-full flex-1 flex-col min-h-0 overflow-hidden">
-			<MobileHeader />
+			{#if !page.url.pathname.startsWith('/app/chat/')}
+				<MobileHeader />
+			{/if}
 
 			<!-- Main Content Layer -->
 			<div class="relative z-10 flex h-full flex-1 flex-col min-h-0 overflow-hidden">

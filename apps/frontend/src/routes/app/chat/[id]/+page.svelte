@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy, tick } from 'svelte';
+	import { slide } from 'svelte/transition';
+	import { backOut } from 'svelte/easing';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
@@ -26,11 +28,15 @@
 		Square,
 		Trash2,
 		Settings2,
-		KeyRound
+		KeyRound,
+		Plus,
+		Share2,
+		Menu
 	} from 'lucide-svelte';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import { useSidebar } from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Resizable from '$lib/components/ui/resizable';
@@ -44,7 +50,7 @@
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
 	import { deleteKey, getKeys, upsertKey } from '$lib/api/keys';
-	import { getConversation } from '$lib/api/rag';
+	import { deleteConversation, getConversation, updateConversation } from '$lib/api/rag';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { PUBLIC_API_URL } from '$env/static/public';
 	import { dokyudoFetch } from '$lib/apiClient';
@@ -233,6 +239,14 @@
 	let activeAbortController: AbortController | null = null;
 	let cancelActiveStream: (() => void) | null = null;
 	let activeStreamReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+	const sidebar = useSidebar();
+	let isTitleEditDialogOpen = $state(false);
+	let titleDraft = $state('');
+	let isTitleSaving = $state(false);
+	let isDeleteConversationDialogOpen = $state(false);
+	let isConversationDeleting = $state(false);
+	let isMobileReferencesOpen = $state(false);
+	let isMobileTitleActionsOpen = $state(false);
 	let isConfigureDialogOpen = $state(false);
 	let configureProvider = $state<ByokProvider>('gemini');
 	let configureApiKey = $state('');
@@ -269,6 +283,24 @@
 				)
 			}))
 			.filter((group) => group.options.length > 0);
+	});
+
+	let conversationReferences = $derived.by(() => {
+		const references = new Map<string, DocReference>();
+		for (const message of messages) {
+			if (message.role !== 'assistant' || !message.references) continue;
+			for (const reference of message.references) {
+				const existing = references.get(reference.id);
+				if (!existing) {
+					references.set(reference.id, { ...reference, pages: [...(reference.pages ?? [])] });
+					continue;
+				}
+				existing.pages = Array.from(
+					new Set([...(existing.pages ?? []), ...(reference.pages ?? [])])
+				).sort((a, b) => a - b);
+			}
+		}
+		return Array.from(references.values());
 	});
 
 	// Citation PDF preview
@@ -601,6 +633,76 @@
 		configureApiKey = '';
 		configureError = '';
 		isConfigureDialogOpen = true;
+	}
+
+	function openTitleEditDialog() {
+		titleDraft = conversationTitle === 'New Conversation' ? '' : conversationTitle;
+		isTitleEditDialogOpen = true;
+	}
+
+	async function saveConversationTitle() {
+		const nextTitle = titleDraft.trim();
+		if (!nextTitle || isTitleSaving) return;
+
+		isTitleSaving = true;
+		try {
+			const result = await updateConversation(chatId, { title: nextTitle });
+			if (!result.ok) {
+				toast.error(result.error.message);
+				return;
+			}
+
+			conversationTitle = nextTitle;
+			conversationsStore.addOrUpdate(chatId, nextTitle);
+			isTitleEditDialogOpen = false;
+			toast.success('Conversation title updated');
+		} catch (err) {
+			console.error('[Chat Detail] Failed to update conversation title:', err);
+			toast.error('Failed to update conversation title');
+		} finally {
+			isTitleSaving = false;
+		}
+	}
+
+	async function deleteCurrentConversation() {
+		if (isConversationDeleting) return;
+
+		isConversationDeleting = true;
+		try {
+			const result = await deleteConversation(chatId);
+			if (!result.ok) {
+				toast.error(result.error.message);
+				return;
+			}
+
+			conversationsStore.remove(chatId);
+			isDeleteConversationDialogOpen = false;
+			await goto('/app/chat');
+		} catch (err) {
+			console.error('[Chat Detail] Failed to delete conversation:', err);
+			toast.error('Failed to delete conversation');
+		} finally {
+			isConversationDeleting = false;
+		}
+	}
+
+	async function shareConversation() {
+		try {
+			await navigator.clipboard.writeText(window.location.href);
+			toast.success('Conversation link copied');
+		} catch {
+			toast.error('Unable to copy conversation link');
+		}
+	}
+
+	function toggleMobileReferences() {
+		isMobileReferencesOpen = !isMobileReferencesOpen;
+		isMobileTitleActionsOpen = false;
+	}
+
+	function toggleMobileTitleActions() {
+		isMobileTitleActionsOpen = !isMobileTitleActionsOpen;
+		isMobileReferencesOpen = false;
 	}
 
 	function selectConfigureProvider(provider: ByokProvider) {
@@ -1237,10 +1339,203 @@
 			style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
 		></div>
 
+		<!-- Mobile Floating Conversation Capsule -->
+		<div
+			class="pointer-events-auto absolute top-3 right-3 left-3 z-30 overflow-hidden rounded-[24px] border border-white/15 bg-[#232323]/90 shadow-2xl backdrop-blur-[42px] md:hidden"
+		>
+			<div class="flex h-14 items-center justify-between px-3">
+				<div class="flex items-center gap-1">
+					<button
+						type="button"
+						class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+						onclick={() => sidebar.toggle()}
+						aria-label="Open navigation"
+					>
+						<Menu class="size-5" />
+					</button>
+					<button
+						type="button"
+						class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+						onclick={() => goto('/app/chat')}
+						aria-label="New chat"
+					>
+						<Plus class="size-4" />
+					</button>
+				</div>
+
+				<button
+					type="button"
+					class="min-w-0 max-w-[45%] cursor-pointer truncate px-2 text-xs font-medium text-white/75 transition-colors hover:text-white"
+					onclick={toggleMobileTitleActions}
+					aria-label="Conversation actions"
+				>
+					{isTitleLoading ? 'Generating title...' : conversationTitle || 'New Conversation'}
+				</button>
+
+				<div class="flex items-center gap-1">
+					<button
+						type="button"
+						class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+						onclick={shareConversation}
+						aria-label="Share conversation"
+					>
+						<Share2 class="size-4" />
+					</button>
+					<button
+						type="button"
+						class="relative flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+						onclick={toggleMobileReferences}
+						aria-label="Conversation references"
+					>
+						<FileText class="size-4" />
+						{#if conversationReferences.length > 0}
+							<span class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black">
+								{conversationReferences.length}
+							</span>
+						{/if}
+					</button>
+				</div>
+			</div>
+
+			{#if isMobileTitleActionsOpen}
+				<div
+					transition:slide={{ duration: 420, easing: backOut }}
+					class="flex items-center justify-center gap-3 border-t border-white/10 px-3 py-3"
+				>
+					<button
+						type="button"
+						class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+						onclick={openTitleEditDialog}
+						aria-label="Edit conversation title"
+					>
+						<Pencil class="size-4" />
+					</button>
+					<button
+						type="button"
+						class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-red-400/20 bg-red-400/10 text-red-300 transition-colors hover:bg-red-400/20 hover:text-red-200"
+						onclick={() => (isDeleteConversationDialogOpen = true)}
+						aria-label="Delete conversation"
+					>
+						<Trash2 class="size-4" />
+					</button>
+				</div>
+			{/if}
+
+			{#if isMobileReferencesOpen}
+				<div
+					transition:slide={{ duration: 420, easing: backOut }}
+					class="max-h-56 overflow-y-auto border-t border-white/10 px-2 py-2"
+				>
+					{#if conversationReferences.length === 0}
+						<div class="px-2 py-2 text-xs text-white/35">No references in this conversation.</div>
+					{:else}
+						{#each conversationReferences as reference (reference.id)}
+							<button
+								type="button"
+								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+								onclick={() => openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
+							>
+								<FileText class="size-3.5 shrink-0 text-white/50" />
+								<span class="min-w-0 truncate">{reference.name}</span>
+							</button>
+						{/each}
+					{/if}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Desktop Conversation Header -->
+		<div
+			class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-28 bg-gradient-to-b from-[#1F1E1D] via-[#1F1E1D]/95 via-65% to-transparent md:block"
+		>
+			<div class="pointer-events-auto grid h-16 w-full grid-cols-3 items-center px-4 md:px-8">
+				<div class="flex justify-start">
+					<button
+						type="button"
+						class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+						onclick={() => goto('/app/chat')}
+					>
+						<Plus class="size-4" />
+						<span>New chat</span>
+					</button>
+				</div>
+
+				<div class="flex min-w-0 justify-center">
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger
+							class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+						>
+							<span class="max-w-56 truncate">
+								{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
+							</span>
+							<ChevronDown class="size-3.5 shrink-0 text-white/45" />
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content class="w-48 border-white/10 bg-[#232323] text-white">
+							<DropdownMenu.Item
+								class="flex cursor-pointer items-center gap-2 text-xs text-white/75 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+								onclick={openTitleEditDialog}
+							>
+								<Pencil class="size-3.5 text-white/60" />
+								<span>Edit title</span>
+							</DropdownMenu.Item>
+							<DropdownMenu.Separator class="bg-white/10" />
+							<DropdownMenu.Item
+								class="flex cursor-pointer items-center gap-2 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300"
+								onclick={() => (isDeleteConversationDialogOpen = true)}
+							>
+								<Trash2 class="size-3.5" />
+								<span>Delete conversation</span>
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+				</div>
+
+				<div class="flex justify-end gap-1">
+					<button
+						type="button"
+						class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white"
+						onclick={shareConversation}
+						aria-label="Share conversation"
+					>
+						<Share2 class="size-4" />
+					</button>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger
+							class="relative flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+							aria-label="Conversation references"
+						>
+							<FileText class="size-4" />
+							{#if conversationReferences.length > 0}
+								<span class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black">
+									{conversationReferences.length}
+								</span>
+							{/if}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end" class="w-72 border-white/10 bg-[#232323] p-1 text-white">
+							<div class="px-2.5 py-2 text-xs font-medium text-white/45">Conversation references</div>
+							{#if conversationReferences.length === 0}
+								<div class="px-2.5 py-3 text-xs text-white/35">No references in this conversation.</div>
+							{:else}
+								{#each conversationReferences as reference (reference.id)}
+									<DropdownMenu.Item
+										class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-xs text-white/75 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+										onclick={() => openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
+									>
+																		<FileText class="size-3.5 shrink-0 text-white/50" />
+																		<span class="min-w-0 flex-1 truncate">{reference.name}</span>
+																	</DropdownMenu.Item>
+								{/each}
+							{/if}
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+				</div>
+			</div>
+		</div>
+
 		<!-- Center Scrollable Chat Area -->
 		<div
 			bind:this={chatContainer}
-			class="relative z-10 flex min-h-0 flex-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent flex-col overflow-y-auto px-4 pt-16 md:px-8 md:pt-8"
+			class="relative z-10 flex min-h-0 flex-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
 		>
 			<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
 				{#each messages as msg, msgIndex (msg.id)}
@@ -1943,6 +2238,80 @@
 					Saving...
 				{:else}
 					Save key
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={isTitleEditDialogOpen}>
+	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title class="text-lg font-semibold text-white">Edit conversation title</Dialog.Title>
+			<Dialog.Description class="text-sm text-white/45">
+				Choose a title that makes this conversation easy to find later.
+			</Dialog.Description>
+		</Dialog.Header>
+		<Input
+			type="text"
+			bind:value={titleDraft}
+			placeholder="Conversation title"
+			maxlength={100}
+			disabled={isTitleSaving}
+			class="border-white/15 bg-black/20 text-white placeholder:text-white/25 focus-visible:border-[#DB8F5E]/60 focus-visible:ring-[#DB8F5E]/20"
+		/>
+		<Dialog.Footer class="mt-1 flex gap-2 sm:justify-end">
+			<Button
+				variant="ghost"
+				class="cursor-pointer text-white/60 hover:bg-white/10 hover:text-white"
+				disabled={isTitleSaving}
+				onclick={() => (isTitleEditDialogOpen = false)}
+			>
+				Cancel
+			</Button>
+			<Button
+				class="cursor-pointer bg-[#DB8F5E] text-black hover:bg-[#E59C6D] disabled:opacity-50"
+				disabled={!titleDraft.trim() || isTitleSaving}
+				onclick={saveConversationTitle}
+			>
+				{#if isTitleSaving}
+					<Spinner class="mr-2" />
+					Saving...
+				{:else}
+					Save title
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={isDeleteConversationDialogOpen}>
+	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title class="text-lg font-semibold text-white">Delete conversation?</Dialog.Title>
+			<Dialog.Description class="text-sm text-white/45">
+				This will permanently delete this conversation and its history.
+			</Dialog.Description>
+		</Dialog.Header>
+		<Dialog.Footer class="mt-1 flex gap-2 sm:justify-end">
+			<Button
+				variant="ghost"
+				class="cursor-pointer text-white/60 hover:bg-white/10 hover:text-white"
+				disabled={isConversationDeleting}
+				onclick={() => (isDeleteConversationDialogOpen = false)}
+			>
+				Cancel
+			</Button>
+			<Button
+				class="cursor-pointer bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+				disabled={isConversationDeleting}
+				onclick={deleteCurrentConversation}
+			>
+				{#if isConversationDeleting}
+					<Spinner class="mr-2" />
+					Deleting...
+				{:else}
+					Delete conversation
 				{/if}
 			</Button>
 		</Dialog.Footer>
