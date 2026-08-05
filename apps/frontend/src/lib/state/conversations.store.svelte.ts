@@ -10,18 +10,20 @@ function createConversationsStore() {
 		set(newList: ConversationItem[]) {
 			items = newList;
 		},
-		addOrUpdate(id: string, title: string) {
+		addOrUpdate(id: string, title?: string) {
 			const index = items.findIndex((c) => c.id === id);
 			const now = new Date().toISOString();
 			if (index !== -1) {
-				items[index] = {
-					...items[index],
-					title,
+				const existing = items[index];
+				const updated: ConversationItem = {
+					...existing,
+					title: title || existing.title,
 					updatedAt: now
 				};
+				items = [updated, ...items.filter((_, i) => i !== index)];
 			} else {
 				items = [
-					{ id, title, createdAt: now, updatedAt: now },
+					{ id, title: title || 'New Conversation', createdAt: now, updatedAt: now },
 					...items
 				];
 			}

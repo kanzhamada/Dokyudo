@@ -571,6 +571,9 @@
 		isGenerating = true;
 		startThinkingTimer();
 
+		// Instantly move active conversation item to top of sidebar
+		conversationsStore.addOrUpdate(chatId, conversationTitle);
+
 		const assistantMsgId = `asst-${Date.now()}`;
 		const assistantMsg: ChatMessage = {
 			id: assistantMsgId,
@@ -584,6 +587,79 @@
 
 		messages = [...messages, assistantMsg];
 		const asstIndex = messages.length - 1;
+
+		let streamBuffer = '';
+		let isStreamDone = false;
+		let typewriterTimer: ReturnType<typeof setInterval> | null = null;
+
+		const startTypewriter = () => {
+			if (typewriterTimer) clearInterval(typewriterTimer);
+			typewriterTimer = setInterval(() => {
+				if (messages[asstIndex].content.length < streamBuffer.length) {
+					const delta = Math.min(3, streamBuffer.length - messages[asstIndex].content.length);
+					messages[asstIndex].content += streamBuffer.substring(
+						messages[asstIndex].content.length,
+						messages[asstIndex].content.length + delta
+					);
+					if (chatContainer) {
+						chatContainer.scrollTop = chatContainer.scrollHeight;
+					}
+				} else if (isStreamDone) {
+					clearInterval(typewriterTimer!);
+					typewriterTimer = null;
+
+					messages[asstIndex].isStreaming = false;
+					isGenerating = false;
+					isTitleLoading = false;
+					stopThinkingTimer();
+
+					const textContent = messages[asstIndex].content;
+					const currentRefs = messages[asstIndex].references;
+
+					if (currentRefs && currentRefs.length > 0) {
+						const isNegativeAnswer = /(Mohon maaf|tidak mengandung informasi|tidak ditemukan|tidak ada informasi|does not contain|cannot answer|no information available)/i.test(textContent);
+						const citationMatches = [...textContent.matchAll(/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi)];
+
+						if (isNegativeAnswer || citationMatches.length === 0) {
+							messages[asstIndex].references = [];
+						} else {
+							const citedPagesMap = new Map<number, Set<number>>();
+							for (const match of citationMatches) {
+								const docIdx = Number(match[1]);
+								const pagesStr = match[2];
+								if (!citedPagesMap.has(docIdx)) {
+									citedPagesMap.set(docIdx, new Set());
+								}
+								if (pagesStr) {
+									const numMatches = pagesStr.match(/\d+/g);
+									if (numMatches) {
+										for (const n of numMatches) {
+											citedPagesMap.get(docIdx)!.add(Number(n));
+										}
+									}
+								}
+							}
+
+							const filteredRefs: DocReference[] = [];
+							for (const ref of currentRefs) {
+								const docIdx = ref.index || 1;
+								const citedSet = citedPagesMap.get(docIdx);
+								if (citedSet) {
+									const sortedCitedPages = Array.from(citedSet).sort((a, b) => a - b);
+									filteredRefs.push({
+										...ref,
+										pages: sortedCitedPages.length > 0 ? sortedCitedPages : ref.pages
+									});
+								}
+							}
+							messages[asstIndex].references = filteredRefs;
+						}
+					}
+				}
+			}, 18);
+		};
+
+		startTypewriter();
 
 		try {
 			const token = sessionStore.getAccessToken();
@@ -607,6 +683,8 @@
 				messages[asstIndex].isStreaming = false;
 				isGenerating = false;
 				isTitleLoading = false;
+				stopThinkingTimer();
+				if (typewriterTimer) clearInterval(typewriterTimer);
 				return;
 			}
 
@@ -615,6 +693,8 @@
 				messages[asstIndex].isStreaming = false;
 				isGenerating = false;
 				isTitleLoading = false;
+				stopThinkingTimer();
+				if (typewriterTimer) clearInterval(typewriterTimer);
 				return;
 			}
 
@@ -663,7 +743,7 @@
 						try {
 							const parsed = JSON.parse(dataStr);
 							if (parsed.token) {
-								messages[asstIndex].content += parsed.token;
+								streamBuffer += parsed.token;
 							}
 						} catch (e) {
 							console.error('[Chat Detail] Failed to parse token event:', e);
@@ -681,61 +761,8 @@
 							console.error('[Chat Detail] Failed to parse title event:', e);
 						}
 					} else if (eventName === 'done') {
-						messages[asstIndex].isStreaming = false;
-						isGenerating = false;
-						isTitleLoading = false;
-
-						const textContent = messages[asstIndex].content;
-						const currentRefs = messages[asstIndex].references;
-
-						if (currentRefs && currentRefs.length > 0) {
-							// Parse all inline citation tags: [Doc N: X, Y]
-							const citationMatches = [...textContent.matchAll(/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi)];
-							
-							if (citationMatches.length === 0) {
-								messages[asstIndex].references = [];
-							} else {
-								const citedPagesMap = new Map<number, Set<number>>();
-
-								for (const match of citationMatches) {
-									const docIdx = Number(match[1]);
-									const pagesStr = match[2];
-
-									if (!citedPagesMap.has(docIdx)) {
-										citedPagesMap.set(docIdx, new Set());
-									}
-
-									if (pagesStr) {
-										const numMatches = pagesStr.match(/\d+/g);
-										if (numMatches) {
-											for (const n of numMatches) {
-												citedPagesMap.get(docIdx)!.add(Number(n));
-											}
-										}
-									}
-								}
-
-								// Filter references: only keep documents that were cited, and set pages to cited pages
-								const filteredRefs: DocReference[] = [];
-								for (const ref of currentRefs) {
-									const docIdx = ref.index || 1;
-									const citedSet = citedPagesMap.get(docIdx);
-									if (citedSet) {
-										const sortedCitedPages = Array.from(citedSet).sort((a, b) => a - b);
-										filteredRefs.push({
-											...ref,
-											pages: sortedCitedPages.length > 0 ? sortedCitedPages : ref.pages
-										});
-									}
-								}
-								messages[asstIndex].references = filteredRefs;
-							}
-						}
-
-						console.log('[Chat Detail] Backend Response (Stream Complete):', {
-							id: assistantMsgId,
-							answerLength: messages[asstIndex].content.length
-						});
+						isStreamDone = true;
+						console.log('[Chat Detail] Backend Response (Stream Complete Signal Received)');
 					} else if (eventName === 'error' && dataStr) {
 						try {
 							const parsed = JSON.parse(dataStr);
@@ -744,20 +771,23 @@
 						} catch (e) {
 							showError('Stream error');
 						}
-						messages[asstIndex].isStreaming = false;
-						isGenerating = false;
-						isTitleLoading = false;
+						isStreamDone = true;
 					}
 				}
 			}
 		} catch (err: any) {
 			console.error('[Chat Detail] Stream Catch Error:', err);
 			showError(err.message || 'Network error streaming chat');
+			isStreamDone = true;
 		} finally {
-			stopThinkingTimer();
-			messages[asstIndex].isStreaming = false;
-			isGenerating = false;
-			isTitleLoading = false;
+			// If buffer was empty or loop not running, ensure clean reset
+			if (!streamBuffer) {
+				stopThinkingTimer();
+				if (typewriterTimer) clearInterval(typewriterTimer);
+				messages[asstIndex].isStreaming = false;
+				isGenerating = false;
+				isTitleLoading = false;
+			}
 		}
 	}
 
