@@ -247,6 +247,8 @@
 	let isConversationDeleting = $state(false);
 	let isMobileReferencesOpen = $state(false);
 	let isMobileTitleActionsOpen = $state(false);
+	let pulseCheckpointId = $state<string | null>(null);
+	let pulseCheckpointTimeout: ReturnType<typeof setTimeout> | null = null;
 	let isConfigureDialogOpen = $state(false);
 	let configureProvider = $state<ByokProvider>('gemini');
 	let configureApiKey = $state('');
@@ -437,6 +439,7 @@
 	onDestroy(() => {
 		cancelActiveStream?.();
 		stopThinkingTimer();
+		if (pulseCheckpointTimeout) clearTimeout(pulseCheckpointTimeout);
 	});
 
 	// Auto-reset textarea height when input is cleared
@@ -453,10 +456,15 @@
 
 	// Conversation Messages
 	let messages: ChatMessage[] = $state([]);
+	let conversationCheckpoints = $derived(
+		messages.filter((message) => message.role === 'user')
+	);
 	let conversationRequestId = 0;
 
 	// Track the last user message id for edit button visibility
 	let lastUserMsgId = $derived([...messages].reverse().find((m) => m.role === 'user')?.id ?? null);
+	let activeCheckpointId = $state<string | null>(null);
+	let currentCheckpointId = $derived(activeCheckpointId ?? lastUserMsgId);
 
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
@@ -695,6 +703,20 @@
 		}
 	}
 
+	function scrollToCheckpoint(messageId: string) {
+		activeCheckpointId = messageId;
+		pulseCheckpointId = messageId;
+		if (pulseCheckpointTimeout) clearTimeout(pulseCheckpointTimeout);
+		pulseCheckpointTimeout = setTimeout(() => {
+			pulseCheckpointId = null;
+			pulseCheckpointTimeout = null;
+		}, 1000);
+		document.getElementById(`chat-message-${messageId}`)?.scrollIntoView({
+			behavior: 'smooth',
+			block: 'center'
+		});
+	}
+
 	function toggleMobileReferences() {
 		isMobileReferencesOpen = !isMobileReferencesOpen;
 		isMobileTitleActionsOpen = false;
@@ -791,7 +813,10 @@
 
 	$effect(() => {
 		if (messages.length) {
-			tick().then(scrollToBottom);
+			tick().then(() => {
+				scrollToBottom();
+				updateActiveCheckpoint();
+			});
 		}
 	});
 
@@ -799,6 +824,28 @@
 		if (chatContainer) {
 			chatContainer.scrollTop = chatContainer.scrollHeight;
 		}
+	}
+
+	function updateActiveCheckpoint() {
+		if (!chatContainer || conversationCheckpoints.length === 0) return;
+
+		const containerRect = chatContainer.getBoundingClientRect();
+		const viewportCenter = containerRect.top + containerRect.height / 2;
+		let closestId: string | null = null;
+		let closestDistance = Number.POSITIVE_INFINITY;
+
+		for (const checkpoint of conversationCheckpoints) {
+			const element = document.getElementById(`chat-message-${checkpoint.id}`);
+			if (!element) continue;
+			const rect = element.getBoundingClientRect();
+			const distance = Math.abs(rect.top + rect.height / 2 - viewportCenter);
+			if (distance < closestDistance) {
+				closestDistance = distance;
+				closestId = checkpoint.id;
+			}
+		}
+
+		if (closestId) activeCheckpointId = closestId;
 	}
 
 	function triggerFileInput() {
@@ -1532,26 +1579,76 @@
 			</div>
 		</div>
 
+		{#if !citationPreview && conversationCheckpoints.length > 0}
+			<!-- Wide-screen conversation checkpoints -->
+			<aside
+				class="group/checkpoints pointer-events-auto absolute top-1/2 right-6 z-20 hidden w-4 -translate-y-1/2 2xl:block"
+				aria-label="Conversation checkpoints"
+			>
+				<div
+					class="grid h-64 items-center py-2"
+					style={`grid-template-rows: repeat(${conversationCheckpoints.length}, minmax(0, 1fr));`}
+				>
+					{#each conversationCheckpoints as checkpoint (checkpoint.id)}
+						<button
+							type="button"
+							class="h-0.5 w-3 cursor-pointer rounded-full transition-all duration-300 hover:w-4 {checkpoint.id === currentCheckpointId
+								? 'bg-[#DB8F5E]'
+								: 'bg-white/25'}"
+							onclick={() => scrollToCheckpoint(checkpoint.id)}
+							aria-label={`Jump to checkpoint: ${checkpoint.content}`}
+						>
+						</button>
+					{/each}
+				</div>
+
+				<div
+					class="pointer-events-none absolute top-1/2 right-0 w-64 -translate-y-1/2 translate-x-2 rounded-2xl border border-white/10 bg-[#232323]/90 p-2 opacity-0 shadow-2xl backdrop-blur-[32px] transition-all duration-300 group-hover/checkpoints:pointer-events-auto group-hover/checkpoints:translate-x-0 group-hover/checkpoints:opacity-100"
+				>
+					<div class="max-h-64 overflow-y-auto">
+						{#each conversationCheckpoints as checkpoint (checkpoint.id)}
+							<button
+								type="button"
+								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-white/10 {checkpoint.id ===
+									currentCheckpointId
+									? 'text-[#E59C6D]'
+									: 'text-white/55'}"
+								onclick={() => scrollToCheckpoint(checkpoint.id)}
+							>
+								<span class="min-w-0 flex-1 truncate">{checkpoint.content}</span>
+								<span
+									class="h-0.5 w-3 shrink-0 rounded-full {checkpoint.id === currentCheckpointId
+										? 'bg-[#DB8F5E]'
+										: 'bg-white/20'}"
+								></span>
+							</button>
+						{/each}
+					</div>
+				</div>
+			</aside>
+		{/if}
+
 		<!-- Center Scrollable Chat Area -->
 		<div
 			bind:this={chatContainer}
+			onscroll={updateActiveCheckpoint}
 			class="relative z-10 flex min-h-0 flex-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
 		>
 			<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
 				{#each messages as msg, msgIndex (msg.id)}
 					{#if msg.role === 'user'}
 						<!-- User Message (Clean Pill) -->
-						<div class="flex w-full justify-end">
+						<div id={`chat-message-${msg.id}`} class="flex w-full justify-end">
 							<div
 								class="flex max-w-[85%] flex-col items-end gap-1.5 md:max-w-[70%] {editingMessageId === msg.id
 									? 'w-full'
 									: ''}"
 							>
 								<div
-									class="rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md {editingMessageId ===
+								class="rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md {editingMessageId ===
 										msg.id
 										? 'w-full'
-										: 'w-fit'}"
+										: 'w-fit'} {pulseCheckpointId === msg.id ? 'checkpoint-pulse' : ''}"
 								>
 									{#if editingMessageId === msg.id}
 										<textarea
@@ -2243,6 +2340,27 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+<style>
+	@keyframes checkpoint-pulse {
+		0% {
+			box-shadow: 0 0 0 0 rgb(255 255 255 / 0%);
+			transform: scale(1);
+		}
+		35% {
+			box-shadow: 0 0 0 5px rgb(255 255 255 / 12%);
+			transform: scale(1.015);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgb(255 255 255 / 0%);
+			transform: scale(1);
+		}
+	}
+
+	.checkpoint-pulse {
+		animation: checkpoint-pulse 900ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+</style>
 
 <Dialog.Root bind:open={isTitleEditDialogOpen}>
 	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">
