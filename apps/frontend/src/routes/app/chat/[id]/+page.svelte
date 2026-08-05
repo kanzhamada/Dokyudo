@@ -109,36 +109,11 @@
 		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
 	}
 
-	function wrapWordsInHtml(html: string): string {
-		if (!html) return '';
-		const parts = html.split(/(<[^>]+>)/g);
-		let inCode = false;
-
-		for (let i = 0; i < parts.length; i++) {
-			const part = parts[i];
-			if (!part) continue;
-
-			if (part.startsWith('<')) {
-				const lower = part.toLowerCase();
-				if (lower.startsWith('<code') || lower.startsWith('<pre')) {
-					inCode = true;
-				} else if (lower.startsWith('</code') || lower.startsWith('</pre')) {
-					inCode = false;
-				}
-			} else if (!inCode) {
-				parts[i] = part.replace(/(\S+)/g, '<span class="animate-word-fade-in">$1</span>');
-			}
-		}
-
-		return parts.join('');
-	}
-
 	function renderMarkdown(text: string, references?: DocReference[]): string {
 		if (!text) return '';
 		try {
 			const rawHtml = marked.parse(text) as string;
-			const citedHtml = transformCitationTags(rawHtml, references);
-			return wrapWordsInHtml(citedHtml);
+			return transformCitationTags(rawHtml, references);
 		} catch (e) {
 			return text;
 		}
@@ -1178,21 +1153,4 @@
 	</div>
 </div>
 
-<style>
-	@keyframes wordFadeIn {
-		0% {
-			opacity: 0;
-			filter: blur(4px);
-			transform: translateY(2px);
-		}
-		100% {
-			opacity: 1;
-			filter: blur(0);
-			transform: translateY(0);
-		}
-	}
-	:global(.animate-word-fade-in) {
-		display: inline-block;
-		animation: wordFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-	}
-</style>
+
