@@ -191,6 +191,29 @@
 	let citationPreview = $state<{ src: string; name: string; pages: number[] } | null>(null);
 	let citationDocId = $state<string | null>(null);
 
+	// LRU cache for presigned document URLs — max 4 docs, evicts oldest on overflow.
+	// Map preserves insertion order, so first key = Least Recently Used.
+	const MAX_CACHED_DOCS = 4;
+	const docUrlCache = new Map<string, string>();
+
+	function cacheGet(documentId: string): string | null {
+		const url = docUrlCache.get(documentId);
+		if (!url) return null;
+		// Move to end (mark as most recently used)
+		docUrlCache.delete(documentId);
+		docUrlCache.set(documentId, url);
+		return url;
+	}
+
+	function cacheSet(documentId: string, url: string): void {
+		if (docUrlCache.has(documentId)) {
+			docUrlCache.delete(documentId);
+		} else if (docUrlCache.size >= MAX_CACHED_DOCS) {
+			docUrlCache.delete(docUrlCache.keys().next().value!);
+		}
+		docUrlCache.set(documentId, url);
+	}
+
 	async function openCitationPreview(documentId: string, name: string, pages: number[]) {
 		if (!documentId) return;
 		// Same document already open — just jump to the page
@@ -198,13 +221,18 @@
 			citationPreview = { ...citationPreview, pages };
 			return;
 		}
-		const res = await apiRequest<{ url: string; expiresIn: number }>(
-			`/api/documents/${documentId}/preview`
-		);
-		if (res.ok) {
-			citationDocId = documentId;
-			citationPreview = { src: res.data.url, name, pages };
+		// Check cache first, fetch only on miss
+		let url = cacheGet(documentId);
+		if (!url) {
+			const res = await apiRequest<{ url: string; expiresIn: number }>(
+				`/api/documents/${documentId}/preview`
+			);
+			if (!res.ok) return;
+			url = res.data.url;
+			cacheSet(documentId, url);
 		}
+		citationDocId = documentId;
+		citationPreview = { src: url, name, pages };
 	}
 
 	const THINKING_STATUS_MESSAGES = [
