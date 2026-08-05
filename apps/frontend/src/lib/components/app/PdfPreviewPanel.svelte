@@ -19,6 +19,32 @@
 
 	let { src, name, initialPages = [], onclose }: Props = $props();
 
+	// Scroll plugin reference — captured once on viewer ready
+	let scrollCap: any = null;
+	let isFirstLayoutReady = true;
+
+	function handleReady(registry: any) {
+		const scrollPlugin = registry.getPlugin('scroll');
+		if (!scrollPlugin?.provides) return;
+
+		scrollCap = scrollPlugin.provides();
+		scrollCap.onLayoutReady((event: any) => {
+			if (event.isInitial && initialPages.length > 0) {
+				scrollCap.scrollToPage({ pageNumber: initialPages[0] });
+			}
+		});
+	}
+
+	// When initialPages changes after first load, scroll to the new page
+	$effect(() => {
+		const page = initialPages[0];
+		if (!page || !scrollCap || isFirstLayoutReady) {
+			isFirstLayoutReady = false;
+			return;
+		}
+		scrollCap.scrollToPage({ pageNumber: page });
+	});
+
 	// Dokyudo dark-mode theme tokens shared across all PDF viewer instances
 	const darkTheme = {
 		preference: 'dark',
@@ -69,21 +95,6 @@
 			}
 		}
 	} as const;
-
-	function handleReady(registry: any) {
-		const targetPage = initialPages.length > 0 ? initialPages[0] : undefined;
-		if (!targetPage) return;
-
-		const scrollPlugin = registry.getPlugin('scroll');
-		if (!scrollPlugin?.provides) return;
-
-		const scrollCap = scrollPlugin.provides();
-		scrollCap.onLayoutReady((event: any) => {
-			if (event.isInitial) {
-				scrollCap.scrollToPage({ pageNumber: targetPage });
-			}
-		});
-	}
 </script>
 
 <!--

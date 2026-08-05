@@ -189,13 +189,22 @@
 
 	// Citation PDF preview
 	let citationPreview = $state<{ src: string; name: string; pages: number[] } | null>(null);
+	let citationDocId = $state<string | null>(null);
 
 	async function openCitationPreview(documentId: string, name: string, pages: number[]) {
 		if (!documentId) return;
+		// Same document already open — just jump to the page
+		if (citationDocId === documentId && citationPreview) {
+			citationPreview = { ...citationPreview, pages };
+			return;
+		}
 		const res = await apiRequest<{ url: string; expiresIn: number }>(
 			`/api/documents/${documentId}/preview`
 		);
-		if (res.ok) citationPreview = { src: res.data.url, name, pages };
+		if (res.ok) {
+			citationDocId = documentId;
+			citationPreview = { src: res.data.url, name, pages };
+		}
 	}
 
 	const THINKING_STATUS_MESSAGES = [
