@@ -50,7 +50,7 @@ sequenceDiagram
 
     loop SSE Stream
         Backend-->>page: event: references
-        page->>page: messages[idx].references = parsed refs
+        page->>page: pendingReferences = parsed refs [di-buffer, belum ditampilkan]
         Backend-->>page: event: token
         page->>page: streamBuffer += token
         page->>page: typewriterTimer drains buffer into content
@@ -60,16 +60,27 @@ sequenceDiagram
         page->>page: isStreamDone = true
     end
 
-    page->>page: Typewriter loop detects isStreamDone
-    page->>page: stopThinkingTimer(), filterReferencesByCitations()
-    page->>page: messages[idx].isStreaming = false
+    alt User Clicks Stop (kapan saja)
+        page->>page: cancelActiveStream()
+        page->>page: abortController.abort() [hanya untuk fetch in-flight]
+        page->>page: reader.cancel() [memutus SSE body reader]
+        page->>page: clearInterval(typewriterTimer) [hentikan animasi ketik]
+        page->>page: isGenerating = false
+    else Stream Selesai + Typewriter Menguras
+        page->>page: Typewriter loop detects isStreamDone
+        page->>page: messages[idx].references = pendingReferences [baru tampil di sini]
+        page->>page: stopThinkingTimer(), filterReferencesByCitations()
+        page->>page: messages[idx].isStreaming = false
+        page->>page: cancelActiveStream = null [setelah buffer habis]
+    end
 ```
 
 ---
 
 ## Completion Timestamp
 
-**Date Completed**: 2026-08-05T16:46:00+07:00
+**Date Completed**: 2026-08-05T16:46:00+07:00  
+**Stream Cancellation Hardened**: 2026-08-05T21:10:00+07:00
 
 ---
 
@@ -77,9 +88,9 @@ sequenceDiagram
 
 | File | Change |
 |---|---|
-| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | All UI/UX, streaming, citation, and animation changes |
+| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | All UI/UX, streaming, citation, animation changes; cancellation via `reader.read()` race with AbortSignal, orphan rejection absorption, `cancelActiveStream` kept alive during typewriter drain |
 | `apps/frontend/src/lib/state/conversations.store.svelte.ts` | addOrUpdate() now shifts item to top of list |
-| `apps/backend/src/modules/rag/rag.service.ts` | System prompt rules for citation formatting; filterReferencesByCitations negative-answer guard |
+| `apps/backend/src/modules/rag/rag.service.ts` | System prompt rules for citation formatting; filterReferencesByCitations negative-answer guard; combined `AbortSignal.any()` + `isConsumerGone()` live cancel detection |
 
 ---
 
@@ -87,7 +98,7 @@ sequenceDiagram
 
 - **Backend RAG Service**: System prompt updated with strict rules: single-doc tags only, comma-separated page numbers without "Hlm." or dashes, and no citation tags on negative/off-topic answers.
 - **Sidebar State**: `conversationsStore` (Svelte 5 reactive store) is shared between `AppSidebar.svelte` and `[id]/+page.svelte`. Updating its list triggers an immediate reactive reorder in the sidebar without any page reload or API refetch.
-- **SSE Pipeline**: The typewriter timer (setInterval, 18ms) decouples the raw SSE network speed from the render speed, preventing UI thrashing on token bursts.
+- **SSE Pipeline**: The typewriter timer (setInterval, 18ms) decouples the raw SSE network speed from the render speed, preventing UI thrashing on token bursts. Cancellation races `reader.read()` against the abort signal and cancels the reader directly to tear down the body stream mid-flight.
 
 ---
 
@@ -100,3 +111,16 @@ sequenceDiagram
 3. **Client-Side Negative-Answer Detection**: Checking for negative phrases client-side provides an instant UX guard even if the backend hallucination suppression in the system prompt partially fails. This is a defense-in-depth approach.
 
 4. **Removing Per-Word Animation**: keyframes wordFadeIn with filter blur caused every word already visible on screen to re-animate when new tokens arrived (because Svelte re-renders the html block). The cleanest fix was to remove all per-word animation entirely, keeping rendering pure and flicker-free.
+
+5. **Typewriter Drain vs Network Stream — Dua Hal Berbeda**: `isStreamDone` (event `done` dari SSE) menandakan **network stream selesai**, tapi typewriter masih "menguras" `streamBuffer` (3 char/18ms). Ini penting untuk UX stop: stream selesai ≠ teks selesai ditampilkan. Tombol stop harus tetap berfungsi selama typewriter masih menguras buffer.
+
+6. **Cancel Tiga Lapis di Frontend**:
+   - `abortController.abort()` — membatalkan fetch request. **Hanya efektif sebelum** response headers diterima; setelah SSE mulai mengalir, sinyal ini tidak lagi menghentikan response body reader.
+   - `activeStreamReader?.cancel()` — membatalkan response body reader. Inilah yang benar-benar memutus aliran SSE mid-stream. Dipanggil via `Promise.race` agar respon instan.
+   - `clearInterval(typewriterTimer)` — menghentikan animasi ketik.
+
+7. **`reader.read()` di-Race dengan AbortSignal**: Setiap iterasi loop membaca body menggunakan `Promise.race([reader.read(), abortPromise])`. Saat user klik stop, `abortPromise` langsung reject → loop keluar tanpa menunggu chunk berikutnya. Rejection dari `reader.read()` yang "kalah race" diserap dengan `.catch(() => {})` untuk mencegah `Uncaught (in promise) DOMException`.
+
+8. **`cancelActiveStream` Dipertahankan Selama Typewriter Menguras**: Bug: setelah network stream selesai (misal `done` event diterima), `cancelActiveStream` di-set `null` di `finally` — padahal typewriter masih mengetik. Akibatnya klik stop tidak bereaksi. Perbaikan: `cancelActiveStream` hanya di-null saat tidak ada `streamBuffer` tersisa untuk ditampilkan, atau oleh typewriter completion handler setelah buffer habis. Dengan ini, `isGenerating` tetap `true` (tombol tetap "stop") sampai teks selesai ditampilkan.
+
+9. **Delayed Source References**: Event `references` dari SSE di-buffer ke `pendingReferences` dan hanya di-assign ke `messages[idx].references` pada typewriter completion handler — yaitu saat stream benar-benar DONE (event `done` diterima, typewriter selesai menguras buffer, dan tidak ada error). Alasan: menampilkan references saat AI masih mengetik membuat UI terasa "belum selesai" dan references bisa berubah-ubah. Guard `streamHadError` mencegah references muncul pada respons yang gagal.

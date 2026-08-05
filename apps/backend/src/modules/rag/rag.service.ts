@@ -298,10 +298,38 @@ ${question}
 
         if (signal?.aborted) return createClosedStream();
 
+        // Internal abort controller for stream lifecycle — fires when consumer cancels the stream
+        // (client disconnect, reader.cancel(), etc.) even after fetch() has resolved.
+        const streamAbort = new AbortController();
+        const cancelSignal = signal
+            ? AbortSignal.any([signal, streamAbort.signal])
+            : streamAbort.signal;
+
         const stream = new ReadableStream({
             async start(controller) {
                 const encoder = new TextEncoder();
-                let cancelled = signal?.aborted === true;
+                let cancelled = cancelSignal.aborted;
+                let stalledPulls = 0;
+
+                // Live check: true when the client is gone (abort signal fired)
+                // OR the HTTP layer stopped pulling (backpressure / disconnect).
+                const isConsumerGone = () => {
+                    if (cancelSignal.aborted) {
+                        cancelled = true;
+                        return true;
+                    }
+                    const ds = controller.desiredSize;
+                    if (ds !== null && ds <= 0) {
+                        stalledPulls++;
+                        if (stalledPulls >= 10) {
+                            cancelled = true;
+                            return true;
+                        }
+                    } else {
+                        stalledPulls = 0;
+                    }
+                    return false;
+                };
                 let success = false;
                 let fullAnswer = "";
                 let successfulModel = "";
@@ -316,7 +344,9 @@ ${question}
                     }
                 };
 
-                signal?.addEventListener("abort", closeOnCancel, { once: true });
+                // Listen on the COMBINED signal so both request-abort and stream-cancel
+                // (client disconnect mid-stream) trigger closeOnCancel.
+                cancelSignal.addEventListener("abort", closeOnCancel, { once: true });
                 if (cancelled) {
                     closeOnCancel();
                     return;
@@ -370,7 +400,7 @@ ${question}
                             encryptedRecord.iv,
                         );
                     } catch (e: any) {
-                        if (isAbortError(e, signal)) return;
+                        if (isAbortError(e, cancelSignal)) return;
                         controller.enqueue(
                             encoder.encode(
                                 `event: error\ndata: ${JSON.stringify({ code: e.code || "UNAUTHORIZED", message: e.message || "Failed to load BYOK key" })}\n\n`,
@@ -391,7 +421,7 @@ ${question}
                                 model: model!,
                                 prompt: augmentedPrompt,
                                 apiKey: byokKey,
-                                signal,
+                                signal: cancelSignal,
                             }),
                         );
                         if (cancelled) return;
@@ -405,13 +435,18 @@ ${question}
                         }
 
                         for await (const chunk of responseStream.stream) {
-                            if (cancelled) return;
+                            if (isConsumerGone()) return;
                             fullAnswer += chunk.text;
-                            controller.enqueue(
-                                encoder.encode(
-                                    `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
-                                ),
-                            );
+                            try {
+                                controller.enqueue(
+                                    encoder.encode(
+                                        `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
+                                    ),
+                                );
+                            } catch {
+                                // Stream already closed by the consumer — stop producing.
+                                return;
+                            }
                         }
 
                         if (cancelled) return;
@@ -420,7 +455,7 @@ ${question}
                         successfulModel = model;
                         if (logContext) logContext.ragModelUsed = model;
                     } catch (error: any) {
-                        if (isAbortError(error, signal)) return;
+                        if (isAbortError(error, cancelSignal)) return;
                         controller.enqueue(
                             encoder.encode(
                                 `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: error.message })}\n\n`,
@@ -432,7 +467,7 @@ ${question}
                     try {
                         const response = await FallbackLlmService.generateStream({
                             messages: [{ role: "user", content: augmentedPrompt }],
-                            signal,
+                            signal: cancelSignal,
                             logContext,
                         });
                         if (cancelled) return;
@@ -446,14 +481,19 @@ ${question}
                         }
 
                         for await (const chunk of response.stream) {
-                            if (cancelled) return;
+                            if (isConsumerGone()) return;
                             if (chunk.text) {
                                 fullAnswer += chunk.text;
-                                controller.enqueue(
-                                    encoder.encode(
-                                        `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
-                                    ),
-                                );
+                                try {
+                                    controller.enqueue(
+                                        encoder.encode(
+                                            `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
+                                        ),
+                                    );
+                                } catch {
+                                    // Stream already closed by the consumer — stop producing.
+                                    return;
+                                }
                             }
                         }
 
@@ -463,7 +503,7 @@ ${question}
                         successfulModel = response.modelId;
                         if (logContext) logContext.ragModelUsed = response.modelId;
                     } catch (error: any) {
-                        if (isAbortError(error, signal)) return;
+                        if (isAbortError(error, cancelSignal)) return;
                         if (logContext) {
                             logContext.ragEvent = `fallback_failed_exhausted`;
                             logContext.ragError = error.message;
@@ -495,7 +535,7 @@ ${question}
                                 smartTitle = titleRes.text.trim().replace(/^["']|["']$/g, '');
                             }
                         } catch (_tErr) {
-                            if (isAbortError(_tErr, signal)) return;
+                            if (isAbortError(_tErr, cancelSignal)) return;
                             // fallback to default question substring
                         }
 
@@ -528,15 +568,15 @@ ${question}
                 if (!cancelled) controller.close();
 
                 // Skip DB persistence if the client cancelled the stream
-                if (cancelled || signal?.aborted) {
-                    signal?.removeEventListener("abort", closeOnCancel);
+                if (cancelled || cancelSignal.aborted) {
+                    cancelSignal.removeEventListener("abort", closeOnCancel);
                     return;
                 }
-                signal?.removeEventListener("abort", closeOnCancel);
+                cancelSignal.removeEventListener("abort", closeOnCancel);
 
                 // Save conversation_turn to DB asynchronously
                 if (success) {
-                    if (signal?.aborted) return;
+                    if (cancelSignal.aborted) return;
                     try {
                         const latencyMs = Date.now() - startMs;
 
@@ -579,6 +619,9 @@ ${question}
                         }
                     }
                 }
+            },
+            cancel() {
+                streamAbort.abort();
             },
         });
 

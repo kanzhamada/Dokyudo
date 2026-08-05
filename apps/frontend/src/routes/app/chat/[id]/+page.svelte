@@ -23,7 +23,8 @@
 		Volume2,
 		Pencil,
 		RotateCw,
-		Square
+		Square,
+		Trash2
 	} from 'lucide-svelte';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -656,14 +657,21 @@
 
 		let streamBuffer = '';
 		let isStreamDone = false;
+		let streamHadError = false;
 		let typewriterTimer: ReturnType<typeof setInterval> | null = null;
 		let wasCancelled = false;
+		// References are buffered until the stream is truly DONE (done event + typewriter drained)
+		// so the Source References block does not appear while the AI is still typing.
+		let pendingReferences: DocReference[] = [];
 
 		const startTypewriter = () => {
 			if (typewriterTimer) clearInterval(typewriterTimer);
 			typewriterTimer = setInterval(() => {
 				if (messages[asstIndex].content.length < streamBuffer.length) {
 					const delta = Math.min(3, streamBuffer.length - messages[asstIndex].content.length);
+					if (messages[asstIndex].content.length % 180 === 0) {
+						console.log('[Chat Detail][DEBUG] typewriter: shown=' + messages[asstIndex].content.length, 'buffered=' + streamBuffer.length);
+					}
 					messages[asstIndex].content += streamBuffer.substring(
 						messages[asstIndex].content.length,
 						messages[asstIndex].content.length + delta
@@ -674,6 +682,7 @@
 				} else if (isStreamDone) {
 					clearInterval(typewriterTimer!);
 					typewriterTimer = null;
+					console.log('[Chat Detail][DEBUG] typewriter finished draining buffer (shown=' + messages[asstIndex].content.length + ')');
 
 					messages[asstIndex].isStreaming = false;
 					isGenerating = false;
@@ -684,6 +693,12 @@
 					}
 					isTitleLoading = false;
 					stopThinkingTimer();
+
+					// Stream is truly DONE (done event + typewriter drained, no error) — now safe
+					// to reveal the buffered Source References.
+					if (!streamHadError) {
+						messages[asstIndex].references = pendingReferences;
+					}
 
 					const textContent = messages[asstIndex].content;
 					const currentRefs = messages[asstIndex].references;
@@ -740,14 +755,19 @@
 		const abortController = new AbortController();
 		activeAbortController = abortController;
 		cancelActiveStream = () => {
+			console.log('[Chat Detail][DEBUG] cancelActiveStream: start');
 			wasCancelled = true;
 			abortController.abort();
-			// Cancel the response body reader to stop the SSE stream mid-flight
-			activeStreamReader?.cancel();
+			console.log('[Chat Detail][DEBUG] cancelActiveStream: abortController.abort() called');
+			// Cancel the response body reader to stop the SSE stream mid-flight.
+			// Absorb the rejection — cancel() on an already-aborted reader rejects.
+			activeStreamReader?.cancel().catch(() => {});
 			activeStreamReader = null;
+			console.log('[Chat Detail][DEBUG] cancelActiveStream: reader.cancel() called');
 			if (typewriterTimer) {
 				clearInterval(typewriterTimer);
 				typewriterTimer = null;
+				console.log('[Chat Detail][DEBUG] cancelActiveStream: typewriter timer cleared');
 			}
 			messages[asstIndex].isStreaming = false;
 			isGenerating = false;
@@ -807,7 +827,31 @@
 			let buffer = '';
 
 			while (true) {
-				const { value, done } = await reader.read();
+				// Race reader.read() against the abort signal so cancel feels instant.
+				const readPromise = reader.read();
+				let onAbort: (() => void) | null = null;
+				const abortPromise = new Promise<never>((_, reject) => {
+					if (abortController.signal.aborted) {
+						reject(new DOMException("Aborted", "AbortError"));
+					} else {
+						onAbort = () => reject(new DOMException("Aborted", "AbortError"));
+						abortController.signal.addEventListener("abort", onAbort, { once: true });
+					}
+				});
+				let value: Uint8Array | undefined;
+				let done = false;
+				try {
+					const result = await Promise.race([readPromise, abortPromise]);
+					if (onAbort) abortController.signal.removeEventListener("abort", onAbort);
+					value = result.value;
+					done = result.done;
+				} catch (_err) {
+					// Abort won the race → exit the loop cleanly.
+					// Absorb the orphaned readPromise rejection (it rejects with AbortError too).
+					readPromise.catch(() => {});
+					console.log('[Chat Detail][DEBUG] reader loop exited:', (_err as Error)?.name ?? 'unknown');
+					break;
+				}
 				if (done) break;
 
 				buffer += decoder.decode(value, { stream: true });
@@ -833,7 +877,9 @@
 						try {
 							const parsed = JSON.parse(dataStr);
 							if (parsed.references) {
-								messages[asstIndex].references = parsed.references.map((r: any, idx: number) => ({
+								// Buffer references — they are assigned to the message only when the
+								// stream is truly DONE (done event received + typewriter drained).
+								pendingReferences = parsed.references.map((r: any, idx: number) => ({
 									id: r.documentId,
 									index: r.index || idx + 1,
 									name: r.title || r.documentId,
@@ -887,6 +933,7 @@
 						} catch (e) {
 							showError('Stream error');
 						}
+						streamHadError = true;
 						isStreamDone = true;
 					}
 				}
@@ -906,6 +953,10 @@
 				isGenerating = false;
 				isTitleLoading = false;
 				stopThinkingTimer();
+				if (activeAbortController === abortController) {
+					activeAbortController = null;
+					cancelActiveStream = null;
+				}
 			} else if (!streamBuffer) {
 				// If buffer was empty or loop not running, ensure clean reset
 				stopThinkingTimer();
@@ -913,12 +964,15 @@
 				messages[asstIndex].isStreaming = false;
 				isGenerating = false;
 				isTitleLoading = false;
+				if (activeAbortController === abortController) {
+					activeAbortController = null;
+					cancelActiveStream = null;
+				}
 			}
-			if (activeAbortController === abortController) {
-				activeAbortController = null;
-				activeStreamReader = null;
-				cancelActiveStream = null;
-			}
+			// NOTE: when streamBuffer has pending content, cancelActiveStream is kept alive
+			// so the stop button can interrupt the typewriter drain. The typewriter
+			// completion handler clears it once the buffer is fully displayed.
+			activeStreamReader = null;
 		}
 	}
 
@@ -928,6 +982,7 @@
 	}
 
 	function stopCurrentStream() {
+		console.log('[Chat Detail][DEBUG] stopCurrentStream: user clicked stop');
 		cancelActiveStream?.();
 	}
 
@@ -977,6 +1032,18 @@
 		setTimeout(() => {
 			if (copiedMessageId === msgId) copiedMessageId = null;
 		}, 2000);
+	}
+
+	function deleteResponse(messageIndex: number) {
+		const message = messages[messageIndex];
+		if (!message || message.role !== 'assistant' || message.isStreaming) return;
+
+		messages = messages.filter(
+			(_item, index) =>
+				index !== messageIndex &&
+				!(index === messageIndex - 1 && messages[index].role === 'user')
+		);
+		toast.success('Response deleted');
 	}
 </script>
 
@@ -1148,12 +1215,6 @@
 								>
 									{#if msg.content}
 										{@html renderMarkdown(msg.content, msg.references)}
-
-										{#if msg.isStreaming}
-											<span
-												class="ml-1 inline-block h-4 w-1.5 animate-pulse bg-white/80 align-middle"
-											></span>
-										{/if}
 									{:else if msg.isStreaming}
 										<div
 											class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
@@ -1428,14 +1489,22 @@
 												<GitBranch class="size-3.5 text-white/70" />
 												<span>Branch in new chat</span>
 											</DropdownMenu.Item>
-											<DropdownMenu.Item
-												class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-												onclick={() => toast.info('Read aloud coming soon')}
-											>
-												<Volume2 class="size-3.5 text-white/70" />
-												<span>Read aloud</span>
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
+													<DropdownMenu.Item
+														class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
+														onclick={() => toast.info('Read aloud coming soon')}
+													>
+														<Volume2 class="size-3.5 text-white/70" />
+														<span>Read aloud</span>
+													</DropdownMenu.Item>
+													<DropdownMenu.Item
+														class="flex cursor-pointer items-center gap-2 text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none"
+														disabled={msg.isStreaming}
+														onclick={() => deleteResponse(msgIndex)}
+													>
+														<Trash2 class="size-3.5" />
+														<span>Delete response</span>
+													</DropdownMenu.Item>
+											</DropdownMenu.Content>
 									</DropdownMenu.Root>
 								</div>
 							</div>
@@ -1536,15 +1605,15 @@
 						/>
 
 						<!-- Model Switcher Dropdown -->
-						<div class="relative flex h-9 items-center">
+						<div class="group/model relative flex h-9 items-center">
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger
-									class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
+									class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors group-focus-within/model:text-white/[0.69] group-hover/model:text-white/[0.69] focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
 								>
 									<img
 										src={selectedModel.icon}
 										alt={selectedModel.name}
-										class="size-5 opacity-40 brightness-0 invert transition-opacity focus-within:opacity-[0.69] hover:opacity-[0.69]"
+										class="size-5 opacity-40 brightness-0 invert transition-opacity group-focus-within/model:opacity-[0.69] group-hover/model:opacity-[0.69]"
 									/>
 									<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
 									<ChevronDown class="size-4" />

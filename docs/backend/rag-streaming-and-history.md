@@ -21,7 +21,9 @@ sequenceDiagram
 
     alt User Cancels (click stop / disconnect)
         User-->>Hono: AbortController.abort() → TCP close
-        Hono-->>Gemini: AbortSignal → stop consuming / fetch abort
+        Note over Hono: cancelSignal = AbortSignal.any([reqSignal, streamAbort.signal])
+        Hono-->>Gemini: check cancelSignal.aborted per chunk / fetch(signal)
+        Note over Hono: isConsumerGone() → desiredSize <= 0 x10
         Note over Hono: Skip DB save & title generation
     else Stream Completes
         Gemini-->>Hono: [DONE]
@@ -42,10 +44,11 @@ sequenceDiagram
 
 ## 3. Completion Timestamp
 **Completed At:** 2026-06-30T18:45:00+07:00 (WIB)  
-**Stream Cancellation Added:** 2026-08-05T19:21:00+07:00 (WIB)
+**Stream Cancellation Added:** 2026-08-05T19:21:00+07:00 (WIB)  
+**Stream Cancellation Hardened:** 2026-08-05T20:40:00+07:00 (WIB)
 
 ## 4. File Mapping
-- `apps/backend/src/modules/rag/rag.service.ts`: Logika *streaming*, *hybrid search*, penyimpanan `updated_at`, denormalisasi `contextReferences`, dan guard `signal.aborted` untuk skip DB write saat stream dibatalkan.
+- `apps/backend/src/modules/rag/rag.service.ts`: Logika *streaming*, *hybrid search*, penyimpanan `updated_at`, denormalisasi `contextReferences`, `AbortSignal.any()` untuk combined cancel signal, helper `isConsumerGone()` (cek live abort + `desiredSize` backpressure), dan guard DB save.
 - `apps/backend/src/modules/rag/rag.controller.ts`: Endpoint `handleChat`, `handleListConversations`, `handleGetConversation`, `handleUpdateConversationTitle`, `handleDeleteConversation`. Meneruskan `c.req.raw.signal` ke service layer.
 - `apps/backend/src/modules/rag/rag.routes.ts`: Deklarasi OpenAPI Zod untuk semua endpoint di atas.
 - `apps/backend/src/modules/rag/rag.schema.ts`: `ContextReferenceSchema`, `ConversationTurnSchema`, `ChatServiceParams` (dengan `signal?: AbortSignal`).
@@ -60,8 +63,23 @@ sequenceDiagram
 - **Denormalization for Context References**: Daripada menggunakan SQL `JOIN` dari array JSONB `chunkIds` ke tabel `document_chunks` (yang lambat dan melanggar prinsip *immutability* sejarah), `contextReferences` disimpan langsung dengan format terstruktur `[{ documentId, pages: [...] }]` saat penulisan (`INSERT`). Dengan ini, query `GET /api/rag/conversations/:id` dapat beroperasi dalam kecepatan sub-10ms (Zero-JOIN).
 - **SSE Fallback Streaming**: Jika model LLM pertama gagal karena *Rate Limit*, *circuit breaker* otomatis mencari fallback model lain dan meneruskan token *streaming* ke Svelte.
 - **Prompt Injection Gatekeeper**: Mengeksekusi *pre-flight prompt* dengan model *lite* untuk mendeteksi injeksi perintah sebelum masuk ke jalur RAG utama demi keamanan basis data konteks.
-- **Stream Cancellation via AbortSignal**: Ketika user mengklik tombol stop (atau disconnect), frontend memanggil `AbortController.abort()`. Sinyal ini diteruskan ke backend melalui `c.req.raw.signal` (native `Request.signal` dari Hono/Bun). Backend kemudian:
-  - Memutus koneksi HTTP ke LLM provider yang menggunakan `fetch()` (OpenRouter, Groq, SambaNova, Cohere) — TCP connection langsung terputus.
+- **Stream Cancellation via Combined AbortSignal**: Ketika user mengklik stop (atau disconnect), frontend memanggil `AbortController.abort()`. Backend menggabungkan dua sumber sinyal menjadi satu `cancelSignal`:
+  ```ts
+  const streamAbort = new AbortController();
+  const cancelSignal = signal
+      ? AbortSignal.any([signal, streamAbort.signal])
+      : streamAbort.signal;
+  ```
+  - `signal` = `c.req.raw.signal` (abort dari request HTTP).
+  - `streamAbort.signal` = dipicu oleh callback `cancel()` pada `ReadableStream`, yang dipanggil runtime saat consumer (HTTP layer) mendeteksi client disconnect.
+  
+  `cancelSignal` dipakai untuk:
+  - Memutus koneksi HTTP ke LLM provider berbasis `fetch()` (OpenRouter, Groq, SambaNova, Cohere) — TCP langsung terputus.
   - Menghentikan iterasi stream pada provider berbasis SDK (Gemini, Mistral) dengan mengecek `signal.aborted` di setiap iterasi `for await`.
-  - Melewatkan penyimpanan ke DB (`conversation_turns`) dan generasi judul otomatis apabila sinyal sudah ter-abort.
-  - Tidak memerlukan endpoint `/cancel` terpisah atau state Redis — lifecycle HTTP stream sudah menangani sinyal ini secara native.
+  - Melewatkan penyimpanan ke DB (`conversation_turns`) dan generasi judul otomatis.
+- **Live Cancel Detection (bukan snapshot)**: Bug awal: `let cancelled = cancelSignal.aborted` disimpan sekali dan tidak pernah diupdate, sehingga loop token tidak pernah berhenti saat cancel terjadi di tengah stream. Perbaikan: helper `isConsumerGone()` dipanggil di **setiap iterasi** kedua token loop (BYOK + fallback), melakukan dua pengecekan:
+  1. `cancelSignal.aborted` — sinyal abort benar-benar fired.
+  2. `controller.desiredSize <= 0` selama ≥10 iterasi berturut-turut — deteksi backpressure saat HTTP layer berhenti menarik data (client disconnect tanpa signal eksplisit).
+  
+  Selain itu `controller.enqueue()` di-wrap `try/catch` — jika stream sudah ditutup consumer, `enqueue()` melempar dan loop berhenti.
+- **DB Save Guard**: Setelah `controller.close()`, pengecekan `cancelled || cancelSignal.aborted` dilakukan sebelum `INSERT conversation_turns` dan generasi title, sehingga turn yang dibatalkan tidak pernah tercatat di riwayat.
