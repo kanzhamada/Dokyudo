@@ -53,7 +53,7 @@
 
 	function transformCitationTags(html: string, references?: DocReference[]): string {
 		if (!html) return '';
-		return html.replace(/\[Doc (\d+)(?:: (?:Hlm\.|Pages?|Page) ([^\]]+))?\]/g, (_match, docIdxStr, pageInfo) => {
+		let result = html.replace(/\[Doc (\d+): (?:Hlm\.|Pages?|Page) ([^\]]+)\]/gi, (_match, docIdxStr, pageInfo) => {
 			const docIdx = Number(docIdxStr);
 			let docDisplayName = `Doc ${docIdx}`;
 			let tooltipTitle = `Doc ${docIdx}`;
@@ -71,9 +71,11 @@
 				}
 			}
 
-			const label = pageInfo ? `${docDisplayName} • Hlm. ${pageInfo}` : docDisplayName;
+			const label = `${docDisplayName} • Hlm. ${pageInfo}`;
 			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageInfo || ''}" class="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300 transition-colors hover:bg-amber-400/25 cursor-pointer" title="${tooltipTitle}">${label}</span>`;
 		});
+
+		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
 	}
 
 	function wrapWordsInHtml(html: string): string {
@@ -210,6 +212,38 @@
 
 	let maxFileSizeMB = $derived((maxFileSizeBytes / (1024 * 1024)).toFixed(0));
 
+	function filterReferencesByCitations(answer: string, references: any[] | null | undefined) {
+		if (!references || references.length === 0 || !answer) return null;
+		const citationRegex = /\[Doc (\d+): (?:Hlm\.|Pages?|Page) ([^\]]+)\]/gi;
+		const citedPagesMap = new Map<number, Set<number>>();
+		let match;
+		while ((match = citationRegex.exec(answer)) !== null) {
+			const docIdx = parseInt(match[1], 10);
+			if (!citedPagesMap.has(docIdx)) citedPagesMap.set(docIdx, new Set<number>());
+			const pagesStr = match[2];
+			if (pagesStr) {
+				const pageMatches = pagesStr.match(/\d+/g);
+				if (pageMatches) {
+					for (const p of pageMatches) citedPagesMap.get(docIdx)!.add(parseInt(p, 10));
+				}
+			}
+		}
+		if (citedPagesMap.size === 0) return null;
+		const filtered: any[] = [];
+		for (const ref of references) {
+			const docIdx = ref.index || 1;
+			const citedSet = citedPagesMap.get(docIdx);
+			if (citedSet) {
+				const sortedPages = Array.from(citedSet).sort((a, b) => a - b);
+				filtered.push({
+					...ref,
+					pages: sortedPages.length > 0 ? sortedPages : ref.pages
+				});
+			}
+		}
+		return filtered.length > 0 ? filtered : null;
+	}
+
 	async function loadConversation(id: string) {
 		const requestId = ++conversationRequestId;
 		messages = [];
@@ -227,7 +261,20 @@
 					const historyMsgs: ChatMessage[] = [];
 					for (const turn of convRes.data.turns) {
 						historyMsgs.push({ id: `${turn.id}-user`, role: 'user', content: turn.question, timestamp: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
-						historyMsgs.push({ id: `${turn.id}-asst`, role: 'assistant', modelName: turn.modelUsed || undefined, content: turn.answer, timestamp: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), references: turn.contextReferences?.map((r: any) => ({ id: r.documentId, name: r.title || r.documentId, pages: r.pages })), isStreaming: false });
+						const filteredTurnRefs = filterReferencesByCitations(turn.answer, turn.contextReferences);
+						historyMsgs.push({
+							id: `${turn.id}-asst`,
+							role: 'assistant',
+							modelName: turn.modelUsed || undefined,
+							content: turn.answer,
+							timestamp: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+							references: filteredTurnRefs?.map((r: any) => ({
+								id: r.documentId,
+								name: r.title || r.documentId,
+								pages: r.pages
+							})),
+							isStreaming: false
+						});
 					}
 					messages = historyMsgs;
 				}
@@ -618,7 +665,7 @@
 	}
 
 	function copyToClipboard(text: string, msgId: string) {
-		const cleanText = text.replace(/\s*\[Doc \d+(?:: (?:Hlm\.|Pages?|Page) [^\]]+)?\]/g, '').trim();
+		const cleanText = text.replace(/\s*\[Doc [^\]]+\]/gi, '').trim();
 		navigator.clipboard.writeText(cleanText);
 		copiedMessageId = msgId;
 		toast.success('Copied to clipboard');

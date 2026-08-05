@@ -195,8 +195,7 @@ CRITICAL CITATION RULES & INSTRUCTIONS:
 2. STRICT INDEX BOUNDS: The CONTEXT DOCUMENTS contain exactly ${totalUniqueDocs} unique document(s), numbered strictly from [Doc 1] to [Doc ${totalUniqueDocs}].
 3. DILARANG KERAS / STRICTLY FORBIDDEN: NEVER cite any document index higher than [Doc ${totalUniqueDocs}]. For example, if there is only 1 document provided, you MUST ONLY cite [Doc 1].
 4. CITATION MANDATE: Whenever you state a factual claim, answer point, or detail derived from the CONTEXT DOCUMENTS, append an inline citation tag at the end of that sentence using the exact tag format: [Doc N: Hlm. X] (where N is the valid document index number between 1 and ${totalUniqueDocs}, and X is the page number, e.g. [Doc 1: Hlm. 167]).
-5. If a sentence is general conversational response, summary text, or not derived from the CONTEXT DOCUMENTS, do NOT attach any citation tag to that sentence.
-6. Only cite sources explicitly provided in CONTEXT DOCUMENTS. If the context does not contain enough information, state that clearly.
+6. ABSOLUTE FORBIDDEN ON NEGATIVE ANSWERS: If the CONTEXT DOCUMENTS do not contain information to answer the question, state that clearly in natural language without adding any document lists or bracketed tags (such as [Doc 1; Doc 2; Doc 3] or [Doc 1]). Only append citation tags [Doc N: Hlm. X] when citing specific factual information with page numbers.
 
 ${historyText}
 ${contextText}
@@ -460,7 +459,10 @@ ${question}
                                 modelUsed: successfulModel,
                                 latencyMs,
                                 contextReferences:
-                                    references.length > 0 ? references : null,
+                                    RagService.filterReferencesByCitations(
+                                        fullAnswer,
+                                        references,
+                                    ),
                             });
 
                             // Explicitly touch the updatedAt field on the parent conversation
@@ -585,7 +587,10 @@ ${question}
                 id: t.id,
                 question: t.question,
                 answer: t.answer,
-                contextReferences: t.contextReferences,
+                contextReferences: RagService.filterReferencesByCitations(
+                    t.answer,
+                    t.contextReferences as any,
+                ),
                 createdAt: t.createdAt.toISOString(),
             })),
         };
@@ -647,5 +652,52 @@ ${question}
                 });
             }
         });
+    }
+
+    public static filterReferencesByCitations<
+        T extends { index?: number; documentId?: string; title?: string; pages?: number[] },
+    >(answer: string, references: T[] | null | undefined): T[] | null {
+        if (!references || references.length === 0 || !answer) {
+            return null;
+        }
+
+        const citationRegex = /\[Doc (\d+): (?:Hlm\.|Pages?|Page) ([^\]]+)\]/gi;
+        const citedPagesMap = new Map<number, Set<number>>();
+        let match;
+
+        while ((match = citationRegex.exec(answer)) !== null) {
+            const docIdx = parseInt(match[1], 10);
+            if (!citedPagesMap.has(docIdx)) {
+                citedPagesMap.set(docIdx, new Set<number>());
+            }
+            const pagesStr = match[2];
+            if (pagesStr) {
+                const pageMatches = pagesStr.match(/\d+/g);
+                if (pageMatches) {
+                    for (const p of pageMatches) {
+                        citedPagesMap.get(docIdx)!.add(parseInt(p, 10));
+                    }
+                }
+            }
+        }
+
+        if (citedPagesMap.size === 0) {
+            return null;
+        }
+
+        const filtered: T[] = [];
+        for (const ref of references) {
+            const docIdx = ref.index || 1;
+            const citedSet = citedPagesMap.get(docIdx);
+            if (citedSet) {
+                const sortedPages = Array.from(citedSet).sort((a, b) => a - b);
+                filtered.push({
+                    ...ref,
+                    pages: sortedPages.length > 0 ? sortedPages : ref.pages,
+                });
+            }
+        }
+
+        return filtered.length > 0 ? filtered : null;
     }
 }
