@@ -275,6 +275,11 @@
 	let messages: ChatMessage[] = $state([]);
 	let conversationRequestId = 0;
 
+	// Track the last user message id for edit button visibility
+	let lastUserMsgId = $derived(
+		[...messages].reverse().find((m) => m.role === 'user')?.id ?? null
+	);
+
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
 	let maxUploads = $state(10);
@@ -806,7 +811,7 @@
 		class="relative z-10 flex flex-1 min-h-0 flex-col overflow-y-auto px-4 pt-16 md:pt-8 md:px-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
 	>
 		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
-			{#each messages as msg (msg.id)}
+			{#each messages as msg, msgIndex (msg.id)}
 				{#if msg.role === 'user'}
 					<!-- User Message (Clean Pill) -->
 					<div class="flex w-full justify-end">
@@ -845,15 +850,17 @@
 										<Copy class="size-3" />
 									{/if}
 								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-									onclick={() => toast.info('Edit question feature coming soon')}
-									aria-label="Edit question"
-								>
-									<Pencil class="size-3" />
-								</Button>
+								{#if msg.id === lastUserMsgId}
+									<Button
+										variant="ghost"
+										size="icon"
+										class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+										onclick={() => toast.info('Edit question feature coming soon')}
+										aria-label="Edit question"
+									>
+										<Pencil class="size-3" />
+									</Button>
+								{/if}
 							</div>
 						</div>
 					</div>
