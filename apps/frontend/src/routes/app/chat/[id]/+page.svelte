@@ -51,9 +51,39 @@
 		breaks: true
 	});
 
+	function formatPageNumbers(raw: string): string {
+		if (!raw) return '';
+		const expanded = raw.replace(/(\d+)\s*-\s*(\d+)/g, (_m, startStr, endStr) => {
+			const start = Number(startStr);
+			const end = Number(endStr);
+			if (end > start && end - start < 30) {
+				const arr: number[] = [];
+				for (let i = start; i <= end; i++) {
+					arr.push(i);
+				}
+				return arr.join(', ');
+			}
+			return `${startStr}, ${endStr}`;
+		});
+
+		const matches = expanded.match(/\d+/g);
+		if (!matches || matches.length === 0) return raw.trim();
+
+		const uniqueNums = Array.from(new Set(matches.map(Number))).sort((a, b) => a - b);
+		return uniqueNums.join(', ');
+	}
+
 	function transformCitationTags(html: string, references?: DocReference[]): string {
 		if (!html) return '';
-		let result = html.replace(/\[Doc (\d+): (?:Hlm\.|Pages?|Page) ([^\]]+)\]/gi, (_match, docIdxStr, pageInfo) => {
+
+		const isNegativeAnswer = /(Mohon maaf|tidak mengandung informasi|tidak ditemukan|tidak ada informasi|does not contain|cannot answer|no information available)/i.test(html);
+		if (isNegativeAnswer) {
+			return html.replace(/\s*\[Doc [^\]]+\]/gi, '');
+		}
+
+		let cleanHtml = html.replace(/\[Doc \d+:[^\]]*;[^\]]*\]/gi, '');
+
+		let result = cleanHtml.replace(/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi, (_match, docIdxStr, rawPageInfo) => {
 			const docIdx = Number(docIdxStr);
 			let docDisplayName = `Doc ${docIdx}`;
 			let tooltipTitle = `Doc ${docIdx}`;
@@ -71,8 +101,9 @@
 				}
 			}
 
-			const label = `${docDisplayName} • Hlm. ${pageInfo}`;
-			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageInfo || ''}" class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white" title="${tooltipTitle}">${label}</span>`;
+			const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
+			const label = pageFormatted ? `${docDisplayName} • ${pageFormatted}` : docDisplayName;
+			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageFormatted}" class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white" title="${tooltipTitle}">${label}</span>`;
 		});
 
 		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
@@ -659,7 +690,7 @@
 
 						if (currentRefs && currentRefs.length > 0) {
 							// Parse all inline citation tags: [Doc N: X, Y]
-							const citationMatches = [...textContent.matchAll(/\[Doc (\d+)(?:: (?:Hlm\.|Pages?|Page) ([^\]]+))?\]/gi)];
+							const citationMatches = [...textContent.matchAll(/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi)];
 							
 							if (citationMatches.length === 0) {
 								messages[asstIndex].references = [];
@@ -871,7 +902,7 @@
 														{#if ref.pages && ref.pages.length > 0}
 															<span class="text-white/40">• {ref.pages.join(', ')}</span>
 														{:else if ref.page}
-															<span class="text-white/40">• {ref.page}</span>
+															<span class="text-white/40">• {formatPageNumbers(String(ref.page))}</span>
 														{/if}
 													</Tooltip.Trigger>
 													<Tooltip.Content
