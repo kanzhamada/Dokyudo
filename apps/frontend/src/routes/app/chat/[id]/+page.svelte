@@ -71,8 +71,8 @@
 				}
 			}
 
-			const label = `${docDisplayName} • ${pageInfo}`;
-			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageInfo || ''}" class="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300 transition-colors hover:bg-amber-400/25 cursor-pointer" title="${tooltipTitle}">${label}</span>`;
+			const label = `${docDisplayName} • Hlm. ${pageInfo}`;
+			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageInfo || ''}" class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white" title="${tooltipTitle}">${label}</span>`;
 		});
 
 		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
