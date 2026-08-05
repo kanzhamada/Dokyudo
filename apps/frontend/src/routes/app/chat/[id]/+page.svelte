@@ -21,7 +21,8 @@
 		Ellipsis,
 		GitBranch,
 		Volume2,
-		Pencil
+		Pencil,
+		RotateCw
 	} from 'lucide-svelte';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -644,7 +645,7 @@
 	<!-- Center Scrollable Chat Area -->
 	<div
 		bind:this={chatContainer}
-		class="relative z-10 flex flex-1 flex-col overflow-y-auto px-4 py-8 md:px-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+		class="relative z-10 flex flex-1 min-h-0 flex-col overflow-y-auto px-4 pt-16 md:pt-8 md:px-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
 	>
 		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-48">
 			{#each messages as msg (msg.id)}
@@ -753,7 +754,7 @@
 								</div>
 							{/if}
 
-							<!-- Action Toolbar (Copy, Thumbs Up/Down, Dropdown Menu) -->
+							<!-- Action Toolbar (Copy, Retry, Thumbs Up/Down, Dropdown Menu) -->
 							<div class="flex items-center gap-1 pt-1 text-white/40">
 								<Button
 									variant="ghost"
@@ -767,6 +768,15 @@
 									{:else}
 										<Copy class="size-3.5" />
 									{/if}
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
+									onclick={() => toast.info('Regenerate response coming soon')}
+									aria-label="Retry response"
+								>
+									<RotateCw class="size-3.5" />
 								</Button>
 								<Button
 									variant="ghost"
@@ -820,8 +830,8 @@
 
 	<!-- Bottom Area: Floating Input Capsule with Gradient Mask -->
 	<div
-		class="pointer-events-none fixed bottom-0 right-0 z-30 flex flex-col items-center justify-end pb-4 pt-20 bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent"
-		style="left: var(--sidebar-width, 16rem); font-family: 'Inter', sans-serif;"
+		class="pointer-events-none absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center justify-end pb-4 pt-20 bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent"
+		style="font-family: 'Inter', sans-serif;"
 	>
 		<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">
 			<!-- Main Input Capsule -->
