@@ -182,6 +182,7 @@
 
 	// Conversation Messages
 	let messages: ChatMessage[] = $state([]);
+	let conversationRequestId = 0;
 
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
@@ -201,6 +202,50 @@
 	);
 
 	let maxFileSizeMB = $derived((maxFileSizeBytes / (1024 * 1024)).toFixed(0));
+
+	async function loadConversation(id: string) {
+		const requestId = ++conversationRequestId;
+		messages = [];
+		conversationTitle = 'New Conversation';
+		inputValue = '';
+		attachedFiles = [];
+
+		try {
+			console.log(`[Chat Detail] Fetching conversation history for ID: ${id}`);
+			const convRes = await getConversation(id);
+			if (requestId !== conversationRequestId) return;
+			if (convRes.ok) {
+				if (convRes.data.title) conversationTitle = convRes.data.title;
+				if (convRes.data.turns && convRes.data.turns.length > 0) {
+					const historyMsgs: ChatMessage[] = [];
+					for (const turn of convRes.data.turns) {
+						historyMsgs.push({ id: `${turn.id}-user`, role: 'user', content: turn.question, timestamp: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+						historyMsgs.push({ id: `${turn.id}-asst`, role: 'assistant', modelName: turn.modelUsed || undefined, content: turn.answer, timestamp: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), references: turn.contextReferences?.map((r: any) => ({ id: r.documentId, name: r.title || r.documentId, pages: r.pages })), isStreaming: false });
+					}
+					messages = historyMsgs;
+				}
+			} else if (convRes.error.code === 'NOT_FOUND') {
+				console.log('[Chat Detail] New conversation initialized (no history in DB yet).');
+			}
+		} catch (err) {
+			if (requestId === conversationRequestId) console.error('[Chat Detail] Failed to load conversation:', err);
+			return;
+		}
+
+		const stateObj = ((page as any)?.state as any) || (history.state as any)?.usr || (history.state as any);
+		if (requestId === conversationRequestId && stateObj?.initialQuestion) {
+			isTitleLoading = true;
+			const initialQ = stateObj.initialQuestion as string;
+			const initialModel = (stateObj.selectedModel as LlmOption) || selectedModel;
+			if (stateObj.selectedModel) selectedModel = stateObj.selectedModel as LlmOption;
+			streamChatTurn(initialQ, initialModel);
+		}
+		scrollToBottom();
+	}
+
+	$effect(() => {
+		loadConversation(chatId);
+	});
 
 	onMount(async () => {
 		console.log(`[Chat Detail] Mounted view for chat ID: ${chatId}`);
@@ -258,61 +303,6 @@
 			console.error('[Chat Detail] Failed to fetch BYOK keys:', err);
 		}
 
-		// Fetch existing conversation turns
-		try {
-			console.log(`[Chat Detail] Fetching conversation history for ID: ${chatId}`);
-			const convRes = await getConversation(chatId);
-			if (convRes.ok) {
-				console.log(`[Chat Detail] Backend Response getConversation:`, convRes);
-				if (convRes.data.title) conversationTitle = convRes.data.title;
-				if (convRes.data.turns && convRes.data.turns.length > 0) {
-					const historyMsgs: ChatMessage[] = [];
-					for (const turn of convRes.data.turns) {
-						historyMsgs.push({
-							id: `${turn.id}-user`,
-							role: 'user',
-							content: turn.question,
-							timestamp: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-						});
-						historyMsgs.push({
-							id: `${turn.id}-asst`,
-							role: 'assistant',
-							modelName: turn.modelUsed || undefined,
-							content: turn.answer,
-							timestamp: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-							references: turn.contextReferences?.map((r: any) => ({
-								id: r.documentId,
-								name: r.title || r.documentId,
-								pages: r.pages
-							})),
-							isStreaming: false
-						});
-					}
-					messages = historyMsgs;
-				}
-			} else if (convRes.error.code === 'NOT_FOUND') {
-				console.log('[Chat Detail] New conversation initialized (no history in DB yet).');
-			}
-		} catch (err) {
-			console.error('[Chat Detail] Failed to load conversation:', err);
-		}
-
-		// Check for initial chat question passed via history.state or page.state from /app/chat
-		const stateObj = ((page as any)?.state as any) || (history.state as any)?.usr || (history.state as any);
-		console.log('[Chat Detail] Navigated State Object:', stateObj);
-
-		if (stateObj && stateObj.initialQuestion) {
-			isTitleLoading = true;
-			const initialQ = stateObj.initialQuestion as string;
-			const initialModel = (stateObj.selectedModel as LlmOption) || selectedModel;
-			if (stateObj.selectedModel) {
-				selectedModel = stateObj.selectedModel as LlmOption;
-			}
-			console.log('[Chat Detail] Auto-starting initial chat stream for question:', initialQ);
-			streamChatTurn(initialQ, initialModel);
-		}
-
-		scrollToBottom();
 	});
 
 	$effect(() => {
