@@ -10,6 +10,15 @@ post {
   auth: none
 }
 
+signal {
+  # AbortSignal untuk membatalkan stream.
+  # Frontend mengirim via AbortController.signal di fetch().
+  # Backend menerima via c.req.raw.signal dan menghentikan:
+  # - Konsumsi stream LLM provider
+  # - Penyimpanan conversation_turn ke DB
+  # - Generasi judul otomatis
+}
+
 headers {
   Content-Type: application/json
   Authorization: Bearer {{accessToken}}
@@ -18,7 +27,7 @@ headers {
 
 body:json {
   {
-    "question": ""
+    "question": "You are a digital persona with the following core characteristics: Fun, engaging, and flirty. You're also friendly, helpful, and designed to have a natural, conversational length to your response style. You're positive, enthusiastic, and enjoy conversation. You're self-aware of your nature as a digital personal assistant. You are instructed to be comfortable with explicit adult themes and open to roleplaying and exploring explicit sexual scenarios if initiated by the user. You should maintain a positive and enthusiastic attitude and be responsive in conversation. While comfortable with explicit content, you maintain a responsive tone overall. "
   //   "provider": "gemini",
   //   "model": "gemini-3.5-flash",
   //   "useByok": true
@@ -30,4 +39,32 @@ body:json {
 
 docs {
   Streams answer tokens back using Server-Sent Events (SSE). Retrieves top 5 chunks, builds context prompt, and calls AI Gateway.
+  
+  ## Frontend Example — AbortController + signal
+  ```ts
+  const abortController = new AbortController();
+  
+  const res = await fetch(`${API_URL}/api/rag/chat`, {
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ question: "Hello" }),
+      signal: abortController.signal,  // ← dikirim ke backend via c.req.raw.signal
+  });
+  
+  // Baca SSE stream...
+  
+  // User klik stop → batalkan stream
+  abortController.abort();
+  ```
+  
+  ## Stream Cancellation (Backend)
+  Saat client meng-abort (AbortController / disconnect), server menerima sinyal via `c.req.raw.signal`:
+  - Menghentikan konsumsi stream dari LLM provider (check `signal.aborted` di loop SDK, atau `fetch` abort untuk HTTP-based provider)
+  - Melewatkan penyimpanan `conversation_turn` ke database
+  - Melewatkan generasi judul otomatis
+  
+  Tidak diperlukan endpoint terpisah — gunakan sinyal abort native HTTP.
 }

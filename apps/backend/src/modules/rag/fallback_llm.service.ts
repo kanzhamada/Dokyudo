@@ -121,18 +121,23 @@ async function recordSuccess(provider: string, modelId: string): Promise<void> {
  * Generic OpenAI-compatible SSE parser.
  * Used by: Groq, SambaNova
  */
-async function* parseOpenAiSse(body: ReadableStream<Uint8Array>): AsyncIterable<{ text: string }> {
+async function* parseOpenAiSse(
+    body: ReadableStream<Uint8Array>,
+    signal?: AbortSignal,
+): AsyncIterable<{ text: string }> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
     while (true) {
+        if (signal?.aborted) return;
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
         for (const line of lines) {
+            if (signal?.aborted) return;
             const trimmed = line.trim();
             if (!trimmed.startsWith("data: ")) continue;
             const data = trimmed.slice(6);
@@ -150,18 +155,23 @@ async function* parseOpenAiSse(body: ReadableStream<Uint8Array>): AsyncIterable<
  * Cohere v2 Chat SSE parser.
  * Event format: {"type":"content-delta","index":0,"delta":{"type":"text","text":"..."}}
  */
-async function* parseCohereSSe(body: ReadableStream<Uint8Array>): AsyncIterable<{ text: string }> {
+async function* parseCohereSSe(
+    body: ReadableStream<Uint8Array>,
+    signal?: AbortSignal,
+): AsyncIterable<{ text: string }> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
     while (true) {
+        if (signal?.aborted) return;
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
         for (const line of lines) {
+            if (signal?.aborted) return;
             const trimmed = line.trim();
             if (!trimmed) continue;
             
@@ -188,13 +198,19 @@ async function* parseCohereSSe(body: ReadableStream<Uint8Array>): AsyncIterable<
 async function streamGemini(
     modelId: string,
     messages: { role: string; content: string }[],
+    signal?: AbortSignal,
 ): Promise<AsyncIterable<{ text: string }>> {
     const client = new GoogleGenAI({ apiKey: getEnv("GOOGLE_API_KEY") });
     const prompt = messages.map(m => m.content).join("\n");
-    const raw = await client.models.generateContentStream({ model: modelId, contents: prompt });
+    const raw = await client.models.generateContentStream({
+        model: modelId,
+        contents: prompt,
+        config: { abortSignal: signal },
+    });
 
     async function* mapped() {
         for await (const chunk of raw) {
+            if (signal?.aborted) break;
             if (chunk.text) yield { text: chunk.text };
         }
     }
@@ -204,6 +220,7 @@ async function streamGemini(
 async function streamMistral(
     modelId: string,
     messages: { role: string; content: string }[],
+    signal?: AbortSignal,
 ): Promise<AsyncIterable<{ text: string }>> {
     const apiKey = getEnv("FREE_MISTRAL_API_KEY") || getEnv("GOOGLE_API_KEY"); // fallback handled by caller
     const { Mistral } = await import("npm:@mistralai/mistralai");
@@ -212,6 +229,7 @@ async function streamMistral(
 
     async function* mapped() {
         for await (const chunk of raw) {
+            if (signal?.aborted) break;
             const content = chunk.data.choices?.[0]?.delta?.content;
             if (content) yield { text: content as string };
         }
@@ -222,6 +240,7 @@ async function streamMistral(
 async function streamGroq(
     modelId: string,
     messages: { role: string; content: string }[],
+    signal?: AbortSignal,
 ): Promise<AsyncIterable<{ text: string }>> {
     const apiKey = getEnv("GROQ_API_KEY");
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -231,6 +250,7 @@ async function streamGroq(
             "Content-Type": "application/json",
         },
         body: JSON.stringify({ model: modelId, messages, stream: true }),
+        signal,
     });
     if (!res.ok || !res.body) throw Object.assign(new Error("Groq error"), { status: res.status });
     
@@ -291,12 +311,13 @@ async function streamGroq(
         }
     }
 
-    return stripThinkTags(parseOpenAiSse(res.body));
+    return stripThinkTags(parseOpenAiSse(res.body, signal));
 }
 
 async function streamSambanova(
     modelId: string,
     messages: { role: string; content: string }[],
+    signal?: AbortSignal,
 ): Promise<AsyncIterable<{ text: string }>> {
     const apiKey = getEnv("SAMBANOVA_API_KEY");
     const res = await fetch(`https://api.sambanova.ai/v1/chat/completions`, {
@@ -311,14 +332,16 @@ async function streamSambanova(
             stream: true,
             stream_options: { include_usage: true },
         }),
+        signal,
     });
     if (!res.ok || !res.body) throw Object.assign(new Error("SambaNova error"), { status: res.status });
-    return parseOpenAiSse(res.body);
+    return parseOpenAiSse(res.body, signal);
 }
 
 async function streamCohere(
     modelId: string,
     messages: { role: string; content: string }[],
+    signal?: AbortSignal,
 ): Promise<AsyncIterable<{ text: string }>> {
     const apiKey = getEnv("COHERE_API_KEY");
     const res = await fetch("https://api.cohere.com/v2/chat", {
@@ -329,9 +352,10 @@ async function streamCohere(
             "Accept": "application/json",
         },
         body: JSON.stringify({ model: modelId, messages, stream: true }),
+        signal,
     });
     if (!res.ok || !res.body) throw Object.assign(new Error("Cohere error"), { status: res.status });
-    return parseCohereSSe(res.body);
+    return parseCohereSSe(res.body, signal);
 }
 
 // ==============================================================================
@@ -341,13 +365,14 @@ async function streamCohere(
 async function callProvider(
     entry: PoolEntry,
     messages: { role: string; content: string }[],
+    signal?: AbortSignal,
 ): Promise<AsyncIterable<{ text: string }>> {
     switch (entry.provider) {
-        case "gemini":    return streamGemini(entry.modelId, messages);
-        case "mistral":   return streamMistral(entry.modelId, messages);
-        case "groq":      return streamGroq(entry.modelId, messages);
-        case "sambanova": return streamSambanova(entry.modelId, messages);
-        case "cohere":    return streamCohere(entry.modelId, messages);
+        case "gemini":    return streamGemini(entry.modelId, messages, signal);
+        case "mistral":   return streamMistral(entry.modelId, messages, signal);
+        case "groq":      return streamGroq(entry.modelId, messages, signal);
+        case "sambanova": return streamSambanova(entry.modelId, messages, signal);
+        case "cohere":    return streamCohere(entry.modelId, messages, signal);
     }
 }
 
@@ -355,13 +380,26 @@ async function callProvider(
 // 6. MAIN SERVICE
 // ==============================================================================
 
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+async function withTimeout<T>(
+    promise: Promise<T>,
+    ms: number,
+    signal?: AbortSignal,
+): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
     const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error("TIMEOUT")), ms);
     });
-    return Promise.race([promise, timeout]).finally(() => {
+    const aborted = new Promise<never>((_, reject) => {
+        if (!signal) return;
+        onAbort = () => reject(signal.reason ?? new DOMException("The operation was aborted", "AbortError"));
+        if (signal.aborted) onAbort();
+        else signal.addEventListener("abort", onAbort, { once: true });
+    });
+
+    return Promise.race([promise, timeout, aborted]).finally(() => {
         if (timer) clearTimeout(timer);
+        if (signal && onAbort) signal.removeEventListener("abort", onAbort);
     });
 }
 
@@ -378,9 +416,10 @@ export class FallbackLlmService {
     static async generateStream(params: {
         messages: { role: string; content: string }[];
         estimatedTokens?: number;
+        signal?: AbortSignal;
         logContext?: Record<string, any>;
     }): Promise<FallbackStreamResponse> {
-        const { messages, logContext } = params;
+        const { messages, signal, logContext } = params;
 
         const fullText = messages.map(m => m.content).join(" ");
         const estimatedTokens = params.estimatedTokens ?? estimateTokenCount(fullText);
@@ -399,6 +438,10 @@ export class FallbackLlmService {
 
         for (const pool of pools) {
             for (const entry of pool) {
+                if (signal?.aborted) {
+                    throw signal.reason ?? new DOMException("The operation was aborted", "AbortError");
+                }
+
                 // Guard 1: Circuit breaker
                 if (await isCircuitOpen(entry.provider, entry.modelId)) continue;
 
@@ -408,7 +451,10 @@ export class FallbackLlmService {
 
                 try {
                     // Enforce 15-second connection timeout (Time-To-First-Token)
-                    const stream = await withTimeout(callProvider(entry, messages), 15_000);
+                    const stream = await withTimeout(callProvider(entry, messages, signal), 15_000, signal);
+                    if (signal?.aborted) {
+                        throw signal.reason ?? new DOMException("The operation was aborted", "AbortError");
+                    }
                     await recordSuccess(entry.provider, entry.modelId);
 
                     if (logContext) {
@@ -418,6 +464,7 @@ export class FallbackLlmService {
 
                     return { stream, provider: entry.provider, modelId: entry.modelId };
                 } catch (err: any) {
+                    if (signal?.aborted || err?.name === "AbortError") throw err;
                     if (logContext) logContext[`${entry.provider}_error`] = err.message;
                     await recordFailure(entry.provider, entry.modelId);
                     // Continue to next candidate

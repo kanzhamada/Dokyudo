@@ -17,6 +17,18 @@ import { KeysService } from "../keys/keys.service.ts";
 import { decryptApiKey } from "../../shared/utils/crypto.util.ts";
 import { tenantKeys } from "../../shared/models/db.model.ts";
 
+function createClosedStream(): ReadableStream<Uint8Array> {
+    return new ReadableStream({
+        start(controller) {
+            controller.close();
+        },
+    });
+}
+
+function isAbortError(error: unknown, signal?: AbortSignal): boolean {
+    return signal?.aborted === true || (error instanceof DOMException && error.name === "AbortError");
+}
+
 export class RagService {
     /**
      * Executes RAG pipeline and returns an SSE ReadableStream.
@@ -32,13 +44,17 @@ export class RagService {
             provider,
             model,
             useByok,
+            signal,
             logContext,
         } = params;
+
+        if (signal?.aborted) return createClosedStream();
 
         // -1. Tier Quota Validation (Check Only)
         await withAuthDb(userId, async (tx) => {
             await TierQuotaUtil.checkQaQuota(tx, tenantId);
         });
+        if (signal?.aborted) return createClosedStream();
 
         // 0. LLM Gatekeeper for Prompt Injection
         const guardPrompt = `You are a strict security gatekeeper for a RAG (Retrieval-Augmented Generation) system.
@@ -53,7 +69,9 @@ ${question}`;
             const guardResponse = await gemini.generateText(
                 guardPrompt,
                 GEMINI_MODELS.llmDefault,
+                signal,
             );
+            if (signal?.aborted) return createClosedStream();
             const guardDecision = guardResponse.text?.trim().toUpperCase();
 
             if (guardDecision?.includes("INJECTION")) {
@@ -77,6 +95,7 @@ ${question}`;
                 });
             }
         } catch (e: any) {
+            if (isAbortError(e, signal)) return createClosedStream();
             if (e instanceof AppError) throw e;
             if (logContext) logContext.ragGatekeeperError = e.message;
         }
@@ -100,6 +119,7 @@ ${question}`;
                         .orderBy(desc(conversationTurns.createdAt))
                         .limit(3);
                 });
+                if (signal?.aborted) return createClosedStream();
 
                 if (previousTurns.length > 0) {
                     // Reverse to chronological order (oldest to newest among the last 3)
@@ -120,7 +140,9 @@ Rewritten Query:`;
                     const rewriteResponse = await gemini.generateText(
                         rewritePrompt,
                         GEMINI_MODELS.llmDefault,
+                        signal,
                     );
+                    if (signal?.aborted) return createClosedStream();
                     const rewritten = rewriteResponse.text?.trim();
                     if (rewritten && rewritten.length > 0) {
                         searchQuery = rewritten;
@@ -129,6 +151,7 @@ Rewritten Query:`;
                     }
                 }
             } catch (e: any) {
+                if (isAbortError(e, signal)) return createClosedStream();
                 if (logContext) logContext.ragHistoryError = e.message;
             }
         }
@@ -140,6 +163,7 @@ Rewritten Query:`;
             limit: 5,
             logContext,
         });
+        if (signal?.aborted) return createClosedStream();
 
         // 2. Context Engineering (RAG Context Engineer Skill)
         interface DocInfo {
@@ -219,6 +243,7 @@ ${question}
         await withAuthDb(userId, async (tx) => {
             await TierQuotaUtil.incrementQa(tx, tenantId);
         });
+        if (signal?.aborted) return createClosedStream();
 
         // Resolve parent conversation existence & isNewConversation flag before streaming
         let isNewConversation = false;
@@ -271,13 +296,31 @@ ${question}
             isNewConversation = true;
         }
 
+        if (signal?.aborted) return createClosedStream();
+
         const stream = new ReadableStream({
             async start(controller) {
                 const encoder = new TextEncoder();
+                let cancelled = signal?.aborted === true;
                 let success = false;
                 let fullAnswer = "";
                 let successfulModel = "";
                 const startMs = Date.now();
+
+                const closeOnCancel = () => {
+                    cancelled = true;
+                    try {
+                        controller.close();
+                    } catch {
+                        // The client may already have cancelled the ReadableStream.
+                    }
+                };
+
+                signal?.addEventListener("abort", closeOnCancel, { once: true });
+                if (cancelled) {
+                    closeOnCancel();
+                    return;
+                }
 
                 const references = Array.from(docIndexMap.values()).map((item) => ({
                     index: item.index,
@@ -312,6 +355,8 @@ ${question}
                             if (res.length > 0) encryptedRecord = res[0];
                         });
 
+                        if (cancelled) return;
+
                         if (!encryptedRecord) {
                             throw new AppError({
                                 code: "UNAUTHORIZED",
@@ -325,6 +370,7 @@ ${question}
                             encryptedRecord.iv,
                         );
                     } catch (e: any) {
+                        if (isAbortError(e, signal)) return;
                         controller.enqueue(
                             encoder.encode(
                                 `event: error\ndata: ${JSON.stringify({ code: e.code || "UNAUTHORIZED", message: e.message || "Failed to load BYOK key" })}\n\n`,
@@ -345,8 +391,10 @@ ${question}
                                 model: model!,
                                 prompt: augmentedPrompt,
                                 apiKey: byokKey,
+                                signal,
                             }),
                         );
+                        if (cancelled) return;
 
                         if (references.length > 0) {
                             controller.enqueue(
@@ -357,6 +405,7 @@ ${question}
                         }
 
                         for await (const chunk of responseStream.stream) {
+                            if (cancelled) return;
                             fullAnswer += chunk.text;
                             controller.enqueue(
                                 encoder.encode(
@@ -365,10 +414,13 @@ ${question}
                             );
                         }
 
+                        if (cancelled) return;
+
                         success = true;
                         successfulModel = model;
                         if (logContext) logContext.ragModelUsed = model;
                     } catch (error: any) {
+                        if (isAbortError(error, signal)) return;
                         controller.enqueue(
                             encoder.encode(
                                 `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: error.message })}\n\n`,
@@ -380,8 +432,10 @@ ${question}
                     try {
                         const response = await FallbackLlmService.generateStream({
                             messages: [{ role: "user", content: augmentedPrompt }],
+                            signal,
                             logContext,
                         });
+                        if (cancelled) return;
 
                         if (references.length > 0) {
                             controller.enqueue(
@@ -392,6 +446,7 @@ ${question}
                         }
 
                         for await (const chunk of response.stream) {
+                            if (cancelled) return;
                             if (chunk.text) {
                                 fullAnswer += chunk.text;
                                 controller.enqueue(
@@ -402,16 +457,21 @@ ${question}
                             }
                         }
 
+                        if (cancelled) return;
+
                         success = true;
                         successfulModel = response.modelId;
                         if (logContext) logContext.ragModelUsed = response.modelId;
                     } catch (error: any) {
+                        if (isAbortError(error, signal)) return;
                         if (logContext) {
                             logContext.ragEvent = `fallback_failed_exhausted`;
                             logContext.ragError = error.message;
                         }
                     }
                 }
+
+                if (cancelled) return;
 
                 if (!success && !useByok) {
                     controller.enqueue(
@@ -420,17 +480,26 @@ ${question}
                         ),
                     );
                 } else if (success) {
+                    if (cancelled) return;
                     if (isNewConversation) {
                         let smartTitle = question.substring(0, 50);
                         try {
                             const titlePrompt = `Summarize the following user question and AI answer into a single, concise conversation title (maximum 7 words, clear and direct, no quotes, no period):\nUser Question: ${question}\nAI Answer: ${fullAnswer.substring(0, 300)}`;
-                            const titleRes = await gemini.generateText(titlePrompt, GEMINI_MODELS.llmDefault);
+                            const titleRes = await gemini.generateText(
+                                titlePrompt,
+                                GEMINI_MODELS.llmDefault,
+                                signal,
+                            );
+                            if (cancelled) return;
                             if (titleRes?.text) {
                                 smartTitle = titleRes.text.trim().replace(/^["']|["']$/g, '');
                             }
                         } catch (_tErr) {
+                            if (isAbortError(_tErr, signal)) return;
                             // fallback to default question substring
                         }
+
+                        if (cancelled) return;
 
                         try {
                             await withAuthDb(userId, async (tx) => {
@@ -443,6 +512,8 @@ ${question}
                             // ignore title DB update failure
                         }
 
+                        if (cancelled) return;
+
                         controller.enqueue(
                             encoder.encode(`event: title\ndata: ${JSON.stringify({ title: smartTitle })}\n\n`),
                         );
@@ -454,10 +525,18 @@ ${question}
                 }
 
                 // Close controller first so client isn't waiting
-                controller.close();
+                if (!cancelled) controller.close();
+
+                // Skip DB persistence if the client cancelled the stream
+                if (cancelled || signal?.aborted) {
+                    signal?.removeEventListener("abort", closeOnCancel);
+                    return;
+                }
+                signal?.removeEventListener("abort", closeOnCancel);
 
                 // Save conversation_turn to DB asynchronously
                 if (success) {
+                    if (signal?.aborted) return;
                     try {
                         const latencyMs = Date.now() - startMs;
 

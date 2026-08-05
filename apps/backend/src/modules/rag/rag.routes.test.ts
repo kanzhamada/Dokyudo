@@ -77,6 +77,55 @@ describe("RAG Routes", () => {
             const json = await res.json();
             assertEquals(json.error.code, "VALIDATION_ERROR");
         });
+
+        it("positive: server handles aborted request signal without crashing", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            if (!validToken) return;
+
+            // Create request with an AbortController signal
+            const abortController = new AbortController();
+            const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+
+            const req = new Request("http://localhost/api/rag/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Request-ID": "test-abort-rag",
+                    "X-Forwarded-For": randomIp,
+                    ...headers,
+                },
+                body: JSON.stringify({ question: "Hello, this will be aborted" }),
+                signal: abortController.signal,
+            });
+
+            // Start the request, but abort it shortly after
+            const fetchPromise = app.fetch(req);
+
+            // Give the server a small window to start processing, then abort
+            await new Promise((r) => setTimeout(r, 10));
+            abortController.abort();
+
+            // The fetch should either resolve or reject — neither should crash the server
+            let errored = false;
+            try {
+                const res = await fetchPromise;
+                // If we got a response, the server handled it gracefully
+                // Body may or may not be readable depending on timing
+                if (res.body) {
+                    try {
+                        const reader = res.body.getReader();
+                        await reader.cancel();
+                    } catch (_) { /* ignore reader errors */ }
+                }
+            } catch (_err) {
+                // AbortError is expected and fine
+                errored = true;
+            }
+
+            // Verify server is still alive by making a normal request
+            const healthRes = await makeRequest("/api/rag/conversations", "GET", undefined, headers);
+            assertEquals(healthRes.status, 200);
+        });
     });
 
     describe("PATCH /api/rag/conversations/:id", () => {

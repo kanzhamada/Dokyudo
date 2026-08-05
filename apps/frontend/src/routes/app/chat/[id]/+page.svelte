@@ -22,7 +22,8 @@
 		GitBranch,
 		Volume2,
 		Pencil,
-		RotateCw
+		RotateCw,
+		Square
 	} from 'lucide-svelte';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -95,19 +96,20 @@
 
 			if (references && references.length > 0) {
 				const refDoc = references.find((r) => r.index === docIdx || r.id === docIdxStr) || references[docIdx - 1];
-				if (refDoc && refDoc.name) {
-					docId = refDoc.id;
-					docFullName = refDoc.name;
-					tooltipTitle = refDoc.name;
-					const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
-					docDisplayName = cleanName.length > 5 ? cleanName.slice(0, 5) + '...' : cleanName;
+					if (refDoc && refDoc.name) {
+						docId = refDoc.id;
+						docFullName = refDoc.name;
+						tooltipTitle = refDoc.name;
+						const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
+						docDisplayName = cleanName.length > 5 ? cleanName.slice(0, 5) + '...' : cleanName;
+					}
 				}
-			}
 
-			const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
-			const label = pageFormatted ? `${docDisplayName} • ${pageFormatted}` : docDisplayName;
-			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageFormatted}" class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white" title="${tooltipTitle}">${label}</span>`;
-		});
+				const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
+				const label = pageFormatted ? `${docDisplayName} • ${pageFormatted}` : docDisplayName;
+				return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageFormatted}" class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white" title="${tooltipTitle}">${label}</span>`;
+			}
+		);
 
 		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
 	}
@@ -186,6 +188,11 @@
 	let attachedFiles: File[] = $state([]);
 	let copiedMessageId: string | null = $state(null);
 	let isGenerating = $state(false);
+	let editingMessageId = $state<string | null>(null);
+	let editingMessageValue = $state('');
+	let editingTextInput: HTMLTextAreaElement | null = $state(null);
+	let activeAbortController: AbortController | null = null;
+	let cancelActiveStream: (() => void) | null = null;
 
 	// Citation PDF preview
 	let citationPreview = $state<{ src: string; name: string; pages: number[] } | null>(null);
@@ -308,6 +315,7 @@
 	}
 
 	onDestroy(() => {
+		cancelActiveStream?.();
 		stopThinkingTimer();
 	});
 
@@ -328,9 +336,7 @@
 	let conversationRequestId = 0;
 
 	// Track the last user message id for edit button visibility
-	let lastUserMsgId = $derived(
-		[...messages].reverse().find((m) => m.role === 'user')?.id ?? null
-	);
+	let lastUserMsgId = $derived([...messages].reverse().find((m) => m.role === 'user')?.id ?? null);
 
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
@@ -385,6 +391,7 @@
 
 	async function loadConversation(id: string) {
 		const requestId = ++conversationRequestId;
+		cancelActiveStream?.();
 		messages = [];
 		conversationTitle = 'New Conversation';
 		inputValue = '';
@@ -399,14 +406,28 @@
 				if (convRes.data.turns && convRes.data.turns.length > 0) {
 					const historyMsgs: ChatMessage[] = [];
 					for (const turn of convRes.data.turns) {
-						historyMsgs.push({ id: `${turn.id}-user`, role: 'user', content: turn.question, timestamp: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
-						const filteredTurnRefs = filterReferencesByCitations(turn.answer, turn.contextReferences);
+						historyMsgs.push({
+							id: `${turn.id}-user`,
+							role: 'user',
+							content: turn.question,
+							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
+								hour: '2-digit',
+								minute: '2-digit'
+							})
+						});
+						const filteredTurnRefs = filterReferencesByCitations(
+							turn.answer,
+							turn.contextReferences
+						);
 						historyMsgs.push({
 							id: `${turn.id}-asst`,
 							role: 'assistant',
 							modelName: turn.modelUsed || undefined,
 							content: turn.answer,
-							timestamp: new Date(turn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
+								hour: '2-digit',
+								minute: '2-digit'
+							}),
 							references: filteredTurnRefs?.map((r: any) => ({
 								id: r.documentId,
 								name: r.title || r.documentId,
@@ -421,11 +442,13 @@
 				console.log('[Chat Detail] New conversation initialized (no history in DB yet).');
 			}
 		} catch (err) {
-			if (requestId === conversationRequestId) console.error('[Chat Detail] Failed to load conversation:', err);
+			if (requestId === conversationRequestId)
+				console.error('[Chat Detail] Failed to load conversation:', err);
 			return;
 		}
 
-		const stateObj = ((page as any)?.state as any) || (history.state as any)?.usr || (history.state as any);
+		const stateObj =
+			((page as any)?.state as any) || (history.state as any)?.usr || (history.state as any);
 		if (requestId === conversationRequestId && stateObj?.initialQuestion) {
 			isTitleLoading = true;
 			const initialQ = stateObj.initialQuestion as string;
@@ -495,7 +518,6 @@
 		} catch (err) {
 			console.error('[Chat Detail] Failed to fetch BYOK keys:', err);
 		}
-
 	});
 
 	$effect(() => {
@@ -623,6 +645,7 @@
 		let streamBuffer = '';
 		let isStreamDone = false;
 		let typewriterTimer: ReturnType<typeof setInterval> | null = null;
+		let wasCancelled = false;
 
 		const startTypewriter = () => {
 			if (typewriterTimer) clearInterval(typewriterTimer);
@@ -642,6 +665,10 @@
 
 					messages[asstIndex].isStreaming = false;
 					isGenerating = false;
+					if (activeAbortController === abortController) {
+						activeAbortController = null;
+						cancelActiveStream = null;
+					}
 					isTitleLoading = false;
 					stopThinkingTimer();
 
@@ -649,8 +676,13 @@
 					const currentRefs = messages[asstIndex].references;
 
 					if (currentRefs && currentRefs.length > 0) {
-						const isNegativeAnswer = /(Mohon maaf|tidak mengandung informasi|tidak ditemukan|tidak ada informasi|does not contain|cannot answer|no information available)/i.test(textContent);
-						const citationMatches = [...textContent.matchAll(/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi)];
+						const isNegativeAnswer =
+							/(Mohon maaf|tidak mengandung informasi|tidak ditemukan|tidak ada informasi|does not contain|cannot answer|no information available)/i.test(
+								textContent
+							);
+						const citationMatches = [
+							...textContent.matchAll(/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi)
+						];
 
 						if (isNegativeAnswer || citationMatches.length === 0) {
 							messages[asstIndex].references = [];
@@ -692,6 +724,24 @@
 		};
 
 		startTypewriter();
+		const abortController = new AbortController();
+		activeAbortController = abortController;
+		cancelActiveStream = () => {
+			wasCancelled = true;
+			abortController.abort();
+			if (typewriterTimer) {
+				clearInterval(typewriterTimer);
+				typewriterTimer = null;
+			}
+			messages[asstIndex].isStreaming = false;
+			isGenerating = false;
+			isTitleLoading = false;
+			stopThinkingTimer();
+			if (activeAbortController === abortController) {
+				activeAbortController = null;
+				cancelActiveStream = null;
+			}
+		};
 
 		try {
 			const token = sessionStore.getAccessToken();
@@ -705,13 +755,17 @@
 			const res = await dokyudoFetch(`${PUBLIC_API_URL}/api/rag/chat`, {
 				method: 'POST',
 				headers,
-				body: JSON.stringify(bodyPayload)
+				body: JSON.stringify(bodyPayload),
+				signal: abortController.signal
 			});
 
 			if (!res.ok) {
-				const errorData = await res.json().catch(() => ({ message: 'Failed to start chat stream' }));
+				const errorData = await res
+					.json()
+					.catch(() => ({ message: 'Failed to start chat stream' }));
 				console.error('[Chat Detail] Backend Response Error:', errorData);
-				const errorMessage: string = errorData?.error?.message ?? errorData?.message ?? 'Error executing chat request';
+				const errorMessage: string =
+					errorData?.error?.message ?? errorData?.message ?? 'Error executing chat request';
 				showError(errorMessage);
 				messages[asstIndex].isStreaming = false;
 				isGenerating = false;
@@ -764,7 +818,7 @@
 							if (parsed.references) {
 								messages[asstIndex].references = parsed.references.map((r: any, idx: number) => ({
 									id: r.documentId,
-									index: r.index || (idx + 1),
+									index: r.index || idx + 1,
 									name: r.title || r.documentId,
 									pages: r.pages
 								}));
@@ -821,17 +875,31 @@
 				}
 			}
 		} catch (err: any) {
-			console.error('[Chat Detail] Stream Catch Error:', err);
-			showError(err.message || 'Network error streaming chat');
+			if (err?.name !== 'AbortError') {
+				console.error('[Chat Detail] Stream Catch Error:', err);
+				showError(err.message || 'Network error streaming chat');
+			}
 			isStreamDone = true;
 		} finally {
-			// If buffer was empty or loop not running, ensure clean reset
-			if (!streamBuffer) {
+			if (wasCancelled) {
+				if (typewriterTimer) clearInterval(typewriterTimer);
+			} else if (abortController.signal.aborted) {
+				if (typewriterTimer) clearInterval(typewriterTimer);
+				messages[asstIndex].isStreaming = false;
+				isGenerating = false;
+				isTitleLoading = false;
+				stopThinkingTimer();
+			} else if (!streamBuffer) {
+				// If buffer was empty or loop not running, ensure clean reset
 				stopThinkingTimer();
 				if (typewriterTimer) clearInterval(typewriterTimer);
 				messages[asstIndex].isStreaming = false;
 				isGenerating = false;
 				isTitleLoading = false;
+			}
+			if (activeAbortController === abortController) {
+				activeAbortController = null;
+				cancelActiveStream = null;
 			}
 		}
 	}
@@ -839,6 +907,41 @@
 	function handleSendMessage() {
 		if (!inputValue.trim() || isGenerating) return;
 		streamChatTurn(inputValue.trim(), selectedModel);
+	}
+
+	function stopCurrentStream() {
+		cancelActiveStream?.();
+	}
+
+	function retryMessage(userPrompt: string) {
+		if (isGenerating || !userPrompt.trim()) return;
+		streamChatTurn(userPrompt, selectedModel);
+	}
+
+	function resizeEditingTextInput() {
+		if (!editingTextInput) return;
+		editingTextInput.style.height = 'auto';
+		editingTextInput.style.height = `${Math.max(editingTextInput.scrollHeight, 80)}px`;
+	}
+
+	async function beginEditMessage(msg: ChatMessage) {
+		editingMessageId = msg.id;
+		editingMessageValue = msg.content;
+		await tick();
+		resizeEditingTextInput();
+	}
+
+	function cancelEditMessage() {
+		editingMessageId = null;
+		editingMessageValue = '';
+	}
+
+	function saveEditMessage(msg: ChatMessage) {
+		const editedPrompt = editingMessageValue.trim();
+		if (!editedPrompt || isGenerating) return;
+		msg.content = editedPrompt;
+		cancelEditMessage();
+		streamChatTurn(editedPrompt, selectedModel);
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -900,9 +1003,7 @@
 </div>
 
 {#snippet chatContent()}
-	<div
-		class="relative flex h-full w-full flex-col overflow-hidden"
-	>
+	<div class="relative flex h-full w-full flex-col overflow-hidden">
 		<!-- Ambient Background Glow Circle (Matching App Shell Layout) -->
 		<div
 			class="pointer-events-none absolute -top-[318px] -left-[295px] z-0 h-[1190px] w-[1190px] rounded-full opacity-[0.07]"
@@ -912,169 +1013,345 @@
 		<!-- Center Scrollable Chat Area -->
 		<div
 			bind:this={chatContainer}
-			class="relative z-10 flex flex-1 min-h-0 flex-col overflow-y-auto px-4 pt-16 md:pt-8 md:px-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+			class="relative z-10 flex min-h-0 flex-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent flex-col overflow-y-auto px-4 pt-16 md:px-8 md:pt-8"
 		>
-		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
-			{#each messages as msg, msgIndex (msg.id)}
-				{#if msg.role === 'user'}
-					<!-- User Message (Clean Pill) -->
-					<div class="flex w-full justify-end">
-						<div class="flex max-w-[85%] flex-col items-end gap-1.5 md:max-w-[70%]">
+			<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
+				{#each messages as msg, msgIndex (msg.id)}
+					{#if msg.role === 'user'}
+						<!-- User Message (Clean Pill) -->
+						<div class="flex w-full justify-end">
 							<div
-								class="rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md"
+								class="flex max-w-[85%] flex-col items-end gap-1.5 md:max-w-[70%] {editingMessageId === msg.id
+									? 'w-full'
+									: ''}"
 							>
-								{#if msg.attachments && msg.attachments.length > 0}
-									<div class="mb-2 flex flex-wrap gap-1.5">
-										{#each msg.attachments as att}
-											<span
-												class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80"
-											>
-												<FileText class="size-3 text-white/60" />
-												{att.name}
-											</span>
-										{/each}
-									</div>
-								{/if}
-
-								<p class="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-							</div>
-
-							<!-- Action Toolbar for User Question (Copy & Edit) -->
-							<div class="flex items-center gap-1 pr-1 text-white/40">
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-									onclick={() => copyToClipboard(msg.content, msg.id)}
-									aria-label="Copy question"
+								<div
+									class="rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md {editingMessageId ===
+										msg.id
+										? 'w-full'
+										: 'w-fit'}"
 								>
-									{#if copiedMessageId === msg.id}
-										<Check class="size-3 text-green-400" />
+									{#if editingMessageId === msg.id}
+										<textarea
+											bind:this={editingTextInput}
+											bind:value={editingMessageValue}
+											maxlength={690}
+											rows={1}
+											class="min-h-20 w-full resize-none overflow-hidden rounded-md border border-white/20 bg-black/20 p-2 text-sm text-white outline-none"
+											aria-label="Edit question"
+											oninput={resizeEditingTextInput}
+										></textarea>
+										<div class="mt-2 flex items-center justify-between gap-2">
+											<div
+												class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] {editingMessageValue.length >=
+													690
+													? 'text-red-400'
+													: 'text-white/40'}"
+											>
+												<Keyboard class="size-3" />
+												<span>{editingMessageValue.length}/690</span>
+											</div>
+											<div class="flex justify-end gap-2">
+												<Button variant="ghost" size="sm" onclick={cancelEditMessage}>Cancel</Button>
+												<Button
+													size="sm"
+													disabled={!editingMessageValue.trim()}
+													onclick={() => saveEditMessage(msg)}>Save &amp; resubmit</Button
+												>
+											</div>
+										</div>
 									{:else}
-										<Copy class="size-3" />
+										{#if msg.attachments && msg.attachments.length > 0}
+											<div class="mb-2 flex flex-wrap gap-1.5">
+												{#each msg.attachments as att}
+													<span
+														class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80"
+													>
+														<FileText class="size-3 text-white/60" />
+														{att.name}
+													</span>
+												{/each}
+											</div>
+										{/if}
+
+										<p class="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
 									{/if}
-								</Button>
-								{#if msg.id === lastUserMsgId}
+								</div>
+
+								<!-- Action Toolbar for User Question (Copy & Edit) -->
+								<div class="flex items-center gap-1 pr-1 text-white/40">
 									<Button
 										variant="ghost"
 										size="icon"
 										class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-										onclick={() => toast.info('Edit question feature coming soon')}
-										aria-label="Edit question"
+										onclick={() => copyToClipboard(msg.content, msg.id)}
+										aria-label="Copy question"
 									>
-										<Pencil class="size-3" />
+										{#if copiedMessageId === msg.id}
+											<Check class="size-3 text-green-400" />
+										{:else}
+											<Copy class="size-3" />
+										{/if}
 									</Button>
-								{/if}
+									{#if msg.id === lastUserMsgId}
+										<Button
+											variant="ghost"
+											size="icon"
+											class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+											onclick={() => beginEditMessage(msg)}
+											aria-label="Edit question"
+										>
+											<Pencil class="size-3" />
+										</Button>
+									{/if}
+								</div>
 							</div>
 						</div>
-					</div>
-				{:else}
-					<!-- Assistant Response (Flat & Clean, No Card Bubble, No Avatar, No Timestamps) -->
-					<div class="flex w-full justify-start py-2">
-						<div class="flex w-full flex-col gap-3">
-							<!-- Markdown Content View -->
-							<div
-								role="none"
-								class="prose prose-invert prose-sm max-w-none text-white/90 prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-li:my-1"
-								onclick={(e) => {
-									const target = e.target as HTMLElement;
-									const chip = target.closest('[data-doc-id]');
-									if (chip) {
-										const docId = chip.getAttribute('data-doc-id') || '';
-										const docTitle = chip.getAttribute('data-doc-title') || '';
-										const pagesRaw = chip.getAttribute('data-pages') || '';
-										const pages = pagesRaw ? pagesRaw.split(',').map(Number).filter(Boolean) : [];
-										openCitationPreview(docId, docTitle, pages);
-									}
-								}}
-								onkeydown={() => {}}
-							>
-								{#if msg.content}
-									{@html renderMarkdown(msg.content, msg.references)}
+					{:else}
+						<!-- Assistant Response (Flat & Clean, No Card Bubble, No Avatar, No Timestamps) -->
+						<div class="flex w-full justify-start py-2">
+							<div class="flex w-full flex-col gap-3">
+								<!-- Markdown Content View -->
+								<div
+									role="none"
+									class="prose prose-sm max-w-none text-white/90 prose-invert prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-li:my-1"
+									onclick={(e) => {
+										const target = e.target as HTMLElement;
+										const chip = target.closest('[data-doc-id]');
+										if (chip) {
+											const docId = chip.getAttribute('data-doc-id') || '';
+											const docTitle = chip.getAttribute('data-doc-title') || '';
+											const pagesRaw = chip.getAttribute('data-pages') || '';
+											const pages = pagesRaw ? pagesRaw.split(',').map(Number).filter(Boolean) : [];
+											openCitationPreview(docId, docTitle, pages);
+										}
+									}}
+									onkeydown={() => {}}
+								>
+									{#if msg.content}
+										{@html renderMarkdown(msg.content, msg.references)}
 
-									{#if msg.isStreaming}
-										<span
-											class="inline-block h-4 w-1.5 animate-pulse bg-white/80 align-middle ml-1"
-										></span>
+										{#if msg.isStreaming}
+											<span
+												class="ml-1 inline-block h-4 w-1.5 animate-pulse bg-white/80 align-middle"
+											></span>
+										{/if}
+									{:else if msg.isStreaming}
+										<div
+											class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
+										>
+											<svg class="size-6 shrink-0 text-white/70" viewBox="0 0 50 50">
+												<g transform="rotate(0 25 25)"
+													><line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0s"
+															repeatCount="indefinite"
+														/></line
+													><circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0s"
+															repeatCount="indefinite"
+														/></circle
+													></g
+												>
+												<g transform="rotate(60 25 25)"
+													><line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0.2s"
+															repeatCount="indefinite"
+														/></line
+													><circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0.2s"
+															repeatCount="indefinite"
+														/></circle
+													></g
+												>
+												<g transform="rotate(120 25 25)"
+													><line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0.4s"
+															repeatCount="indefinite"
+														/></line
+													><circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0.4s"
+															repeatCount="indefinite"
+														/></circle
+													></g
+												>
+												<g transform="rotate(180 25 25)"
+													><line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0.6s"
+															repeatCount="indefinite"
+														/></line
+													><circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0.6s"
+															repeatCount="indefinite"
+														/></circle
+													></g
+												>
+												<g transform="rotate(240 25 25)"
+													><line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0.8s"
+															repeatCount="indefinite"
+														/></line
+													><circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0.8s"
+															repeatCount="indefinite"
+														/></circle
+													></g
+												>
+												<g transform="rotate(300 25 25)"
+													><line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="1s"
+															repeatCount="indefinite"
+														/></line
+													><circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="1s"
+															repeatCount="indefinite"
+														/></circle
+													></g
+												>
+											</svg>
+											<span>{currentThinkingStatus}</span>
+										</div>
 									{/if}
-								{:else if msg.isStreaming}
-									<div class="flex items-center gap-2 text-xs font-medium text-white/60 italic animate-pulse py-1 select-none">
-										<svg class="size-6 text-white/70 shrink-0" viewBox="0 0 50 50">
-											<g transform="rotate(0 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0s" repeatCount="indefinite" /></circle></g>
-											<g transform="rotate(60 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0.2s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0.2s" repeatCount="indefinite" /></circle></g>
-											<g transform="rotate(120 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0.4s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0.4s" repeatCount="indefinite" /></circle></g>
-											<g transform="rotate(180 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0.6s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0.6s" repeatCount="indefinite" /></circle></g>
-											<g transform="rotate(240 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0.8s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0.8s" repeatCount="indefinite" /></circle></g>
-											<g transform="rotate(300 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="1s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="1s" repeatCount="indefinite" /></circle></g>
-										</svg>
-										<span>{currentThinkingStatus}</span>
+								</div>
+
+								<!-- Document Reference Chips -->
+								{#if msg.references && msg.references.length > 0}
+									<div class="mt-2 border-t border-white/10 pt-3">
+										<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
+											<BookOpen class="size-3.5 text-white/60" />
+											<span>Source References ({msg.references.length})</span>
+										</div>
+										<div class="flex flex-wrap gap-2">
+											{#each msg.references as ref}
+												<Tooltip.Provider delayDuration={100}>
+													<Tooltip.Root>
+														<Tooltip.Trigger
+															class="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#2B2A29] px-3 py-1 text-xs text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white"
+															onclick={() => openCitationPreview(ref.id, ref.name, ref.pages ?? [])}
+														>
+															<FileText class="size-3 text-white/60" />
+															<span class="font-medium">{ref.name}</span>
+															{#if ref.pages && ref.pages.length > 0}
+																<span class="text-white/40">• {ref.pages.join(', ')}</span>
+															{:else if ref.page}
+																<span class="text-white/40"
+																	>• {formatPageNumbers(String(ref.page))}</span
+																>
+															{/if}
+														</Tooltip.Trigger>
+														<Tooltip.Content
+															class="max-w-xs border border-white/15 bg-[#232323] text-xs text-white"
+														>
+															<p class="font-semibold text-white/90">{ref.name}</p>
+															{#if ref.snippet}
+																<p class="mt-1 text-white/70 italic">"{ref.snippet}"</p>
+															{/if}
+															<p class="mt-1 text-[10px] text-white/40">ID: {ref.id}</p>
+														</Tooltip.Content>
+													</Tooltip.Root>
+												</Tooltip.Provider>
+											{/each}
+										</div>
 									</div>
 								{/if}
-							</div>
 
-							<!-- Document Reference Chips -->
-							{#if msg.references && msg.references.length > 0}
-								<div class="mt-2 border-t border-white/10 pt-3">
-									<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
-										<BookOpen class="size-3.5 text-white/60" />
-										<span>Source References ({msg.references.length})</span>
-									</div>
-									<div class="flex flex-wrap gap-2">
-										{#each msg.references as ref}
-											<Tooltip.Provider delayDuration={100}>
-												<Tooltip.Root>
-													<Tooltip.Trigger
-														class="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#2B2A29] px-3 py-1 text-xs text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white"
-														onclick={() => openCitationPreview(ref.id, ref.name, ref.pages ?? [])}
-													>
-														<FileText class="size-3 text-white/60" />
-														<span class="font-medium">{ref.name}</span>
-														{#if ref.pages && ref.pages.length > 0}
-															<span class="text-white/40">• {ref.pages.join(', ')}</span>
-														{:else if ref.page}
-															<span class="text-white/40">• {formatPageNumbers(String(ref.page))}</span>
-														{/if}
-													</Tooltip.Trigger>
-													<Tooltip.Content
-														class="border border-white/15 bg-[#232323] text-white text-xs max-w-xs"
-													>
-														<p class="font-semibold text-white/90">{ref.name}</p>
-														{#if ref.snippet}
-															<p class="mt-1 text-white/70 italic">"{ref.snippet}"</p>
-														{/if}
-														<p class="mt-1 text-[10px] text-white/40">ID: {ref.id}</p>
-													</Tooltip.Content>
-												</Tooltip.Root>
-											</Tooltip.Provider>
-										{/each}
-									</div>
-								</div>
-							{/if}
-
-							<!-- Action Toolbar (Copy, Retry, Thumbs Up/Down, Dropdown Menu) -->
-							<div class="flex items-center gap-1 pt-1 text-white/40">
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-									onclick={() => copyToClipboard(msg.content, msg.id)}
-									aria-label="Copy response"
-								>
-									{#if copiedMessageId === msg.id}
-										<Check class="size-3.5 text-green-400" />
-									{:else}
-										<Copy class="size-3.5" />
-									{/if}
-								</Button>
-								{#if !msg.isRejection}
+								<!-- Action Toolbar (Copy, Retry, Thumbs Up/Down, Dropdown Menu) -->
+								<div class="flex items-center gap-1 pt-1 text-white/40">
 									<Button
 										variant="ghost"
 										size="icon"
 										class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-										onclick={() => toast.info('Regenerate response coming soon')}
-										aria-label="Retry response"
+										onclick={() => copyToClipboard(msg.content, msg.id)}
+										aria-label="Copy response"
 									>
-										<RotateCw class="size-3.5" />
+										{#if copiedMessageId === msg.id}
+											<Check class="size-3.5 text-green-400" />
+										{:else}
+											<Copy class="size-3.5" />
+										{/if}
 									</Button>
 									<Button
 										variant="ghost"
@@ -1092,7 +1369,28 @@
 									>
 										<ThumbsDown class="size-3.5" />
 									</Button>
-
+									{#if !msg.isRejection && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
+										<DropdownMenu.Root>
+											<DropdownMenu.Trigger
+												class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
+												aria-label="Retry response"
+											>
+												<RotateCw class="size-3.5" />
+											</DropdownMenu.Trigger>
+											<DropdownMenu.Content
+												align="start"
+												class="w-36 border-white/15 bg-[#232323] p-1 text-white"
+											>
+												<DropdownMenu.Item
+													class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
+													onclick={() => retryMessage(messages[msgIndex - 1]?.content ?? '')}
+												>
+													<RotateCw class="size-3.5 text-white/70" />
+													<span>Try Again</span>
+												</DropdownMenu.Item>
+													</DropdownMenu.Content>
+										</DropdownMenu.Root>
+									{/if}
 									<!-- Triple Dot Dropdown Menu -->
 									<DropdownMenu.Root>
 										<DropdownMenu.Trigger
@@ -1101,7 +1399,10 @@
 										>
 											<Ellipsis class="size-3.5" />
 										</DropdownMenu.Trigger>
-										<DropdownMenu.Content align="start" class="w-48 border-white/15 bg-[#232323] text-white">
+										<DropdownMenu.Content
+											align="start"
+											class="w-48 border-white/15 bg-[#232323] text-white"
+										>
 											<DropdownMenu.Item
 												class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
 												onclick={() => toast.info('Branch in new chat coming soon')}
@@ -1118,167 +1419,168 @@
 											</DropdownMenu.Item>
 										</DropdownMenu.Content>
 									</DropdownMenu.Root>
-								{/if}
+								</div>
 							</div>
 						</div>
-					</div>
-				{/if}
-			{/each}
+					{/if}
+				{/each}
+			</div>
 		</div>
-	</div>
 
-	<!-- Bottom Area: Floating Input Capsule with Gradient Mask -->
-	<div
-		class="pointer-events-none absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center justify-end pb-4 pt-6 bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent"
-		style="font-family: 'Inter', sans-serif;"
-	>
-		<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">
-			<!-- Main Input Capsule -->
-			<div
-				class="group flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.85] px-4 py-2 shadow-2xl backdrop-blur-[42px] transition-all"
-			>
-			<!-- Row 1: Attached Files -->
-			{#if attachedFiles.length > 0}
-				<div class="flex flex-wrap gap-2 pt-1 pb-1">
-					{#each attachedFiles as file, index}
-						<div
-							class="flex items-center gap-2 rounded-full bg-[#121212]/[0.80] py-1.5 pr-2 pl-3 text-sm text-white/[0.80] backdrop-blur-[20px] transition-all"
-						>
-							<span class="max-w-[200px] truncate">{file.name}</span>
-							<button
-								class="flex cursor-pointer items-center justify-center rounded-full p-0.5 text-white/[0.40] transition-colors hover:bg-white/[0.16] hover:text-white"
-								onclick={() => removeFile(index)}
-								aria-label="Remove file"
-							>
-								<X class="size-3.5" />
-							</button>
-						</div>
-					{/each}
-				</div>
-			{/if}
-
-			<!-- Row 2: Input Controls -->
-			<div class="flex w-full flex-row items-end gap-3">
-				<!-- Attach Button -->
-				<div class="relative flex h-9 items-center">
-					<Tooltip.Provider delayDuration={100}>
-						<Tooltip.Root>
-							<Tooltip.Trigger
-								class="flex cursor-pointer items-center text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69]"
-								aria-label="Attach Document"
-								onclick={triggerFileInput}
-							>
-								<Paperclip class="size-5" />
-							</Tooltip.Trigger>
-							<Tooltip.Content
-								class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
-								arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
-							>
-								<p>Attach Document (PDF, TXT, DOCX)</p>
-								<p class="text-xs text-white/[0.69]">
-									{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
-								</p>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
-				</div>
-				<Input
-					type="file"
-					bind:ref={fileInput}
-					id="file-upload-detail"
-					accept=".pdf,.txt,.docx"
-					class="hidden"
-					multiple
-					onchange={handleFileChange}
-				/>
-
-				<!-- Textarea -->
-				<Textarea
-					bind:ref={textInput}
-					bind:value={inputValue}
-					maxlength={690}
-					rows={1}
-					placeholder="Ask a follow-up question..."
-					class="max-h-32 min-h-[36px] flex-1 resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 text-white shadow-none ring-0 transition-colors outline-none placeholder:text-white/[0.40] focus-within:text-white hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-					onkeydown={(e) => {
-						if (e.key === 'Enter' && !e.shiftKey) {
-							e.preventDefault();
-							handleSendMessage();
-						}
-					}}
-					oninput={(e) => {
-						const target = e.currentTarget as HTMLTextAreaElement;
-						if (target) {
-							target.style.height = 'auto';
-							if (target.value) {
-								target.style.height = Math.min(target.scrollHeight, 128) + 'px';
-							}
-						}
-					}}
-				/>
-
-				<!-- Model Switcher Dropdown -->
-				<div class="relative flex h-9 items-center">
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger
-							class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
-						>
-							<img
-								src={selectedModel.icon}
-								alt={selectedModel.name}
-								class="size-5 opacity-40 brightness-0 invert transition-opacity focus-within:opacity-[0.69] hover:opacity-[0.69]"
-							/>
-							<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
-							<ChevronDown class="size-4" />
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Content
-							class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] bg-[#232323]/90 text-white backdrop-blur-[42px]"
-						>
-							{#each llmOptions as option}
-								<DropdownMenu.Item
-									class="flex cursor-pointer items-center gap-2 focus:bg-white/[0.16] focus:text-white"
-									onclick={() => (selectedModel = option)}
-								>
-									<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
-									<span class="truncate">{option.name}</span>
-								</DropdownMenu.Item>
-							{/each}
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
-				</div>
-
-				<!-- Send Button -->
-				<button
-					class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
-					disabled={!inputValue.trim() && attachedFiles.length === 0}
-					onclick={handleSendMessage}
-					aria-label="Send Message"
+		<!-- Bottom Area: Floating Input Capsule with Gradient Mask -->
+		<div
+			class="pointer-events-none absolute right-0 bottom-0 left-0 z-30 flex flex-col items-center justify-end bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent pt-6 pb-4"
+			style="font-family: 'Inter', sans-serif;"
+		>
+			<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">
+				<!-- Main Input Capsule -->
+				<div
+					class="group flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.85] px-4 py-2 shadow-2xl backdrop-blur-[42px] transition-all"
 				>
-					<SendHorizontal class="size-5 -rotate-90" />
-				</button>
-			</div>
-		</div>
+					<!-- Row 1: Attached Files -->
+					{#if attachedFiles.length > 0}
+						<div class="flex flex-wrap gap-2 pt-1 pb-1">
+							{#each attachedFiles as file, index}
+								<div
+									class="flex items-center gap-2 rounded-full bg-[#121212]/[0.80] py-1.5 pr-2 pl-3 text-sm text-white/[0.80] backdrop-blur-[20px] transition-all"
+								>
+									<span class="max-w-[200px] truncate">{file.name}</span>
+									<button
+										class="flex cursor-pointer items-center justify-center rounded-full p-0.5 text-white/[0.40] transition-colors hover:bg-white/[0.16] hover:text-white"
+										onclick={() => removeFile(index)}
+										aria-label="Remove file"
+									>
+										<X class="size-3.5" />
+									</button>
+								</div>
+							{/each}
+						</div>
+					{/if}
 
-		<!-- Lower Row: Disclaimer & Counter -->
-		<div class="flex w-full items-center justify-between px-2 text-xs text-white/40">
-			<p class="text-[11px] text-white/40 select-none">
-				Dokyudo can make mistakes. Check important info.
-			</p>
+					<!-- Row 2: Input Controls -->
+					<div class="flex w-full flex-row items-end gap-3">
+						<!-- Attach Button -->
+						<div class="relative flex h-9 items-center">
+							<Tooltip.Provider delayDuration={100}>
+								<Tooltip.Root>
+									<Tooltip.Trigger
+										class="flex cursor-pointer items-center text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69]"
+										aria-label="Attach Document"
+										onclick={triggerFileInput}
+									>
+										<Paperclip class="size-5" />
+									</Tooltip.Trigger>
+									<Tooltip.Content
+										class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
+										arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+									>
+										<p>Attach Document (PDF, TXT, DOCX)</p>
+										<p class="text-xs text-white/[0.69]">
+											{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
+										</p>
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</Tooltip.Provider>
+						</div>
+						<Input
+							type="file"
+							bind:ref={fileInput}
+							id="file-upload-detail"
+							accept=".pdf,.txt,.docx"
+							class="hidden"
+							multiple
+							onchange={handleFileChange}
+						/>
 
-			<!-- Keyboard length counter -->
-			<div
-				class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] {inputValue.length >=
-				690
-					? 'text-red-400'
-					: 'text-white/40'}"
-			>
-				<Keyboard class="size-3" />
-				<span>{inputValue.length}/690</span>
+						<!-- Textarea -->
+						<Textarea
+							bind:ref={textInput}
+							bind:value={inputValue}
+							maxlength={690}
+							rows={1}
+							placeholder="Ask a follow-up question..."
+							class="max-h-32 min-h-[36px] flex-1 resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 text-white shadow-none ring-0 transition-colors outline-none placeholder:text-white/[0.40] focus-within:text-white hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+							onkeydown={(e) => {
+								if (e.key === 'Enter' && !e.shiftKey) {
+									e.preventDefault();
+									handleSendMessage();
+								}
+							}}
+							oninput={(e) => {
+								const target = e.currentTarget as HTMLTextAreaElement;
+								if (target) {
+									target.style.height = 'auto';
+									if (target.value) {
+										target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+									}
+								}
+							}}
+						/>
+
+						<!-- Model Switcher Dropdown -->
+						<div class="relative flex h-9 items-center">
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger
+									class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
+								>
+									<img
+										src={selectedModel.icon}
+										alt={selectedModel.name}
+										class="size-5 opacity-40 brightness-0 invert transition-opacity focus-within:opacity-[0.69] hover:opacity-[0.69]"
+									/>
+									<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
+									<ChevronDown class="size-4" />
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content
+									class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] bg-[#232323]/90 text-white backdrop-blur-[42px]"
+								>
+									{#each llmOptions as option}
+										<DropdownMenu.Item
+											class="flex cursor-pointer items-center gap-2 focus:bg-white/[0.16] focus:text-white"
+											onclick={() => (selectedModel = option)}
+										>
+											<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
+											<span class="truncate">{option.name}</span>
+										</DropdownMenu.Item>
+									{/each}
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
+						</div>
+
+						<!-- Send Button -->
+						<button
+							class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
+							disabled={!isGenerating && !inputValue.trim() && attachedFiles.length === 0}
+							onclick={isGenerating ? stopCurrentStream : handleSendMessage}
+							aria-label={isGenerating ? 'Stop generating' : 'Send Message'}
+						>
+							{#if isGenerating}
+								<Square class="size-4" />
+							{:else}
+								<SendHorizontal class="size-5 -rotate-90" />
+							{/if}
+						</button>
+					</div>
+				</div>
+
+				<!-- Lower Row: Disclaimer & Counter -->
+				<div class="flex w-full items-center justify-between px-2 text-xs text-white/40">
+					<p class="text-[11px] text-white/40 select-none">
+						Dokyudo can make mistakes. Check important info.
+					</p>
+
+					<!-- Keyboard length counter -->
+					<div
+						class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] {inputValue.length >=
+						690
+							? 'text-red-400'
+							: 'text-white/40'}"
+					>
+						<Keyboard class="size-3" />
+						<span>{inputValue.length}/690</span>
+					</div>
+				</div>
 			</div>
-		</div>
 		</div>
 	</div>
-</div>
 {/snippet}
-
-

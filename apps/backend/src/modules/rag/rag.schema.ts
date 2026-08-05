@@ -17,6 +17,7 @@ export interface ChatServiceParams {
     provider?: "gemini" | "mistral" | "openrouter";
     model?: string;
     useByok: boolean;
+    signal?: AbortSignal;
     logContext?: Record<string, any>;
 }
 

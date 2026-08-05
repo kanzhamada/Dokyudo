@@ -44,10 +44,15 @@ class GeminiClient {
      * Generate a streaming text response from the LLM.
      * Accepts an optional model parameter for fallback purposes.
      */
-    async generateTextStream(prompt: string, model: string = GEMINI_MODELS.llmDefault) {
+    async generateTextStream(
+        prompt: string,
+        model: string = GEMINI_MODELS.llmDefault,
+        signal?: AbortSignal,
+    ) {
         return await this.client.models.generateContentStream({
             model: model,
             contents: prompt,
+            config: { abortSignal: signal },
         });
     }
 
@@ -55,10 +60,15 @@ class GeminiClient {
      * Generate a full text response (non-streaming) from the LLM.
      * Useful for quick classification or gatekeeping tasks.
      */
-    async generateText(prompt: string, model: string = GEMINI_MODELS.llmDefault) {
+    async generateText(
+        prompt: string,
+        model: string = GEMINI_MODELS.llmDefault,
+        signal?: AbortSignal,
+    ) {
         return await this.client.models.generateContent({
             model: model,
             contents: prompt,
+            config: { abortSignal: signal },
         });
     }
 }

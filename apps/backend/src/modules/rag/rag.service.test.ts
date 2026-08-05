@@ -3,9 +3,10 @@ import { assertEquals, assertExists, assertRejects } from "jsr:@std/assert";
 import { stub } from "jsr:@std/testing/mock";
 import { RagService } from "./rag.service.ts";
 import { SearchService } from "../search/search.service.ts";
+import { FallbackLlmService } from "./fallback_llm.service.ts";
 import { db } from "../../config/drizzle.ts";
 import { conversations, conversationTurns, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { gemini } from "../../config/gemini.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 
@@ -225,6 +226,136 @@ describe("RagService Isolated Tests", () => {
             assertEquals(result, [
                 { index: 1, documentId: "doc-1", title: "Doc 1", pages: [2] }
             ]);
+        });
+    });
+
+    describe("streamChat cancellation", () => {
+        it("positive: skips DB persistence when signal is aborted before streaming", async () => {
+            // Stub gatekeeper to return SAFE
+            using gatekeeperStub = stub(gemini, "generateText", () =>
+                Promise.resolve({ text: "SAFE" }) as any);
+
+            // Stub search to return empty results
+            using searchStub = stub(SearchService, "executeHybridSearch", () =>
+                Promise.resolve([]) as any);
+
+            // Stub FallbackLlmService to return a simple completed stream
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () => {
+                async function* simpleGen() {
+                    yield { text: "Hello" };
+                }
+                return Promise.resolve({
+                    stream: simpleGen(),
+                    provider: "gemini" as any,
+                    modelId: "gemini-2.0-flash-lite",
+                });
+            });
+
+            // Create and abort the signal before passing to streamChat
+            const abortController = new AbortController();
+            abortController.abort();
+
+            const params = {
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question: "What is the meaning of life?",
+                conversationId: TEST_CONVERSATION_ID,
+                useByok: false,
+                signal: abortController.signal,
+                logContext: {},
+            };
+
+            // Count existing turns before the call
+            const turnsBefore = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.conversationId, TEST_CONVERSATION_ID));
+
+            const stream = await RagService.streamChat(params);
+
+            // Should still return a valid ReadableStream
+            assertEquals(stream instanceof ReadableStream, true);
+
+            // Read stream to completion
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { done } = await reader.read();
+                if (done) break;
+            }
+
+            // Wait a tick for any async DB writes to flush
+            await new Promise((r) => setTimeout(r, 50));
+
+            // Verify no new conversation turns were inserted (aborted signal skips DB)
+            const turnsAfter = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.conversationId, TEST_CONVERSATION_ID));
+
+            assertEquals(turnsAfter.length, turnsBefore.length);
+        });
+
+        it("positive: persists turn to DB when signal is NOT aborted", async () => {
+            // Stub gatekeeper to return SAFE
+            using gatekeeperStub = stub(gemini, "generateText", () =>
+                Promise.resolve({ text: "SAFE" }) as any);
+
+            // Stub search to return empty results
+            using searchStub = stub(SearchService, "executeHybridSearch", () =>
+                Promise.resolve([]) as any);
+
+            // Stub FallbackLlmService to return a simple completed stream
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () => {
+                async function* simpleGen() {
+                    yield { text: "Hello world" };
+                }
+                return Promise.resolve({
+                    stream: simpleGen(),
+                    provider: "gemini" as any,
+                    modelId: "gemini-2.0-flash-lite",
+                });
+            });
+
+            // Create signal but do NOT abort it
+            const abortController = new AbortController();
+
+            const params = {
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question: "What is the meaning of life?",
+                conversationId: TEST_CONVERSATION_ID,
+                useByok: false,
+                signal: abortController.signal,
+                logContext: {},
+            };
+
+            // Count existing turns before the call
+            const turnsBefore = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.conversationId, TEST_CONVERSATION_ID));
+
+            const stream = await RagService.streamChat(params);
+            assertEquals(stream instanceof ReadableStream, true);
+
+            // Read stream to completion
+            const reader = stream.getReader();
+            while (true) {
+                const { done } = await reader.read();
+                if (done) break;
+            }
+
+            // Wait for async DB writes
+            await new Promise((r) => setTimeout(r, 100));
+
+            // Verify a new turn was inserted (signal NOT aborted, so DB save should happen)
+            const turnsAfter = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.conversationId, TEST_CONVERSATION_ID));
+
+            assertEquals(turnsAfter.length, turnsBefore.length + 1);
         });
     });
 });

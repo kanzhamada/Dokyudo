@@ -17,6 +17,7 @@ export class LlmRouterService {
         model: string;
         prompt: string;
         apiKey?: string;
+        signal?: AbortSignal;
     }): Promise<StreamResponse> {
 
         if (!isValidModelForProvider(params.provider, params.model)) {
@@ -29,28 +30,30 @@ export class LlmRouterService {
 
         switch (params.provider) {
             case "gemini":
-                return this.streamGemini(params.model, params.prompt, params.apiKey);
+                return this.streamGemini(params.model, params.prompt, params.apiKey, params.signal);
             case "mistral":
-                return this.streamMistral(params.model, params.prompt, params.apiKey);
+                return this.streamMistral(params.model, params.prompt, params.apiKey, params.signal);
             case "openrouter":
-                return this.streamOpenRouter(params.model, params.prompt, params.apiKey);
+                return this.streamOpenRouter(params.model, params.prompt, params.apiKey, params.signal);
             default:
                 throw new AppError({ code: "VALIDATION_ERROR", message: "Unsupported provider", status: 400 });
         }
     }
 
-    private static async streamGemini(model: string, prompt: string, apiKey?: string): Promise<StreamResponse> {
+    private static async streamGemini(model: string, prompt: string, apiKey?: string, signal?: AbortSignal): Promise<StreamResponse> {
         const key = apiKey || getEnv("GOOGLE_API_KEY");
         const client = new GoogleGenAI({ apiKey: key });
 
         const stream = await client.models.generateContentStream({
             model: model,
             contents: prompt,
+            config: { abortSignal: signal },
         });
 
         // Map it to common format
         async function* mappedStream() {
             for await (const chunk of stream) {
+                if (signal?.aborted) break;
                 if (chunk.text) {
                     yield { text: chunk.text };
                 }
@@ -60,7 +63,7 @@ export class LlmRouterService {
         return { stream: mappedStream() };
     }
 
-    private static async streamMistral(model: string, prompt: string, apiKey?: string): Promise<StreamResponse> {
+    private static async streamMistral(model: string, prompt: string, apiKey?: string, signal?: AbortSignal): Promise<StreamResponse> {
         if (!apiKey) {
             throw new AppError({ code: "UNAUTHORIZED", message: "Mistral BYOK API key is required", status: 401 });
         }
@@ -76,6 +79,7 @@ export class LlmRouterService {
 
         async function* mappedStream() {
             for await (const chunk of responseStream) {
+                if (signal?.aborted) break;
                 if (chunk.data.choices && chunk.data.choices[0]?.delta?.content) {
                     yield { text: chunk.data.choices[0].delta.content as string };
                 }
@@ -85,7 +89,7 @@ export class LlmRouterService {
         return { stream: mappedStream() };
     }
 
-    private static async streamOpenRouter(model: string, prompt: string, apiKey?: string): Promise<StreamResponse> {
+    private static async streamOpenRouter(model: string, prompt: string, apiKey?: string, signal?: AbortSignal): Promise<StreamResponse> {
         if (!apiKey) {
             throw new AppError({ code: "UNAUTHORIZED", message: "OpenRouter BYOK API key is required", status: 401 });
         }
@@ -102,7 +106,8 @@ export class LlmRouterService {
                 model: model,
                 stream: true,
                 messages: [{ role: "user", content: prompt }]
-            })
+            }),
+            signal,
         });
 
         if (!response.ok) {
@@ -121,6 +126,7 @@ export class LlmRouterService {
         async function* mappedStream() {
             let buffer = "";
             while (true) {
+                if (signal?.aborted) return;
                 const { done, value } = await reader.read();
                 if (done) break;
                 
@@ -129,6 +135,7 @@ export class LlmRouterService {
                 buffer = lines.pop() || "";
                 
                 for (const line of lines) {
+                    if (signal?.aborted) return;
                     const trimmedLine = line.trim();
                     if (trimmedLine.startsWith("data: ")) {
                         const dataStr = trimmedLine.substring(6);

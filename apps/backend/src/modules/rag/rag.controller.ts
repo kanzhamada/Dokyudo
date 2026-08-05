@@ -17,6 +17,7 @@ export async function handleChat(c: Context) {
         provider: body.provider,
         model: body.model,
         useByok: body.useByok,
+        signal: c.req.raw.signal,
         logContext,
     };
 
