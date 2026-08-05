@@ -838,8 +838,15 @@
 										></span>
 									{/if}
 								{:else if msg.isStreaming}
-									<div class="flex items-center gap-2 text-xs font-medium text-white/50 italic animate-pulse py-1 select-none">
-										<Sparkles class="size-3.5 text-white/40 animate-spin" />
+									<div class="flex items-center gap-2 text-xs font-medium text-white/60 italic animate-pulse py-1 select-none">
+										<svg class="size-6 text-white/70 shrink-0" viewBox="0 0 50 50">
+											<g transform="rotate(0 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0s" repeatCount="indefinite" /></circle></g>
+											<g transform="rotate(60 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0.2s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0.2s" repeatCount="indefinite" /></circle></g>
+											<g transform="rotate(120 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0.4s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0.4s" repeatCount="indefinite" /></circle></g>
+											<g transform="rotate(180 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0.6s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0.6s" repeatCount="indefinite" /></circle></g>
+											<g transform="rotate(240 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="0.8s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="0.8s" repeatCount="indefinite" /></circle></g>
+											<g transform="rotate(300 25 25)"><line x1="25" y1="15" x2="25" y2="35" stroke="currentColor" stroke-width="1"><animate attributeName="strokeWidth" values="0.5;2;0.5" dur="1s" begin="1s" repeatCount="indefinite" /></line><circle cx="25" cy="15" r="2" fill="currentColor"><animate attributeName="cy" values="15;35;15" dur="1s" begin="1s" repeatCount="indefinite" /></circle></g>
+										</svg>
 										<span>{currentThinkingStatus}</span>
 									</div>
 								{/if}
