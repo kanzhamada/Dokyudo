@@ -15,3 +15,13 @@ export interface KeysListResponse {
 export function getKeys(): Promise<ApiResult<KeysListResponse>> {
 	return apiRequest<KeysListResponse>('/api/keys', { method: 'GET' });
 }
+
+export function upsertKey(
+	provider: 'gemini' | 'mistral' | 'openrouter',
+	apiKey: string
+): Promise<ApiResult<{ data: { success: boolean } }>> {
+	return apiRequest<{ data: { success: boolean } }>('/api/keys', {
+		method: 'PUT',
+		body: { provider, apiKey }
+	});
+}

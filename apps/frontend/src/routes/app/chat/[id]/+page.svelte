@@ -24,10 +24,13 @@
 		Pencil,
 		RotateCw,
 		Square,
-		Trash2
+		Trash2,
+		Settings2,
+		KeyRound
 	} from 'lucide-svelte';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Resizable from '$lib/components/ui/resizable';
@@ -40,7 +43,7 @@
 	import { toast } from 'svelte-sonner';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
-	import { getKeys } from '$lib/api/keys';
+	import { getKeys, upsertKey } from '$lib/api/keys';
 	import { getConversation } from '$lib/api/rag';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { PUBLIC_API_URL } from '$env/static/public';
@@ -141,6 +144,16 @@
 		icon: string;
 	}
 
+	type ByokProvider = 'gemini' | 'mistral' | 'openrouter';
+
+	interface ByokProviderOption {
+		id: ByokProvider;
+		label: string;
+		description: string;
+		icon: string;
+		placeholder: string;
+	}
+
 	interface DocReference {
 		id: string;
 		index?: number;
@@ -177,6 +190,30 @@
 		{ name: 'Free Auto', provider: 'auto', model: 'auto', icon: geminiIcon }
 	];
 
+	const BYOK_PROVIDER_OPTIONS: ByokProviderOption[] = [
+		{
+			id: 'gemini',
+			label: 'Google AI',
+			description: 'Gemini models',
+			icon: geminiIcon,
+			placeholder: 'AIza...'
+		},
+		{
+			id: 'mistral',
+			label: 'Mistral',
+			description: 'Mistral models',
+			icon: mistralIcon,
+			placeholder: 'Mistral API key'
+		},
+		{
+			id: 'openrouter',
+			label: 'OpenRouter',
+			description: 'Access more models',
+			icon: openrouterIcon,
+			placeholder: 'sk-or-v1-...'
+		}
+	];
+
 	// UI & Transition State
 	let isMounted = $state(false);
 	let activeMode = $state('chat');
@@ -195,6 +232,34 @@
 	let activeAbortController: AbortController | null = null;
 	let cancelActiveStream: (() => void) | null = null;
 	let activeStreamReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+	let isConfigureDialogOpen = $state(false);
+	let configureProvider = $state<ByokProvider>('gemini');
+	let configureApiKey = $state('');
+	let isSavingKey = $state(false);
+	let configureError = $state('');
+	let configuredKeyMasks = $state<Record<ByokProvider, string>>({
+		gemini: '',
+		mistral: '',
+		openrouter: ''
+	});
+
+	let modelGroups = $derived.by(() => {
+		const groupLabels: Record<string, string> = {
+			auto: 'Free Models Router',
+			gemini: 'Google AI',
+			mistral: 'Mistral',
+			openrouter: 'OpenRouter'
+		};
+		const groupOrder = ['auto', 'gemini', 'mistral', 'openrouter'];
+
+		return groupOrder
+			.map((provider) => ({
+				provider,
+				label: groupLabels[provider],
+				options: llmOptions.filter((option) => option.provider.toLowerCase() === provider)
+			}))
+			.filter((group) => group.options.length > 0);
+	});
 
 	// Citation PDF preview
 	let citationPreview = $state<{ src: string; name: string; pages: number[] } | null>(null);
@@ -476,6 +541,87 @@
 		loadConversation(chatId);
 	});
 
+	function isByokProvider(provider: string): provider is ByokProvider {
+		return provider === 'gemini' || provider === 'mistral' || provider === 'openrouter';
+	}
+
+	async function loadLlmOptions() {
+		try {
+			const keysRes = await getKeys();
+			if (!keysRes.ok) return;
+
+			const dynamicOptions: LlmOption[] = [...INITIAL_LLM_OPTIONS];
+			const nextMasks: Record<ByokProvider, string> = {
+				gemini: '',
+				mistral: '',
+				openrouter: ''
+			};
+
+			for (const item of keysRes.data.data ?? []) {
+				const provider = item.provider.toLowerCase();
+				if (!isByokProvider(provider)) continue;
+
+				nextMasks[provider] = item.maskedKey;
+				const icon = PROVIDER_ICONS[provider] || geminiIcon;
+				for (const model of item.models ?? []) {
+					dynamicOptions.push({
+						name: model,
+						provider,
+						model,
+						icon
+					});
+				}
+			}
+
+			const selectedKey = `${selectedModel.provider}:${selectedModel.model}`;
+			llmOptions = dynamicOptions;
+			configuredKeyMasks = nextMasks;
+			selectedModel =
+				dynamicOptions.find((option) => `${option.provider}:${option.model}` === selectedKey) ??
+				dynamicOptions[0];
+		} catch (err) {
+			console.error('[Chat Detail] Failed to fetch BYOK keys:', err);
+		}
+	}
+
+	function openConfigureDialog(provider: ByokProvider = configureProvider) {
+		configureProvider = provider;
+		configureApiKey = '';
+		configureError = '';
+		isConfigureDialogOpen = true;
+	}
+
+	function selectConfigureProvider(provider: ByokProvider) {
+		configureProvider = provider;
+		configureApiKey = '';
+		configureError = '';
+	}
+
+	async function saveConfigureKey() {
+		const apiKey = configureApiKey.trim();
+		if (!apiKey || isSavingKey) return;
+
+		isSavingKey = true;
+		configureError = '';
+		try {
+			const result = await upsertKey(configureProvider, apiKey);
+			if (!result.ok) {
+				configureError = result.error.message;
+				return;
+			}
+
+			await loadLlmOptions();
+			configureApiKey = '';
+			isConfigureDialogOpen = false;
+			toast.success(`${BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.label} key saved`);
+		} catch (err) {
+			console.error('[Chat Detail] Failed to save BYOK key:', err);
+			configureError = 'Failed to save API key.';
+		} finally {
+			isSavingKey = false;
+		}
+	}
+
 	onMount(async () => {
 		console.log(`[Chat Detail] Mounted view for chat ID: ${chatId}`);
 		setTimeout(() => {
@@ -504,33 +650,7 @@
 			console.error('[Chat Detail] Failed to fetch usage metrics:', err);
 		}
 
-		try {
-			const keysRes = await getKeys();
-			if (keysRes.ok && keysRes.data?.data && keysRes.data.data.length > 0) {
-				const dynamicOptions: LlmOption[] = [
-					{ name: 'Free Auto', provider: 'auto', model: 'auto', icon: geminiIcon }
-				];
-
-				for (const item of keysRes.data.data) {
-					const icon = PROVIDER_ICONS[item.provider.toLowerCase()] || geminiIcon;
-					if (Array.isArray(item.models)) {
-						for (const model of item.models) {
-							dynamicOptions.push({
-								name: model,
-								provider: item.provider,
-								model: model,
-								icon
-							});
-						}
-					}
-				}
-
-				llmOptions = dynamicOptions;
-				selectedModel = llmOptions[0];
-			}
-		} catch (err) {
-			console.error('[Chat Detail] Failed to fetch BYOK keys:', err);
-		}
+		await loadLlmOptions();
 	});
 
 	$effect(() => {
@@ -1618,19 +1738,42 @@
 									<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
 									<ChevronDown class="size-4" />
 								</DropdownMenu.Trigger>
-								<DropdownMenu.Content
-									class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] bg-[#232323]/90 text-white backdrop-blur-[42px]"
-								>
-									{#each llmOptions as option}
-										<DropdownMenu.Item
-											class="flex cursor-pointer items-center gap-2 focus:bg-white/[0.16] focus:text-white"
-											onclick={() => (selectedModel = option)}
-										>
-											<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
-											<span class="truncate">{option.name}</span>
-										</DropdownMenu.Item>
-									{/each}
-								</DropdownMenu.Content>
+									<DropdownMenu.Content
+										class="w-80 border border-white/[0.16] bg-[#232323]/95 p-0 text-white backdrop-blur-[42px]"
+									>
+										<div class="max-h-72 overflow-y-auto px-1 py-1">
+											<div class="border-b border-white/10 px-2.5 py-2 text-xs text-white/35">
+												Select a model...
+											</div>
+											{#each modelGroups as group (group.provider)}
+												<div class="px-2.5 pt-3 pb-1 text-[11px] font-medium text-white/40">
+													{group.label}
+												</div>
+												{#each group.options as option (`${option.provider}:${option.model}`)}
+													<DropdownMenu.Item
+														class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/75 focus:bg-white/[0.16] focus:text-white data-highlighted:bg-white/[0.12]"
+														onclick={() => (selectedModel = option)}
+													>
+														<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert opacity-60" />
+														<span class="min-w-0 flex-1 truncate">{option.name}</span>
+														{#if selectedModel.provider === option.provider && selectedModel.model === option.model}
+															<Check class="size-3.5 text-[#DB8F5E]" />
+														{/if}
+													</DropdownMenu.Item>
+												{/each}
+											{/each}
+										</div>
+										<div class="border-t border-white/10 p-1">
+											<DropdownMenu.Item
+												class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 focus:bg-white/[0.12] focus:text-white data-highlighted:bg-white/[0.12]"
+												onclick={() => openConfigureDialog()}
+											>
+												<Settings2 class="size-3.5" />
+												<span>Configure</span>
+												<kbd class="ml-1 rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/35">Ctrl-Alt-C</kbd>
+											</DropdownMenu.Item>
+										</div>
+									</DropdownMenu.Content>
 							</DropdownMenu.Root>
 						</div>
 
@@ -1671,3 +1814,84 @@
 		</div>
 	</div>
 {/snippet}
+
+<Dialog.Root bind:open={isConfigureDialogOpen}>
+	<Dialog.Content class="w-full max-w-lg border border-white/10 bg-[#232323] p-0 text-white shadow-2xl">
+		<Dialog.Header class="border-b border-white/10 px-6 py-5">
+			<Dialog.Title class="text-lg font-semibold text-white">Configure BYOK</Dialog.Title>
+			<Dialog.Description class="text-sm text-white/45">
+				Connect your own API key to access provider models directly.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<div class="flex gap-2 border-b border-white/10 px-6 py-3">
+			{#each BYOK_PROVIDER_OPTIONS as provider (provider.id)}
+				<button
+					type="button"
+					class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors {configureProvider ===
+						provider.id
+						? 'border-[#DB8F5E]/60 bg-[#DB8F5E]/10 text-white'
+						: 'border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.08] hover:text-white/80'}"
+					onclick={() => selectConfigureProvider(provider.id)}
+				>
+					<img src={provider.icon} alt={provider.label} class="size-4 shrink-0 brightness-0 invert opacity-70" />
+					<span class="min-w-0 truncate text-xs font-medium">{provider.label}</span>
+				</button>
+			{/each}
+		</div>
+
+		<div class="flex flex-col gap-3 px-6 py-5">
+			<div class="flex items-center justify-between gap-3">
+				<div>
+					<p class="text-sm font-medium text-white/85">
+						{BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.label} API key
+					</p>
+					<p class="mt-1 text-xs text-white/40">
+						{BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.description}
+					</p>
+				</div>
+				<KeyRound class="size-4 text-white/35" />
+			</div>
+
+			<Input
+				type="password"
+				bind:value={configureApiKey}
+				placeholder={BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.placeholder}
+				class="h-10 border-white/15 bg-black/20 text-sm text-white placeholder:text-white/25 focus-visible:border-[#DB8F5E]/60 focus-visible:ring-[#DB8F5E]/20"
+				autocomplete="new-password"
+			/>
+
+			{#if configuredKeyMasks[configureProvider]}
+				<p class="text-xs text-white/40">
+					Currently configured: <span class="font-mono text-white/60">{configuredKeyMasks[configureProvider]}</span>
+				</p>
+			{/if}
+			{#if configureError}
+				<p class="text-xs text-red-400">{configureError}</p>
+			{/if}
+		</div>
+
+		<Dialog.Footer class="border-t border-white/10 px-6 py-4">
+			<Button
+				variant="ghost"
+				class="cursor-pointer text-white/60 hover:bg-white/10 hover:text-white"
+				disabled={isSavingKey}
+				onclick={() => (isConfigureDialogOpen = false)}
+			>
+				Cancel
+			</Button>
+			<Button
+				class="cursor-pointer bg-[#DB8F5E] text-black hover:bg-[#E59C6D] disabled:opacity-50"
+				disabled={!configureApiKey.trim() || isSavingKey}
+				onclick={saveConfigureKey}
+			>
+				{#if isSavingKey}
+					<Spinner class="mr-2" />
+					Saving...
+				{:else}
+					Save key
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
