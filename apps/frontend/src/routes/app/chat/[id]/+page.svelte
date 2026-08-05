@@ -193,10 +193,12 @@
 	let editingTextInput: HTMLTextAreaElement | null = $state(null);
 	let activeAbortController: AbortController | null = null;
 	let cancelActiveStream: (() => void) | null = null;
+	let activeStreamReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
 	// Citation PDF preview
 	let citationPreview = $state<{ src: string; name: string; pages: number[] } | null>(null);
 	let citationDocId = $state<string | null>(null);
+	let preservedChatScrollTop = $state(0);
 
 	// LRU cache for presigned document URLs — max 4 docs, evicts oldest on overflow.
 	// Map preserves insertion order, so first key = Least Recently Used.
@@ -223,6 +225,7 @@
 
 	async function openCitationPreview(documentId: string, name: string, pages: number[]) {
 		if (!documentId) return;
+		preservedChatScrollTop = chatContainer?.scrollTop ?? preservedChatScrollTop;
 		// Same document already open — just jump to the page
 		if (citationDocId === documentId && citationPreview) {
 			citationPreview = { ...citationPreview, pages };
@@ -240,6 +243,15 @@
 		}
 		citationDocId = documentId;
 		citationPreview = { src: url, name, pages };
+		await tick();
+		if (chatContainer) chatContainer.scrollTop = preservedChatScrollTop;
+	}
+
+	async function closeCitationPreview() {
+		preservedChatScrollTop = chatContainer?.scrollTop ?? preservedChatScrollTop;
+		citationPreview = null;
+		await tick();
+		if (chatContainer) chatContainer.scrollTop = preservedChatScrollTop;
 	}
 
 	const THINKING_STATUS_MESSAGES = [
@@ -668,6 +680,7 @@
 					if (activeAbortController === abortController) {
 						activeAbortController = null;
 						cancelActiveStream = null;
+						activeStreamReader = null;
 					}
 					isTitleLoading = false;
 					stopThinkingTimer();
@@ -729,6 +742,9 @@
 		cancelActiveStream = () => {
 			wasCancelled = true;
 			abortController.abort();
+			// Cancel the response body reader to stop the SSE stream mid-flight
+			activeStreamReader?.cancel();
+			activeStreamReader = null;
 			if (typewriterTimer) {
 				clearInterval(typewriterTimer);
 				typewriterTimer = null;
@@ -786,6 +802,7 @@
 			}
 
 			const reader = res.body.getReader();
+			activeStreamReader = reader;
 			const decoder = new TextDecoder();
 			let buffer = '';
 
@@ -899,6 +916,7 @@
 			}
 			if (activeAbortController === abortController) {
 				activeAbortController = null;
+				activeStreamReader = null;
 				cancelActiveStream = null;
 			}
 		}
@@ -974,7 +992,7 @@
 				src={citationPreview.src}
 				name={citationPreview.name}
 				initialPages={citationPreview.pages}
-				onclose={() => (citationPreview = null)}
+				onclose={closeCitationPreview}
 			/>
 		</div>
 		<!-- Desktop: resizable split -->
@@ -990,9 +1008,9 @@
 				<Resizable.Pane defaultSize={40} minSize={25}>
 					<PdfPreviewPanel
 						src={citationPreview.src}
-						name={citationPreview.name}
-						initialPages={citationPreview.pages}
-						onclose={() => (citationPreview = null)}
+					name={citationPreview.name}
+					initialPages={citationPreview.pages}
+					onclose={closeCitationPreview}
 					/>
 				</Resizable.Pane>
 			</Resizable.PaneGroup>
