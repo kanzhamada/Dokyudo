@@ -13,3 +13,23 @@ get {
 auth:bearer {
   token: {{accessToken}}
 }
+
+docs {
+  Returns a single conversation with all turns.
+  
+  Each turn contains:
+  - `question`: user prompt
+  - `answer`: assistant answer with inline citations (e.g. `[Doc 1: 48]`)
+  - `contextReferences`: filtered references actually cited in `answer`, shaped as:
+    ```json
+    [
+      {
+        "index": 1,
+        "documentId": "...",
+        "title": "annual_report_pt_harum_energy_tbk_2020.pdf",
+        "pages": [48]
+      }
+    ]
+    ```
+  - `modelUsed`, `createdAt`, etc.
+}

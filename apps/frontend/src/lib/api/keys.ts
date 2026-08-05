@@ -25,3 +25,11 @@ export function upsertKey(
 		body: { provider, apiKey }
 	});
 }
+
+export function deleteKey(
+	provider: 'gemini' | 'mistral' | 'openrouter'
+): Promise<ApiResult<{ data: { success: boolean } }>> {
+	return apiRequest<{ data: { success: boolean } }>(`/api/keys/${provider}`, {
+		method: 'DELETE'
+	});
+}

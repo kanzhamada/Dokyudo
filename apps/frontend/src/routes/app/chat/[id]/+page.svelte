@@ -43,7 +43,7 @@
 	import { toast } from 'svelte-sonner';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
-	import { getKeys, upsertKey } from '$lib/api/keys';
+	import { deleteKey, getKeys, upsertKey } from '$lib/api/keys';
 	import { getConversation } from '$lib/api/rag';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { PUBLIC_API_URL } from '$env/static/public';
@@ -105,13 +105,13 @@
 						docFullName = refDoc.name;
 						tooltipTitle = refDoc.name;
 						const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
-						docDisplayName = cleanName.length > 5 ? cleanName.slice(0, 5) + '...' : cleanName;
+						docDisplayName = cleanName.length > 20 ? cleanName.slice(0, 20) + '...' : cleanName;
 					}
 				}
 
 				const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
 				const label = pageFormatted ? `${docDisplayName} • ${pageFormatted}` : docDisplayName;
-				return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageFormatted}" class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white" title="${tooltipTitle}">${label}</span>`;
+				return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageFormatted}" class="inline-flex cursor-pointer items-center gap-1 truncate rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white" style="max-width: 180px;" title="${tooltipTitle}">${label}</span>`;
 			}
 		);
 
@@ -172,6 +172,7 @@
 		attachments?: { name: string; size?: number }[];
 		references?: DocReference[];
 		isStreaming?: boolean;
+		isCancelled?: boolean;
 		isRejection?: boolean;
 	}
 
@@ -236,7 +237,9 @@
 	let configureProvider = $state<ByokProvider>('gemini');
 	let configureApiKey = $state('');
 	let isSavingKey = $state(false);
+	let isResettingKey = $state(false);
 	let configureError = $state('');
+	let modelSearchQuery = $state('');
 	let configuredKeyMasks = $state<Record<ByokProvider, string>>({
 		gemini: '',
 		mistral: '',
@@ -244,6 +247,7 @@
 	});
 
 	let modelGroups = $derived.by(() => {
+		const query = modelSearchQuery.trim().toLowerCase();
 		const groupLabels: Record<string, string> = {
 			auto: 'Free Models Router',
 			gemini: 'Google AI',
@@ -256,7 +260,13 @@
 			.map((provider) => ({
 				provider,
 				label: groupLabels[provider],
-				options: llmOptions.filter((option) => option.provider.toLowerCase() === provider)
+				options: llmOptions.filter(
+					(option) =>
+						option.provider.toLowerCase() === provider &&
+						(!query ||
+							option.name.toLowerCase().includes(query) ||
+							groupLabels[provider].toLowerCase().includes(query))
+				)
 			}))
 			.filter((group) => group.options.length > 0);
 	});
@@ -508,6 +518,7 @@
 							}),
 							references: filteredTurnRefs?.map((r: any) => ({
 								id: r.documentId,
+								index: r.index || 1,
 								name: r.title || r.documentId,
 								pages: r.pages
 							})),
@@ -585,6 +596,7 @@
 	}
 
 	function openConfigureDialog(provider: ByokProvider = configureProvider) {
+		modelSearchQuery = '';
 		configureProvider = provider;
 		configureApiKey = '';
 		configureError = '';
@@ -619,6 +631,28 @@
 			configureError = 'Failed to save API key.';
 		} finally {
 			isSavingKey = false;
+		}
+	}
+
+	async function resetConfigureKey() {
+		if (isResettingKey) return;
+
+		isResettingKey = true;
+		configureError = '';
+		try {
+			const result = await deleteKey(configureProvider);
+			if (!result.ok) {
+				configureError = result.error.message;
+				return;
+			}
+
+			await loadLlmOptions();
+			toast.success(`${BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.label} key reset`);
+		} catch (err) {
+			console.error('[Chat Detail] Failed to reset BYOK key:', err);
+			configureError = 'Failed to reset API key.';
+		} finally {
+			isResettingKey = false;
 		}
 	}
 
@@ -769,6 +803,7 @@
 			timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 			content: '',
 			isStreaming: true,
+			isCancelled: false,
 			references: []
 		};
 
@@ -780,18 +815,12 @@
 		let streamHadError = false;
 		let typewriterTimer: ReturnType<typeof setInterval> | null = null;
 		let wasCancelled = false;
-		// References are buffered until the stream is truly DONE (done event + typewriter drained)
-		// so the Source References block does not appear while the AI is still typing.
-		let pendingReferences: DocReference[] = [];
 
 		const startTypewriter = () => {
 			if (typewriterTimer) clearInterval(typewriterTimer);
 			typewriterTimer = setInterval(() => {
 				if (messages[asstIndex].content.length < streamBuffer.length) {
 					const delta = Math.min(3, streamBuffer.length - messages[asstIndex].content.length);
-					if (messages[asstIndex].content.length % 180 === 0) {
-						console.log('[Chat Detail][DEBUG] typewriter: shown=' + messages[asstIndex].content.length, 'buffered=' + streamBuffer.length);
-					}
 					messages[asstIndex].content += streamBuffer.substring(
 						messages[asstIndex].content.length,
 						messages[asstIndex].content.length + delta
@@ -802,7 +831,6 @@
 				} else if (isStreamDone) {
 					clearInterval(typewriterTimer!);
 					typewriterTimer = null;
-					console.log('[Chat Detail][DEBUG] typewriter finished draining buffer (shown=' + messages[asstIndex].content.length + ')');
 
 					messages[asstIndex].isStreaming = false;
 					isGenerating = false;
@@ -814,10 +842,9 @@
 					isTitleLoading = false;
 					stopThinkingTimer();
 
-					// Stream is truly DONE (done event + typewriter drained, no error) — now safe
-					// to reveal the buffered Source References.
-					if (!streamHadError) {
-						messages[asstIndex].references = pendingReferences;
+					if (streamHadError) {
+						messages[asstIndex].references = [];
+						return;
 					}
 
 					const textContent = messages[asstIndex].content;
@@ -875,21 +902,18 @@
 		const abortController = new AbortController();
 		activeAbortController = abortController;
 		cancelActiveStream = () => {
-			console.log('[Chat Detail][DEBUG] cancelActiveStream: start');
 			wasCancelled = true;
 			abortController.abort();
-			console.log('[Chat Detail][DEBUG] cancelActiveStream: abortController.abort() called');
 			// Cancel the response body reader to stop the SSE stream mid-flight.
 			// Absorb the rejection — cancel() on an already-aborted reader rejects.
 			activeStreamReader?.cancel().catch(() => {});
 			activeStreamReader = null;
-			console.log('[Chat Detail][DEBUG] cancelActiveStream: reader.cancel() called');
 			if (typewriterTimer) {
 				clearInterval(typewriterTimer);
 				typewriterTimer = null;
-				console.log('[Chat Detail][DEBUG] cancelActiveStream: typewriter timer cleared');
 			}
 			messages[asstIndex].isStreaming = false;
+			messages[asstIndex].isCancelled = true;
 			isGenerating = false;
 			isTitleLoading = false;
 			stopThinkingTimer();
@@ -969,7 +993,6 @@
 					// Abort won the race → exit the loop cleanly.
 					// Absorb the orphaned readPromise rejection (it rejects with AbortError too).
 					readPromise.catch(() => {});
-					console.log('[Chat Detail][DEBUG] reader loop exited:', (_err as Error)?.name ?? 'unknown');
 					break;
 				}
 				if (done) break;
@@ -997,9 +1020,10 @@
 						try {
 							const parsed = JSON.parse(dataStr);
 							if (parsed.references) {
-								// Buffer references — they are assigned to the message only when the
-								// stream is truly DONE (done event received + typewriter drained).
-								pendingReferences = parsed.references.map((r: any, idx: number) => ({
+								// Assign references immediately so inline citations render file names
+								// while the answer is still typing. The Source References block below
+								// the message is only shown once the stream is fully done.
+								messages[asstIndex].references = parsed.references.map((r: any, idx: number) => ({
 									id: r.documentId,
 									index: r.index || idx + 1,
 									name: r.title || r.documentId,
@@ -1044,7 +1068,6 @@
 						}
 					} else if (eventName === 'done') {
 						isStreamDone = true;
-						console.log('[Chat Detail] Backend Response (Stream Complete Signal Received)');
 					} else if (eventName === 'error' && dataStr) {
 						try {
 							const parsed = JSON.parse(dataStr);
@@ -1102,7 +1125,6 @@
 	}
 
 	function stopCurrentStream() {
-		console.log('[Chat Detail][DEBUG] stopCurrentStream: user clicked stop');
 		cancelActiveStream?.();
 	}
 
@@ -1497,7 +1519,7 @@
 								</div>
 
 								<!-- Document Reference Chips -->
-								{#if msg.references && msg.references.length > 0}
+								{#if !msg.isStreaming && !msg.isCancelled && msg.references && msg.references.length > 0}
 									<div class="mt-2 border-t border-white/10 pt-3">
 										<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
 											<BookOpen class="size-3.5 text-white/60" />
@@ -1726,7 +1748,11 @@
 
 						<!-- Model Switcher Dropdown -->
 						<div class="group/model relative flex h-9 items-center">
-							<DropdownMenu.Root>
+							<DropdownMenu.Root
+								onOpenChange={(open) => {
+									if (!open) modelSearchQuery = '';
+								}}
+							>
 								<DropdownMenu.Trigger
 									class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors group-focus-within/model:text-white/[0.69] group-hover/model:text-white/[0.69] focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
 								>
@@ -1742,9 +1768,13 @@
 										class="w-80 border border-white/[0.16] bg-[#232323]/95 p-0 text-white backdrop-blur-[42px]"
 									>
 										<div class="max-h-72 overflow-y-auto px-1 py-1">
-											<div class="border-b border-white/10 px-2.5 py-2 text-xs text-white/35">
-												Select a model...
-											</div>
+											<Input
+												type="search"
+												bind:value={modelSearchQuery}
+												placeholder="Select a model..."
+												class="h-9 rounded-none border-0 border-b border-white/10 bg-transparent px-2.5 text-xs text-white shadow-none focus-visible:border-white/20 focus-visible:ring-0"
+												onkeydown={(event) => event.stopPropagation()}
+											/>
 											{#each modelGroups as group (group.provider)}
 												<div class="px-2.5 pt-3 pb-1 text-[11px] font-medium text-white/40">
 													{group.label}
@@ -1767,11 +1797,10 @@
 											<DropdownMenu.Item
 												class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 focus:bg-white/[0.12] focus:text-white data-highlighted:bg-white/[0.12]"
 												onclick={() => openConfigureDialog()}
-											>
-												<Settings2 class="size-3.5" />
-												<span>Configure</span>
-												<kbd class="ml-1 rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/35">Ctrl-Alt-C</kbd>
-											</DropdownMenu.Item>
+													>
+														<Settings2 class="size-3.5" />
+														<span>Configure</span>
+													</DropdownMenu.Item>
 										</div>
 									</DropdownMenu.Content>
 							</DropdownMenu.Root>
@@ -1816,7 +1845,18 @@
 {/snippet}
 
 <Dialog.Root bind:open={isConfigureDialogOpen}>
-	<Dialog.Content class="w-full max-w-lg border border-white/10 bg-[#232323] p-0 text-white shadow-2xl">
+	<Dialog.Content
+		showCloseButton={false}
+		class="w-full max-w-lg border border-white/10 bg-[#232323] p-0 text-white shadow-2xl"
+	>
+		<button
+			type="button"
+			onclick={() => (isConfigureDialogOpen = false)}
+			class="absolute top-4 right-4 z-10 flex size-8 cursor-pointer items-center justify-center rounded-md text-white/45 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
+			aria-label="Close configure dialog"
+		>
+			<X class="size-4" />
+		</button>
 		<Dialog.Header class="border-b border-white/10 px-6 py-5">
 			<Dialog.Title class="text-lg font-semibold text-white">Configure BYOK</Dialog.Title>
 			<Dialog.Description class="text-sm text-white/45">
@@ -1853,19 +1893,32 @@
 				<KeyRound class="size-4 text-white/35" />
 			</div>
 
-			<Input
-				type="password"
-				bind:value={configureApiKey}
-				placeholder={BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.placeholder}
-				class="h-10 border-white/15 bg-black/20 text-sm text-white placeholder:text-white/25 focus-visible:border-[#DB8F5E]/60 focus-visible:ring-[#DB8F5E]/20"
-				autocomplete="new-password"
-			/>
-
 			{#if configuredKeyMasks[configureProvider]}
-				<p class="text-xs text-white/40">
-					Currently configured: <span class="font-mono text-white/60">{configuredKeyMasks[configureProvider]}</span>
-				</p>
+				<div class="flex h-10 items-center justify-between rounded-lg border border-white/15 bg-black/20 px-3">
+					<div class="flex items-center gap-2 text-sm text-white/75">
+						<Check class="size-4 text-white/60" />
+						<span>API Key Configured</span>
+					</div>
+					<button
+						type="button"
+						class="flex cursor-pointer items-center gap-1 text-xs text-white/50 transition-colors hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+						disabled={isResettingKey}
+						onclick={resetConfigureKey}
+					>
+						<RotateCw class="size-3.5" />
+						<span>{isResettingKey ? 'Resetting...' : 'Reset Key'}</span>
+					</button>
+				</div>
+			{:else}
+				<Input
+					type="password"
+					bind:value={configureApiKey}
+					placeholder={BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.placeholder}
+					class="h-10 border-white/15 bg-black/20 text-sm text-white placeholder:text-white/25 focus-visible:border-[#DB8F5E]/60 focus-visible:ring-[#DB8F5E]/20"
+					autocomplete="new-password"
+				/>
 			{/if}
+
 			{#if configureError}
 				<p class="text-xs text-red-400">{configureError}</p>
 			{/if}
@@ -1882,7 +1935,7 @@
 			</Button>
 			<Button
 				class="cursor-pointer bg-[#DB8F5E] text-black hover:bg-[#E59C6D] disabled:opacity-50"
-				disabled={!configureApiKey.trim() || isSavingKey}
+				disabled={!configureApiKey.trim() || isSavingKey || isResettingKey}
 				onclick={saveConfigureKey}
 			>
 				{#if isSavingKey}
