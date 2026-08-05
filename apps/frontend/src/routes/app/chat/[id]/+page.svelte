@@ -28,6 +28,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
+	import * as Resizable from '$lib/components/ui/resizable';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -42,8 +43,10 @@
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { PUBLIC_API_URL } from '$env/static/public';
 	import { dokyudoFetch } from '$lib/apiClient';
+	import { apiRequest } from '$lib/api/client';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
+	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 	import { marked } from 'marked';
 
 	marked.setOptions({
@@ -183,6 +186,17 @@
 	let attachedFiles: File[] = $state([]);
 	let copiedMessageId: string | null = $state(null);
 	let isGenerating = $state(false);
+
+	// Citation PDF preview
+	let citationPreview = $state<{ src: string; name: string; pages: number[] } | null>(null);
+
+	async function openCitationPreview(documentId: string, name: string, pages: number[]) {
+		if (!documentId) return;
+		const res = await apiRequest<{ url: string; expiresIn: number }>(
+			`/api/documents/${documentId}/preview`
+		);
+		if (res.ok) citationPreview = { src: res.data.url, name, pages };
+	}
 
 	const THINKING_STATUS_MESSAGES = [
 		'Chudmaxxing...',
@@ -809,21 +823,60 @@
 </script>
 
 <div
-	class="relative flex h-full w-full flex-col overflow-hidden bg-[#1F1E1D] font-sans text-white transition-opacity duration-500 ease-in-out {isMounted
+	class="relative flex h-full w-full overflow-hidden bg-[#1F1E1D] font-sans text-white transition-opacity duration-500 ease-in-out {isMounted
 		? 'opacity-100'
 		: 'opacity-0'}"
 >
-	<!-- Ambient Background Glow Circle (Matching App Shell Layout) -->
-	<div
-		class="pointer-events-none absolute -top-[318px] -left-[295px] z-0 h-[1190px] w-[1190px] rounded-full opacity-[0.07]"
-		style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
-	></div>
+	{#if citationPreview}
+		<!-- Mobile: full-screen preview -->
+		<div class="h-full w-full md:hidden">
+			<PdfPreviewPanel
+				src={citationPreview.src}
+				name={citationPreview.name}
+				initialPages={citationPreview.pages}
+				onclose={() => (citationPreview = null)}
+			/>
+		</div>
+		<!-- Desktop: resizable split -->
+		<div class="hidden h-full w-full md:block">
+			<Resizable.PaneGroup direction="horizontal" autoSaveId="chat-layout">
+				<Resizable.Pane defaultSize={60} minSize={30}>
+					{@render chatContent()}
+				</Resizable.Pane>
+				<Resizable.Handle
+					withHandle
+					class="w-1 bg-white/10 hover:bg-[#DB8F5E]/50 active:bg-[#DB8F5E]"
+				/>
+				<Resizable.Pane defaultSize={40} minSize={25}>
+					<PdfPreviewPanel
+						src={citationPreview.src}
+						name={citationPreview.name}
+						initialPages={citationPreview.pages}
+						onclose={() => (citationPreview = null)}
+					/>
+				</Resizable.Pane>
+			</Resizable.PaneGroup>
+		</div>
+	{:else}
+		{@render chatContent()}
+	{/if}
+</div>
 
-	<!-- Center Scrollable Chat Area -->
+{#snippet chatContent()}
 	<div
-		bind:this={chatContainer}
-		class="relative z-10 flex flex-1 min-h-0 flex-col overflow-y-auto px-4 pt-16 md:pt-8 md:px-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+		class="relative flex h-full w-full flex-col overflow-hidden"
 	>
+		<!-- Ambient Background Glow Circle (Matching App Shell Layout) -->
+		<div
+			class="pointer-events-none absolute -top-[318px] -left-[295px] z-0 h-[1190px] w-[1190px] rounded-full opacity-[0.07]"
+			style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
+		></div>
+
+		<!-- Center Scrollable Chat Area -->
+		<div
+			bind:this={chatContainer}
+			class="relative z-10 flex flex-1 min-h-0 flex-col overflow-y-auto px-4 pt-16 md:pt-8 md:px-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+		>
 		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
 			{#each messages as msg, msgIndex (msg.id)}
 				{#if msg.role === 'user'}
@@ -884,7 +937,20 @@
 						<div class="flex w-full flex-col gap-3">
 							<!-- Markdown Content View -->
 							<div
+								role="none"
 								class="prose prose-invert prose-sm max-w-none text-white/90 prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-li:my-1"
+								onclick={(e) => {
+									const target = e.target as HTMLElement;
+									const chip = target.closest('[data-doc-id]');
+									if (chip) {
+										const docId = chip.getAttribute('data-doc-id') || '';
+										const docTitle = chip.getAttribute('data-doc-title') || '';
+										const pagesRaw = chip.getAttribute('data-pages') || '';
+										const pages = pagesRaw ? pagesRaw.split(',').map(Number).filter(Boolean) : [];
+										openCitationPreview(docId, docTitle, pages);
+									}
+								}}
+								onkeydown={() => {}}
 							>
 								{#if msg.content}
 									{@html renderMarkdown(msg.content, msg.references)}
@@ -922,6 +988,7 @@
 												<Tooltip.Root>
 													<Tooltip.Trigger
 														class="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#2B2A29] px-3 py-1 text-xs text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white"
+														onclick={() => openCitationPreview(ref.id, ref.name, ref.pages ?? [])}
 													>
 														<FileText class="size-3 text-white/60" />
 														<span class="font-medium">{ref.name}</span>
@@ -1175,5 +1242,6 @@
 		</div>
 	</div>
 </div>
+{/snippet}
 
 
