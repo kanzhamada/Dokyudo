@@ -704,9 +704,9 @@
 									<div class="mb-2 flex flex-wrap gap-1.5">
 										{#each msg.attachments as att}
 											<span
-												class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-amber-300/90"
+												class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80"
 											>
-												<FileText class="size-3" />
+												<FileText class="size-3 text-white/60" />
 												{att.name}
 											</span>
 										{/each}
@@ -721,7 +721,7 @@
 								<Button
 									variant="ghost"
 									size="icon"
-									class="h-6 w-6 text-white/40 hover:bg-white/10 hover:text-white"
+									class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
 									onclick={() => copyToClipboard(msg.content, msg.id)}
 									aria-label="Copy question"
 								>
@@ -734,7 +734,7 @@
 								<Button
 									variant="ghost"
 									size="icon"
-									class="h-6 w-6 text-white/40 hover:bg-white/10 hover:text-white"
+									class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
 									onclick={() => toast.info('Edit question feature coming soon')}
 									aria-label="Edit question"
 								>
@@ -749,13 +749,13 @@
 						<div class="flex w-full flex-col gap-3">
 							<!-- Markdown Content View -->
 							<div
-								class="prose prose-invert prose-sm max-w-none text-white/90 prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-amber-300 prose-code:before:content-none prose-code:after:content-none prose-a:text-amber-400 prose-li:my-1"
+								class="prose prose-invert prose-sm max-w-none text-white/90 prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-li:my-1"
 							>
 								{@html renderMarkdown(msg.content, msg.references)}
 
 								{#if msg.isStreaming}
 									<span
-										class="inline-block h-4 w-1.5 animate-pulse bg-amber-400 align-middle ml-1"
+										class="inline-block h-4 w-1.5 animate-pulse bg-white/80 align-middle ml-1"
 									></span>
 								{/if}
 							</div>
@@ -764,7 +764,7 @@
 							{#if msg.references && msg.references.length > 0}
 								<div class="mt-2 border-t border-white/10 pt-3">
 									<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
-										<BookOpen class="size-3.5 text-amber-400" />
+										<BookOpen class="size-3.5 text-white/60" />
 										<span>Source References ({msg.references.length})</span>
 									</div>
 									<div class="flex flex-wrap gap-2">
@@ -772,9 +772,9 @@
 											<Tooltip.Provider delayDuration={100}>
 												<Tooltip.Root>
 													<Tooltip.Trigger
-														class="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#1A1918] px-3 py-1 text-xs text-amber-300/90 transition-colors hover:border-amber-400/50 hover:bg-[#2B2A29]"
+														class="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#2B2A29] px-3 py-1 text-xs text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white"
 													>
-														<FileText class="size-3 text-amber-400" />
+														<FileText class="size-3 text-white/60" />
 														<span class="font-medium">{ref.name}</span>
 														{#if ref.pages && ref.pages.length > 0}
 															<span class="text-white/40">• {ref.pages.join(', ')}</span>
@@ -785,7 +785,7 @@
 													<Tooltip.Content
 														class="border border-white/15 bg-[#232323] text-white text-xs max-w-xs"
 													>
-														<p class="font-semibold text-amber-400">{ref.name}</p>
+														<p class="font-semibold text-white/90">{ref.name}</p>
 														{#if ref.snippet}
 															<p class="mt-1 text-white/70 italic">"{ref.snippet}"</p>
 														{/if}
@@ -803,7 +803,7 @@
 								<Button
 									variant="ghost"
 									size="icon"
-									class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
+									class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
 									onclick={() => copyToClipboard(msg.content, msg.id)}
 									aria-label="Copy response"
 								>
@@ -816,7 +816,7 @@
 								<Button
 									variant="ghost"
 									size="icon"
-									class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
+									class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
 									onclick={() => toast.info('Regenerate response coming soon')}
 									aria-label="Retry response"
 								>
@@ -825,7 +825,7 @@
 								<Button
 									variant="ghost"
 									size="icon"
-									class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
+									class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
 									aria-label="Helpful"
 								>
 									<ThumbsUp class="size-3.5" />
@@ -833,7 +833,7 @@
 								<Button
 									variant="ghost"
 									size="icon"
-									class="h-7 w-7 text-white/40 hover:bg-white/10 hover:text-white"
+									class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
 									aria-label="Not helpful"
 								>
 									<ThumbsDown class="size-3.5" />
@@ -849,17 +849,17 @@
 									</DropdownMenu.Trigger>
 									<DropdownMenu.Content align="start" class="w-48 border-white/15 bg-[#232323] text-white">
 										<DropdownMenu.Item
-											class="flex cursor-pointer items-center gap-2 text-xs text-white/80 hover:bg-white/10 hover:text-white"
+											class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
 											onclick={() => toast.info('Branch in new chat coming soon')}
 										>
-											<GitBranch class="size-3.5 text-amber-400" />
+											<GitBranch class="size-3.5 text-white/70" />
 											<span>Branch in new chat</span>
 										</DropdownMenu.Item>
 										<DropdownMenu.Item
-											class="flex cursor-pointer items-center gap-2 text-xs text-white/80 hover:bg-white/10 hover:text-white"
+											class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
 											onclick={() => toast.info('Read aloud coming soon')}
 										>
-											<Volume2 class="size-3.5 text-amber-400" />
+											<Volume2 class="size-3.5 text-white/70" />
 											<span>Read aloud</span>
 										</DropdownMenu.Item>
 									</DropdownMenu.Content>
@@ -994,7 +994,7 @@
 
 				<!-- Send Button -->
 				<button
-					class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-amber-500 hover:text-black disabled:opacity-40"
+					class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
 					disabled={!inputValue.trim() && attachedFiles.length === 0}
 					onclick={handleSendMessage}
 					aria-label="Send Message"
