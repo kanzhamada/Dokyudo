@@ -60,10 +60,20 @@
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 	import { mergeConversationReferences, type DocReference } from '$lib/utils/doc-references';
 	import { marked } from 'marked';
+	import { mount } from 'svelte';
+	import CodeBlockPreview from '$lib/components/chat/CodeBlockPreview.svelte';
+
+	const customRenderer = new marked.Renderer();
+	customRenderer.code = ({ text, lang }: { text: string; lang?: string }) => {
+		const cleanLang = (lang || '').trim().toLowerCase();
+		const encodedCode = encodeURIComponent(text);
+		return `<div class="code-block-embed my-3" data-code="${encodedCode}" data-lang="${cleanLang}"></div>`;
+	};
 
 	marked.setOptions({
 		gfm: true,
-		breaks: true
+		breaks: true,
+		renderer: customRenderer
 	});
 
 	function formatPageNumbers(raw: string): string {
@@ -475,6 +485,29 @@
 		if (!inputValue && textInput) {
 			textInput.style.height = 'auto';
 		}
+	});
+
+	// Auto-mount interactive Code & Mermaid Preview components
+	$effect(() => {
+		const msgLength = messages.length;
+		if (!chatContainer || msgLength === 0) return;
+
+		setTimeout(() => {
+			if (!chatContainer) return;
+			const blockElements = chatContainer.querySelectorAll<HTMLElement>('.code-block-embed:not([data-mounted])');
+			blockElements.forEach((el) => {
+				const rawCode = el.getAttribute('data-code');
+				const lang = el.getAttribute('data-lang') || '';
+				if (rawCode) {
+					const code = decodeURIComponent(rawCode);
+					el.setAttribute('data-mounted', 'true');
+					mount(CodeBlockPreview, {
+						target: el,
+						props: { code, language: lang }
+					});
+				}
+			});
+		}, 30);
 	});
 
 	// Conversation metadata
