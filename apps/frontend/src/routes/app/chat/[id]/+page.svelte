@@ -245,8 +245,17 @@
 	function openTitleMenu(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
-		titleMenuPos = { x: e.clientX, y: e.clientY };
+		const rect = (e.currentTarget as HTMLElement)?.getBoundingClientRect();
+		if (rect) {
+			titleMenuPos = {
+				x: rect.left + rect.width / 2,
+				y: rect.bottom
+			};
+		} else {
+			titleMenuPos = { x: e.clientX, y: e.clientY };
+		}
 		isTitleMenuOpen = !isTitleMenuOpen;
+		isMobileReferencesOpen = false;
 	}
 	let isMobileReferencesOpen = $state(false);
 	let isMobileTitleActionsOpen = $state(false);
@@ -700,11 +709,13 @@
 	function toggleMobileReferences() {
 		isMobileReferencesOpen = !isMobileReferencesOpen;
 		isMobileTitleActionsOpen = false;
+		isTitleMenuOpen = false;
 	}
 
 	function toggleMobileTitleActions() {
 		isMobileTitleActionsOpen = !isMobileTitleActionsOpen;
 		isMobileReferencesOpen = false;
+		isTitleMenuOpen = false;
 	}
 
 	function selectConfigureProvider(provider: ByokProvider) {
@@ -1418,7 +1429,7 @@
 				<button
 					type="button"
 					class="min-w-0 max-w-[45%] cursor-pointer truncate px-2 text-xs font-medium text-white/75 transition-colors hover:text-white"
-					onclick={openTitleMenu}
+					onclick={toggleMobileTitleActions}
 					aria-label="Conversation actions"
 				>
 					{isTitleLoading ? 'Generating title...' : conversationTitle || 'New Conversation'}
@@ -1476,13 +1487,16 @@
 
 			{#if isMobileTitleActionsOpen}
 				<div
-					transition:slide={{ duration: 420, easing: backOut }}
+					transition:slide={{ duration: 300, easing: backOut }}
 					class="flex items-center justify-center gap-3 border-t border-white/10 px-3 py-3"
 				>
 					<button
 						type="button"
 						class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-						onclick={openTitleEditDialog}
+						onclick={() => {
+							isMobileTitleActionsOpen = false;
+							openTitleEditDialog();
+						}}
 						aria-label="Edit conversation title"
 					>
 						<Pencil class="size-4" />
@@ -1490,7 +1504,10 @@
 					<button
 						type="button"
 						class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-red-400/20 bg-red-400/10 text-red-300 transition-colors hover:bg-red-400/20 hover:text-red-200"
-						onclick={() => (isDeleteConversationDialogOpen = true)}
+						onclick={() => {
+							isMobileTitleActionsOpen = false;
+							isDeleteConversationDialogOpen = true;
+						}}
 						aria-label="Delete conversation"
 					>
 						<Trash2 class="size-4" />
