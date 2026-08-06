@@ -1,7 +1,6 @@
 import { withAuthDb } from "../../config/drizzle.ts";
-import { documentChunks, documents, tenantSubscriptions } from "../../shared/models/db.model.ts";
+import { documentChunks, documents } from "../../shared/models/db.model.ts";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { TIER_LIMITS } from "../../shared/constants/tiers.constant.ts";
 import { vectorIndex } from "../../config/vector.ts";
 import { redis } from "../../config/redis.ts";
 import { RedisKeys } from "../../shared/constants/redis_keys.constant.ts";
@@ -10,9 +9,19 @@ import { cloudflare, CLOUDFLARE_MODELS } from "../../config/cloudflare.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 import { SearchParams } from "./search.schema.ts";
+import { DEFAULT_FUSION, fuseWithRRF, type FusionConfig, type RankedId } from "./rrf.ts";
 
 // Protect the external LLM Embedding API with a Circuit Breaker
 const embeddingCB = createCircuitBreaker("llm-embedding");
+
+export interface SearchResult {
+    id: string;
+    documentId: string;
+    documentTitle: string;
+    metadata: unknown;
+    content: string;
+    score: number;
+}
 
 export class SearchService {
     private static async getEmbedding(params: SearchParams): Promise<number[]> {
@@ -67,15 +76,46 @@ export class SearchService {
         return safeValues;
     }
 
-    static async executeHybridSearch(params: SearchParams) {
-        const { tenantId, query, limit = 10, logContext } = params;
+    /**
+     * Production entry point. Fuses with a single config — by default the
+     * original behavior (k=60, equal 1:1 weights), overridable via optional
+     * `rrfK` / `ftsWeight` / `vectorWeight` params for experiments.
+     */
+    static async executeHybridSearch(params: SearchParams): Promise<SearchResult[]> {
+        const configs: FusionConfig[] = (params.fusionConfigs ?? [
+            {
+                k: params.rrfK ?? DEFAULT_FUSION.k,
+                ftsWeight: params.ftsWeight ?? DEFAULT_FUSION.ftsWeight,
+                vectorWeight: params.vectorWeight ?? DEFAULT_FUSION.vectorWeight,
+            },
+        ]).map((cfg) => ({
+            k: cfg.k ?? DEFAULT_FUSION.k,
+            ftsWeight: cfg.ftsWeight ?? DEFAULT_FUSION.ftsWeight,
+            vectorWeight: cfg.vectorWeight ?? DEFAULT_FUSION.vectorWeight,
+        }));
+        const results = await SearchService.executeHybridSearchForConfigs(params, configs);
+        return results[0] ?? [];
+    }
+
+    /**
+     * Benchmark sweep entry point: runs the same candidate fetch once and
+     * evaluates multiple fusion configs against it. One search call serves all
+     * configs (no extra quota / API cost per config).
+     */
+    static async executeHybridSearchForConfigs(
+        params: SearchParams,
+        configs: FusionConfig[],
+    ): Promise<SearchResult[][]> {
+        const { tenantId, query, limit = 10, logContext, skipQuota } = params;
 
         // -1. Tier Quota Validation & Enforcement (Atomic)
-        await withAuthDb(tenantId, async (tx) => {
-            await TierQuotaUtil.checkAndIncrementSearch(tx, tenantId);
-        });
-
-        const k = 60; 
+        // Skipped when the benchmark runs with `skipQuota` — benchmarking should
+        // not consume a tenant's production search quota.
+        if (!skipQuota) {
+            await withAuthDb(tenantId, async (tx) => {
+                await TierQuotaUtil.checkAndIncrementSearch(tx, tenantId);
+            });
+        }
 
         const rankCalc = sql<number>`ts_rank(${documentChunks.fts}, (websearch_to_tsquery('indonesian', ${query}) || websearch_to_tsquery('english', ${query})))`;
 
@@ -137,7 +177,7 @@ export class SearchService {
         })();
 
         let ftsResults: { id: string; rank: number }[] = [];
-        let vectorIds: { id: string; rank: number }[] = [];
+        let vectorIds: RankedId[] = [];
 
         try {
             const [fts, vec] = await Promise.all([ftsPromise, vectorPromise]);
@@ -151,32 +191,23 @@ export class SearchService {
             }
         }
 
-        const scores = new Map<string, number>();
+        // Per-config ranked id lists (fusion is in-memory — cheap to sweep).
+        const ftsRanked: RankedId[] = ftsResults.map((r, i) => ({ id: r.id, rank: i + 1 }));
+        const perConfig = configs.map((cfg) =>
+            fuseWithRRF(vectorIds, ftsRanked, cfg).slice(0, limit),
+        );
 
-        const lenVector = vectorIds.length;
-        for (let i = 0; i < lenVector; i++) {
-            const res = vectorIds[i];
-            scores.set(res.id, (scores.get(res.id) || 0) + 1 / (k + res.rank));
+        if (perConfig.every((list) => list.length === 0)) {
+            return configs.map(() => []);
         }
 
-        const lenFts = ftsResults.length;
-        for (let i = 0; i < lenFts; i++) {
-            const res = ftsResults[i];
-            const rank = i + 1;
-            scores.set(res.id, (scores.get(res.id) || 0) + 1 / (k + rank));
+        // Union of ids across configs, fetched in a single query.
+        const idSet = new Set<string>();
+        for (const list of perConfig) {
+            for (const r of list) idSet.add(r.id);
         }
+        const topIds = Array.from(idSet);
 
-        if (scores.size === 0) return [];
-
-        const sortedIds = Array.from(scores.entries())
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, limit);
-        const topIdsLen = sortedIds.length;
-        const topIds = new Array(topIdsLen);
-        for (let i = 0; i < topIdsLen; i++) {
-            topIds[i] = sortedIds[i][0];
-        }
-        
         const chunks = await withAuthDb(tenantId, async (tx) => {
             return await tx
                 .select({
@@ -202,16 +233,13 @@ export class SearchService {
             chunkMap.set(chunks[i].id, chunks[i]);
         }
 
-        const results = [];
-        for (let i = 0; i < topIdsLen; i++) {
-            const id = sortedIds[i][0];
-            const score = sortedIds[i][1];
-            const chunk = chunkMap.get(id);
-            if (chunk) {
-                results.push({ ...chunk, score });
-            }
-        }
-
-        return results;
+        return perConfig.map((list) =>
+            list
+                .map((r) => {
+                    const chunk = chunkMap.get(r.id);
+                    return chunk ? { ...chunk, score: r.score } : null;
+                })
+                .filter((x): x is SearchResult => x !== null),
+        );
     }
 }

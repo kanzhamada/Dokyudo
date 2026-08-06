@@ -16,6 +16,24 @@ export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 export const SearchParamsSchema = SearchQuerySchema.extend({
     tenantId: z.string().uuid(),
     logContext: z.any().optional(),
+    // Fusion tuning (benchmark/experiments only; the HTTP endpoint never sets
+    // these, so production falls back to the defaults in rrf.ts).
+    rrfK: z.number().min(1).max(1000).optional(),
+    ftsWeight: z.number().min(0).max(10).optional(),
+    vectorWeight: z.number().min(0).max(10).optional(),
+    /** Multiple fusion configs evaluated in one fetch — benchmark sweep mode. */
+    fusionConfigs: z
+        .array(
+            z.object({
+                k: z.number().min(1).max(1000),
+                ftsWeight: z.number().min(0).max(10),
+                vectorWeight: z.number().min(0).max(10),
+            }),
+        )
+        .min(1)
+        .optional(),
+    /** Benchmark-only: skip the tenant search-quota check/increment. No HTTP path sets this. */
+    skipQuota: z.boolean().optional(),
 });
 export type SearchParams = z.infer<typeof SearchParamsSchema>;
 

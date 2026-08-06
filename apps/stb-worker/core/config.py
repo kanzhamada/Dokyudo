@@ -12,7 +12,7 @@ class Settings:
     S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
     WORKER_TMP_DIR = os.getenv('WORKER_TMP_DIR')
     GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-    CF_EMBEDDING_MODEL = '@cf/qwen/qwen3-embedding-0.6b'
+    CF_EMBEDDING_MODEL = '@cf/baai/bge-m3'
     CLOUDFLARE_ACCOUNT_ID = os.getenv('CLOUDFLARE_ACCOUNT_ID')
     CLOUDFLARE_AUTH_TOKEN = os.getenv('CLOUDFLARE_AUTH_TOKEN')
     

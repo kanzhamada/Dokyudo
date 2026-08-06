@@ -1,0 +1,23 @@
+{
+    "name": "Dokyudo RAG baseline — chunk 1000/150",
+    "cases": [
+        {
+            "id": "example-1",
+            "query": "Ganti placeholder ini dengan query nyata dari dokumen kamu",
+            "expectedDocumentIds": ["REPLACE-WITH-REAL-DOCUMENT-UUID"],
+            "expectedChunkIds": []
+        },
+        {
+            "id": "example-2",
+            "query": "Query kedua — misalnya istilah/nomor yang spesifik (nomor invoice, pasal, kode)",
+            "expectedDocumentIds": ["REPLACE-WITH-REAL-DOCUMENT-UUID"],
+            "expectedChunkIds": []
+        },
+        {
+            "id": "example-3",
+            "query": "Query ketiga — pertanyaan konseptual yang butuh pemahaman semantik",
+            "expectedDocumentIds": ["REPLACE-WITH-REAL-DOCUMENT-UUID"],
+            "expectedChunkIds": []
+        }
+    ]
+}

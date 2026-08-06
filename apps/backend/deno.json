@@ -2,7 +2,13 @@
     "nodeModulesDir": "auto",
     "tasks": {
         "dev": "dotenvx run -- deno run --watch --allow-net --allow-env --allow-read --allow-sys src/main.ts",
-        "test": "dotenvx run -- deno test --allow-net --allow-env --allow-read --allow-sys src/"
+        "test": "dotenvx run -- deno test --allow-net --allow-env --allow-read --allow-sys src/",
+        "benchmark": "dotenvx run -- deno run --allow-net --allow-env --allow-read --allow-sys --allow-write=benchmark benchmark/run_benchmark.ts",
+        "benchmark:list": "dotenvx run -- deno run --allow-net --allow-env --allow-read --allow-sys benchmark/list_documents.ts",
+        "benchmark:bge3": "dotenvx run -- deno run --allow-net --allow-env --allow-read --allow-sys --allow-write=benchmark benchmark/bge_m3_test.ts",
+        "benchmark:bge3-fuse": "dotenvx run -- deno run --allow-net --allow-env --allow-read --allow-sys --allow-write=benchmark benchmark/fuse_bge3.ts",
+        "benchmark:fts-rank": "dotenvx run -- deno run --allow-net --allow-env --allow-read --allow-sys --allow-write=benchmark benchmark/fts_rank_test.ts",
+        "benchmark:migrate-bge3": "dotenvx run -- deno run --allow-net --allow-env --allow-read --allow-sys --allow-write=benchmark benchmark/migrate_bge3.ts"
     },
     "imports": {
         "@google/genai": "npm:@google/genai@^2.10.0",

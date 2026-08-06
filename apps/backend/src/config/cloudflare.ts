@@ -1,7 +1,7 @@
 import { getEnv } from "./env.ts";
 
 export const CLOUDFLARE_MODELS = {
-    embedding: "@cf/qwen/qwen3-embedding-0.6b",
+    embedding: "@cf/baai/bge-m3",
 } as const;
 
 class CloudflareClient {
@@ -15,7 +15,7 @@ class CloudflareClient {
 
     /**
      * Generate a vector embedding for a given text using Cloudflare Workers AI.
-     * Dimensions are expected to be 1024 for Qwen3-0.6b.
+     * Dimensions are expected to be 1024 for BGE-M3 (base, dense).
      */
     async generateEmbedding(text: string): Promise<number[]> {
         const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/ai/run/${CLOUDFLARE_MODELS.embedding}`;
