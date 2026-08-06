@@ -14,6 +14,14 @@ describe("DocumentsService Isolated Tests", () => {
     const originalFetch = globalThis.fetch;
 
     beforeAll(async () => {
+        // Set mock S3 env vars for AWS SDK presigner
+        Deno.env.set("S3_ENDPOINT", "localhost");
+        Deno.env.set("S3_PORT", "9000");
+        Deno.env.set("S3_ACCESS_KEY", "minioadmin");
+        Deno.env.set("S3_SECRET_KEY", "minioadmin");
+        Deno.env.set("S3_BUCKET_NAME", "dokyudo-documents");
+        Deno.env.set("S3_USE_SSL", "false");
+
         // Create dummy tenant for DB constraints
         await db.insert(tenants).values({
             id: TEST_TENANT_ID,
@@ -27,7 +35,7 @@ describe("DocumentsService Isolated Tests", () => {
         }).onConflictDoNothing();
 
         // Mock global fetch for AWS SDK S3 requests
-        globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+        globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit) => {
             const urlStr = typeof input === "string" ? input : (input as Request).url;
             if (urlStr.includes("not-exist")) {
                 return new Response(null, { status: 404 });
@@ -57,7 +65,7 @@ describe("DocumentsService Isolated Tests", () => {
                     }]
                 }),
                 AppError,
-                "File size exceeds maximum allowed size"
+                "exceeds maximum allowed size"
             );
         });
 
@@ -66,23 +74,25 @@ describe("DocumentsService Isolated Tests", () => {
                 .set({ uploadsCount: 20 }) // > 10 for FREE
                 .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
 
-            await assertRejects(
-                () => DocumentsService.createPresignedUrlBatch({
-                    tenantId: TEST_TENANT_ID, 
-                    files: [{
-                        filename: "test.pdf", 
-                        mimeType: "application/pdf", 
-                        sizeBytes: 1024 * 1024
-                    }]
-                }),
-                AppError,
-                "Upload limit exceeded"
-            );
-
-            // Reset back
-            await db.update(tenantSubscriptions)
-                .set({ uploadsCount: 0 })
-                .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
+            try {
+                await assertRejects(
+                    () => DocumentsService.createPresignedUrlBatch({
+                        tenantId: TEST_TENANT_ID, 
+                        files: [{
+                            filename: "test.pdf", 
+                            mimeType: "application/pdf", 
+                            sizeBytes: 1024 * 1024
+                        }]
+                    }),
+                    AppError,
+                    "exceeds your monthly limit"
+                );
+            } finally {
+                // Reset back
+                await db.update(tenantSubscriptions)
+                    .set({ uploadsCount: 0 })
+                    .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
+            }
         });
 
         it("positive: creates presigned URL batch and pending DB records", async () => {

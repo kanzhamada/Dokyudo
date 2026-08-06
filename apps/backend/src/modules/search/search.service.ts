@@ -188,7 +188,12 @@ export class SearchService {
                 })
                 .from(documentChunks)
                 .innerJoin(documents, eq(documentChunks.documentId, documents.id))
-                .where(inArray(documentChunks.id, topIds));
+                .where(
+                    and(
+                        inArray(documentChunks.id, topIds),
+                        eq(documentChunks.tenantId, tenantId),
+                    ),
+                );
         });
 
         const chunkMap = new Map();

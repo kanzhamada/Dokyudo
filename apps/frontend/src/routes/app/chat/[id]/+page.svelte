@@ -58,6 +58,7 @@
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
+	import { mergeConversationReferences, type DocReference } from '$lib/utils/doc-references';
 	import { marked } from 'marked';
 
 	marked.setOptions({
@@ -158,15 +159,6 @@
 		description: string;
 		icon: string;
 		placeholder: string;
-	}
-
-	interface DocReference {
-		id: string;
-		index?: number;
-		name: string;
-		page?: number;
-		pages?: number[];
-		snippet?: string;
 	}
 
 	interface ChatMessage {
@@ -288,23 +280,13 @@
 			.filter((group) => group.options.length > 0);
 	});
 
-	let conversationReferences = $derived.by(() => {
-		const references = new Map<string, DocReference>();
-		for (const message of messages) {
-			if (message.role !== 'assistant' || !message.references) continue;
-			for (const reference of message.references) {
-				const existing = references.get(reference.id);
-				if (!existing) {
-					references.set(reference.id, { ...reference, pages: [...(reference.pages ?? [])] });
-					continue;
-				}
-				existing.pages = Array.from(
-					new Set([...(existing.pages ?? []), ...(reference.pages ?? [])])
-				).sort((a, b) => a - b);
-			}
-		}
-		return Array.from(references.values());
-	});
+	let conversationReferences = $derived.by(() =>
+		mergeConversationReferences(
+			messages
+				.filter((message) => message.role === 'assistant')
+				.map((message) => message.references)
+		)
+	);
 
 	// Citation PDF preview
 	let citationPreview = $state<{ src: string; name: string; pages: number[] } | null>(null);
@@ -487,38 +469,6 @@
 
 	let maxFileSizeMB = $derived((maxFileSizeBytes / (1024 * 1024)).toFixed(0));
 
-	function filterReferencesByCitations(answer: string, references: any[] | null | undefined) {
-		if (!references || references.length === 0 || !answer) return null;
-		const citationRegex = /\[Doc (\d+): (?:Hlm\.|Pages?|Page) ([^\]]+)\]/gi;
-		const citedPagesMap = new Map<number, Set<number>>();
-		let match;
-		while ((match = citationRegex.exec(answer)) !== null) {
-			const docIdx = parseInt(match[1], 10);
-			if (!citedPagesMap.has(docIdx)) citedPagesMap.set(docIdx, new Set<number>());
-			const pagesStr = match[2];
-			if (pagesStr) {
-				const pageMatches = pagesStr.match(/\d+/g);
-				if (pageMatches) {
-					for (const p of pageMatches) citedPagesMap.get(docIdx)!.add(parseInt(p, 10));
-				}
-			}
-		}
-		if (citedPagesMap.size === 0) return null;
-		const filtered: any[] = [];
-		for (const ref of references) {
-			const docIdx = ref.index || 1;
-			const citedSet = citedPagesMap.get(docIdx);
-			if (citedSet) {
-				const sortedPages = Array.from(citedSet).sort((a, b) => a - b);
-				filtered.push({
-					...ref,
-					pages: sortedPages.length > 0 ? sortedPages : ref.pages
-				});
-			}
-		}
-		return filtered.length > 0 ? filtered : null;
-	}
-
 	async function loadConversation(id: string) {
 		const requestId = ++conversationRequestId;
 		cancelActiveStream?.();
@@ -545,10 +495,6 @@
 								minute: '2-digit'
 							})
 						});
-						const filteredTurnRefs = filterReferencesByCitations(
-							turn.answer,
-							turn.contextReferences
-						);
 						historyMsgs.push({
 							id: `${turn.id}-asst`,
 							role: 'assistant',
@@ -558,7 +504,7 @@
 								hour: '2-digit',
 								minute: '2-digit'
 							}),
-							references: filteredTurnRefs?.map((r: any) => ({
+							references: turn.contextReferences?.map((r: any) => ({
 								id: r.documentId,
 								index: r.index || 1,
 								name: r.title || r.documentId,

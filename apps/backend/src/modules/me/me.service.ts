@@ -1,6 +1,6 @@
 import { db, withAuthDb } from "../../config/drizzle.ts";
 import { users, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import * as MeParams from "./me.schema.ts";
 import { TIER_LIMITS, type TierType } from "../../shared/constants/tiers.constant.ts";
@@ -14,7 +14,12 @@ export class MeService {
         const [userRecord] = await db
             .select()
             .from(users)
-            .where(eq(users.id, params.userId));
+            .where(
+                and(
+                    eq(users.id, params.userId),
+                    eq(users.tenantId, params.tenantId),
+                )
+            );
 
         if (!userRecord) {
             throw new AppError({

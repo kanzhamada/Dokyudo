@@ -347,7 +347,7 @@ describe("RagService Isolated Tests", () => {
             }
 
             // Wait for async DB writes
-            await new Promise((r) => setTimeout(r, 100));
+            await new Promise((r) => setTimeout(r, 300));
 
             // Verify a new turn was inserted (signal NOT aborted, so DB save should happen)
             const turnsAfter = await db

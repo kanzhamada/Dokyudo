@@ -111,9 +111,12 @@ ${question}`;
                         .select()
                         .from(conversationTurns)
                         .where(
-                            eq(
-                                conversationTurns.conversationId,
-                                conversationId,
+                            and(
+                                eq(
+                                    conversationTurns.conversationId,
+                                    conversationId,
+                                ),
+                                eq(conversationTurns.tenantId, tenantId),
                             ),
                         )
                         .orderBy(desc(conversationTurns.createdAt))
@@ -698,7 +701,12 @@ ${question}
                 turns = await tx
                     .select()
                     .from(conversationTurns)
-                    .where(eq(conversationTurns.conversationId, conversationId))
+                    .where(
+                        and(
+                            eq(conversationTurns.conversationId, conversationId),
+                            eq(conversationTurns.tenantId, tenantId),
+                        ),
+                    )
                     .orderBy(conversationTurns.createdAt);
             }
         });
