@@ -675,10 +675,23 @@
 		activeCheckpointId = messageId;
 		if (pulseCheckpointTimeout) clearTimeout(pulseCheckpointTimeout);
 		if (checkpointVisibilityTimeout) clearTimeout(checkpointVisibilityTimeout);
-		document.getElementById(`chat-message-${messageId}`)?.scrollIntoView({
-			behavior: 'smooth',
-			block: 'center'
-		});
+
+		const targetElement = document.getElementById(`chat-message-${messageId}`);
+		if (targetElement && chatContainer) {
+			const containerRect = chatContainer.getBoundingClientRect();
+			const elementRect = targetElement.getBoundingClientRect();
+			const targetScrollTop =
+				chatContainer.scrollTop +
+				(elementRect.top - containerRect.top) -
+				containerRect.height / 2 +
+				elementRect.height / 2;
+
+			chatContainer.scrollTo({
+				top: Math.max(0, targetScrollTop),
+				behavior: 'smooth'
+			});
+		}
+
 		waitForCheckpointVisibility(messageId);
 	}
 
