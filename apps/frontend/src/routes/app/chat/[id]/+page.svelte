@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy, tick } from 'svelte';
-	import { slide } from 'svelte/transition';
+	import { slide, scale } from 'svelte/transition';
 	import { backOut } from 'svelte/easing';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -239,6 +239,15 @@
 	let isTitleSaving = $state(false);
 	let isDeleteConversationDialogOpen = $state(false);
 	let isConversationDeleting = $state(false);
+	let isTitleMenuOpen = $state(false);
+	let titleMenuPos = $state<{ x: number; y: number }>({ x: 0, y: 0 });
+
+	function openTitleMenu(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		titleMenuPos = { x: e.clientX, y: e.clientY };
+		isTitleMenuOpen = !isTitleMenuOpen;
+	}
 	let isMobileReferencesOpen = $state(false);
 	let isMobileTitleActionsOpen = $state(false);
 	let pulseCheckpointId = $state<string | null>(null);
@@ -1409,7 +1418,7 @@
 				<button
 					type="button"
 					class="min-w-0 max-w-[45%] cursor-pointer truncate px-2 text-xs font-medium text-white/75 transition-colors hover:text-white"
-					onclick={toggleMobileTitleActions}
+					onclick={openTitleMenu}
 					aria-label="Conversation actions"
 				>
 					{isTitleLoading ? 'Generating title...' : conversationTitle || 'New Conversation'}
@@ -1541,62 +1550,41 @@
 				</div>
 
 				<div class="flex min-w-0 justify-center">
-					<DropdownMenu.Root>
-						{#if (conversationTitle || '').length > 25}
-							<Tooltip.Provider delayDuration={100}>
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										{#snippet child({ props: tooltipProps })}
-											<DropdownMenu.Trigger>
-												{#snippet child({ props: dropdownProps })}
-													<button
-														{...tooltipProps}
-														{...dropdownProps}
-														type="button"
-														class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
-													>
-														<span class="max-w-56 truncate">
-															{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
-														</span>
-														<ChevronDown class="size-3.5 shrink-0 text-white/45" />
-													</button>
-												{/snippet}
-											</DropdownMenu.Trigger>
-										{/snippet}
-									</Tooltip.Trigger>
-									<Tooltip.Content class="max-w-xs rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-										<p>{conversationTitle}</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
-							</Tooltip.Provider>
-						{:else}
-							<DropdownMenu.Trigger
-								class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
-							>
-								<span class="max-w-56 truncate">
-									{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
-								</span>
-								<ChevronDown class="size-3.5 shrink-0 text-white/45" />
-							</DropdownMenu.Trigger>
-						{/if}
-						<DropdownMenu.Content class="w-48 border-white/10 bg-[#232323] text-white">
-							<DropdownMenu.Item
-								class="flex cursor-pointer items-center gap-2 text-xs text-white/75 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-								onclick={openTitleEditDialog}
-							>
-								<Pencil class="size-3.5 text-white/60" />
-								<span>Edit title</span>
-							</DropdownMenu.Item>
-							<DropdownMenu.Separator class="bg-white/10" />
-							<DropdownMenu.Item
-								class="flex cursor-pointer items-center gap-2 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300"
-								onclick={() => (isDeleteConversationDialogOpen = true)}
-							>
-								<Trash2 class="size-3.5" />
-								<span>Delete conversation</span>
-							</DropdownMenu.Item>
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
+					{#if (conversationTitle || '').length > 25}
+						<Tooltip.Provider delayDuration={100}>
+							<Tooltip.Root>
+								<Tooltip.Trigger>
+									{#snippet child({ props })}
+										<button
+											{...props}
+											type="button"
+											class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+											onclick={openTitleMenu}
+										>
+											<span class="max-w-56 truncate">
+												{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
+											</span>
+											<ChevronDown class="size-3.5 shrink-0 text-white/45" />
+										</button>
+									{/snippet}
+								</Tooltip.Trigger>
+								<Tooltip.Content class="max-w-xs rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+									<p>{conversationTitle}</p>
+								</Tooltip.Content>
+							</Tooltip.Root>
+						</Tooltip.Provider>
+					{:else}
+						<button
+							type="button"
+							class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+							onclick={openTitleMenu}
+						>
+							<span class="max-w-56 truncate">
+								{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
+							</span>
+							<ChevronDown class="size-3.5 shrink-0 text-white/45" />
+						</button>
+					{/if}
 				</div>
 
 				<div class="flex justify-end gap-1">
@@ -2627,3 +2615,44 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+{#if isTitleMenuOpen}
+	<!-- Backdrop to capture click outside -->
+	<div
+		role="presentation"
+		class="fixed inset-0 z-50 bg-transparent"
+		onclick={() => (isTitleMenuOpen = false)}
+		onkeydown={() => (isTitleMenuOpen = false)}
+	></div>
+
+	<!-- Cursor Positioned Floating Menu -->
+	<div
+		transition:scale={{ duration: 150, start: 0.95 }}
+		style={`position: fixed; top: ${titleMenuPos.y + 8}px; left: ${Math.min(Math.max(16, titleMenuPos.x - 96), window.innerWidth - 208)}px;`}
+		class="z-50 w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+	>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => {
+				isTitleMenuOpen = false;
+				openTitleEditDialog();
+			}}
+		>
+			<Pencil class="size-3.5 text-white/60" />
+			<span>Edit title</span>
+		</button>
+		<div class="my-1 h-px bg-white/10"></div>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+			onclick={() => {
+				isTitleMenuOpen = false;
+				isDeleteConversationDialogOpen = true;
+			}}
+		>
+			<Trash2 class="size-3.5" />
+			<span>Delete conversation</span>
+		</button>
+	</div>
+{/if}
