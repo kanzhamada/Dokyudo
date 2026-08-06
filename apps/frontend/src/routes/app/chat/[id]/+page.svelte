@@ -242,6 +242,9 @@
 	let isTitleMenuOpen = $state(false);
 	let titleMenuPos = $state<{ x: number; y: number }>({ x: 0, y: 0 });
 
+	let activeResponseMenuMsgIndex = $state<number | null>(null);
+	let responseMenuPos = $state<{ x: number; y: number }>({ x: 0, y: 0 });
+
 	function openTitleMenu(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
@@ -256,6 +259,27 @@
 		}
 		isTitleMenuOpen = !isTitleMenuOpen;
 		isMobileReferencesOpen = false;
+		closeResponseMenu();
+	}
+
+	function openResponseMenu(e: MouseEvent, msgIndex: number) {
+		e.preventDefault();
+		e.stopPropagation();
+		const rect = (e.currentTarget as HTMLElement)?.getBoundingClientRect();
+		if (rect) {
+			responseMenuPos = {
+				x: rect.left,
+				y: rect.bottom
+			};
+		} else {
+			responseMenuPos = { x: e.clientX, y: e.clientY };
+		}
+		activeResponseMenuMsgIndex = msgIndex;
+		isTitleMenuOpen = false;
+	}
+
+	function closeResponseMenu() {
+		activeResponseMenuMsgIndex = null;
 	}
 	let isMobileReferencesOpen = $state(false);
 	let isMobileTitleActionsOpen = $state(false);
@@ -2195,60 +2219,27 @@
 											</DropdownMenu.Content>
 										</DropdownMenu.Root>
 									{/if}
-									<!-- Triple Dot Dropdown Menu -->
-									<DropdownMenu.Root>
-										<Tooltip.Provider delayDuration={100}>
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													{#snippet child({ props: tooltipProps })}
-														<DropdownMenu.Trigger>
-															{#snippet child({ props: dropdownProps })}
-																<button
-																	{...tooltipProps}
-																	{...dropdownProps}
-																	type="button"
-																	class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
-																	aria-label="More options"
-																>
-																	<Ellipsis class="size-3.5" />
-																</button>
-															{/snippet}
-														</DropdownMenu.Trigger>
-													{/snippet}
-												</Tooltip.Trigger>
-												<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-													<p>More options</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										</Tooltip.Provider>
-										<DropdownMenu.Content
-											align="start"
-											class="w-48 border-white/15 bg-[#232323] text-white"
-										>
-											<DropdownMenu.Item
-												class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-												onclick={() => toast.info('Branch in new chat coming soon')}
-											>
-												<GitBranch class="size-3.5 text-white/70" />
-												<span>Branch in new chat</span>
-											</DropdownMenu.Item>
-													<DropdownMenu.Item
-														class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-														onclick={() => toast.info('Read aloud coming soon')}
+									<!-- Triple Dot Response Action Button -->
+									<Tooltip.Provider delayDuration={100}>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<button
+														{...props}
+														type="button"
+														class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+														onclick={(e) => openResponseMenu(e, msgIndex)}
+														aria-label="More options"
 													>
-														<Volume2 class="size-3.5 text-white/70" />
-														<span>Read aloud</span>
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
-														class="flex cursor-pointer items-center gap-2 text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none"
-														disabled={msg.isStreaming}
-														onclick={() => deleteResponse(msgIndex)}
-													>
-														<Trash2 class="size-3.5" />
-														<span>Delete response</span>
-													</DropdownMenu.Item>
-											</DropdownMenu.Content>
-									</DropdownMenu.Root>
+														<Ellipsis class="size-3.5" />
+													</button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+												<p>More options</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									</Tooltip.Provider>
 								</div>
 							</div>
 						</div>
@@ -2674,14 +2665,69 @@
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
 			onclick={() => {
 				isTitleMenuOpen = false;
 				isDeleteConversationDialogOpen = true;
 			}}
 		>
-			<Trash2 class="size-3.5" />
+			<Trash2 class="size-3.5 shrink-0 text-red-400" />
 			<span>Delete conversation</span>
+		</button>
+	</div>
+{/if}
+
+{#if activeResponseMenuMsgIndex !== null}
+	<!-- Backdrop to capture click outside -->
+	<div
+		role="presentation"
+		class="fixed inset-0 z-50 bg-transparent"
+		onclick={closeResponseMenu}
+		onkeydown={closeResponseMenu}
+	></div>
+
+	<!-- Custom AI Response Action Floating Menu -->
+	<div
+		transition:scale={{ duration: 150, start: 0.95 }}
+		style={`position: fixed; top: ${responseMenuPos.y + 6}px; left: ${Math.min(Math.max(16, responseMenuPos.x), window.innerWidth - 208)}px;`}
+		class="z-50 w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+	>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => {
+				closeResponseMenu();
+				toast.info('Branch in new chat coming soon');
+			}}
+		>
+			<GitBranch class="size-3.5 text-white/70" />
+			<span>Branch in new chat</span>
+		</button>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => {
+				closeResponseMenu();
+				toast.info('Read aloud coming soon');
+			}}
+		>
+			<Volume2 class="size-3.5 text-white/70" />
+			<span>Read aloud</span>
+		</button>
+		<div class="my-1 h-px bg-white/10"></div>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
+			disabled={messages[activeResponseMenuMsgIndex]?.isStreaming}
+			onclick={() => {
+				if (activeResponseMenuMsgIndex !== null) {
+					deleteResponse(activeResponseMenuMsgIndex);
+				}
+				closeResponseMenu();
+			}}
+		>
+			<Trash2 class="size-3.5 shrink-0 text-red-400" />
+			<span>Delete response</span>
 		</button>
 	</div>
 {/if}
