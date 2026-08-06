@@ -246,7 +246,7 @@
 		{
 			label: 'Chat Assistant',
 			icon: MessageSquare,
-			active: $page.url.pathname.startsWith('/app/chat'),
+			active: $page.url.pathname === '/app/chat' || $page.url.pathname === '/app/chat/',
 			href: '/app/chat'
 		},
 		{
