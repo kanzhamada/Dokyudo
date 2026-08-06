@@ -1685,15 +1685,14 @@
 				aria-label="Conversation checkpoints"
 			>
 				<div
-					class="grid h-64 items-center py-2"
-					style={`grid-template-rows: repeat(${conversationCheckpoints.length}, minmax(0, 1fr));`}
+					class="flex max-h-[65vh] flex-col items-center justify-center overflow-y-auto scrollbar-none py-2 {conversationCheckpoints.length > 24 ? 'gap-1' : conversationCheckpoints.length > 12 ? 'gap-1.5' : 'gap-2.5'}"
 				>
 					{#each conversationCheckpoints as checkpoint (checkpoint.id)}
 						<button
 							type="button"
-							class="h-0.5 w-3 cursor-pointer rounded-full transition-all duration-300 hover:w-4 {checkpoint.id === currentCheckpointId
-								? 'bg-[#DB8F5E]'
-								: 'bg-white/25'}"
+							class="h-0.5 shrink-0 cursor-pointer rounded-full transition-all duration-300 {checkpoint.id === currentCheckpointId
+								? 'w-4.5 bg-[#DB8F5E]'
+								: 'w-3 bg-white/25 hover:w-4.5 hover:bg-white/50'}"
 							onclick={() => scrollToCheckpoint(checkpoint.id)}
 							aria-label={`Jump to checkpoint: ${checkpoint.content}`}
 						>
