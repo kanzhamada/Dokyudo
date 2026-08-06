@@ -184,6 +184,10 @@
 		isStreaming?: boolean;
 		isCancelled?: boolean;
 		isRejection?: boolean;
+		/** Server turn id — needed to re-generate this turn in place (edit mode). */
+		turnId?: string;
+		/** Terminal status from the server: complete | stopped | failed. */
+		status?: 'complete' | 'stopped' | 'failed';
 	}
 
 	const PROVIDER_ICONS: Record<string, string> = {
@@ -567,6 +571,7 @@
 							id: `${turn.id}-user`,
 							role: 'user',
 							content: turn.question,
+							turnId: turn.id,
 							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
 								hour: '2-digit',
 								minute: '2-digit'
@@ -577,6 +582,7 @@
 							role: 'assistant',
 							modelName: turn.modelUsed || undefined,
 							content: turn.answer,
+							status: turn.status ?? 'complete',
 							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
 								hour: '2-digit',
 								minute: '2-digit'
@@ -971,7 +977,7 @@
 		attachedFiles.splice(index, 1);
 	}
 
-	async function streamChatTurn(questionText: string, modelChoice: LlmOption) {
+	async function streamChatTurn(questionText: string, modelChoice: LlmOption, editTurnId?: string) {
 		if (!questionText || isGenerating) return;
 
 		const useByok = modelChoice.provider !== 'auto';
@@ -980,6 +986,8 @@
 			conversation_id: chatId,
 			useByok
 		};
+		// Edit mode: overwrite the existing turn in place instead of creating a new one.
+		if (editTurnId) bodyPayload.edit_turn_id = editTurnId;
 
 		if (useByok) {
 			bodyPayload.provider = modelChoice.provider;
@@ -993,6 +1001,7 @@
 			role: 'user',
 			content: questionText,
 			timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+			turnId: editTurnId,
 			attachments: attachedFiles.map((f) => ({ name: f.name, size: f.size }))
 		};
 
@@ -1124,6 +1133,7 @@
 			}
 			messages[asstIndex].isStreaming = false;
 			messages[asstIndex].isCancelled = true;
+			messages[asstIndex].status = 'stopped';
 			isGenerating = false;
 			isTitleLoading = false;
 			stopThinkingTimer();
@@ -1278,6 +1288,16 @@
 						}
 					} else if (eventName === 'done') {
 						isStreamDone = true;
+						// The server echoes the persisted turn id — lets the user edit
+						// this turn in place later without reloading the conversation.
+						if (dataStr) {
+							try {
+								const parsed = JSON.parse(dataStr);
+								if (parsed.turnId) userMsg.turnId = parsed.turnId;
+							} catch {
+								// Legacy done payloads (e.g. injection warning `{}`) are fine.
+							}
+						}
 					} else if (eventName === 'error' && dataStr) {
 						try {
 							const parsed = JSON.parse(dataStr);
@@ -1287,6 +1307,7 @@
 							showError('Stream error');
 						}
 						streamHadError = true;
+						messages[asstIndex].status = 'failed';
 						isStreamDone = true;
 					}
 				}
@@ -1364,9 +1385,15 @@
 	function saveEditMessage(msg: ChatMessage) {
 		const editedPrompt = editingMessageValue.trim();
 		if (!editedPrompt || isGenerating) return;
-		msg.content = editedPrompt;
+		const msgIndex = messages.indexOf(msg);
+		if (msgIndex !== -1) {
+			// Remove the edited question and everything after it — the turn is
+			// regenerated in place via edit_turn_id, so the old answer must not
+			// linger in the transcript.
+			messages = messages.slice(0, msgIndex);
+		}
 		cancelEditMessage();
-		streamChatTurn(editedPrompt, selectedModel);
+		streamChatTurn(editedPrompt, selectedModel, msg.turnId);
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -2107,6 +2134,22 @@
 										</div>
 									{/if}
 								</div>
+
+								<!-- Terminal Status Marker (stopped / failed) -->
+								{#if !msg.isStreaming && msg.status === 'stopped'}
+									<div
+										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
+									>
+										<Square class="size-3" />
+										<span>⏹ Response Stopped</span>
+									</div>
+								{:else if !msg.isStreaming && msg.status === 'failed'}
+									<div
+										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300/80"
+									>
+										<span>Response failed — regenerate or edit the question above</span>
+									</div>
+								{/if}
 
 								<!-- Document Reference Chips -->
 								{#if !msg.isStreaming && !msg.isCancelled && msg.references && msg.references.length > 0}

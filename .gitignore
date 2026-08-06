@@ -67,5 +67,4 @@ logs
 __pycache__
 
 # RAG Benchmark
-apps/backend/benchmark/eval_set.json
-apps/backend/benchmark/results/
+apps/backend/benchmark/

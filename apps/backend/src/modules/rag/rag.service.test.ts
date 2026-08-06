@@ -6,9 +6,43 @@ import { SearchService } from "../search/search.service.ts";
 import { FallbackLlmService } from "./fallback_llm.service.ts";
 import { db } from "../../config/drizzle.ts";
 import { conversations, conversationTurns, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { gemini } from "../../config/gemini.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
+
+async function drainStream(stream: ReadableStream): Promise<void> {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        decoder.decode(value, { stream: true });
+    }
+}
+
+/**
+ * Polls the DB until `predicate` matches the conversation's turns (newest first).
+ * Avoids timing flakes: DB writes from the stream's finalize step are async and
+ * may land after the SSE stream has already closed.
+ */
+async function waitForTurns(
+    conversationId: string,
+    predicate: (turns: any[]) => boolean,
+    timeoutMs = 5000,
+): Promise<any[]> {
+    const deadline = Date.now() + timeoutMs;
+    let turns: any[] = [];
+    while (Date.now() < deadline) {
+        turns = await db
+            .select()
+            .from(conversationTurns)
+            .where(eq(conversationTurns.conversationId, conversationId))
+            .orderBy(desc(conversationTurns.createdAt));
+        if (predicate(turns)) return turns;
+        await new Promise((r) => setTimeout(r, 50));
+    }
+    return turns;
+}
 
 describe("RagService Isolated Tests", () => {
     const TEST_TENANT_ID = crypto.randomUUID();
@@ -339,23 +373,214 @@ describe("RagService Isolated Tests", () => {
             const stream = await RagService.streamChat(params);
             assertEquals(stream instanceof ReadableStream, true);
 
-            // Read stream to completion
+            // Read stream to completion, capturing the SSE payload
             const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            let fullPayload = "";
             while (true) {
-                const { done } = await reader.read();
+                const { value, done } = await reader.read();
                 if (done) break;
+                if (value) fullPayload += decoder.decode(value, { stream: true });
             }
 
             // Wait for async DB writes
             await new Promise((r) => setTimeout(r, 300));
 
             // Verify a new turn was inserted (signal NOT aborted, so DB save should happen)
-            const turnsAfter = await db
+            const turnsAfter = await waitForTurns(
+                TEST_CONVERSATION_ID,
+                (t) => t.length === turnsBefore.length + 1,
+            );
+
+            assertEquals(turnsAfter.length, turnsBefore.length + 1);
+
+            // The done event must carry the turn id so the client can reference it
+            // for in-session edits without reloading the conversation.
+            const doneIdx = fullPayload.lastIndexOf("event: done");
+            const doneData = fullPayload.slice(doneIdx).split("\n")[1]?.replace("data: ", "").trim();
+            assertExists(doneData);
+            const parsed = JSON.parse(doneData);
+            assertEquals(parsed.turnId, turnsAfter[0].id);
+        });
+
+        it("positive: persists partial answer with status=stopped when aborted mid-stream", async () => {
+            const abortController = new AbortController();
+
+            // Stub gatekeeper to return SAFE
+            using gatekeeperStub = stub(gemini, "generateText", () =>
+                Promise.resolve({ text: "SAFE" }) as any);
+
+            // Stub search to return empty results
+            using searchStub = stub(SearchService, "executeHybridSearch", () =>
+                Promise.resolve([]) as any);
+
+            // Stub FallbackLlmService: yield one token, then park until the request
+            // is aborted. This makes the mid-stream cancel deterministic — the loop
+            // can only finish after the abort fires, so the turn is always 'stopped'.
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () => {
+                async function* parkedGen() {
+                    yield { text: "Partial " };
+                    await new Promise<void>((resolve) => {
+                        abortController.signal.addEventListener("abort", () => resolve(), {
+                            once: true,
+                        });
+                    });
+                }
+                return Promise.resolve({
+                    stream: parkedGen(),
+                    provider: "gemini" as any,
+                    modelId: "gemini-2.0-flash-lite",
+                });
+            });
+
+            const params = {
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question: "What is the meaning of life?",
+                conversationId: TEST_CONVERSATION_ID,
+                useByok: false,
+                signal: abortController.signal,
+                logContext: {},
+            };
+
+            const stream = await RagService.streamChat(params);
+            const reader = stream.getReader();
+
+            // Read the first chunk (first token), then abort mid-stream
+            await reader.read();
+            abortController.abort();
+
+            // Drain the remainder (the controller is closed on abort)
+            while (true) {
+                const { done } = await reader.read();
+                if (done) break;
+            }
+
+            // Wait (polling) for the async stopped-turn write to flush
+            const turns = await waitForTurns(
+                TEST_CONVERSATION_ID,
+                (t) => t.some((row) => row.status === "stopped"),
+            );
+
+            const stopped = turns.find((t) => t.status === "stopped");
+            assertExists(stopped);
+            // Partial answer persisted with a terminal "stopped" status
+            assertEquals(stopped.status, "stopped");
+            assertEquals(stopped.answer.includes("Partial"), true);
+            assertEquals(stopped.answer.includes("answer"), false);
+        });
+    });
+
+    describe("streamChat edit mode (edit_turn_id)", () => {
+        it("positive: overwrites the existing turn in place (question + answer + status)", async () => {
+            let generation = 0;
+            using gatekeeperStub = stub(gemini, "generateText", () =>
+                Promise.resolve({ text: "SAFE" }) as any);
+            using searchStub = stub(SearchService, "executeHybridSearch", () =>
+                Promise.resolve([]) as any);
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () => {
+                generation += 1;
+                const text = generation === 1 ? "First answer" : "Edited answer";
+                async function* simpleGen() {
+                    yield { text };
+                }
+                return Promise.resolve({
+                    stream: simpleGen(),
+                    provider: "gemini" as any,
+                    modelId: "gemini-2.0-flash-lite",
+                });
+            });
+
+            const turnsBefore = await db
                 .select()
                 .from(conversationTurns)
                 .where(eq(conversationTurns.conversationId, TEST_CONVERSATION_ID));
 
-            assertEquals(turnsAfter.length, turnsBefore.length + 1);
+            // 1. Create a turn normally
+            const ctrl1 = new AbortController();
+            const stream1 = await RagService.streamChat({
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question: "Original question?",
+                conversationId: TEST_CONVERSATION_ID,
+                useByok: false,
+                signal: ctrl1.signal,
+                logContext: {},
+            });
+            await drainStream(stream1);
+
+            const turnsAfterCreate = await waitForTurns(
+                TEST_CONVERSATION_ID,
+                (t) => t.length === turnsBefore.length + 1,
+            );
+            assertEquals(turnsAfterCreate.length, turnsBefore.length + 1);
+            // Newest first — the turn we just created
+            const created = turnsAfterCreate[0];
+
+            // 2. Edit the same turn (edit_turn_id points at the created turn)
+            const ctrl2 = new AbortController();
+            const stream2 = await RagService.streamChat({
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question: "Edited question?",
+                conversationId: TEST_CONVERSATION_ID,
+                editTurnId: created.id,
+                useByok: false,
+                signal: ctrl2.signal,
+                logContext: {},
+            });
+            await drainStream(stream2);
+
+            const turnsAfterEdit = await waitForTurns(
+                TEST_CONVERSATION_ID,
+                (t) =>
+                    t.some(
+                        (row) =>
+                            row.id === created.id &&
+                            row.answer === "Edited answer" &&
+                            row.status === "complete",
+                    ),
+            );
+
+            // Same row count — the edit updated in place instead of inserting
+            assertEquals(turnsAfterEdit.length, turnsBefore.length + 1);
+
+            const edited = turnsAfterEdit.find((t) => t.id === created.id);
+            assertExists(edited);
+            assertEquals(edited.question, "Edited question?");
+            assertEquals(edited.answer, "Edited answer");
+            assertEquals(edited.status, "complete");
+        });
+
+        it("negative: throws 404 if the turn does not exist", async () => {
+            await assertRejects(
+                () =>
+                    RagService.streamChat({
+                        tenantId: TEST_TENANT_ID,
+                        userId: TEST_USER_ID,
+                        question: "Edited question?",
+                        conversationId: TEST_CONVERSATION_ID,
+                        editTurnId: crypto.randomUUID(),
+                        useByok: false,
+                    }),
+                AppError,
+                "Turn not found",
+            );
+        });
+
+        it("negative: throws 400 if edit_turn_id is sent without conversation_id", async () => {
+            await assertRejects(
+                () =>
+                    RagService.streamChat({
+                        tenantId: TEST_TENANT_ID,
+                        userId: TEST_USER_ID,
+                        question: "Edited question?",
+                        editTurnId: crypto.randomUUID(),
+                        useByok: false,
+                    }),
+                AppError,
+                "conversation_id is required when editing a turn",
+            );
         });
     });
 });

@@ -118,6 +118,12 @@ export const authProviderEnum = pgEnum("auth_provider_enum", [
     "oauth_github",
 ]);
 
+export const turnStatusEnum = pgEnum("turn_status_enum", [
+    "complete",
+    "stopped",
+    "failed",
+]);
+
 // ==============================================================================
 // 3. LOGIN ATTEMPTS TABLE (Anti-Bruteforce)
 // ==============================================================================
@@ -242,6 +248,15 @@ export const conversationTurns = pgTable("conversation_turns", {
     modelUsed: varchar("model_used", { length: 100 }).notNull(),
     latencyMs: integer("latency_ms"),
     contextReferences: jsonb("context_references"),
+    status: turnStatusEnum("status").notNull().default("complete"),
+    updatedAt: timestamp("updated_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    })
+        .defaultNow()
+        .notNull()
+        .$onUpdateFn(() => new Date()),
     createdAt: timestamp("created_at", {
         mode: "date",
         precision: 3,

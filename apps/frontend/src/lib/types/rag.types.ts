@@ -37,13 +37,17 @@ export interface ContextReference {
 	pages: number[];
 }
 
+export type TurnStatus = 'complete' | 'stopped' | 'failed';
+
 export interface ConversationTurn {
 	id: string;
 	question: string;
 	answer: string;
+	status: TurnStatus;
 	modelUsed: string | null;
 	contextReferences: ContextReference[] | null;
 	createdAt: string;
+	updatedAt?: string;
 }
 
 export interface GetConversationResponse {

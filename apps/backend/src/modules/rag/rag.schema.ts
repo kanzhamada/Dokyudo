@@ -6,8 +6,15 @@ export const ChatBodySchema = z.object({
     provider: z.enum(["gemini", "mistral", "openrouter"]).optional(),
     model: z.string().optional(),
     useByok: z.boolean().default(false),
+    /**
+     * When set, the streamed answer overwrites this existing turn (edit mode)
+     * instead of inserting a new turn. Requires `conversation_id`.
+     */
+    edit_turn_id: z.string().uuid("Invalid turn ID").optional(),
 });
 export type ChatBody = z.infer<typeof ChatBodySchema>;
+
+export type TurnStatus = "complete" | "stopped" | "failed";
 
 export interface ChatServiceParams {
     tenantId: string;
@@ -17,6 +24,7 @@ export interface ChatServiceParams {
     provider?: "gemini" | "mistral" | "openrouter";
     model?: string;
     useByok: boolean;
+    editTurnId?: string;
     signal?: AbortSignal;
     logContext?: Record<string, any>;
 }
@@ -60,8 +68,10 @@ export const ConversationTurnSchema = z.object({
     id: z.string().uuid(),
     question: z.string(),
     answer: z.string(),
+    status: z.enum(["complete", "stopped", "failed"]),
     contextReferences: z.array(ContextReferenceSchema).nullable(),
     createdAt: z.string(),
+    updatedAt: z.string().optional(),
 });
 export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
 

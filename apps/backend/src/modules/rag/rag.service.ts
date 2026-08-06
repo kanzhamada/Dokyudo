@@ -1,5 +1,5 @@
 import { AppError } from "../../shared/utils/errors.util.ts";
-import { ChatServiceParams } from "./rag.schema.ts";
+import { ChatServiceParams, TurnStatus } from "./rag.schema.ts";
 import { SearchService } from "../search/search.service.ts";
 import { gemini, GEMINI_MODELS } from "../../config/gemini.ts";
 import { createCircuitBreaker } from "../../infra/circuit_breaker.infra.ts";
@@ -44,6 +44,7 @@ export class RagService {
             provider,
             model,
             useByok,
+            editTurnId,
             signal,
             logContext,
         } = params;
@@ -55,6 +56,50 @@ export class RagService {
             await TierQuotaUtil.checkQaQuota(tx, tenantId);
         });
         if (signal?.aborted) return createClosedStream();
+
+        // 0. Edit Mode (optional): overwrite an existing turn instead of inserting
+        //    a new one. Persist the edited question and drop the now-stale answer /
+        //    references up front, so the edit survives even if generation is
+        //    cancelled or fails. History retrieval below then sees the edited
+        //    question instead of the original one.
+        if (editTurnId) {
+            if (!conversationId) {
+                throw new AppError({
+                    code: "VALIDATION_ERROR",
+                    message: "conversation_id is required when editing a turn",
+                    status: 400,
+                });
+            }
+            await withAuthDb(userId, async (tx) => {
+                const [turn] = await tx
+                    .select({ id: conversationTurns.id })
+                    .from(conversationTurns)
+                    .where(
+                        and(
+                            eq(conversationTurns.id, editTurnId),
+                            eq(conversationTurns.conversationId, conversationId!),
+                            eq(conversationTurns.tenantId, tenantId),
+                        ),
+                    );
+                if (!turn) {
+                    throw new AppError({
+                        code: "NOT_FOUND",
+                        message: "Turn not found",
+                        status: 404,
+                    });
+                }
+                await tx
+                    .update(conversationTurns)
+                    .set({
+                        question,
+                        answer: "",
+                        contextReferences: null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(conversationTurns.id, editTurnId));
+            });
+            if (signal?.aborted) return createClosedStream();
+        }
 
         // 0. LLM Gatekeeper for Prompt Injection
         const guardPrompt = `You are a strict security gatekeeper for a RAG (Retrieval-Augmented Generation) system.
@@ -301,6 +346,10 @@ ${question}
 
         if (signal?.aborted) return createClosedStream();
 
+        // Pre-generate the turn id so the client can reference it for edits
+        // (sent in the `done` event) even before the DB row is persisted.
+        const turnId = editTurnId ?? crypto.randomUUID();
+
         // Internal abort controller for stream lifecycle — fires when consumer cancels the stream
         // (client disconnect, reader.cancel(), etc.) even after fetch() has resolved.
         const streamAbort = new AbortController();
@@ -336,6 +385,9 @@ ${question}
                 let success = false;
                 let fullAnswer = "";
                 let successfulModel = "";
+                // model_used is NOT NULL in the schema — fallback used when
+                // generation stops/fails before any model actually completes.
+                const modelUsedFallback = useByok ? (model || "auto") : "auto";
                 const startMs = Date.now();
 
                 const closeOnCancel = () => {
@@ -361,6 +413,78 @@ ${question}
                     title: item.title,
                     pages: Array.from(item.pages).sort((a, b) => a - b),
                 }));
+
+                // Persist the turn (insert, or in-place update for edit mode) with a
+                // terminal status. Called for every outcome: complete / stopped / failed.
+                const finalizeTurn = async (status: TurnStatus, answer: string) => {
+                    const latencyMs = Date.now() - startMs;
+                    try {
+                        await withAuthDb(userId, async (tx) => {
+                            if (editTurnId) {
+                                await tx
+                                    .update(conversationTurns)
+                                    .set({
+                                        answer,
+                                        modelUsed: successfulModel || modelUsedFallback,
+                                        latencyMs,
+                                        contextReferences:
+                                            RagService.filterReferencesByCitations(
+                                                answer,
+                                                references,
+                                            ),
+                                        status,
+                                        updatedAt: new Date(),
+                                    })
+                                    .where(
+                                        and(
+                                            eq(conversationTurns.id, editTurnId),
+                                            eq(conversationTurns.conversationId, cid!),
+                                            eq(conversationTurns.tenantId, tenantId),
+                                        ),
+                                    );
+                            } else {
+                                await tx.insert(conversationTurns).values({
+                                    id: turnId,
+                                    tenantId,
+                                    conversationId: cid!,
+                                    question,
+                                    answer,
+                                    modelUsed: successfulModel || modelUsedFallback,
+                                    latencyMs,
+                                    contextReferences:
+                                        RagService.filterReferencesByCitations(
+                                            answer,
+                                            references,
+                                        ),
+                                    status,
+                                });
+                            }
+
+                            // Explicitly touch the updatedAt field on the parent conversation
+                            await tx
+                                .update(conversations)
+                                .set({ updatedAt: new Date() })
+                                .where(
+                                    and(
+                                        eq(conversations.id, cid!),
+                                        eq(conversations.tenantId, tenantId),
+                                    ),
+                                );
+                        });
+
+                        if (logContext) {
+                            logContext.ragEvent = "conversation_saved";
+                            logContext.latencyMs = latencyMs;
+                            logContext.turnStatus = status;
+                        }
+                    } catch (dbErr: any) {
+                        console.error("[RAG DB SAVE ERROR]:", dbErr);
+                        if (logContext) {
+                            logContext.ragEvent = "conversation_save_error";
+                            logContext.ragError = dbErr.message;
+                        }
+                    }
+                };
 
                 // 4.5 Check BYOK Key if requested
                 let byokKey: string | undefined = undefined;
@@ -388,7 +512,10 @@ ${question}
                             if (res.length > 0) encryptedRecord = res[0];
                         });
 
-                        if (cancelled) return;
+                        if (cancelled) {
+                            await finalizeTurn("stopped", "");
+                            return;
+                        }
 
                         if (!encryptedRecord) {
                             throw new AppError({
@@ -403,13 +530,17 @@ ${question}
                             encryptedRecord.iv,
                         );
                     } catch (e: any) {
-                        if (isAbortError(e, cancelSignal)) return;
+                        if (isAbortError(e, cancelSignal)) {
+                            await finalizeTurn("stopped", "");
+                            return;
+                        }
                         controller.enqueue(
                             encoder.encode(
                                 `event: error\ndata: ${JSON.stringify({ code: e.code || "UNAUTHORIZED", message: e.message || "Failed to load BYOK key" })}\n\n`,
                             ),
                         );
                         controller.close();
+                        await finalizeTurn("failed", "");
                         return;
                     }
                 }
@@ -427,7 +558,10 @@ ${question}
                                 signal: cancelSignal,
                             }),
                         );
-                        if (cancelled) return;
+                        if (cancelled) {
+                            await finalizeTurn("stopped", fullAnswer);
+                            return;
+                        }
 
                         if (references.length > 0) {
                             controller.enqueue(
@@ -438,7 +572,7 @@ ${question}
                         }
 
                         for await (const chunk of responseStream.stream) {
-                            if (isConsumerGone()) return;
+                            if (isConsumerGone()) break;
                             fullAnswer += chunk.text;
                             try {
                                 controller.enqueue(
@@ -448,17 +582,24 @@ ${question}
                                 );
                             } catch {
                                 // Stream already closed by the consumer — stop producing.
-                                return;
+                                cancelled = true;
+                                break;
                             }
                         }
 
-                        if (cancelled) return;
+                        if (cancelled) {
+                            await finalizeTurn("stopped", fullAnswer);
+                            return;
+                        }
 
                         success = true;
                         successfulModel = model;
                         if (logContext) logContext.ragModelUsed = model;
                     } catch (error: any) {
-                        if (isAbortError(error, cancelSignal)) return;
+                        if (isAbortError(error, cancelSignal)) {
+                            await finalizeTurn("stopped", fullAnswer);
+                            return;
+                        }
                         controller.enqueue(
                             encoder.encode(
                                 `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: error.message })}\n\n`,
@@ -473,7 +614,10 @@ ${question}
                             signal: cancelSignal,
                             logContext,
                         });
-                        if (cancelled) return;
+                        if (cancelled) {
+                            await finalizeTurn("stopped", fullAnswer);
+                            return;
+                        }
 
                         if (references.length > 0) {
                             controller.enqueue(
@@ -484,7 +628,7 @@ ${question}
                         }
 
                         for await (const chunk of response.stream) {
-                            if (isConsumerGone()) return;
+                            if (isConsumerGone()) break;
                             if (chunk.text) {
                                 fullAnswer += chunk.text;
                                 try {
@@ -495,18 +639,25 @@ ${question}
                                     );
                                 } catch {
                                     // Stream already closed by the consumer — stop producing.
-                                    return;
+                                    cancelled = true;
+                                    break;
                                 }
                             }
                         }
 
-                        if (cancelled) return;
+                        if (cancelled) {
+                            await finalizeTurn("stopped", fullAnswer);
+                            return;
+                        }
 
                         success = true;
                         successfulModel = response.modelId;
                         if (logContext) logContext.ragModelUsed = response.modelId;
                     } catch (error: any) {
-                        if (isAbortError(error, cancelSignal)) return;
+                        if (isAbortError(error, cancelSignal)) {
+                            await finalizeTurn("stopped", fullAnswer);
+                            return;
+                        }
                         if (logContext) {
                             logContext.ragEvent = `fallback_failed_exhausted`;
                             logContext.ragError = error.message;
@@ -514,8 +665,13 @@ ${question}
                     }
                 }
 
-                if (cancelled) return;
+                if (cancelled) {
+                    await finalizeTurn("stopped", fullAnswer);
+                    return;
+                }
 
+                // Emit an error event when generation failed (system mode also
+                // surfaced it inside the branch; BYOK surfaced it in its catch).
                 if (!success && !useByok) {
                     controller.enqueue(
                         encoder.encode(
@@ -523,7 +679,6 @@ ${question}
                         ),
                     );
                 } else if (success) {
-                    if (cancelled) return;
                     if (isNewConversation) {
                         let smartTitle = question.substring(0, 50);
                         try {
@@ -533,95 +688,54 @@ ${question}
                                 GEMINI_MODELS.llmDefault,
                                 signal,
                             );
-                            if (cancelled) return;
                             if (titleRes?.text) {
                                 smartTitle = titleRes.text.trim().replace(/^["']|["']$/g, '');
                             }
                         } catch (_tErr) {
-                            if (isAbortError(_tErr, cancelSignal)) return;
+                            if (isAbortError(_tErr, cancelSignal)) {
+                                // Answer is complete even though title generation
+                                // was interrupted — persist it before returning.
+                                await finalizeTurn("complete", fullAnswer);
+                                return;
+                            }
                             // fallback to default question substring
                         }
 
-                        if (cancelled) return;
-
-                        try {
-                            await withAuthDb(userId, async (tx) => {
-                                await tx
-                                    .update(conversations)
-                                    .set({ title: smartTitle, updatedAt: new Date() })
-                                    .where(eq(conversations.id, cid!));
-                            });
-                        } catch (_dbErr) {
-                            // ignore title DB update failure
+                        if (!cancelled) {
+                            try {
+                                await withAuthDb(userId, async (tx) => {
+                                    await tx
+                                        .update(conversations)
+                                        .set({ title: smartTitle, updatedAt: new Date() })
+                                        .where(eq(conversations.id, cid!));
+                                });
+                            } catch (_dbErr) {
+                                // ignore title DB update failure
+                            }
                         }
 
-                        if (cancelled) return;
-
-                        controller.enqueue(
-                            encoder.encode(`event: title\ndata: ${JSON.stringify({ title: smartTitle })}\n\n`),
-                        );
+                        if (!cancelled) {
+                            controller.enqueue(
+                                encoder.encode(`event: title\ndata: ${JSON.stringify({ title: smartTitle })}\n\n`),
+                            );
+                        }
                     }
 
-                    controller.enqueue(
-                        encoder.encode("event: done\ndata: [DONE]\n\n"),
-                    );
+                    if (!cancelled) {
+                        controller.enqueue(
+                            encoder.encode(`event: done\ndata: ${JSON.stringify({ turnId })}\n\n`),
+                        );
+                    }
                 }
 
                 // Close controller first so client isn't waiting
                 if (!cancelled) controller.close();
-
-                // Skip DB persistence if the client cancelled the stream
-                if (cancelled || cancelSignal.aborted) {
-                    cancelSignal.removeEventListener("abort", closeOnCancel);
-                    return;
-                }
                 cancelSignal.removeEventListener("abort", closeOnCancel);
 
-                // Save conversation_turn to DB asynchronously
-                if (success) {
-                    if (cancelSignal.aborted) return;
-                    try {
-                        const latencyMs = Date.now() - startMs;
-
-                        await withAuthDb(userId, async (tx) => {
-                            await tx.insert(conversationTurns).values({
-                                tenantId,
-                                conversationId: cid!,
-                                question,
-                                answer: fullAnswer,
-                                modelUsed: successfulModel,
-                                latencyMs,
-                                contextReferences:
-                                    RagService.filterReferencesByCitations(
-                                        fullAnswer,
-                                        references,
-                                    ),
-                            });
-
-                            // Explicitly touch the updatedAt field on the parent conversation
-                            await tx
-                                .update(conversations)
-                                .set({ updatedAt: new Date() })
-                                .where(
-                                    and(
-                                        eq(conversations.id, cid!),
-                                        eq(conversations.tenantId, tenantId),
-                                    ),
-                                );
-                        });
-
-                        if (logContext) {
-                            logContext.ragEvent = "conversation_saved";
-                            logContext.latencyMs = latencyMs;
-                        }
-                    } catch (dbErr: any) {
-                        console.error("[RAG DB SAVE ERROR]:", dbErr);
-                        if (logContext) {
-                            logContext.ragEvent = "conversation_save_error";
-                            logContext.ragError = dbErr.message;
-                        }
-                    }
-                }
+                // Persist the turn with a terminal status (complete / failed).
+                // Client cancellation mid-stream is handled earlier and returns
+                // via finalizeTurn("stopped", ...) before reaching this point.
+                await finalizeTurn(success ? "complete" : "failed", fullAnswer);
             },
             cancel() {
                 streamAbort.abort();
@@ -728,11 +842,13 @@ ${question}
                 id: t.id,
                 question: t.question,
                 answer: t.answer,
+                status: t.status,
                 contextReferences: RagService.filterReferencesByCitations(
                     t.answer,
                     t.contextReferences as any,
                 ),
                 createdAt: t.createdAt.toISOString(),
+                updatedAt: t.updatedAt?.toISOString(),
             })),
         };
     }
