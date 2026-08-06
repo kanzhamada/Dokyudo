@@ -1806,9 +1806,15 @@
 												<span>{editingMessageValue.length}/690</span>
 											</div>
 											<div class="flex justify-end gap-2">
-												<Button variant="ghost" size="sm" onclick={cancelEditMessage}>Cancel</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													class="cursor-pointer text-xs text-white/70 hover:bg-white/10 hover:text-white focus:outline-none"
+													onclick={cancelEditMessage}>Cancel</Button
+												>
 												<Button
 													size="sm"
+													class="cursor-pointer border border-white/20 bg-white/15 text-xs font-medium text-white hover:bg-white/25 hover:text-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
 													disabled={!editingMessageValue.trim()}
 													onclick={() => saveEditMessage(msg)}>Save &amp; resubmit</Button
 												>
@@ -1892,7 +1898,7 @@
 								<!-- Markdown Content View -->
 								<div
 									role="none"
-									class="prose prose-sm max-w-none text-white/90 prose-invert prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-li:my-1"
+									class="prose prose-sm max-w-none text-white/90 prose-invert prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-li:my-1 prose-th:border-b prose-th:border-white/20 prose-td:border-b prose-td:border-white/10 prose-tr:border-b prose-tr:border-white/10"
 									onclick={(e) => {
 										const target = e.target as HTMLElement;
 										const chip = target.closest('[data-doc-id]');
@@ -2560,6 +2566,27 @@
 	.checkpoint-pulse {
 		animation: checkpoint-pulse 900ms cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
+
+	:global(.prose table) {
+		border-collapse: collapse;
+		width: 100%;
+		margin-top: 1rem;
+		margin-bottom: 1rem;
+	}
+	:global(.prose th) {
+		border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+		padding: 0.625rem 0.875rem;
+		font-weight: 600;
+		color: rgba(255, 255, 255, 0.95);
+	}
+	:global(.prose td) {
+		border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+		padding: 0.625rem 0.875rem;
+		color: rgba(255, 255, 255, 0.85);
+	}
+	:global(.prose tr:hover) {
+		background-color: rgba(255, 255, 255, 0.03);
+	}
 </style>
 
 <Dialog.Root bind:open={isTitleEditDialogOpen}>
@@ -2731,3 +2758,5 @@
 		</button>
 	</div>
 {/if}
+
+
