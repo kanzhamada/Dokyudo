@@ -107,20 +107,22 @@
 
 			if (references && references.length > 0) {
 				const refDoc = references.find((r) => r.index === docIdx || r.id === docIdxStr) || references[docIdx - 1];
-					if (refDoc && refDoc.name) {
-						docId = refDoc.id;
-						docFullName = refDoc.name;
-						tooltipTitle = refDoc.name;
-						const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
-						docDisplayName = cleanName.length > 20 ? cleanName.slice(0, 20) + '...' : cleanName;
-					}
+				if (refDoc && refDoc.name) {
+					docId = refDoc.id;
+					docFullName = refDoc.name;
+					tooltipTitle = refDoc.name;
+					const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
+					docDisplayName = cleanName.length > 22 ? cleanName.slice(0, 22) + '...' : cleanName;
 				}
-
-				const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
-				const label = pageFormatted ? `${docDisplayName} • ${pageFormatted}` : docDisplayName;
-				return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageFormatted}" class="inline-flex cursor-pointer items-center gap-1 truncate rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white" style="max-width: 180px;" title="${tooltipTitle}">${label}</span>`;
 			}
-		);
+
+			const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
+			const label = pageFormatted
+				? `${docDisplayName} <span class="text-white/40 font-normal">• ${pageFormatted}</span>`
+				: docDisplayName;
+
+			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageFormatted}" class="inline-flex cursor-pointer items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white mx-0.5 my-0.5 whitespace-nowrap" title="${tooltipTitle}">${label}</span>`;
+		});
 
 		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
 	}
@@ -1361,22 +1363,47 @@
 		>
 			<div class="flex h-14 items-center justify-between px-3">
 				<div class="flex items-center gap-1">
-					<button
-						type="button"
-						class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-						onclick={() => sidebar.toggle()}
-						aria-label="Open navigation"
-					>
-						<Menu class="size-5" />
-					</button>
-					<button
-						type="button"
-						class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-						onclick={() => goto('/app/chat')}
-						aria-label="New chat"
-					>
-						<Plus class="size-4" />
-					</button>
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										type="button"
+										class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+										onclick={() => sidebar.toggle()}
+										aria-label="Open navigation"
+									>
+										<Menu class="size-5" />
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+								<p>Toggle Menu</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
+
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										type="button"
+										class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+										onclick={() => goto('/app/chat')}
+										aria-label="New chat"
+									>
+										<Plus class="size-4" />
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+								<p>New Chat</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
 				</div>
 
 				<button
@@ -1389,27 +1416,52 @@
 				</button>
 
 				<div class="flex items-center gap-1">
-					<button
-						type="button"
-						class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-						onclick={shareConversation}
-						aria-label="Share conversation"
-					>
-						<Share2 class="size-4" />
-					</button>
-					<button
-						type="button"
-						class="relative flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-						onclick={toggleMobileReferences}
-						aria-label="Conversation references"
-					>
-						<FileText class="size-4" />
-						{#if conversationReferences.length > 0}
-							<span class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black">
-								{conversationReferences.length}
-							</span>
-						{/if}
-					</button>
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										type="button"
+										class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+										onclick={shareConversation}
+										aria-label="Share conversation"
+									>
+										<Share2 class="size-4" />
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+								<p>Share Conversation</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
+
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										type="button"
+										class="relative flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+										onclick={toggleMobileReferences}
+										aria-label="Conversation references"
+									>
+										<FileText class="size-4" />
+										{#if conversationReferences.length > 0}
+											<span class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black">
+												{conversationReferences.length}
+											</span>
+										{/if}
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+								<p>References ({conversationReferences.length})</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
 				</div>
 			</div>
 
@@ -1466,26 +1518,67 @@
 		>
 			<div class="pointer-events-auto grid h-16 w-full grid-cols-3 items-center px-4 md:px-8">
 				<div class="flex justify-start">
-					<button
-						type="button"
-						class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-						onclick={() => goto('/app/chat')}
-					>
-						<Plus class="size-4" />
-						<span>New chat</span>
-					</button>
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										type="button"
+										class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+										onclick={() => goto('/app/chat')}
+									>
+										<Plus class="size-4" />
+										<span>New chat</span>
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+								<p>Start New Chat</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
 				</div>
 
 				<div class="flex min-w-0 justify-center">
 					<DropdownMenu.Root>
-						<DropdownMenu.Trigger
-							class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
-						>
-							<span class="max-w-56 truncate">
-								{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
-							</span>
-							<ChevronDown class="size-3.5 shrink-0 text-white/45" />
-						</DropdownMenu.Trigger>
+						{#if (conversationTitle || '').length > 25}
+							<Tooltip.Provider delayDuration={100}>
+								<Tooltip.Root>
+									<Tooltip.Trigger>
+										{#snippet child({ props: tooltipProps })}
+											<DropdownMenu.Trigger>
+												{#snippet child({ props: dropdownProps })}
+													<button
+														{...tooltipProps}
+														{...dropdownProps}
+														type="button"
+														class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+													>
+														<span class="max-w-56 truncate">
+															{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
+														</span>
+														<ChevronDown class="size-3.5 shrink-0 text-white/45" />
+													</button>
+												{/snippet}
+											</DropdownMenu.Trigger>
+										{/snippet}
+									</Tooltip.Trigger>
+									<Tooltip.Content class="max-w-xs rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+										<p>{conversationTitle}</p>
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</Tooltip.Provider>
+						{:else}
+							<DropdownMenu.Trigger
+								class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+							>
+								<span class="max-w-56 truncate">
+									{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
+								</span>
+								<ChevronDown class="size-3.5 shrink-0 text-white/45" />
+							</DropdownMenu.Trigger>
+						{/if}
 						<DropdownMenu.Content class="w-48 border-white/10 bg-[#232323] text-white">
 							<DropdownMenu.Item
 								class="flex cursor-pointer items-center gap-2 text-xs text-white/75 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
@@ -1507,26 +1600,58 @@
 				</div>
 
 				<div class="flex justify-end gap-1">
-					<button
-						type="button"
-						class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white"
-						onclick={shareConversation}
-						aria-label="Share conversation"
-					>
-						<Share2 class="size-4" />
-					</button>
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										type="button"
+										class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white"
+										onclick={shareConversation}
+										aria-label="Share conversation"
+									>
+										<Share2 class="size-4" />
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+								<p>Share Conversation</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
+
 					<DropdownMenu.Root>
-						<DropdownMenu.Trigger
-							class="relative flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
-							aria-label="Conversation references"
-						>
-							<FileText class="size-4" />
-							{#if conversationReferences.length > 0}
-								<span class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black">
-									{conversationReferences.length}
-								</span>
-							{/if}
-						</DropdownMenu.Trigger>
+						<Tooltip.Provider delayDuration={100}>
+							<Tooltip.Root>
+								<Tooltip.Trigger>
+									{#snippet child({ props: tooltipProps })}
+										<DropdownMenu.Trigger>
+											{#snippet child({ props: dropdownProps })}
+												<button
+													{...tooltipProps}
+													{...dropdownProps}
+													type="button"
+													class="relative flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+													aria-label="Conversation references"
+												>
+													<FileText class="size-4" />
+													{#if conversationReferences.length > 0}
+														<span class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black">
+															{conversationReferences.length}
+														</span>
+													{/if}
+												</button>
+											{/snippet}
+										</DropdownMenu.Trigger>
+									{/snippet}
+								</Tooltip.Trigger>
+								<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+									<p>Conversation References</p>
+								</Tooltip.Content>
+							</Tooltip.Root>
+						</Tooltip.Provider>
+
 						<DropdownMenu.Content align="end" class="w-72 border-white/10 bg-[#232323] p-1 text-white">
 							<div class="px-2.5 py-2 text-xs font-medium text-white/45">Conversation references</div>
 							{#if conversationReferences.length === 0}
@@ -1537,9 +1662,9 @@
 										class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-xs text-white/75 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 										onclick={() => openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
 									>
-																		<FileText class="size-3.5 shrink-0 text-white/50" />
-																		<span class="min-w-0 flex-1 truncate">{reference.name}</span>
-																	</DropdownMenu.Item>
+										<FileText class="size-3.5 shrink-0 text-white/50" />
+										<span class="min-w-0 flex-1 truncate">{reference.name}</span>
+									</DropdownMenu.Item>
 								{/each}
 							{/if}
 						</DropdownMenu.Content>
@@ -1667,30 +1792,54 @@
 								</div>
 
 								<!-- Action Toolbar for User Question (Copy & Edit) -->
-								<div class="flex items-center gap-1 pr-1 text-white/40">
-									<Button
-										variant="ghost"
-										size="icon"
-										class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-										onclick={() => copyToClipboard(msg.content, msg.id)}
-										aria-label="Copy question"
-									>
-										{#if copiedMessageId === msg.id}
-											<Check class="size-3 text-green-400" />
-										{:else}
-											<Copy class="size-3" />
-										{/if}
-									</Button>
+								<div class="flex items-center gap-1">
+									<Tooltip.Provider delayDuration={100}>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<Button
+														{...props}
+														variant="ghost"
+														size="icon"
+														class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+														onclick={() => copyToClipboard(msg.content, msg.id)}
+														aria-label="Copy question"
+													>
+														{#if copiedMessageId === msg.id}
+															<Check class="size-3 text-green-400" />
+														{:else}
+															<Copy class="size-3" />
+														{/if}
+													</Button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+												<p>{copiedMessageId === msg.id ? 'Copied!' : 'Copy question'}</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									</Tooltip.Provider>
 									{#if msg.id === lastUserMsgId}
-										<Button
-											variant="ghost"
-											size="icon"
-											class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-											onclick={() => beginEditMessage(msg)}
-											aria-label="Edit question"
-										>
-											<Pencil class="size-3" />
-										</Button>
+										<Tooltip.Provider delayDuration={100}>
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}
+														<Button
+															{...props}
+															variant="ghost"
+															size="icon"
+															class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+															onclick={() => beginEditMessage(msg)}
+															aria-label="Edit question"
+														>
+															<Pencil class="size-3" />
+														</Button>
+													{/snippet}
+												</Tooltip.Trigger>
+												<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+													<p>Edit question</p>
+												</Tooltip.Content>
+											</Tooltip.Root>
+										</Tooltip.Provider>
 									{/if}
 								</div>
 							</div>
@@ -1905,13 +2054,12 @@
 															{/if}
 														</Tooltip.Trigger>
 														<Tooltip.Content
-															class="max-w-xs border border-white/15 bg-[#232323] text-xs text-white"
+															class="max-w-xs rounded-md border-0 bg-white px-3 py-1.5 text-xs text-black shadow-md"
 														>
-															<p class="font-semibold text-white/90">{ref.name}</p>
+															<p class="font-semibold text-black">{ref.name}</p>
 															{#if ref.snippet}
-																<p class="mt-1 text-white/70 italic">"{ref.snippet}"</p>
+																<p class="mt-1 text-black/70 italic">"{ref.snippet}"</p>
 															{/if}
-															<p class="mt-1 text-[10px] text-white/40">ID: {ref.id}</p>
 														</Tooltip.Content>
 													</Tooltip.Root>
 												</Tooltip.Provider>
@@ -1922,43 +2070,100 @@
 
 								<!-- Action Toolbar (Copy, Retry, Thumbs Up/Down, Dropdown Menu) -->
 								<div class="flex items-center gap-1 pt-1 text-white/40">
-									<Button
-										variant="ghost"
-										size="icon"
-										class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-										onclick={() => copyToClipboard(msg.content, msg.id)}
-										aria-label="Copy response"
-									>
-										{#if copiedMessageId === msg.id}
-											<Check class="size-3.5 text-green-400" />
-										{:else}
-											<Copy class="size-3.5" />
-										{/if}
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-										aria-label="Helpful"
-									>
-										<ThumbsUp class="size-3.5" />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-										aria-label="Not helpful"
-									>
-										<ThumbsDown class="size-3.5" />
-									</Button>
+									<Tooltip.Provider delayDuration={100}>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<Button
+														{...props}
+														variant="ghost"
+														size="icon"
+														class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+														onclick={() => copyToClipboard(msg.content, msg.id)}
+														aria-label="Copy response"
+													>
+														{#if copiedMessageId === msg.id}
+															<Check class="size-3.5 text-green-400" />
+														{:else}
+															<Copy class="size-3.5" />
+														{/if}
+													</Button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+												<p>{copiedMessageId === msg.id ? 'Copied!' : 'Copy response'}</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									</Tooltip.Provider>
+
+									<Tooltip.Provider delayDuration={100}>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<Button
+														{...props}
+														variant="ghost"
+														size="icon"
+														class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+														aria-label="Helpful"
+													>
+														<ThumbsUp class="size-3.5" />
+													</Button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+												<p>Good response</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									</Tooltip.Provider>
+
+									<Tooltip.Provider delayDuration={100}>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<Button
+														{...props}
+														variant="ghost"
+														size="icon"
+														class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+														aria-label="Not helpful"
+													>
+														<ThumbsDown class="size-3.5" />
+													</Button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+												<p>Bad response</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									</Tooltip.Provider>
+
 									{#if !msg.isRejection && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
 										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
-												class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
-												aria-label="Retry response"
-											>
-												<RotateCw class="size-3.5" />
-											</DropdownMenu.Trigger>
+											<Tooltip.Provider delayDuration={100}>
+												<Tooltip.Root>
+													<Tooltip.Trigger>
+														{#snippet child({ props: tooltipProps })}
+															<DropdownMenu.Trigger>
+																{#snippet child({ props: dropdownProps })}
+																	<button
+																		{...tooltipProps}
+																		{...dropdownProps}
+																		type="button"
+																		class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
+																		aria-label="Retry response"
+																	>
+																		<RotateCw class="size-3.5" />
+																	</button>
+																{/snippet}
+															</DropdownMenu.Trigger>
+														{/snippet}
+													</Tooltip.Trigger>
+													<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+														<p>Regenerate response</p>
+													</Tooltip.Content>
+												</Tooltip.Root>
+											</Tooltip.Provider>
 											<DropdownMenu.Content
 												align="start"
 												class="w-36 border-white/15 bg-[#232323] p-1 text-white"
@@ -1970,17 +2175,35 @@
 													<RotateCw class="size-3.5 text-white/70" />
 													<span>Try Again</span>
 												</DropdownMenu.Item>
-													</DropdownMenu.Content>
+											</DropdownMenu.Content>
 										</DropdownMenu.Root>
 									{/if}
 									<!-- Triple Dot Dropdown Menu -->
 									<DropdownMenu.Root>
-										<DropdownMenu.Trigger
-											class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
-											aria-label="More options"
-										>
-											<Ellipsis class="size-3.5" />
-										</DropdownMenu.Trigger>
+										<Tooltip.Provider delayDuration={100}>
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props: tooltipProps })}
+														<DropdownMenu.Trigger>
+															{#snippet child({ props: dropdownProps })}
+																<button
+																	{...tooltipProps}
+																	{...dropdownProps}
+																	type="button"
+																	class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+																	aria-label="More options"
+																>
+																	<Ellipsis class="size-3.5" />
+																</button>
+															{/snippet}
+														</DropdownMenu.Trigger>
+													{/snippet}
+												</Tooltip.Trigger>
+												<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+													<p>More options</p>
+												</Tooltip.Content>
+											</Tooltip.Root>
+										</Tooltip.Provider>
 										<DropdownMenu.Content
 											align="start"
 											class="w-48 border-white/15 bg-[#232323] text-white"
