@@ -623,8 +623,11 @@
 					}
 					messages = historyMsgs;
 				}
-			} else if (convRes.error.code === 'NOT_FOUND') {
-				console.log('[Chat Detail] New conversation initialized (no history in DB yet).');
+			} else if (convRes.error?.code === 'NOT_FOUND' || convRes.status === 404) {
+				console.log(`[Chat Detail] Conversation ID ${id} not found in DB. Redirecting to /app/chat`);
+				toast.error('Conversation not found');
+				await goto('/app/chat');
+				return;
 			}
 		} catch (err) {
 			if (requestId === conversationRequestId)
