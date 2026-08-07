@@ -62,7 +62,7 @@
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 	import { mergeConversationReferences, type DocReference } from '$lib/utils/doc-references';
 	import { marked } from 'marked';
-	import { mount } from 'svelte';
+	import { mount, untrack } from 'svelte';
 	import CodeBlockPreview from '$lib/components/chat/CodeBlockPreview.svelte';
 
 	const customRenderer = new marked.Renderer();
@@ -565,6 +565,22 @@
 		inputValue = '';
 		attachedFiles = [];
 
+		const stateObj =
+			((page as any)?.state as any) || (history.state as any)?.usr || (history.state as any);
+
+		// If navigating with an initial question (new room submission), skip fetching DB history
+		// to avoid a 404 HTTP request before the conversation record is created by SSE.
+		if (requestId === conversationRequestId && stateObj?.initialQuestion) {
+			console.log(`[Chat Detail] Initializing new conversation for ID: ${id}`);
+			isTitleLoading = true;
+			const initialQ = stateObj.initialQuestion as string;
+			const initialModel = (stateObj.selectedModel as LlmOption) || selectedModel;
+			if (stateObj.selectedModel) selectedModel = stateObj.selectedModel as LlmOption;
+			streamChatTurn(initialQ, initialModel);
+			scrollToBottom();
+			return;
+		}
+
 		try {
 			console.log(`[Chat Detail] Fetching conversation history for ID: ${id}`);
 			const convRes = await getConversation(id);
@@ -616,20 +632,14 @@
 			return;
 		}
 
-		const stateObj =
-			((page as any)?.state as any) || (history.state as any)?.usr || (history.state as any);
-		if (requestId === conversationRequestId && stateObj?.initialQuestion) {
-			isTitleLoading = true;
-			const initialQ = stateObj.initialQuestion as string;
-			const initialModel = (stateObj.selectedModel as LlmOption) || selectedModel;
-			if (stateObj.selectedModel) selectedModel = stateObj.selectedModel as LlmOption;
-			streamChatTurn(initialQ, initialModel);
-		}
 		scrollToBottom();
 	}
 
 	$effect(() => {
-		loadConversation(chatId);
+		const currentId = chatId;
+		untrack(() => {
+			loadConversation(currentId);
+		});
 	});
 
 	function isByokProvider(provider: string): provider is ByokProvider {
