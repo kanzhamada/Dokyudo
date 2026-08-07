@@ -1,0 +1,19 @@
+meta {
+  name: Delete Turn
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/rag/conversations/{{conversationId}}/turns/{{turnId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Deletes a single turn (question and response) from a conversation by turn ID.
+}
