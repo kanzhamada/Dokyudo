@@ -150,5 +150,5 @@ export async function handleBranchConversation(c: Context) {
         turnId: body.turn_id,
     });
 
-    return c.json({ id: result.id });
+    return c.json({ id: result.id, title: result.title });
 }

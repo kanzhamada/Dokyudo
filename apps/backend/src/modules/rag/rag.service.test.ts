@@ -413,7 +413,7 @@ describe("RagService Isolated Tests", () => {
             await db.insert(conversationTurns).values([
                 {
                     id: t1, tenantId: TEST_TENANT_ID, conversationId: parentId,
-                    question: "Q1", answer: "A1", modelUsed: "gemini", status: "complete",
+                    question: "Q1", answer: "A1 (partial)", modelUsed: "gemini", status: "stopped",
                     feedback: "good", feedbackAt: base, createdAt: base,
                 },
                 {
@@ -440,7 +440,7 @@ describe("RagService Isolated Tests", () => {
             const branch = await db.select().from(conversations).where(eq(conversations.id, result.id));
             assertEquals(branch.length, 1);
             assertEquals(branch[0].branchOfId, parentId);
-            assertEquals(branch[0].title, "Parent Conv");
+            assertEquals(branch[0].title, "Branched - Parent Conv");
 
             // Copied prefix in order; boundary (Q2) carries the lineage marker
             const branchTurns = await db
@@ -454,10 +454,12 @@ describe("RagService Isolated Tests", () => {
             // Feedback is reset on copies (original Q1 had feedback=good)
             assertEquals(branchTurns[0].feedback, null);
             assertEquals(branchTurns[0].feedbackAt, null);
+            // Original status is preserved on the copy (Q1 was stopped)
+            assertEquals(branchTurns[0].status, "stopped");
+            assertEquals(branchTurns[1].status, "complete");
             // Boundary marker points to the ORIGINAL turn id
             assertEquals(branchTurns[1].branchedFromTurnId, t2);
             assertEquals(branchTurns[0].branchedFromTurnId, null);
-            assertEquals(branchTurns[0].status, "complete");
 
             // Parent untouched — still 3 turns
             const parentTurns = await db
@@ -465,6 +467,23 @@ describe("RagService Isolated Tests", () => {
                 .from(conversationTurns)
                 .where(eq(conversationTurns.conversationId, parentId));
             assertEquals(parentTurns.length, 3);
+
+            // Deleting the parent must NOT wipe the branch marker — the divider
+            // still renders ("Branched from Deleted Conversation"). branchOfId
+            // goes NULL (FK SET NULL), branchedFromTurnId survives (no FK).
+            await db.delete(conversations).where(eq(conversations.id, parentId));
+            const branchAfter = await db
+                .select()
+                .from(conversations)
+                .where(eq(conversations.id, result.id));
+            assertEquals(branchAfter.length, 1);
+            assertEquals(branchAfter[0].branchOfId, null);
+            const turnsAfter = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.conversationId, result.id))
+                .orderBy(conversationTurns.createdAt);
+            assertEquals(turnsAfter[1].branchedFromTurnId, t2);
         });
 
         it("negative: throws 404 if the turn does not exist in the conversation", async () => {

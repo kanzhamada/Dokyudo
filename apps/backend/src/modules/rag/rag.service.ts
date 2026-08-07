@@ -1061,10 +1061,11 @@ Always include the document references ([Doc N: Page X]) in your answer.
         tenantId: string;
         conversationId: string;
         turnId: string;
-    }): Promise<{ id: string }> {
+    }): Promise<{ id: string; title: string }> {
         const { userId, tenantId, conversationId, turnId } = params;
 
         let newConversationId = "";
+        let newConversationTitle = "";
 
         await withAuthDb(userId, async (tx) => {
             // 1. Parent must exist and belong to the tenant
@@ -1111,16 +1112,17 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 .insert(conversations)
                 .values({
                     tenantId,
-                    title: parent.title,
+                    title: `Branched - ${parent.title}`,
                     branchOfId: conversationId,
                 })
-                .returning({ id: conversations.id });
+                .returning({ id: conversations.id, title: conversations.title });
             newConversationId = newConv.id;
+            newConversationTitle = newConv.title;
 
             // 4. Copy the shared prefix [0..boundaryIndex] into the branch:
             //    - new ids (lineage kept via branchedFromTurnId on the boundary)
             //    - feedback reset (interactions don't branch)
-            //    - status forced to complete (copied turns are finished)
+            //    - original status preserved (e.g. a stopped/failed turn stays so)
             //    - createdAt preserved (faithful timeline / ordering)
             const prefix = turns.slice(0, boundaryIndex + 1);
             if (prefix.length > 0) {
@@ -1134,7 +1136,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
                         modelUsed: t.modelUsed,
                         latencyMs: t.latencyMs,
                         contextReferences: t.contextReferences,
-                        status: "complete",
+                        status: t.status,
                         feedback: null,
                         feedbackAt: null,
                         branchedFromTurnId: i === prefix.length - 1 ? t.id : null,
@@ -1144,7 +1146,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
             }
         });
 
-        return { id: newConversationId };
+        return { id: newConversationId, title: newConversationTitle };
     }
 
     static async updateConversationTitle(params: {

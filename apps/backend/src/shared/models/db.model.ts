@@ -272,11 +272,10 @@ export const conversationTurns = pgTable("conversation_turns", {
     }),
     // Set ONLY on the boundary turn of a branched conversation — points to the
     // original turn in the parent conversation that this copy was made from.
-    // The frontend renders the "Branched from ..." divider after this turn.
-    branchedFromTurnId: uuid("branched_from_turn_id").references(
-        () => conversationTurns.id,
-        { onDelete: "set null" },
-    ),
+    // Plain column (NO FK): the marker must survive the parent turn/conversation
+    // being deleted, so the frontend can still render "Branched from Deleted
+    // Conversation". It is a lineage pointer, not referential integrity.
+    branchedFromTurnId: uuid("branched_from_turn_id"),
     updatedAt: timestamp("updated_at", {
         mode: "date",
         precision: 3,

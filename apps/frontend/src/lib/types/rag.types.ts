@@ -93,5 +93,6 @@ export type BranchConversationParams = {
 
 export interface BranchConversationResponse {
 	id: string;
+	title: string;
 }
 

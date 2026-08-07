@@ -527,6 +527,7 @@
 	let chatId = $derived(page.params.id || 'chat-default');
 	let conversationTitle = $state('New Conversation');
 	let branchOfTitle = $state<string | null>(null);
+	let branchOfId = $state<string | null>(null);
 	let isTitleLoading = $state(false);
 
 	// Conversation Messages
@@ -566,6 +567,7 @@
 		messages = [];
 		conversationTitle = 'New Conversation';
 		branchOfTitle = null;
+		branchOfId = null;
 		inputValue = '';
 		attachedFiles = [];
 
@@ -592,6 +594,7 @@
 			if (convRes.ok) {
 				if (convRes.data.title) conversationTitle = convRes.data.title;
 				branchOfTitle = convRes.data.branchOf?.title ?? null;
+				branchOfId = convRes.data.branchOf?.id ?? null;
 				if (convRes.data.turns && convRes.data.turns.length > 0) {
 					const historyMsgs: ChatMessage[] = [];
 					for (const turn of convRes.data.turns) {
@@ -1500,6 +1503,8 @@
 			toast.error(result.error.message);
 			return;
 		}
+		// Push the new branch to the top of the sidebar before navigating.
+		conversationsStore.addOrUpdate(result.data.id, result.data.title);
 		toast.success('Branch created');
 		await goto(`/app/chat/${result.data.id}`);
 	}
@@ -2470,10 +2475,21 @@
 							</div>
 						</div>
 					{/if}
-				{#if msg.branchedFromTurnId}
-					<div class="flex items-center justify-center gap-3 py-2 text-[11px] text-white/40">
+				{#if msg.role === 'assistant' && msg.branchedFromTurnId}
+					<div class="flex items-center justify-center gap-2 py-2 text-[11px] text-white/40">
 						<div class="h-px flex-1 bg-white/10"></div>
-						<span>Branched from {branchOfTitle ?? 'conversation'}</span>
+						<GitBranch class="size-3 shrink-0" />
+						<span class="flex items-center gap-1">
+							Branched from
+							{#if branchOfTitle}
+								<a
+									href={`/app/chat/${branchOfId ?? ''}`}
+									class="cursor-pointer underline decoration-white/30 underline-offset-2 hover:text-white hover:decoration-white/70"
+								>{branchOfTitle}</a>
+							{:else}
+								Deleted Conversation
+							{/if}
+						</span>
 						<div class="h-px flex-1 bg-white/10"></div>
 					</div>
 				{/if}
