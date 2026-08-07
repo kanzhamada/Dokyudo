@@ -846,7 +846,7 @@ describe("RagService Isolated Tests", () => {
             );
 
             const rewritePrompt = capturedPrompts.find((p) =>
-                p.includes("rewrite the user's question"),
+                p.includes("Latest User Question"),
             );
             assertExists(rewritePrompt);
             // The complete turn is included as history context...
