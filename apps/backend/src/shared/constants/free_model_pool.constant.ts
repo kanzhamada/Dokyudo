@@ -5,17 +5,22 @@
  * free-tier RAG chat. It depends on `free_providers.constant.ts` for rate limit
  * metadata but does NOT import BYOK constants.
  *
- * Tier selection is driven by the CONVERSATION HISTORY DEPTH (number of previous
- * turns carried into the prompt) — the strongest real signal, since the RAG
- * context is bounded by the search limit and therefore near-constant:
- *   LIGHT  → 0 previous turns (fresh conversation)
- *   MEDIUM → 1–2 previous turns
- *   HEAVY  → 3 previous turns (deep context)
+ * Tier selection is driven by CONVERSATION HISTORY DEPTH, refined by a weighted
+ * complexity score so depth-1/2 turns can float between tiers:
+ *   depth 0            → LIGHT   (fresh conversation, no context)
+ *   depth 1            → LIGHT or MEDIUM  (by complexity score)
+ *   depth 2            → MEDIUM or HEAVY  (by complexity score)
+ *   depth 3            → HEAVY   (deep context)
  *
- * Three guards override the depth-based classification:
- *   - questionTokens > 200    → HEAVY (very long questions need more capacity)
- *   - contextTokens > 12K     → HEAVY (large prompts need the big-context pools)
- *   - totalTokens > 30K       → HEAVY (absolute ceiling — never route past it)
+ * Complexity score (reasoning load the model must carry):
+ *   score = questionTokens + historyTokens + contextTokens * CONTEXT_WEIGHT
+ *   - question + history get full weight (the model REASONS over them)
+ *   - context is discounted (bounded by search, mostly "reading")
+ *
+ * Capability guards override everything, cheapest first:
+ *   - totalTokens > 30K          → HEAVY (absolute ceiling)
+ *   - contextTokens > 12K        → HEAVY (needs the big-context pools)
+ *   - questionTokens > 200       → HEAVY (needs more reasoning capacity)
  *
  * Within each tier, models are ordered by a composite priority score:
  *   Primary:   RPM (sustain high concurrency)
@@ -48,7 +53,7 @@ export interface PoolEntry {
 }
 
 // ==============================================================================
-// 2. TOKEN & DEPTH THRESHOLDS
+// 2. TIER SCORING & THRESHOLDS
 // ==============================================================================
 
 /**
@@ -60,34 +65,39 @@ export const TIER_THRESHOLDS = {
 } as const;
 
 /**
- * Question-length threshold (tokens): questions above this are always routed
- * to HEAVY — they need more reasoning capacity regardless of conversation
- * depth. (~800 characters at the 1-token-per-4-chars rule of thumb.)
+ * Capability guards — checked BEFORE the score (cheapest first). They protect
+ * model capability regardless of the complexity score:
+ *   - very long questions  → need more reasoning capacity
+ *   - very large contexts  → need the big-context pools
  */
-export const QUESTION_HEAVY_MIN_TOKENS = 200;
-
-/**
- * Conversation-depth thresholds — the PRIMARY classification signal.
- *
- * Why history-based instead of total-prompt-based: the RAG context is bounded
- * by the search limit (fixed top-K chunks), so the retrieved-document part is
- * near-constant. The only variables that actually move the prompt size are the
- * conversation history (0–3 previous turns) and the question. Deeper history
- * means the model must carry and reconcile more prior Q&A, so it drives the tier:
- *   0 previous turns (fresh conversation) → LIGHT
- *   1–2 previous turns                    → MEDIUM
- *   3 previous turns                      → HEAVY
- */
-export const HISTORY_DEPTH_THRESHOLDS = {
-    /** Max history depth that still maps to MEDIUM (above this → HEAVY). */
-    MEDIUM_MAX_DEPTH: 2,
+export const GUARD_THRESHOLDS = {
+    /** Questions above this many tokens always go HEAVY (~800 chars). */
+    QUESTION_HEAVY_MIN_TOKENS: 200,
+    /** Retrieved context above this many tokens always goes HEAVY. */
+    CONTEXT_HEAVY_MIN_TOKENS: 12_000,
 } as const;
 
 /**
- * Context guard: when the retrieved document context alone exceeds this many
- * tokens, route to HEAVY regardless of question length or history depth.
+ * Complexity score — the reasoning load the model must carry. Not all prompt
+ * tokens cost the same:
+ *   - question + history tokens get FULL weight (the model must reason over them)
+ *   - context tokens get a discount (bounded by the search limit, mostly
+ *     "reading" rather than reasoning — capability is still guarded separately)
+ *
+ *   score = questionTokens + historyTokens + contextTokens * CONTEXT_WEIGHT
+ *
+ * The score refines the depth boundaries:
+ *   - depth 1: score ≤ DEPTH1_LIGHT_MAX stays LIGHT (tiny history + short Q)
+ *   - depth 2: score ≤ DEPTH2_MEDIUM_MAX stays MEDIUM (above → HEAVY)
  */
-export const CONTEXT_HEAVY_MIN_TOKENS = 12_000;
+export const TIER_SCORING = {
+    /** Discount applied to context tokens in the score. */
+    CONTEXT_WEIGHT: 0.1,
+    /** Depth-1 score ceiling that still maps to LIGHT. */
+    DEPTH1_LIGHT_MAX: 500,
+    /** Depth-2 score ceiling that still maps to MEDIUM (above → HEAVY). */
+    DEPTH2_MEDIUM_MAX: 1500,
+} as const;
 
 // ==============================================================================
 // 3. ROTATION POOLS (ordered by priority — index 0 = highest priority)
@@ -199,36 +209,50 @@ export const ROTATION_POOLS = {
 /**
  * Selects the appropriate rotation tier.
  *
- * Classification is driven by conversation history depth (the strongest real
- * signal), with guards that force HEAVY for very long questions, very large
- * contexts, or prompts over the hard budget. All inputs are pre-computed token
- * estimates — the function itself is O(1).
+ * Depth is the primary signal; a weighted complexity score refines the
+ * depth-1 (LIGHT vs MEDIUM) and depth-2 (MEDIUM vs HEAVY) boundaries.
+ * Capability guards (hard budget, context size, question length) override
+ * everything. All inputs are pre-computed token estimates — the function is
+ * O(1), no string work.
  *
- * @param params.historyDepth   - Number of previous turns carried in the prompt
+ * @param params.historyDepth   - Number of previous (complete) turns in the prompt
  * @param params.questionTokens - Estimated tokens of the user question only
+ * @param params.historyTokens  - Estimated tokens of the conversation history text
  * @param params.contextTokens  - Estimated tokens of retrieved document context
  * @param params.totalTokens    - Estimated tokens of the full prompt (all parts)
  */
 export function selectTier(params: {
     historyDepth: number;
     questionTokens: number;
+    historyTokens: number;
     contextTokens: number;
     totalTokens: number;
 }): RotationTier {
-    const { historyDepth, questionTokens, contextTokens, totalTokens } = params;
+    const { historyDepth, questionTokens, historyTokens, contextTokens, totalTokens } = params;
 
-    // Guards (safety) — checked first, cheapest to evaluate.
-    // Hard budget: never route a prompt past the free tier's ceiling.
+    // Capability guards — checked first, cheapest to evaluate.
     if (totalTokens > TIER_THRESHOLDS.HEAVY_MAX) return "HEAVY";
-    // Very large retrieved context needs the big-context pools.
-    if (contextTokens > CONTEXT_HEAVY_MIN_TOKENS) return "HEAVY";
-    // Very long questions need more reasoning capacity regardless of depth.
-    if (questionTokens > QUESTION_HEAVY_MIN_TOKENS) return "HEAVY";
+    if (contextTokens > GUARD_THRESHOLDS.CONTEXT_HEAVY_MIN_TOKENS) return "HEAVY";
+    if (questionTokens > GUARD_THRESHOLDS.QUESTION_HEAVY_MIN_TOKENS) return "HEAVY";
 
-    // Primary signal: conversation history depth.
-    if (historyDepth === 0) return "LIGHT";
-    if (historyDepth <= HISTORY_DEPTH_THRESHOLDS.MEDIUM_MAX_DEPTH) return "MEDIUM";
-    return "HEAVY";
+    // Complexity score — the reasoning load the model must carry.
+    const score =
+        questionTokens +
+        historyTokens +
+        contextTokens * TIER_SCORING.CONTEXT_WEIGHT;
+
+    // Conversation depth is the primary signal; the score refines the
+    // depth-1 (LIGHT vs MEDIUM) and depth-2 (MEDIUM vs HEAVY) boundaries.
+    switch (historyDepth) {
+        case 0:
+            return "LIGHT";
+        case 1:
+            return score <= TIER_SCORING.DEPTH1_LIGHT_MAX ? "LIGHT" : "MEDIUM";
+        case 2:
+            return score <= TIER_SCORING.DEPTH2_MEDIUM_MAX ? "MEDIUM" : "HEAVY";
+        default:
+            return "HEAVY";
+    }
 }
 
 /**

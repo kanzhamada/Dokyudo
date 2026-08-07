@@ -414,6 +414,7 @@ export class FallbackLlmService {
      * @param params.estimatedTokens  Pre-computed total prompt token estimate
      * @param params.historyDepth     Number of previous turns carried in the prompt
      * @param params.questionTokens   Estimated tokens of the user question only
+     * @param params.historyTokens    Estimated tokens of the conversation history text
      * @param params.contextTokens    Estimated tokens of retrieved document context
      * @param params.logContext       Optional log context for structured logging
      */
@@ -422,6 +423,7 @@ export class FallbackLlmService {
         estimatedTokens?: number;
         historyDepth?: number;
         questionTokens?: number;
+        historyTokens?: number;
         contextTokens?: number;
         signal?: AbortSignal;
         logContext?: Record<string, any>;
@@ -432,14 +434,16 @@ export class FallbackLlmService {
         const totalTokens = params.estimatedTokens ?? estimateTokenCount(fullText);
         const historyDepth = params.historyDepth ?? 0;
         const questionTokens = params.questionTokens ?? estimateTokenCount(messages[messages.length - 1]?.content ?? "");
+        const historyTokens = params.historyTokens ?? 0;
         const contextTokens = params.contextTokens ?? totalTokens;
-        const tier = selectTier({ historyDepth, questionTokens, contextTokens, totalTokens });
+        const tier = selectTier({ historyDepth, questionTokens, historyTokens, contextTokens, totalTokens });
 
         if (logContext) {
             logContext.fallbackTier = tier;
             logContext.estimatedTokens = totalTokens;
             logContext.historyDepth = historyDepth;
             logContext.estimatedQuestionTokens = questionTokens;
+            logContext.estimatedHistoryTokens = historyTokens;
             logContext.estimatedContextTokens = contextTokens;
         }
 
@@ -449,6 +453,15 @@ export class FallbackLlmService {
             [...getRotationPool(tier, true).filter(e => e.emergency)],
         ];
 
+        // Ordered fallback chain — every candidate tried, ending with the one
+        // that succeeded (persisted as model_used) or the last failure.
+        const fallbackChain: {
+            provider: FreeProvider;
+            modelId: string;
+            outcome: "circuit_open" | "quota_exhausted" | "failed" | "success";
+            error?: string;
+        }[] = [];
+
         for (const pool of pools) {
             for (const entry of pool) {
                 if (signal?.aborted) {
@@ -456,11 +469,25 @@ export class FallbackLlmService {
                 }
 
                 // Guard 1: Circuit breaker
-                if (await isCircuitOpen(entry.provider, entry.modelId)) continue;
+                if (await isCircuitOpen(entry.provider, entry.modelId)) {
+                    fallbackChain.push({
+                        provider: entry.provider,
+                        modelId: entry.modelId,
+                        outcome: "circuit_open",
+                    });
+                    continue;
+                }
 
                 // Guard 2: Quota
                 const withinQuota = await isWithinQuota(entry);
-                if (!withinQuota) continue;
+                if (!withinQuota) {
+                    fallbackChain.push({
+                        provider: entry.provider,
+                        modelId: entry.modelId,
+                        outcome: "quota_exhausted",
+                    });
+                    continue;
+                }
 
                 try {
                     // Enforce 15-second connection timeout (Time-To-First-Token)
@@ -469,10 +496,16 @@ export class FallbackLlmService {
                         throw signal.reason ?? new DOMException("The operation was aborted", "AbortError");
                     }
                     await recordSuccess(entry.provider, entry.modelId);
+                    fallbackChain.push({
+                        provider: entry.provider,
+                        modelId: entry.modelId,
+                        outcome: "success",
+                    });
 
                     if (logContext) {
                         logContext.selectedProvider = entry.provider;
                         logContext.selectedModel    = entry.modelId;
+                        logContext.fallbackChain    = fallbackChain;
                     }
 
                     return { stream, provider: entry.provider, modelId: entry.modelId };
@@ -480,10 +513,19 @@ export class FallbackLlmService {
                     if (signal?.aborted || err?.name === "AbortError") throw err;
                     if (logContext) logContext[`${entry.provider}_error`] = err.message;
                     await recordFailure(entry.provider, entry.modelId);
+                    fallbackChain.push({
+                        provider: entry.provider,
+                        modelId: entry.modelId,
+                        outcome: "failed",
+                        error: err.message,
+                    });
                     // Continue to next candidate
                 }
             }
         }
+
+        // All candidates exhausted — expose the full chain in the log for debugging.
+        if (logContext) logContext.fallbackChain = fallbackChain;
 
         throw new AppError({
             code: "PROVIDER_UNAVAILABLE",

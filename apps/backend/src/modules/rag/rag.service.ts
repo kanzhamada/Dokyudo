@@ -697,10 +697,11 @@ ${question}
                     try {
                         const response = await FallbackLlmService.generateStream({
                             messages: [{ role: "user", content: augmentedPrompt }],
-                            // Tier classification is driven by conversation depth
-                            // (the strongest real variable) — pass it through.
+                            // Tier = conversation depth refined by a weighted
+                            // complexity score (question + history + context).
                             historyDepth,
                             questionTokens: estimateTokenCount(question),
+                            historyTokens: estimateTokenCount(historyText),
                             contextTokens: estimateTokenCount(contextText),
                             signal: cancelSignal,
                             logContext,
