@@ -1451,6 +1451,16 @@
 		const next = prev === rating ? null : rating;
 		// Optimistic update — revert on failure.
 		msg.feedback = next;
+
+		if (next === 'good') {
+			toast.success('Feedback recorded: Helpful response');
+		} else if (next === 'bad') {
+			toast.info('Feedback recorded: Needs improvement');
+		} else {
+			toast.info('Feedback cleared');
+		}
+
+		console.log('[Chat Detail] Updating turn feedback:', { turnId: msg.turnId, rating: next });
 		const result = await updateTurnFeedback(chatId, msg.turnId, { rating: next });
 		if (!result.ok) {
 			msg.feedback = prev;

@@ -109,26 +109,21 @@ export const TIER_SCORING = {
  *
  * Priority rationale:
  * 1. Mistral ministral-3b  → 750 RPM — unmatched throughput, lightweight
- * 2. Groq qwen3-32b        → 60 RPM, 1K RPD — highest quality at high RPM
- * 3. Mistral small-2506    → 300 RPM — strong throughput, mid quality
- * 4. Groq llama-3.1-8b    → 30 RPM, 14.4K RPD — best daily volume
- * 5. Mistral ministral-8b  → 188 RPM — solid mid model
- * 6. Groq llama-4-scout    → 30 RPM, high quality, 30K TPM headroom
- * 7. Groq llama-3.3-70b   → 30 RPM, highest quality in Groq free
- * 8. Gemini 3.1-flash-lite → 15 RPM, 500 RPD — best Gemini daily budget
- * 9. Cohere command-r7b    → 20 RPM — lightweight fallback
+ * 2. Mistral small-2506    → 300 RPM — strong throughput, mid quality
+ * 3. Groq llama-3.1-8b    → 30 RPM, 14.4K RPD — best daily volume
+ * 4. Mistral ministral-8b  → 188 RPM — solid mid model
+ * 5. Groq llama-3.3-70b   → 30 RPM, highest quality in Groq free
+ * 6. Gemini 3.1-flash-lite → 15 RPM, 500 RPD — best Gemini daily budget
+ * 7. Cohere command-r7b    → 20 RPM — lightweight fallback
  */
 export const LIGHT_POOL: readonly PoolEntry[] = [
     { provider: "mistral", modelId: "ministral-3b-2512" },
-    { provider: "groq", modelId: "qwen/qwen3-32b" },
     { provider: "mistral", modelId: "mistral-small-2506" },
     { provider: "groq", modelId: "llama-3.1-8b-instant" },
     { provider: "mistral", modelId: "ministral-8b-2512" },
-    { provider: "groq", modelId: "meta-llama/llama-4-scout-17b-16e-instruct" },
     { provider: "groq", modelId: "llama-3.3-70b-versatile" },
     { provider: "gemini", modelId: "gemini-3.1-flash-lite" },
     { provider: "cohere", modelId: "command-r7b-12-2024" },
-    { provider: "groq", modelId: "qwen/qwen3.6-27b" },
     {
         provider: "sambanova",
         modelId: "Meta-Llama-3.3-70B-Instruct",
@@ -142,23 +137,18 @@ export const LIGHT_POOL: readonly PoolEntry[] = [
  * Best for: standard questions (40–200 tokens).
  *
  * Priority rationale:
- * 1. Groq llama-4-scout    → 30K TPM — highest TPM in Groq free
- * 2. Gemini 3.1-flash-lite → 250K TPM — massive headroom, 500 RPD
- * 3. Mistral open-nemo     → 500K TPM, 128K ctx
- * 4. Mistral ministral-14b → 937K TPM, 131K ctx
- * 5. Groq llama-3.3-70b   → 12K TPM, highest quality
- * 6. Groq gpt-oss-120b     → 8K TPM, 200K TPD
- * 7. Gemini 2.5-flash-lite → 250K TPM, 20 RPD (limited)
- * 8. Cohere command-r      → 128K ctx, unknown TPM
- * 9. Cohere command-a      → 256K ctx — largest Cohere context window
+ * 1. Gemini 3.1-flash-lite → 250K TPM — massive headroom, 500 RPD
+ * 2. Mistral open-nemo     → 500K TPM, 128K ctx
+ * 3. Mistral ministral-14b → 937K TPM, 131K ctx
+ * 4. Groq llama-3.3-70b   → 12K TPM, highest quality
+ * 5. Cohere command-r      → 128K ctx, unknown TPM
+ * 6. Cohere command-a      → 256K ctx — largest Cohere context window
  */
 export const MEDIUM_POOL: readonly PoolEntry[] = [
-    { provider: "groq", modelId: "meta-llama/llama-4-scout-17b-16e-instruct" },
     { provider: "gemini", modelId: "gemini-3.1-flash-lite" },
     { provider: "mistral", modelId: "open-mistral-nemo" },
     { provider: "mistral", modelId: "ministral-14b-2512" },
     { provider: "groq", modelId: "llama-3.3-70b-versatile" },
-    { provider: "groq", modelId: "openai/gpt-oss-120b" },
     { provider: "cohere", modelId: "command-r-08-2024" },
     { provider: "cohere", modelId: "command-a-03-2025" },
     { provider: "mistral", modelId: "mistral-medium-2505" },
@@ -178,22 +168,17 @@ export const MEDIUM_POOL: readonly PoolEntry[] = [
  * 1. Gemini 3.1-flash-lite → 1M ctx, 250K TPM, 500 RPD — best daily budget
  * 2. Gemini 2.5-flash      → 1M ctx, 250K TPM — highest quality Gemini free
  * 3. Gemini 3.5-flash      → 1M ctx, 250K TPM
- * 4. Gemini 3-flash        → 1M ctx, 250K TPM
- * 5. Gemini 2.5-flash-lite → 1M ctx, 250K TPM (20 RPD — careful)
- * 6. Mistral medium-2505   → 131K ctx, 375K TPM
- * 7. Groq groq/compound-mini → 70K TPM, 128K ctx
- * 8. Cohere command-a      → 256K ctx — largest non-Gemini context
- * 9. SambaNova DeepSeek    → emergency, high quality for very long prompts
+ * 4. Mistral medium-2505   → 131K ctx, 375K TPM
+ * 5. Cohere command-a      → 256K ctx — largest non-Gemini context
+ * 6. SambaNova DeepSeek    → emergency, high quality for very long prompts
  */
 export const HEAVY_POOL: readonly PoolEntry[] = [
-    { provider: "gemini",    modelId: "gemini-3.1-flash-lite" },
-    { provider: "gemini",    modelId: "gemini-2.5-flash" },
-    { provider: "gemini",    modelId: "gemini-3.5-flash" },
-    { provider: "mistral",   modelId: "mistral-medium-2505" },
-    { provider: "groq",      modelId: "groq/compound-mini" },
-    { provider: "cohere",    modelId: "command-a-plus-05-2026" },
+    { provider: "gemini", modelId: "gemini-3.1-flash-lite" },
+    { provider: "gemini", modelId: "gemini-2.5-flash" },
+    { provider: "gemini", modelId: "gemini-3.5-flash" },
+    { provider: "mistral", modelId: "mistral-medium-2505" },
+    { provider: "cohere", modelId: "command-a-plus-05-2026" },
     { provider: "sambanova", modelId: "DeepSeek-V3.1", emergency: true },
-    { provider: "sambanova", modelId: "gpt-oss-120b", emergency: true },
 ] as const;
 
 export const ROTATION_POOLS = {
@@ -228,12 +213,20 @@ export function selectTier(params: {
     contextTokens: number;
     totalTokens: number;
 }): RotationTier {
-    const { historyDepth, questionTokens, historyTokens, contextTokens, totalTokens } = params;
+    const {
+        historyDepth,
+        questionTokens,
+        historyTokens,
+        contextTokens,
+        totalTokens,
+    } = params;
 
     // Capability guards — checked first, cheapest to evaluate.
     if (totalTokens > TIER_THRESHOLDS.HEAVY_MAX) return "HEAVY";
-    if (contextTokens > GUARD_THRESHOLDS.CONTEXT_HEAVY_MIN_TOKENS) return "HEAVY";
-    if (questionTokens > GUARD_THRESHOLDS.QUESTION_HEAVY_MIN_TOKENS) return "HEAVY";
+    if (contextTokens > GUARD_THRESHOLDS.CONTEXT_HEAVY_MIN_TOKENS)
+        return "HEAVY";
+    if (questionTokens > GUARD_THRESHOLDS.QUESTION_HEAVY_MIN_TOKENS)
+        return "HEAVY";
 
     // Complexity score — the reasoning load the model must carry.
     const score =

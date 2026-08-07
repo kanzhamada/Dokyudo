@@ -12,7 +12,7 @@ import {
 import { desc, eq, and, lt, ne, sql } from "drizzle-orm";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 import { LlmRouterService } from "./llm_router.service.ts";
-import { FallbackLlmService } from "./fallback_llm.service.ts";
+import { FallbackLlmService, type FallbackStreamResponse } from "./fallback_llm.service.ts";
 import { KeysService } from "../keys/keys.service.ts";
 import { decryptApiKey } from "../../shared/utils/crypto.util.ts";
 import { tenantKeys } from "../../shared/models/db.model.ts";
@@ -451,6 +451,121 @@ ${question}
         //  turnId, cid and isNewConversation are already resolved above.)
         if (signal?.aborted) return await abortAsStopped();
 
+        // 5.1 Stream-scope state — shared between the pre-stream model selection
+        // and the in-stream finalize path.
+        const references = Array.from(docIndexMap.values()).map((item) => ({
+            index: item.index,
+            documentId: item.docId,
+            title: item.title,
+            pages: Array.from(item.pages).sort((a, b) => a - b),
+        }));
+        let successfulModel = "";
+        // model_used is nullable — fallback used when generation stops/fails
+        // before any model actually completes.
+        const modelUsedFallback = useByok ? (model || "auto") : "auto";
+        const startMs = Date.now();
+
+        // Resolve the eagerly-inserted (or edited) turn to a terminal status.
+        // Always an UPDATE — the row already exists. The `status = processing`
+        // gate makes the state machine explicit and prevents a stale writer
+        // from clobbering an already-terminal state.
+        const finalizeTurn = async (status: TurnStatus, answer: string) => {
+            const latencyMs = Date.now() - startMs;
+            try {
+                await withAuthDb(userId, async (tx) => {
+                    await tx
+                        .update(conversationTurns)
+                        .set({
+                            answer,
+                            modelUsed: successfulModel || modelUsedFallback,
+                            latencyMs,
+                            contextReferences:
+                                RagService.filterReferencesByCitations(
+                                    answer,
+                                    references,
+                                ),
+                            status,
+                            updatedAt: new Date(),
+                        })
+                        .where(
+                            and(
+                                eq(conversationTurns.id, turnId),
+                                eq(conversationTurns.conversationId, cid!),
+                                eq(conversationTurns.tenantId, tenantId),
+                                eq(conversationTurns.status, "processing"),
+                            ),
+                        );
+
+                    // Explicitly touch the updatedAt field on the parent conversation
+                    await tx
+                        .update(conversations)
+                        .set({ updatedAt: new Date() })
+                        .where(
+                            and(
+                                eq(conversations.id, cid!),
+                                eq(conversations.tenantId, tenantId),
+                            ),
+                        );
+                });
+
+                if (logContext) {
+                    logContext.ragEvent = "conversation_saved";
+                    logContext.latencyMs = latencyMs;
+                    logContext.turnStatus = status;
+                }
+            } catch (dbErr: any) {
+                console.error("[RAG DB SAVE ERROR]:", dbErr);
+                if (logContext) {
+                    logContext.ragEvent = "conversation_save_error";
+                    logContext.ragError = dbErr.message;
+                }
+            }
+        };
+
+        // 5.2 Pre-stream model selection (system mode). Resolving the fallback
+        // model BEFORE the stream is returned lets the selection — tier,
+        // fallbackChain, selected model — land in the http_request log, which is
+        // emitted when the handler returns (before the stream body is pumped).
+        // Aborts during selection mark the turn 'stopped'; selection failure
+        // marks it 'failed' and returns a graceful error stream.
+        let resolvedFallbackStream: FallbackStreamResponse | null = null;
+        if (!useByok) {
+            try {
+                resolvedFallbackStream = await FallbackLlmService.generateStream({
+                    messages: [{ role: "user", content: augmentedPrompt }],
+                    historyDepth,
+                    questionTokens: estimateTokenCount(question),
+                    historyTokens: estimateTokenCount(historyText),
+                    contextTokens: estimateTokenCount(contextText),
+                    signal,
+                    logContext,
+                });
+            } catch (error: any) {
+                if (isAbortError(error, signal)) return await abortAsStopped();
+                if (logContext) {
+                    logContext.ragEvent = "fallback_failed_exhausted";
+                    logContext.ragError = error.message;
+                }
+                await finalizeTurn("failed", "");
+                // Graceful error stream (HTTP 200 + error event) — mirrors the
+                // old in-stream failure path so the frontend behaves identically.
+                return new ReadableStream({
+                    start(controller) {
+                        const encode = (data: string) =>
+                            new TextEncoder().encode(data);
+                        controller.enqueue(
+                            encode(
+                                `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: "All free LLM providers are currently quota-exhausted or unavailable. Please try again later." })}\n\n`,
+                            ),
+                        );
+                        controller.enqueue(encode(`event: done\ndata: {}\n\n`));
+                        controller.close();
+                    },
+                });
+            }
+        }
+        if (signal?.aborted) return await abortAsStopped();
+
         // Internal abort controller for stream lifecycle — fires when consumer cancels the stream
         // (client disconnect, reader.cancel(), etc.) even after fetch() has resolved.
         const streamAbort = new AbortController();
@@ -485,11 +600,6 @@ ${question}
                 };
                 let success = false;
                 let fullAnswer = "";
-                let successfulModel = "";
-                // model_used is NOT NULL in the schema — fallback used when
-                // generation stops/fails before any model actually completes.
-                const modelUsedFallback = useByok ? (model || "auto") : "auto";
-                const startMs = Date.now();
 
                 const closeOnCancel = () => {
                     cancelled = true;
@@ -507,70 +617,6 @@ ${question}
                     closeOnCancel();
                     return;
                 }
-
-                const references = Array.from(docIndexMap.values()).map((item) => ({
-                    index: item.index,
-                    documentId: item.docId,
-                    title: item.title,
-                    pages: Array.from(item.pages).sort((a, b) => a - b),
-                }));
-
-                // Resolve the eagerly-inserted (or edited) turn to a terminal status.
-                // Always an UPDATE — the row already exists. The `status = processing`
-                // gate makes the state machine explicit and prevents a stale writer
-                // from clobbering an already-terminal state.
-                const finalizeTurn = async (status: TurnStatus, answer: string) => {
-                    const latencyMs = Date.now() - startMs;
-                    try {
-                        await withAuthDb(userId, async (tx) => {
-                            await tx
-                                .update(conversationTurns)
-                                .set({
-                                    answer,
-                                    modelUsed: successfulModel || modelUsedFallback,
-                                    latencyMs,
-                                    contextReferences:
-                                        RagService.filterReferencesByCitations(
-                                            answer,
-                                            references,
-                                        ),
-                                    status,
-                                    updatedAt: new Date(),
-                                })
-                                .where(
-                                    and(
-                                        eq(conversationTurns.id, turnId),
-                                        eq(conversationTurns.conversationId, cid!),
-                                        eq(conversationTurns.tenantId, tenantId),
-                                        eq(conversationTurns.status, "processing"),
-                                    ),
-                                );
-
-                            // Explicitly touch the updatedAt field on the parent conversation
-                            await tx
-                                .update(conversations)
-                                .set({ updatedAt: new Date() })
-                                .where(
-                                    and(
-                                        eq(conversations.id, cid!),
-                                        eq(conversations.tenantId, tenantId),
-                                    ),
-                                );
-                        });
-
-                        if (logContext) {
-                            logContext.ragEvent = "conversation_saved";
-                            logContext.latencyMs = latencyMs;
-                            logContext.turnStatus = status;
-                        }
-                    } catch (dbErr: any) {
-                        console.error("[RAG DB SAVE ERROR]:", dbErr);
-                        if (logContext) {
-                            logContext.ragEvent = "conversation_save_error";
-                            logContext.ragError = dbErr.message;
-                        }
-                    }
-                };
 
                 // 4.5 Check BYOK Key if requested
                 let byokKey: string | undefined = undefined;
@@ -693,23 +739,13 @@ ${question}
                         );
                     }
                 } else {
-                    // System Mode: Smart multi-provider Fallback
+                    // System Mode: the fallback model was already resolved
+                    // pre-stream (see 5.2) so the selection — tier, fallbackChain,
+                    // selected model — lands in the http_request log.
                     try {
-                        const response = await FallbackLlmService.generateStream({
-                            messages: [{ role: "user", content: augmentedPrompt }],
-                            // Tier = conversation depth refined by a weighted
-                            // complexity score (question + history + context).
-                            historyDepth,
-                            questionTokens: estimateTokenCount(question),
-                            historyTokens: estimateTokenCount(historyText),
-                            contextTokens: estimateTokenCount(contextText),
-                            signal: cancelSignal,
-                            logContext,
-                        });
-                        // The fallback router has selected the actual model — record
-                        // it NOW so a mid-stream stop still persists the real model
-                        // name (not a generic "auto") in model_used.
-                        successfulModel = response.modelId;
+                        // The model is known before the loop — record it now so a
+                        // mid-stream stop still persists the real model name.
+                        successfulModel = resolvedFallbackStream!.modelId;
                         if (cancelled) {
                             await finalizeTurn("stopped", fullAnswer);
                             return;
@@ -723,7 +759,7 @@ ${question}
                             );
                         }
 
-                        for await (const chunk of response.stream) {
+                        for await (const chunk of resolvedFallbackStream!.stream) {
                             if (isConsumerGone()) break;
                             if (chunk.text) {
                                 fullAnswer += chunk.text;
@@ -747,7 +783,7 @@ ${question}
                         }
 
                         success = true;
-                        if (logContext) logContext.ragModelUsed = response.modelId;
+                        if (logContext) logContext.ragModelUsed = resolvedFallbackStream!.modelId;
                     } catch (error: any) {
                         if (isAbortError(error, cancelSignal)) {
                             await finalizeTurn("stopped", fullAnswer);

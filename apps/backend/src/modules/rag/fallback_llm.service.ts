@@ -118,6 +118,39 @@ async function recordSuccess(provider: string, modelId: string): Promise<void> {
 // ==============================================================================
 
 /**
+ * Reads a fetch Response body and extracts the API's error message (JSON
+ * `error.message` first, raw text fallback) for fetch-based providers.
+ */
+async function extractApiError(res: Response): Promise<string> {
+    const raw = await res.text().catch(() => "");
+    if (!raw) return "empty error body";
+    try {
+        const parsed = JSON.parse(raw);
+        const msg = parsed?.error?.message ?? parsed?.message ?? raw;
+        return String(msg).slice(0, 250);
+    } catch {
+        return raw.slice(0, 250);
+    }
+}
+
+/**
+ * Normalizes a provider error into a short, auditable message regardless of
+ * source: fetch-based providers (Groq/SambaNova/Cohere) enrich their error
+ * with an HTTP status + API body at throw time; SDK-based providers
+ * (Gemini/Mistral) carry their native error message.
+ */
+function providerErrorMessage(err: unknown): string {
+    const e = err as any;
+    if (e?.name === "AbortError") return "aborted";
+    const status = typeof e?.status === "number" ? e.status : undefined;
+    const msg = typeof e?.message === "string" && e.message.length > 0
+        ? e.message
+        : String(e ?? "unknown provider error");
+    const trimmed = msg.slice(0, 300);
+    return status ? `[${status}] ${trimmed}` : trimmed;
+}
+
+/**
  * Generic OpenAI-compatible SSE parser.
  * Used by: Groq, SambaNova
  */
@@ -252,7 +285,12 @@ async function streamGroq(
         body: JSON.stringify({ model: modelId, messages, stream: true }),
         signal,
     });
-    if (!res.ok || !res.body) throw Object.assign(new Error("Groq error"), { status: res.status });
+    if (!res.ok || !res.body) {
+        throw Object.assign(
+            new Error(`Groq ${res.status}: ${await extractApiError(res)}`),
+            { status: res.status },
+        );
+    }
     
     // Some models (like Qwen) return <think> tags. We strip them from the stream.
     async function* stripThinkTags(source: AsyncIterable<{ text: string }>) {
@@ -334,7 +372,12 @@ async function streamSambanova(
         }),
         signal,
     });
-    if (!res.ok || !res.body) throw Object.assign(new Error("SambaNova error"), { status: res.status });
+    if (!res.ok || !res.body) {
+        throw Object.assign(
+            new Error(`SambaNova ${res.status}: ${await extractApiError(res)}`),
+            { status: res.status },
+        );
+    }
     return parseOpenAiSse(res.body, signal);
 }
 
@@ -354,7 +397,12 @@ async function streamCohere(
         body: JSON.stringify({ model: modelId, messages, stream: true }),
         signal,
     });
-    if (!res.ok || !res.body) throw Object.assign(new Error("Cohere error"), { status: res.status });
+    if (!res.ok || !res.body) {
+        throw Object.assign(
+            new Error(`Cohere ${res.status}: ${await extractApiError(res)}`),
+            { status: res.status },
+        );
+    }
     return parseCohereSSe(res.body, signal);
 }
 
@@ -503,21 +551,18 @@ export class FallbackLlmService {
                     });
 
                     if (logContext) {
-                        logContext.selectedProvider = entry.provider;
-                        logContext.selectedModel    = entry.modelId;
-                        logContext.fallbackChain    = fallbackChain;
+                        logContext.fallbackChain = fallbackChain;
                     }
 
                     return { stream, provider: entry.provider, modelId: entry.modelId };
                 } catch (err: any) {
                     if (signal?.aborted || err?.name === "AbortError") throw err;
-                    if (logContext) logContext[`${entry.provider}_error`] = err.message;
                     await recordFailure(entry.provider, entry.modelId);
                     fallbackChain.push({
                         provider: entry.provider,
                         modelId: entry.modelId,
                         outcome: "failed",
-                        error: err.message,
+                        error: providerErrorMessage(err),
                     });
                     // Continue to next candidate
                 }
