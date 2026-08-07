@@ -134,6 +134,13 @@
       "when": 1786101835255,
       "tag": "0018_jittery_cable",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786104645329,
+      "tag": "0019_powerful_juggernaut",
+      "breakpoints": true
     }
   ]
 }

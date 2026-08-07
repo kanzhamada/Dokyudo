@@ -143,14 +143,15 @@ export class RagService {
 
                 // Eager insert: the question is persisted up front with a
                 // "processing" status so the request is trackable from the start.
-                // modelUsed is NOT NULL — finalizeTurn overwrites it on completion.
+                // modelUsed starts null — it is filled once the actual model is
+                // selected (or stays null when the request is blocked/cancelled).
                 await tx.insert(conversationTurns).values({
                     id: turnId,
                     tenantId,
                     conversationId: cid!,
                     question,
                     answer: "",
-                    modelUsed: useByok ? (model || "auto") : "auto",
+                    modelUsed: null,
                     status: "processing",
                 });
             }
@@ -205,11 +206,18 @@ ${question}`;
 
                 // The eagerly-inserted turn records the rejected attempt; resolve it
                 // to a terminal state instead of leaving it stuck in "processing".
+                // Status is "blocked" (a security decision) — "failed" is reserved
+                // for genuine server-side failures. No model was ever invoked, so
+                // model_used stays null.
                 try {
                     await withAuthDb(userId, async (tx) => {
                         await tx
                             .update(conversationTurns)
-                            .set({ status: "failed", updatedAt: new Date() })
+                            .set({
+                                status: "blocked",
+                                modelUsed: null,
+                                updatedAt: new Date(),
+                            })
                             .where(
                                 and(
                                     eq(conversationTurns.id, turnId),
@@ -650,6 +658,10 @@ ${question}
                             signal: cancelSignal,
                             logContext,
                         });
+                        // The fallback router has selected the actual model — record
+                        // it NOW so a mid-stream stop still persists the real model
+                        // name (not a generic "auto") in model_used.
+                        successfulModel = response.modelId;
                         if (cancelled) {
                             await finalizeTurn("stopped", fullAnswer);
                             return;
@@ -687,7 +699,6 @@ ${question}
                         }
 
                         success = true;
-                        successfulModel = response.modelId;
                         if (logContext) logContext.ragModelUsed = response.modelId;
                     } catch (error: any) {
                         if (isAbortError(error, cancelSignal)) {
@@ -768,10 +779,20 @@ ${question}
                 if (!cancelled) controller.close();
                 cancelSignal.removeEventListener("abort", closeOnCancel);
 
-                // Persist the turn with a terminal status (complete / failed).
-                // Client cancellation mid-stream is handled earlier and returns
-                // via finalizeTurn("stopped", ...) before reaching this point.
-                await finalizeTurn(success ? "complete" : "failed", fullAnswer);
+                // Persist the turn with a terminal status. The abort can land right
+                // as the last token arrives — after the in-stream cancellation checks
+                // but before this point — so re-check the live signal instead of
+                // trusting the stale `cancelled` flag. A request the user cancelled
+                // must never be recorded as "complete".
+                const abortedAtFinalize = cancelled || cancelSignal.aborted;
+                await finalizeTurn(
+                    abortedAtFinalize
+                        ? "stopped"
+                        : success
+                          ? "complete"
+                          : "failed",
+                    fullAnswer,
+                );
             },
             cancel() {
                 streamAbort.abort();

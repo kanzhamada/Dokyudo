@@ -123,6 +123,7 @@ export const turnStatusEnum = pgEnum("turn_status_enum", [
     "complete",
     "stopped",
     "failed",
+    "blocked",
 ]);
 
 // ==============================================================================
@@ -246,7 +247,9 @@ export const conversationTurns = pgTable("conversation_turns", {
         .references(() => conversations.id, { onDelete: "cascade" }),
     question: text("question").notNull(),
     answer: text("answer").notNull(),
-    modelUsed: varchar("model_used", { length: 100 }).notNull(),
+    // Nullable: no model is recorded when the request was blocked (prompt
+    // injection) or cancelled before any model was selected.
+    modelUsed: varchar("model_used", { length: 100 }),
     latencyMs: integer("latency_ms"),
     contextReferences: jsonb("context_references"),
     status: turnStatusEnum("status").notNull().default("complete"),

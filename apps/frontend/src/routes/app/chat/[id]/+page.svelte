@@ -186,8 +186,8 @@
 		isRejection?: boolean;
 		/** Server turn id — needed to re-generate this turn in place (edit mode). */
 		turnId?: string;
-		/** Terminal status from the server: processing | complete | stopped | failed. */
-		status?: 'processing' | 'complete' | 'stopped' | 'failed';
+		/** Terminal status from the server: processing | complete | stopped | failed | blocked. */
+		status?: 'processing' | 'complete' | 'stopped' | 'failed' | 'blocked';
 	}
 
 	const PROVIDER_ICONS: Record<string, string> = {
@@ -1038,16 +1038,18 @@
 		const startTypewriter = () => {
 			if (typewriterTimer) clearInterval(typewriterTimer);
 			typewriterTimer = setInterval(() => {
-				if (messages[asstIndex].content.length < streamBuffer.length) {
-					const delta = Math.min(3, streamBuffer.length - messages[asstIndex].content.length);
-					messages[asstIndex].content += streamBuffer.substring(
-						messages[asstIndex].content.length,
-						messages[asstIndex].content.length + delta
-					);
-					if (chatContainer) {
-						chatContainer.scrollTop = chatContainer.scrollHeight;
+				if (isStreamDone) {
+					// Generation finished — flush any remaining buffer immediately so
+					// the displayed text never lags the actual response. This keeps
+					// the "Stop" button live only while the stream is genuinely
+					// generating, so an abort always lands mid-SSE and the server
+					// persists a partial answer with status=stopped.
+					if (messages[asstIndex].content.length < streamBuffer.length) {
+						messages[asstIndex].content = streamBuffer;
+						if (chatContainer) {
+							chatContainer.scrollTop = chatContainer.scrollHeight;
+						}
 					}
-				} else if (isStreamDone) {
 					clearInterval(typewriterTimer!);
 					typewriterTimer = null;
 
@@ -1113,6 +1115,15 @@
 							messages[asstIndex].references = filteredRefs;
 						}
 					}
+				} else if (messages[asstIndex].content.length < streamBuffer.length) {
+					const delta = Math.min(3, streamBuffer.length - messages[asstIndex].content.length);
+					messages[asstIndex].content += streamBuffer.substring(
+						messages[asstIndex].content.length,
+						messages[asstIndex].content.length + delta
+					);
+					if (chatContainer) {
+						chatContainer.scrollTop = chatContainer.scrollHeight;
+					}
 				}
 			}, 18);
 		};
@@ -1131,9 +1142,13 @@
 				clearInterval(typewriterTimer);
 				typewriterTimer = null;
 			}
+			// Freeze at everything received so far — this is the partial the
+			// server persists as "stopped". If the stream already completed
+			// (isStreamDone), the answer is complete, not stopped.
+			messages[asstIndex].content = streamBuffer;
 			messages[asstIndex].isStreaming = false;
 			messages[asstIndex].isCancelled = true;
-			messages[asstIndex].status = 'stopped';
+			messages[asstIndex].status = isStreamDone ? 'complete' : 'stopped';
 			isGenerating = false;
 			isTitleLoading = false;
 			stopThinkingTimer();
@@ -2148,6 +2163,12 @@
 										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300/80"
 									>
 										<span>Response failed — regenerate or edit the question above</span>
+									</div>
+								{:else if !msg.isStreaming && msg.status === 'blocked'}
+									<div
+										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-300/80"
+									>
+										<span>Response blocked by security filter</span>
 									</div>
 								{/if}
 

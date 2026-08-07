@@ -123,7 +123,10 @@ describe("RagService Isolated Tests", () => {
             );
             const blocked = turns.find((t) => t.question === params.question);
             assertExists(blocked);
-            assertEquals(blocked.status, "failed");
+            // Blocked by the injection gate — a security decision, not a server
+            // failure, and no model was ever invoked.
+            assertEquals(blocked.status, "blocked");
+            assertEquals(blocked.modelUsed, null);
         });
 
         // testing successful streaming is complex due to SSE ReadableStream mock, so we focus on unit test DB operations next.
@@ -484,6 +487,9 @@ describe("RagService Isolated Tests", () => {
             assertEquals(stopped.status, "stopped");
             assertEquals(stopped.answer.includes("Partial"), true);
             assertEquals(stopped.answer.includes("answer"), false);
+            // The actual routed model is recorded even though the stream was cut
+            // short — not a generic "auto" placeholder.
+            assertEquals(stopped.modelUsed, "gemini-2.0-flash-lite");
         });
     });
 

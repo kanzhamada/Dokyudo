@@ -37,7 +37,7 @@ export interface ContextReference {
 	pages: number[];
 }
 
-export type TurnStatus = 'processing' | 'complete' | 'stopped' | 'failed';
+export type TurnStatus = 'processing' | 'complete' | 'stopped' | 'failed' | 'blocked';
 
 export interface ConversationTurn {
 	id: string;
