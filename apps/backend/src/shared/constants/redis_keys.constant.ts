@@ -23,4 +23,12 @@ export const RedisKeys = {
     // Circuit breaker: stores "OPEN" string when provider is tripped
     llmCircuitBreaker: (provider: string, modelId: string): string =>
         `llm:cb:${provider}:${modelId}`,
+
+    // Prompt injection blocklist — question SHA-256 hash → "1". A question already
+    // detected as an injection attempt is blocked again without re-running the
+    // guard model (token saving). Only positive results are cached — never "SAFE".
+    promptInjection: async (question: string): Promise<string> => {
+        const hash = await hashTextSHA256(question);
+        return `guard:injection:${hash}`;
+    },
 } as const;

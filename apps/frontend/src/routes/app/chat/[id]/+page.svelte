@@ -31,6 +31,7 @@
 		KeyRound,
 		Plus,
 		Share2,
+		ShieldAlert,
 		Menu
 	} from 'lucide-svelte';
 
@@ -2168,6 +2169,7 @@
 									<div
 										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-300/80"
 									>
+										<ShieldAlert class="size-3" />
 										<span>Response blocked by security filter</span>
 									</div>
 								{/if}
