@@ -2277,7 +2277,7 @@
 														{...props}
 														variant="ghost"
 														size="icon"
-														class="h-7 w-7 cursor-pointer {msg.feedback === 'good' ? 'bg-white/10 text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}"
+														class="h-7 w-7 cursor-pointer {msg.feedback === 'good' ? 'bg-white/10 text-white hover:bg-white/20 hover:text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}"
 														onclick={() => toggleFeedback(msg, 'good')}
 														aria-label="Helpful"
 													>
@@ -2299,7 +2299,7 @@
 														{...props}
 														variant="ghost"
 														size="icon"
-														class="h-7 w-7 cursor-pointer {msg.feedback === 'bad' ? 'bg-white/10 text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}"
+														class="h-7 w-7 cursor-pointer {msg.feedback === 'bad' ? 'bg-white/10 text-white hover:bg-white/20 hover:text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}"
 														onclick={() => toggleFeedback(msg, 'bad')}
 														aria-label="Not helpful"
 													>
