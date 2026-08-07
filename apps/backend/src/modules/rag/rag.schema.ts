@@ -47,6 +47,18 @@ export const UpdateConversationBodySchema = z.object({
 });
 export type UpdateConversationBody = z.infer<typeof UpdateConversationBodySchema>;
 
+export const BranchConversationBodySchema = z.object({
+    /** The boundary turn: history up to (and including) this turn is copied. */
+    turn_id: z.string().uuid("Invalid turn ID"),
+});
+export type BranchConversationBody = z.infer<typeof BranchConversationBodySchema>;
+
+export const BranchOfSchema = z.object({
+    id: z.string().uuid(),
+    title: z.string(),
+});
+export type BranchOf = z.infer<typeof BranchOfSchema>;
+
 export const ConversationItemSchema = z.object({
     id: z.string().uuid(),
     title: z.string(),
@@ -80,6 +92,8 @@ export const ConversationTurnSchema = z.object({
     status: z.enum(["processing", "complete", "stopped", "failed", "blocked"]),
     feedback: z.enum(["good", "bad"]).nullable().optional(),
     feedbackAt: z.string().nullable().optional(),
+    /** Set only on the boundary turn of a branched conversation. */
+    branchedFromTurnId: z.string().uuid().nullable().optional(),
     contextReferences: z.array(ContextReferenceSchema).nullable(),
     createdAt: z.string(),
     updatedAt: z.string().optional(),
@@ -87,6 +101,8 @@ export const ConversationTurnSchema = z.object({
 export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
 
 export const GetConversationResponseSchema = ConversationItemSchema.extend({
+    /** Parent conversation when this one is a branch. Null otherwise. */
+    branchOf: BranchOfSchema.nullable().optional(),
     turns: z.array(ConversationTurnSchema),
 });
 export type GetConversationResponse = z.infer<typeof GetConversationResponseSchema>;

@@ -9,7 +9,8 @@ import type {
 	DeleteConversationResponse,
 	UpdateTurnFeedbackParams,
 	UpdateTurnFeedbackResponse,
-	DeleteTurnResponse
+	DeleteTurnResponse,
+	BranchConversationResponse
 } from '../types/rag.types';
 
 /**
@@ -84,5 +85,19 @@ export function deleteTurn(
 		`/api/rag/conversations/${conversationId}/turns/${turnId}`,
 		{ method: 'DELETE' }
 	);
+}
+
+/**
+ * Creates a new conversation that branches from the given turn — copies the
+ * history up to (and including) that turn, marked as a branch of the source.
+ */
+export function branchConversation(
+	conversationId: string,
+	turnId: string
+): Promise<ApiResult<BranchConversationResponse>> {
+	return apiRequest<BranchConversationResponse>(`/api/rag/conversations/${conversationId}/branch`, {
+		method: 'POST',
+		body: { turn_id: turnId }
+	});
 }
 

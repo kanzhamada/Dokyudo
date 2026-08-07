@@ -219,6 +219,13 @@ export const conversations = pgTable("conversations", {
         .notNull()
         .references(() => tenants.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    // Non-null when this conversation was branched from another (the parent).
+    // ON DELETE SET NULL: the branch keeps existing if the parent is deleted,
+    // it just loses the lineage link.
+    branchOfId: uuid("branch_of_id").references(
+        () => conversations.id,
+        { onDelete: "set null" },
+    ),
     createdAt: timestamp("created_at", {
         mode: "date",
         precision: 3,
@@ -263,6 +270,13 @@ export const conversationTurns = pgTable("conversation_turns", {
         precision: 3,
         withTimezone: true,
     }),
+    // Set ONLY on the boundary turn of a branched conversation — points to the
+    // original turn in the parent conversation that this copy was made from.
+    // The frontend renders the "Branched from ..." divider after this turn.
+    branchedFromTurnId: uuid("branched_from_turn_id").references(
+        () => conversationTurns.id,
+        { onDelete: "set null" },
+    ),
     updatedAt: timestamp("updated_at", {
         mode: "date",
         precision: 3,

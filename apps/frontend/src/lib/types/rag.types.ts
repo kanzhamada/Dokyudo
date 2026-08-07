@@ -64,17 +64,34 @@ export interface ConversationTurn {
 	status: TurnStatus;
 	feedback: 'good' | 'bad' | null;
 	feedbackAt?: string | null;
+	/** Set only on the boundary turn of a branched conversation. */
+	branchedFromTurnId?: string | null;
 	modelUsed: string | null;
 	contextReferences: ContextReference[] | null;
 	createdAt: string;
 	updatedAt?: string;
 }
 
+export interface BranchOf {
+	id: string;
+	title: string;
+}
+
 export interface GetConversationResponse {
 	id: string;
 	title: string;
+	/** Parent conversation when this one is a branch. Null otherwise. */
+	branchOf?: BranchOf | null;
 	createdAt: string;
 	updatedAt: string;
 	turns: ConversationTurn[];
+}
+
+export type BranchConversationParams = {
+	turn_id: string;
+};
+
+export interface BranchConversationResponse {
+	id: string;
 }
 

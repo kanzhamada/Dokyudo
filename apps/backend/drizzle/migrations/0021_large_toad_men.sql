@@ -1,0 +1,4 @@
+ALTER TABLE "conversation_turns" ADD COLUMN "branched_from_turn_id" uuid;--> statement-breakpoint
+ALTER TABLE "conversations" ADD COLUMN "branch_of_id" uuid;--> statement-breakpoint
+ALTER TABLE "conversation_turns" ADD CONSTRAINT "conversation_turns_branched_from_turn_id_conversation_turns_id_fk" FOREIGN KEY ("branched_from_turn_id") REFERENCES "public"."conversation_turns"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "conversations" ADD CONSTRAINT "conversations_branch_of_id_conversations_id_fk" FOREIGN KEY ("branch_of_id") REFERENCES "public"."conversations"("id") ON DELETE set null ON UPDATE no action;

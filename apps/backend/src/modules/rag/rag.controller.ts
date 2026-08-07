@@ -135,3 +135,20 @@ export async function handleGetConversation(c: Context) {
 
     return c.json(result);
 }
+
+export async function handleBranchConversation(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { id: conversationId } = c.req.valid("param" as never) as { id: string };
+    const body = extractor.extractValidJson<RagSchema.BranchConversationBody>();
+
+    const result = await RagService.branchConversation({
+        userId,
+        tenantId,
+        conversationId,
+        turnId: body.turn_id,
+    });
+
+    return c.json({ id: result.id });
+}

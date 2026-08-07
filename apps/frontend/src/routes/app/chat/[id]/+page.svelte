@@ -52,7 +52,7 @@
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
 	import { deleteKey, getKeys, upsertKey } from '$lib/api/keys';
-	import { deleteConversation, deleteTurn, getConversation, updateConversation, updateTurnFeedback } from '$lib/api/rag';
+	import { branchConversation, deleteConversation, deleteTurn, getConversation, updateConversation, updateTurnFeedback } from '$lib/api/rag';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { PUBLIC_API_URL } from '$env/static/public';
 	import { dokyudoFetch } from '$lib/apiClient';
@@ -192,6 +192,8 @@
 		status?: 'processing' | 'complete' | 'stopped' | 'failed' | 'blocked';
 		/** User feedback on the answer: good | bad | null (not rated / cleared). */
 		feedback?: 'good' | 'bad' | null;
+		/** Set on the boundary turn of a branched conversation. */
+		branchedFromTurnId?: string | null;
 	}
 
 	const PROVIDER_ICONS: Record<string, string> = {
@@ -524,6 +526,7 @@
 	// Conversation metadata
 	let chatId = $derived(page.params.id || 'chat-default');
 	let conversationTitle = $state('New Conversation');
+	let branchOfTitle = $state<string | null>(null);
 	let isTitleLoading = $state(false);
 
 	// Conversation Messages
@@ -562,6 +565,7 @@
 		cancelActiveStream?.();
 		messages = [];
 		conversationTitle = 'New Conversation';
+		branchOfTitle = null;
 		inputValue = '';
 		attachedFiles = [];
 
@@ -587,6 +591,7 @@
 			if (requestId !== conversationRequestId) return;
 			if (convRes.ok) {
 				if (convRes.data.title) conversationTitle = convRes.data.title;
+				branchOfTitle = convRes.data.branchOf?.title ?? null;
 				if (convRes.data.turns && convRes.data.turns.length > 0) {
 					const historyMsgs: ChatMessage[] = [];
 					for (const turn of convRes.data.turns) {
@@ -595,6 +600,7 @@
 							role: 'user',
 							content: turn.question,
 							turnId: turn.id,
+							branchedFromTurnId: turn.branchedFromTurnId ?? null,
 							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
 								hour: '2-digit',
 								minute: '2-digit'
@@ -604,6 +610,7 @@
 							id: `${turn.id}-asst`,
 							role: 'assistant',
 							turnId: turn.id,
+							branchedFromTurnId: turn.branchedFromTurnId ?? null,
 							modelName: turn.modelUsed || undefined,
 							content: turn.answer,
 							status: turn.status ?? 'complete',
@@ -1479,6 +1486,22 @@
 			msg.feedback = prev;
 			toast.error(result.error.message);
 		}
+	}
+
+	async function branchFromMessage(msgIndex: number) {
+		const msg = messages[msgIndex];
+		if (!msg?.turnId) {
+			toast.error('Cannot branch — this message is not ready yet');
+			return;
+		}
+		closeResponseMenu();
+		const result = await branchConversation(chatId, msg.turnId);
+		if (!result.ok) {
+			toast.error(result.error.message);
+			return;
+		}
+		toast.success('Branch created');
+		await goto(`/app/chat/${result.data.id}`);
 	}
 
 	function openDeleteResponseDialog(messageIndex: number) {
@@ -2447,6 +2470,13 @@
 							</div>
 						</div>
 					{/if}
+				{#if msg.branchedFromTurnId}
+					<div class="flex items-center justify-center gap-3 py-2 text-[11px] text-white/40">
+						<div class="h-px flex-1 bg-white/10"></div>
+						<span>Branched from {branchOfTitle ?? 'conversation'}</span>
+						<div class="h-px flex-1 bg-white/10"></div>
+					</div>
+				{/if}
 				{/each}
 			</div>
 		</div>
@@ -2958,10 +2988,7 @@
 		<button
 			type="button"
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-			onclick={() => {
-				closeResponseMenu();
-				toast.info('Branch in new chat coming soon');
-			}}
+				onclick={() => branchFromMessage(activeResponseMenuMsgIndex!)}
 		>
 			<GitBranch class="size-3.5 text-white/70" />
 			<span>Branch in new chat</span>

@@ -397,6 +397,105 @@ describe("RagService Isolated Tests", () => {
         });
     });
 
+    describe("branchConversation", () => {
+        it("positive: copies the shared prefix into a new branch conversation", async () => {
+            // Seed a parent with 3 turns, one of them rated
+            const parentId = crypto.randomUUID();
+            await db.insert(conversations).values({
+                id: parentId,
+                tenantId: TEST_TENANT_ID,
+                title: "Parent Conv",
+            });
+            const t1 = crypto.randomUUID();
+            const t2 = crypto.randomUUID();
+            const t3 = crypto.randomUUID();
+            const base = new Date("2026-01-01T00:00:00.000Z");
+            await db.insert(conversationTurns).values([
+                {
+                    id: t1, tenantId: TEST_TENANT_ID, conversationId: parentId,
+                    question: "Q1", answer: "A1", modelUsed: "gemini", status: "complete",
+                    feedback: "good", feedbackAt: base, createdAt: base,
+                },
+                {
+                    id: t2, tenantId: TEST_TENANT_ID, conversationId: parentId,
+                    question: "Q2", answer: "A2", modelUsed: "gemini", status: "complete",
+                    createdAt: new Date(base.getTime() + 1000),
+                },
+                {
+                    id: t3, tenantId: TEST_TENANT_ID, conversationId: parentId,
+                    question: "Q3", answer: "A3", modelUsed: "gemini", status: "complete",
+                    createdAt: new Date(base.getTime() + 2000),
+                },
+            ]);
+
+            // Branch at turn 2 (index 1) — copies [Q1, Q2]
+            const result = await RagService.branchConversation({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: parentId,
+                turnId: t2,
+            });
+
+            // New conversation exists, marked as a branch of the parent
+            const branch = await db.select().from(conversations).where(eq(conversations.id, result.id));
+            assertEquals(branch.length, 1);
+            assertEquals(branch[0].branchOfId, parentId);
+            assertEquals(branch[0].title, "Parent Conv");
+
+            // Copied prefix in order; boundary (Q2) carries the lineage marker
+            const branchTurns = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.conversationId, result.id))
+                .orderBy(conversationTurns.createdAt);
+            assertEquals(branchTurns.length, 2);
+            assertEquals(branchTurns[0].question, "Q1");
+            assertEquals(branchTurns[1].question, "Q2");
+            // Feedback is reset on copies (original Q1 had feedback=good)
+            assertEquals(branchTurns[0].feedback, null);
+            assertEquals(branchTurns[0].feedbackAt, null);
+            // Boundary marker points to the ORIGINAL turn id
+            assertEquals(branchTurns[1].branchedFromTurnId, t2);
+            assertEquals(branchTurns[0].branchedFromTurnId, null);
+            assertEquals(branchTurns[0].status, "complete");
+
+            // Parent untouched — still 3 turns
+            const parentTurns = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.conversationId, parentId));
+            assertEquals(parentTurns.length, 3);
+        });
+
+        it("negative: throws 404 if the turn does not exist in the conversation", async () => {
+            await assertRejects(
+                () =>
+                    RagService.branchConversation({
+                        userId: TEST_USER_ID,
+                        tenantId: TEST_TENANT_ID,
+                        conversationId: TEST_CONVERSATION_ID,
+                        turnId: crypto.randomUUID(),
+                    }),
+                AppError,
+                "Turn not found",
+            );
+        });
+
+        it("negative: throws 404 if the conversation does not exist", async () => {
+            await assertRejects(
+                () =>
+                    RagService.branchConversation({
+                        userId: TEST_USER_ID,
+                        tenantId: TEST_TENANT_ID,
+                        conversationId: crypto.randomUUID(),
+                        turnId: crypto.randomUUID(),
+                    }),
+                AppError,
+                "Conversation not found",
+            );
+        });
+    });
+
     describe("deleteConversation", () => {
         it("negative: throws 404 if conversation does not exist", async () => {
             await assertRejects(

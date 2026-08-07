@@ -983,6 +983,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
         const { userId, tenantId, conversationId } = params;
 
         let conversation: any = null;
+        let branchParent: { id: string; title: string } | null = null;
         let turns: any[] = [];
 
         await withAuthDb(userId, async (tx) => {
@@ -998,6 +999,17 @@ Always include the document references ([Doc N: Page X]) in your answer.
 
             if (results.length > 0) {
                 conversation = results[0];
+
+                // Parent of a branched conversation — for the "Branched from ..." label
+                if (conversation.branchOfId) {
+                    const parent = await tx
+                        .select({ id: conversations.id, title: conversations.title })
+                        .from(conversations)
+                        .where(eq(conversations.id, conversation.branchOfId));
+                    if (parent.length > 0) {
+                        branchParent = { id: parent[0].id, title: parent[0].title };
+                    }
+                }
 
                 turns = await tx
                     .select()
@@ -1023,6 +1035,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
         return {
             id: conversation.id,
             title: conversation.title,
+            branchOf: branchParent,
             createdAt: conversation.createdAt.toISOString(),
             updatedAt: conversation.updatedAt.toISOString(),
             turns: turns.map((t) => ({
@@ -1032,6 +1045,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 status: t.status,
                 feedback: t.feedback ?? null,
                 feedbackAt: t.feedbackAt?.toISOString() ?? null,
+                branchedFromTurnId: t.branchedFromTurnId ?? null,
                 contextReferences: RagService.filterReferencesByCitations(
                     t.answer,
                     t.contextReferences as any,
@@ -1040,6 +1054,97 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 updatedAt: t.updatedAt?.toISOString(),
             })),
         };
+    }
+
+    static async branchConversation(params: {
+        userId: string;
+        tenantId: string;
+        conversationId: string;
+        turnId: string;
+    }): Promise<{ id: string }> {
+        const { userId, tenantId, conversationId, turnId } = params;
+
+        let newConversationId = "";
+
+        await withAuthDb(userId, async (tx) => {
+            // 1. Parent must exist and belong to the tenant
+            const [parent] = await tx
+                .select({ id: conversations.id, title: conversations.title })
+                .from(conversations)
+                .where(
+                    and(
+                        eq(conversations.id, conversationId),
+                        eq(conversations.tenantId, tenantId),
+                    ),
+                );
+            if (!parent) {
+                throw new AppError({
+                    code: "NOT_FOUND",
+                    message: "Conversation not found",
+                    status: 404,
+                });
+            }
+
+            // 2. Ordered turns + locate the boundary turn
+            const turns = await tx
+                .select()
+                .from(conversationTurns)
+                .where(
+                    and(
+                        eq(conversationTurns.conversationId, conversationId),
+                        eq(conversationTurns.tenantId, tenantId),
+                    ),
+                )
+                .orderBy(conversationTurns.createdAt);
+
+            const boundaryIndex = turns.findIndex((t) => t.id === turnId);
+            if (boundaryIndex === -1) {
+                throw new AppError({
+                    code: "NOT_FOUND",
+                    message: "Turn not found",
+                    status: 404,
+                });
+            }
+
+            // 3. New conversation marked as a branch of the parent
+            const [newConv] = await tx
+                .insert(conversations)
+                .values({
+                    tenantId,
+                    title: parent.title,
+                    branchOfId: conversationId,
+                })
+                .returning({ id: conversations.id });
+            newConversationId = newConv.id;
+
+            // 4. Copy the shared prefix [0..boundaryIndex] into the branch:
+            //    - new ids (lineage kept via branchedFromTurnId on the boundary)
+            //    - feedback reset (interactions don't branch)
+            //    - status forced to complete (copied turns are finished)
+            //    - createdAt preserved (faithful timeline / ordering)
+            const prefix = turns.slice(0, boundaryIndex + 1);
+            if (prefix.length > 0) {
+                await tx.insert(conversationTurns).values(
+                    prefix.map((t, i) => ({
+                        id: crypto.randomUUID(),
+                        tenantId,
+                        conversationId: newConversationId,
+                        question: t.question,
+                        answer: t.answer,
+                        modelUsed: t.modelUsed,
+                        latencyMs: t.latencyMs,
+                        contextReferences: t.contextReferences,
+                        status: "complete",
+                        feedback: null,
+                        feedbackAt: null,
+                        branchedFromTurnId: i === prefix.length - 1 ? t.id : null,
+                        createdAt: t.createdAt,
+                    })),
+                );
+            }
+        });
+
+        return { id: newConversationId };
     }
 
     static async updateConversationTitle(params: {

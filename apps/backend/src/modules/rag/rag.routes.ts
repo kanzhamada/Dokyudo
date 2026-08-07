@@ -61,6 +61,46 @@ ragRoutes.openapi(
 
 ragRoutes.openapi(
     createRoute({
+        method: "post",
+        path: "/conversations/{id}/branch",
+        tags: ["RAG"],
+        summary: "Branch Conversation",
+        description:
+            "Creates a new conversation that copies the history up to (and including) the given turn, marked as a branch of the source conversation.",
+        request: {
+            params: RagSchema.ConversationParamSchema,
+            body: {
+                content: {
+                    "application/json": {
+                        schema: RagSchema.BranchConversationBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Success — returns the new conversation id",
+            },
+            400: {
+                description: "Validation error",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Conversation or turn not found",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleBranchConversation as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
         method: "patch",
         path: "/conversations/{id}",
         tags: ["RAG"],
