@@ -1527,6 +1527,16 @@
 	}
 
 	// ---- Web Speech API (Read Aloud) ----
+	/** Show the Chrome suggestion at most once per session. */
+	let ttsChromeHintShown = false;
+
+	/** Firefox on Linux often ships without any TTS voices (no speech backend). */
+	function isFirefoxOnLinux(): boolean {
+		if (typeof navigator === 'undefined') return false;
+		const ua = navigator.userAgent.toLowerCase();
+		return ua.includes('firefox') && ua.includes('linux');
+	}
+
 	/** Cheap heuristic: counts language markers to pick an id/en voice. */
 	function detectSpeechLang(text: string): string {
 		const lower = text.toLowerCase();
@@ -1617,6 +1627,13 @@
 			console.log('[ReadAloud] speechSynthesis NOT supported');
 			toast.error('Text-to-speech is not supported in this browser');
 			return;
+		}
+		// Firefox on Linux often has zero TTS voices — suggest Chrome once.
+		if (!ttsChromeHintShown && isFirefoxOnLinux()) {
+			ttsChromeHintShown = true;
+			toast.info('Use Chrome for a better read-aloud experience', {
+				description: 'Firefox on Linux often has no speech voices installed.'
+			});
 		}
 		console.log(
 			'[ReadAloud] state: speaking =',
@@ -2479,9 +2496,18 @@
 								{/if}
 
 								{#if speakingMessageId === msg.id}
-									<div class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-white/50">
-										<Volume2 class="size-3 animate-pulse" />
-										<span>Reading aloud…</span>
+									<div class="mt-2 inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 py-1 pr-1.5 pl-3">
+										<Volume2 class="size-3.5 shrink-0 animate-pulse text-white/60" />
+										<span class="text-xs font-medium text-white/60">Reading aloud…</span>
+										<button
+											type="button"
+											class="flex cursor-pointer items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/80 transition-colors hover:bg-white/20 hover:text-white focus:outline-none"
+											onclick={stopSpeaking}
+											aria-label="Stop reading"
+										>
+											<Square class="size-3" />
+											<span>Stop</span>
+										</button>
 									</div>
 								{/if}
 
