@@ -52,7 +52,7 @@
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
 	import { deleteKey, getKeys, upsertKey } from '$lib/api/keys';
-	import { deleteConversation, getConversation, updateConversation } from '$lib/api/rag';
+	import { deleteConversation, getConversation, updateConversation, updateTurnFeedback } from '$lib/api/rag';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { PUBLIC_API_URL } from '$env/static/public';
 	import { dokyudoFetch } from '$lib/apiClient';
@@ -190,6 +190,8 @@
 		turnId?: string;
 		/** Terminal status from the server: processing | complete | stopped | failed | blocked. */
 		status?: 'processing' | 'complete' | 'stopped' | 'failed' | 'blocked';
+		/** User feedback on the answer: good | bad | null (not rated / cleared). */
+		feedback?: 'good' | 'bad' | null;
 	}
 
 	const PROVIDER_ICONS: Record<string, string> = {
@@ -582,9 +584,11 @@
 						historyMsgs.push({
 							id: `${turn.id}-asst`,
 							role: 'assistant',
+							turnId: turn.id,
 							modelName: turn.modelUsed || undefined,
 							content: turn.answer,
 							status: turn.status ?? 'complete',
+							feedback: turn.feedback ?? null,
 							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
 								hour: '2-digit',
 								minute: '2-digit'
@@ -1309,11 +1313,15 @@
 					} else if (eventName === 'done') {
 						isStreamDone = true;
 						// The server echoes the persisted turn id — lets the user edit
-						// this turn in place later without reloading the conversation.
+						// this turn in place later (or rate it) without reloading the
+						// conversation.
 						if (dataStr) {
 							try {
 								const parsed = JSON.parse(dataStr);
-								if (parsed.turnId) userMsg.turnId = parsed.turnId;
+								if (parsed.turnId) {
+									userMsg.turnId = parsed.turnId;
+									messages[asstIndex].turnId = parsed.turnId;
+								}
 							} catch {
 								// Legacy done payloads (e.g. injection warning `{}`) are fine.
 							}
@@ -1431,6 +1439,20 @@
 		setTimeout(() => {
 			if (copiedMessageId === msgId) copiedMessageId = null;
 		}, 2000);
+	}
+
+	async function toggleFeedback(msg: ChatMessage, rating: 'good' | 'bad') {
+		if (!msg.turnId) return;
+		const prev = msg.feedback ?? null;
+		// Clicking the active rating again clears it.
+		const next = prev === rating ? null : rating;
+		// Optimistic update — revert on failure.
+		msg.feedback = next;
+		const result = await updateTurnFeedback(chatId, msg.turnId, { rating: next });
+		if (!result.ok) {
+			msg.feedback = prev;
+			toast.error(result.error.message);
+		}
 	}
 
 	function deleteResponse(messageIndex: number) {
@@ -2255,7 +2277,8 @@
 														{...props}
 														variant="ghost"
 														size="icon"
-														class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+														class="h-7 w-7 cursor-pointer {msg.feedback === 'good' ? 'bg-white/10 text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}"
+														onclick={() => toggleFeedback(msg, 'good')}
 														aria-label="Helpful"
 													>
 														<ThumbsUp class="size-3.5" />
@@ -2276,7 +2299,8 @@
 														{...props}
 														variant="ghost"
 														size="icon"
-														class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+														class="h-7 w-7 cursor-pointer {msg.feedback === 'bad' ? 'bg-white/10 text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}"
+														onclick={() => toggleFeedback(msg, 'bad')}
 														aria-label="Not helpful"
 													>
 														<ThumbsDown class="size-3.5" />

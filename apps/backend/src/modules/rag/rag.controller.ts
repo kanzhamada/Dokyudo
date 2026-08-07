@@ -50,6 +50,27 @@ export async function handleUpdateConversationTitle(c: Context) {
     return c.json({ data: { success: true } });
 }
 
+export async function handleUpdateTurnFeedback(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { id: conversationId, turnId } = c.req.valid("param" as never) as {
+        id: string;
+        turnId: string;
+    };
+    const body = extractor.extractValidJson<RagSchema.TurnFeedbackBody>();
+
+    await RagService.updateTurnFeedback({
+        userId,
+        tenantId,
+        conversationId,
+        turnId,
+        rating: body.rating,
+    });
+
+    return c.json({ data: { success: true } });
+}
+
 export async function handleDeleteConversation(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, userId } = extractor.extractAuthContext();

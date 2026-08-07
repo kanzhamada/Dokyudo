@@ -31,6 +31,18 @@ export interface DeleteConversationResponse {
 	};
 }
 
+export type FeedbackRating = 'good' | 'bad';
+
+export type UpdateTurnFeedbackParams = {
+	rating: FeedbackRating | null;
+};
+
+export interface UpdateTurnFeedbackResponse {
+	data: {
+		success: boolean;
+	};
+}
+
 export interface ContextReference {
 	documentId: string;
 	title?: string;
@@ -44,6 +56,8 @@ export interface ConversationTurn {
 	question: string;
 	answer: string;
 	status: TurnStatus;
+	feedback: 'good' | 'bad' | null;
+	feedbackAt?: string | null;
 	modelUsed: string | null;
 	contextReferences: ContextReference[] | null;
 	createdAt: string;

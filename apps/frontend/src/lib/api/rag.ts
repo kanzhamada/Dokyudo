@@ -6,7 +6,9 @@ import type {
 	GetConversationResponse,
 	UpdateConversationParams,
 	UpdateConversationResponse,
-	DeleteConversationResponse
+	DeleteConversationResponse,
+	UpdateTurnFeedbackParams,
+	UpdateTurnFeedbackResponse
 } from '../types/rag.types';
 
 /**
@@ -54,5 +56,19 @@ export function deleteConversation(
 	return apiRequest<DeleteConversationResponse>(`/api/rag/conversations/${conversationId}`, {
 		method: 'DELETE'
 	});
+}
+
+/**
+ * Sets or clears (rating=null) the user's good/bad feedback on a single turn.
+ */
+export function updateTurnFeedback(
+	conversationId: string,
+	turnId: string,
+	params: UpdateTurnFeedbackParams
+): Promise<ApiResult<UpdateTurnFeedbackResponse>> {
+	return apiRequest<UpdateTurnFeedbackResponse>(
+		`/api/rag/conversations/${conversationId}/turns/${turnId}/feedback`,
+		{ method: 'PATCH', body: params }
+	);
 }
 

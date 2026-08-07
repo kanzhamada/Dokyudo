@@ -126,6 +126,8 @@ export const turnStatusEnum = pgEnum("turn_status_enum", [
     "blocked",
 ]);
 
+export const feedbackEnum = pgEnum("feedback_enum", ["good", "bad"]);
+
 // ==============================================================================
 // 3. LOGIN ATTEMPTS TABLE (Anti-Bruteforce)
 // ==============================================================================
@@ -253,6 +255,14 @@ export const conversationTurns = pgTable("conversation_turns", {
     latencyMs: integer("latency_ms"),
     contextReferences: jsonb("context_references"),
     status: turnStatusEnum("status").notNull().default("complete"),
+    // User feedback on the answer (good/bad). Nullable: no rating given yet.
+    // Cleared when the turn is edited/regenerated — the old rating would be stale.
+    feedback: feedbackEnum("feedback"),
+    feedbackAt: timestamp("feedback_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    }),
     updatedAt: timestamp("updated_at", {
         mode: "date",
         precision: 3,

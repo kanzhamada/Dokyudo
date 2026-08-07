@@ -33,6 +33,15 @@ export const ConversationParamSchema = z.object({
     id: z.string().uuid("Invalid conversation ID"),
 });
 
+export const TurnFeedbackParamSchema = ConversationParamSchema.extend({
+    turnId: z.string().uuid("Invalid turn ID"),
+});
+
+export const TurnFeedbackBodySchema = z.object({
+    rating: z.enum(["good", "bad"]).nullable(),
+});
+export type TurnFeedbackBody = z.infer<typeof TurnFeedbackBodySchema>;
+
 export const UpdateConversationBodySchema = z.object({
     title: z.string().min(1, "Title cannot be empty").max(100, "Title is too long"),
 });
@@ -69,6 +78,8 @@ export const ConversationTurnSchema = z.object({
     question: z.string(),
     answer: z.string(),
     status: z.enum(["processing", "complete", "stopped", "failed", "blocked"]),
+    feedback: z.enum(["good", "bad"]).nullable().optional(),
+    feedbackAt: z.string().nullable().optional(),
     contextReferences: z.array(ContextReferenceSchema).nullable(),
     createdAt: z.string(),
     updatedAt: z.string().optional(),

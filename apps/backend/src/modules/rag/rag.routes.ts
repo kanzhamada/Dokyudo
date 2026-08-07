@@ -100,6 +100,46 @@ ragRoutes.openapi(
 
 ragRoutes.openapi(
     createRoute({
+        method: "patch",
+        path: "/conversations/{id}/turns/{turnId}/feedback",
+        tags: ["RAG"],
+        summary: "Update Turn Feedback",
+        description:
+            "Sets or clears (rating=null) the user's good/bad feedback on a single turn.",
+        request: {
+            params: RagSchema.TurnFeedbackParamSchema,
+            body: {
+                content: {
+                    "application/json": {
+                        schema: RagSchema.TurnFeedbackBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Success",
+            },
+            400: {
+                description: "Validation error",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Not found",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleUpdateTurnFeedback as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
         method: "delete",
         path: "/conversations/{id}",
         tags: ["RAG"],

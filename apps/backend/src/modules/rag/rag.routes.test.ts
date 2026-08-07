@@ -2,7 +2,7 @@ import { assertEquals, assertExists } from "@std/assert";
 import { describe, it, beforeAll } from "jsr:@std/testing/bdd";
 import app from "../../main.ts";
 import { db } from "../../config/drizzle.ts";
-import { conversations, tenants } from "../../shared/models/db.model.ts";
+import { conversations, conversationTurns, tenants } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
 
 async function makeRequest(
@@ -28,6 +28,7 @@ async function makeRequest(
 describe("RAG Routes", () => {
     let validToken = "";
     const TEST_TENANT_ID = crypto.randomUUID();
+    let testTenantId = "";
     let testConversationId = crypto.randomUUID();
 
     beforeAll(async () => {
@@ -53,10 +54,11 @@ describe("RAG Routes", () => {
 
             // Find the tenantId of this user to create a valid test conversation
             const decoded = JSON.parse(atob(validToken.split(".")[1]));
-            
+            testTenantId = decoded.tenantId;
+
             await db.insert(conversations).values({
                 id: testConversationId,
-                tenantId: decoded.tenantId,
+                tenantId: testTenantId,
                 title: "Test Conversation for Routes",
             }).onConflictDoNothing();
         }
@@ -143,6 +145,52 @@ describe("RAG Routes", () => {
             const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
             const res = await makeRequest(`/api/rag/conversations/${testConversationId}`, "PATCH", { title: "" }, headers);
             
+            if (!validToken) return;
+            assertEquals(res.status, 400);
+            const json = await res.json();
+            assertEquals(json.error.code, "VALIDATION_ERROR");
+        });
+    });
+
+    describe("PATCH /api/rag/conversations/:id/turns/:turnId/feedback", () => {
+        it("positive: sets feedback on a turn", async () => {
+            // Same defensive pattern as the other positive route tests: without a
+            // valid token (e.g. Supabase email confirmation disabled in the env),
+            // the test is skipped rather than crashing on the DB seed below.
+            if (!validToken) return;
+            const headers: Record<string, string> = { Authorization: `Bearer ${validToken}` };
+            const turnId = crypto.randomUUID();
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: testTenantId,
+                conversationId: testConversationId,
+                question: "Route feedback Q",
+                answer: "Route feedback A",
+                modelUsed: "gemini",
+                status: "complete",
+            });
+
+            const res = await makeRequest(
+                `/api/rag/conversations/${testConversationId}/turns/${turnId}/feedback`,
+                "PATCH",
+                { rating: "good" },
+                headers,
+            );
+
+            assertEquals(res.status, 200);
+            const json = await res.json();
+            assertEquals(json.data.success, true);
+        });
+
+        it("negative: invalid rating returns 400 validation error", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(
+                `/api/rag/conversations/${testConversationId}/turns/${crypto.randomUUID()}/feedback`,
+                "PATCH",
+                { rating: "meh" },
+                headers,
+            );
+
             if (!validToken) return;
             assertEquals(res.status, 400);
             const json = await res.json();

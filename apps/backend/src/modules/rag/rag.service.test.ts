@@ -288,6 +288,74 @@ describe("RagService Isolated Tests", () => {
         });
     });
 
+    describe("updateTurnFeedback", () => {
+        it("positive: sets, changes, and clears feedback on a turn", async () => {
+            const turnId = crypto.randomUUID();
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                question: "Feedback test Q",
+                answer: "Feedback test A",
+                modelUsed: "gemini",
+                status: "complete",
+            });
+
+            const readTurn = async () =>
+                (await db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)))[0];
+
+            // 1. Set good
+            await RagService.updateTurnFeedback({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                turnId,
+                rating: "good",
+            });
+            let row = await readTurn();
+            assertEquals(row.feedback, "good");
+            assertExists(row.feedbackAt);
+
+            // 2. Change to bad
+            await RagService.updateTurnFeedback({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                turnId,
+                rating: "bad",
+            });
+            row = await readTurn();
+            assertEquals(row.feedback, "bad");
+
+            // 3. Clear (rating null)
+            await RagService.updateTurnFeedback({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                turnId,
+                rating: null,
+            });
+            row = await readTurn();
+            assertEquals(row.feedback, null);
+            assertEquals(row.feedbackAt, null);
+        });
+
+        it("negative: throws 404 if the turn does not exist", async () => {
+            await assertRejects(
+                () =>
+                    RagService.updateTurnFeedback({
+                        userId: TEST_USER_ID,
+                        tenantId: TEST_TENANT_ID,
+                        conversationId: TEST_CONVERSATION_ID,
+                        turnId: crypto.randomUUID(),
+                        rating: "good",
+                    }),
+                AppError,
+                "Turn not found",
+            );
+        });
+    });
+
     describe("deleteConversation", () => {
         it("negative: throws 404 if conversation does not exist", async () => {
             await assertRejects(
@@ -594,6 +662,12 @@ describe("RagService Isolated Tests", () => {
             // Newest first — the turn we just created
             const created = turnsAfterCreate[0];
 
+            // Pre-rate the turn — editing/regenerating must reset the stale feedback.
+            await db
+                .update(conversationTurns)
+                .set({ feedback: "good", feedbackAt: new Date() })
+                .where(eq(conversationTurns.id, created.id));
+
             // 2. Edit the same turn (edit_turn_id points at the created turn)
             const ctrl2 = new AbortController();
             const stream2 = await RagService.streamChat({
@@ -627,6 +701,8 @@ describe("RagService Isolated Tests", () => {
             assertEquals(edited.question, "Edited question?");
             assertEquals(edited.answer, "Edited answer");
             assertEquals(edited.status, "complete");
+            // The stale feedback was reset by the edit.
+            assertEquals(edited.feedback, null);
         });
 
         it("negative: throws 404 if the turn does not exist", async () => {

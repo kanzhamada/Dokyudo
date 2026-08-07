@@ -103,7 +103,8 @@ export class RagService {
                 }
                 // Persist the edited question, drop the stale answer, and mark the
                 // turn as processing so it is excluded from LLM history until the
-                // regeneration completes.
+                // regeneration completes. Feedback is reset too — the old rating
+                // refers to an answer that no longer exists.
                 await tx
                     .update(conversationTurns)
                     .set({
@@ -111,6 +112,8 @@ export class RagService {
                         answer: "",
                         contextReferences: null,
                         status: "processing",
+                        feedback: null,
+                        feedbackAt: null,
                         updatedAt: new Date(),
                     })
                     .where(eq(conversationTurns.id, editTurnId));
@@ -936,6 +939,8 @@ ${question}
                 question: t.question,
                 answer: t.answer,
                 status: t.status,
+                feedback: t.feedback ?? null,
+                feedbackAt: t.feedbackAt?.toISOString() ?? null,
                 contextReferences: RagService.filterReferencesByCitations(
                     t.answer,
                     t.contextReferences as any,
@@ -970,6 +975,42 @@ ${question}
                 throw new AppError({
                     code: "NOT_FOUND",
                     message: "Conversation not found",
+                    status: 404,
+                });
+            }
+        });
+    }
+
+    static async updateTurnFeedback(params: {
+        userId: string;
+        tenantId: string;
+        conversationId: string;
+        turnId: string;
+        rating: "good" | "bad" | null;
+    }) {
+        const { userId, tenantId, conversationId, turnId, rating } = params;
+
+        await withAuthDb(userId, async (tx) => {
+            const result = await tx
+                .update(conversationTurns)
+                .set({
+                    feedback: rating,
+                    // null rating clears the feedback — no timestamp kept either
+                    feedbackAt: rating ? new Date() : null,
+                })
+                .where(
+                    and(
+                        eq(conversationTurns.id, turnId),
+                        eq(conversationTurns.conversationId, conversationId),
+                        eq(conversationTurns.tenantId, tenantId),
+                    ),
+                )
+                .returning({ id: conversationTurns.id });
+
+            if (result.length === 0) {
+                throw new AppError({
+                    code: "NOT_FOUND",
+                    message: "Turn not found",
                     status: 404,
                 });
             }
