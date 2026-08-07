@@ -52,7 +52,7 @@
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
 	import { deleteKey, getKeys, upsertKey } from '$lib/api/keys';
-	import { deleteConversation, getConversation, updateConversation, updateTurnFeedback } from '$lib/api/rag';
+	import { deleteConversation, deleteTurn, getConversation, updateConversation, updateTurnFeedback } from '$lib/api/rag';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { PUBLIC_API_URL } from '$env/static/public';
 	import { dokyudoFetch } from '$lib/apiClient';
@@ -257,6 +257,9 @@
 	let isTitleSaving = $state(false);
 	let isDeleteConversationDialogOpen = $state(false);
 	let isConversationDeleting = $state(false);
+	let isDeleteResponseDialogOpen = $state(false);
+	let isResponseDeleting = $state(false);
+	let targetDeleteMessageIndex = $state<number | null>(null);
 	let isTitleMenuOpen = $state(false);
 	let titleMenuPos = $state<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -1455,16 +1458,55 @@
 		}
 	}
 
-	function deleteResponse(messageIndex: number) {
+	function openDeleteResponseDialog(messageIndex: number) {
 		const message = messages[messageIndex];
 		if (!message || message.role !== 'assistant' || message.isStreaming) return;
+		targetDeleteMessageIndex = messageIndex;
+		isDeleteResponseDialogOpen = true;
+	}
 
-		messages = messages.filter(
-			(_item, index) =>
-				index !== messageIndex &&
-				!(index === messageIndex - 1 && messages[index].role === 'user')
-		);
-		toast.success('Response deleted');
+	async function confirmDeleteResponse() {
+		if (targetDeleteMessageIndex === null || isResponseDeleting) return;
+
+		const msgIndex = targetDeleteMessageIndex;
+		const msg = messages[msgIndex];
+		if (!msg || !msg.turnId) {
+			toast.error('Unable to delete response: missing turn reference');
+			isDeleteResponseDialogOpen = false;
+			return;
+		}
+
+		isResponseDeleting = true;
+		console.log('[Chat Detail] Deleting turn:', {
+			conversationId: chatId,
+			turnId: msg.turnId,
+			messageIndex: msgIndex
+		});
+
+		try {
+			const result = await deleteTurn(chatId, msg.turnId);
+			console.log('[Chat Detail] Delete turn backend response:', result);
+
+			if (!result.ok) {
+				toast.error(result.error.message);
+				return;
+			}
+
+			messages = messages.filter(
+				(_item, index) =>
+					index !== msgIndex &&
+					!(index === msgIndex - 1 && messages[index].role === 'user')
+			);
+
+			isDeleteResponseDialogOpen = false;
+			targetDeleteMessageIndex = null;
+			toast.success('Response deleted');
+		} catch (err) {
+			console.error('[Chat Detail] Failed to delete turn:', err);
+			toast.error('Failed to delete response');
+		} finally {
+			isResponseDeleting = false;
+		}
 	}
 </script>
 
@@ -2791,6 +2833,39 @@
 	</Dialog.Content>
 </Dialog.Root>
 
+<Dialog.Root bind:open={isDeleteResponseDialogOpen}>
+	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title class="text-lg font-semibold text-white">Delete response?</Dialog.Title>
+			<Dialog.Description class="text-sm text-white/45">
+				This will permanently remove this response turn from the conversation.
+			</Dialog.Description>
+		</Dialog.Header>
+		<Dialog.Footer class="mt-1 flex gap-2 sm:justify-end">
+			<Button
+				variant="ghost"
+				class="cursor-pointer text-white/60 hover:bg-white/10 hover:text-white"
+				disabled={isResponseDeleting}
+				onclick={() => (isDeleteResponseDialogOpen = false)}
+			>
+				Cancel
+			</Button>
+			<Button
+				class="cursor-pointer bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+				disabled={isResponseDeleting}
+				onclick={confirmDeleteResponse}
+			>
+				{#if isResponseDeleting}
+					<Spinner class="mr-2" />
+					Deleting...
+				{:else}
+					Delete response
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
 {#if isTitleMenuOpen}
 	<!-- Backdrop to capture click outside -->
 	<div
@@ -2876,7 +2951,7 @@
 			disabled={messages[activeResponseMenuMsgIndex]?.isStreaming}
 			onclick={() => {
 				if (activeResponseMenuMsgIndex !== null) {
-					deleteResponse(activeResponseMenuMsgIndex);
+					openDeleteResponseDialog(activeResponseMenuMsgIndex);
 				}
 				closeResponseMenu();
 			}}
