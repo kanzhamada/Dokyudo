@@ -1,0 +1,37 @@
+meta {
+  name: Branch Conversation
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/rag/conversations/{{conversationId}}/branch
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "turn_id": "{{turnId}}"
+  }
+}
+
+docs {
+  Creates a new conversation that copies the history up to (and including) the
+  given turn (turn_id), marked as a branch of the source conversation.
+
+  Response: { "id": "...", "title": "Branched - <parent title>" }
+
+  - Copied turns get NEW ids; feedback is reset; the original turn status is
+    preserved.
+  - The boundary turn's copy carries branchedFromTurnId (the ORIGINAL turn id)
+    so the frontend can render "Branched from ..." after it.
+  - getConversation returns branchOf { id, title } for the branch — null when
+    the parent conversation has been deleted ("Branched from Deleted
+    Conversation").
+}

@@ -86,6 +86,43 @@ sequenceDiagram
     RagService-->>Client: 200 OK { data: { success: true } }
 ```
 
+## Branching Conversations
+
+### 1. Core Logic
+Branch = conversation baru yang dimulai dari **salinan history** sampai turn batas (endpoint) yang dipilih, lalu divergen. Parent dan branch **independen** (snapshot immutable): meng-edit turn parent setelah branch tidak mengubah branch, dan sebaliknya. Pendekatan salin dipilih (bukan shared-prefix ala Git) karena branch harus snapshot — model copy-on-write over-engineered untuk skala ini.
+
+### 2. DB (Migrasi 0021–0022)
+
+- `conversations.branch_of_id` — FK → `conversations.id`, `ON DELETE SET NULL`. Penanda "conversation ini branch dari X" + sumber label. Parent dihapus → null (branch tetap hidup).
+- `conversation_turns.branched_from_turn_id` — **plain column, sengaja TANPA FK**. Marker turn batas (turn terakhir yang disalin), menunjuk ke id turn asli di parent. Tanpa FK karena marker harus **bertahan** saat parent (dan turn aslinya) dihapus — kalau pakai FK `ON DELETE SET NULL`, marker ikut ter-null-kan dan divider "Branched from Deleted Conversation" tidak akan pernah render (bug yang pernah terjadi).
+
+### 3. Endpoint & Service
+
+`POST /api/rag/conversations/{id}/branch` — body `{ "turn_id": "..." }` → `{ id, title }`.
+
+`RagService.branchConversation` (satu transaksi):
+1. Validasi parent (conversation + tenant) → 404; cari index turn batas → 404 kalau tidak ada.
+2. Buat conversation baru: `title = "Branched - {parent.title}"`, `branchOfId = parent.id`.
+3. Salin prefix `[0..boundaryIndex]` dengan aturan:
+   - **id baru** (lineage via marker, bukan id sama),
+   - `createdAt` dipertahankan (timeline/urutan faithful),
+   - **status asli dipertahankan** (turn stopped/failed tetap begitu),
+   - `feedback`/`feedbackAt` di-reset (interaksi tidak ikut branch),
+   - turn batas diberi `branchedFromTurnId` = id turn asli.
+
+### 4. Response `getConversation`
+
+- Level conversation: `branchOf: { id, title } | null` — null saat parent dihapus.
+- Per turn: `branchedFromTurnId: string | null` — frontend render divider **setelah** turn dengan marker ini.
+
+### 5. Frontend
+
+- Divider `Branched from {title}` dirender **hanya di bawah response AI** (bukan question user): icon `GitBranch` + title sebagai `<a href>` (underline, hyperlink ke parent conversation; SvelteKit tetap client-side nav). Parent dihapus → **"Branched from Deleted Conversation"** tanpa link.
+- Setelah branch berhasil: `conversationsStore.addOrUpdate(id, "Branched - XXXX")` → conversation branch langsung muncul di **paling atas** sidebar, lalu navigate ke halaman branch.
+
+### 6. Completion Timestamp
+**Branching:** 2026-08-08
+
 ## Completion Timestamp
 **Date:** 2026-08-08
 **Time:** 00:35 (UTC+7)

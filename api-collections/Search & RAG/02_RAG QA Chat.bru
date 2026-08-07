@@ -31,7 +31,8 @@ body:json {
   //   "provider": "gemini",
   //   "model": "gemini-3.5-flash",
   //   "useByok": true,
-  //   "conversation_id": "{{conversationId}}"
+  //   "conversation_id": "{{conversationId}}",
+  //   "edit_turn_id": "{{turnId}}"
   }
 }
 
@@ -69,7 +70,7 @@ docs {
   ## Stream Cancellation (Backend)
   Saat client meng-abort (AbortController / disconnect), server menerima sinyal via `c.req.raw.signal`:
   - Menghentikan konsumsi stream dari LLM provider (check `signal.aborted` di loop SDK, atau `fetch` abort untuk HTTP-based provider)
-  - Melewatkan penyimpanan `conversation_turn` ke database
+  - Menyimpan jawaban parsial ke `conversation_turns` dengan `status='stopped'`
   - Melewatkan generasi judul otomatis
   
   Tidak diperlukan endpoint terpisah — gunakan sinyal abort native HTTP.

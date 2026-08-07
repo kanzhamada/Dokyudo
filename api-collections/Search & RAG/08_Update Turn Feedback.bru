@@ -1,0 +1,31 @@
+meta {
+  name: Update Turn Feedback
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{baseUrl}}/api/rag/conversations/{{conversationId}}/turns/{{turnId}}/feedback
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "rating": "good"
+  }
+}
+
+docs {
+  Sets or clears (rating = null) the user's good/bad feedback on a single turn.
+  - "good" | "bad" sets the rating and records feedback_at
+  - null clears the rating (toggle good → bad → none)
+
+  Feedback is reset automatically when the turn is edited/regenerated, because
+  the old rating refers to an answer that no longer exists.
+}
