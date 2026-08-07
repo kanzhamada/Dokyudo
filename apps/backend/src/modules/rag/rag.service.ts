@@ -481,6 +481,8 @@ ${historyText}
 ${contextText}
 USER QUESTION:
 ${question}
+
+Always include the document references ([Doc N: Page X]) in your answer.
         `.trim();
 
         // 4. Cascading Fallback & SSE Streaming
