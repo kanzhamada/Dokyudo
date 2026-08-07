@@ -2067,7 +2067,7 @@
 								<!-- Markdown Content View -->
 								<div
 									role="none"
-									class="prose prose-sm max-w-none text-white/90 prose-invert prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-li:my-1 prose-th:border-b prose-th:border-white/20 prose-td:border-b prose-td:border-white/10 prose-tr:border-b prose-tr:border-white/10"
+									class="prose prose-sm max-w-none text-white/90 prose-invert prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-li:my-1 prose-th:border-b prose-th:border-white/20 prose-td:border-b prose-td:border-white/10 prose-tr:border-b prose-tr:border-white/10 prose-hr:border-white/10 prose-hr:my-4"
 									onclick={(e) => {
 										const target = e.target as HTMLElement;
 										const chip = target.closest('[data-doc-id]');
@@ -2620,7 +2620,7 @@
 				<!-- Lower Row: Disclaimer & Counter -->
 				<div class="flex w-full items-center justify-between px-2 text-xs text-white/40">
 					<p class="text-[11px] text-white/40 select-none">
-						Dokyudo can make mistakes. Check important info.
+						Dokyudo can make mistakes. Check again the source references document.
 					</p>
 
 					<!-- Keyboard length counter -->
@@ -2783,6 +2783,12 @@
 	}
 	:global(.prose tr:hover) {
 		background-color: rgba(255, 255, 255, 0.03);
+	}
+	:global(.prose hr) {
+		border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+		border-bottom: none !important;
+		margin-top: 1.25rem;
+		margin-bottom: 1.25rem;
 	}
 </style>
 
