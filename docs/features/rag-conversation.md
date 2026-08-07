@@ -1,7 +1,7 @@
 # RAG Conversation Management
 
 ## Core Logic
-This feature encompasses the conversational memory capabilities, responsive user interface, and management of the Retrieval-Augmented Generation (RAG) system. It enables the AI to "remember" past interactions during a chat session without suffering from context bloat. Additionally, it provides users with full control over their data by allowing them to rename conversation titles, branch conversations, edit/regenerate turns, delete single turns, and permanently delete chat histories.
+This feature encompasses the conversational memory capabilities, responsive user interface, and management of the Retrieval-Augmented Generation (RAG) system. It enables the AI to "remember" past interactions during a chat session without suffering from context bloat. Additionally, it provides users with full control over their data by allowing them to rename conversation titles, branch conversations, edit/regenerate turns, delete single turns with confirmation dialogs, and permanently delete chat histories.
 
 Key capabilities:
 - **Conversation Memory (Sliding Window):** Automatically fetches up to 3 of the most recent conversation turns when a `conversationId` is provided.
@@ -12,8 +12,20 @@ Key capabilities:
 - **Auto-Resetting Textarea Height:** Reactive Svelte 5 `$effect` observing `inputValue` to instantly reset `textInput.style.height = 'auto'` when input is cleared.
 - **User Question & AI Response Action Bars:**
   - **User Question:** Copy button (`Copy`/`Check`) and Edit button (`Pencil`).
-  - **AI Response:** Copy button (`Copy`/`Check`), Retry button (`RotateCw`), Thumbs Up/Down, and a Triple-dot Dropdown (`Ellipsis`) menu containing "Branch in new chat" (`GitBranch`) and "Read aloud" (`Volume2`).
-- **Feedback Button Hover Styling:** Explicit semi-transparent hover states (`hover:bg-white/20 hover:text-white`) for active feedback buttons to prevent theme fallback to opaque white.
+  - **AI Response:** Copy button (`Copy`/`Check`), Retry button (`RotateCw`), Thumbs Up/Down, and a Triple-dot Dropdown (`Ellipsis`) menu containing "Branch in new chat" (`GitBranch`), "Read aloud" (`Volume2`), and "Delete response" (`Trash2`).
+- **Interactive Feedback System with Sonner Toasts:**
+  - Explicit semi-transparent hover state (`hover:bg-white/20 hover:text-white`) for active feedback buttons to prevent theme fallback to opaque white.
+  - Sonner toast notifications on rating toggle (`toast.success` for Helpful, `toast.info` for Needs Improvement / Cleared).
+- **Turn Deletion with Confirmation Modal:**
+  - Dedicated `<Dialog.Root>` confirmation dialog before executing response turn deletion.
+  - Asynchronous HTTP API call (`DELETE /api/rag/conversations/:id/turns/:turnId`) with optimistic UI removal.
+- **Non-Existent Conversation 404 Route Protection:**
+  - Automatic detection of invalid/non-existent conversation UUIDs when accessed directly via URL address bar.
+  - Triggers `toast.error('Conversation not found')` and smoothly redirects client to `/app/chat`.
+- **Svelte 5 `untrack()` Effect Optimization:**
+  - Wraps `loadConversation` inside Svelte 5 `untrack()` within `$effect` to prevent infinite re-submission loops triggered by reactive state mutations during SSE streaming.
+- **Matching Markdown Horizontal Rule (`---`) Styling:**
+  - Custom `:global(.prose hr)` border (`rgba(255, 255, 255, 0.12)`) and spacing matching markdown table grid dividers.
 - **Strict 3-Layer Citation Filtering & Fallback Bracket Stripping:**
   1. *System Prompt Rule 6:* Explicitly forbids generic document list brackets like `[Doc 1; Doc 2; Doc 3]` on negative/fallback answers.
   2. *Server & Client Citation Filtering (`filterReferencesByCitations`):* Strictly requires page-specific citation tags (`[Doc N: Hlm. X]`). If no page-specific citations exist, `contextReferences` evaluates to `null` so `Source References` UI block is completely hidden.
@@ -66,6 +78,7 @@ sequenceDiagram
     RagService->>Database: Async Save new conversation_turn (contextReferences: filteredRefs)
 
     %% Turn Deletion Sub-Flow
+    Client->>Client: Open Delete Response Confirmation Dialog
     Client->>API Gateway: DELETE /api/rag/conversations/:id/turns/:turnId
     API Gateway->>RagService: Extract Auth & Parameters
     RagService->>Database: DELETE FROM conversation_turns WHERE id=turnId AND tenant_id=tenantId
@@ -74,8 +87,8 @@ sequenceDiagram
 ```
 
 ## Completion Timestamp
-**Date:** 2026-08-07
-**Time:** 20:41 (UTC+7)
+**Date:** 2026-08-08
+**Time:** 00:35 (UTC+7)
 
 ## File Mapping
 - `apps/backend/src/modules/rag/rag.schema.ts`: Added schema definitions and types for conversation management and turn interactions.
@@ -88,24 +101,26 @@ sequenceDiagram
 - `apps/frontend/src/lib/types/rag.types.ts`: Exported `DeleteTurnResponse` interface.
 - `apps/frontend/src/lib/api/rag.ts`: Exported `deleteTurn` API client helper.
 - `apps/frontend/src/routes/app/+layout.svelte`: Locked viewport bounds on `<main>` (`h-svh max-h-svh flex-1 min-h-0 flex-col overflow-hidden`).
-- `apps/frontend/src/routes/app/chat/[id]/+page.svelte`: Built headerless layout, active feedback button hover styling, responsive floating input bar with linear gradient, action bars (Copy, Retry, ThumbsUp/Down, Dropdown menu), auto-resetting textarea height `$effect`, and client-side citation tag transformer and filtering.
+- `apps/frontend/src/routes/app/chat/[id]/+page.svelte`: Built headerless layout, active feedback button hover styling, toast notifications, delete response confirmation modal, `untrack()` Svelte 5 effect optimization, 404 route redirect, matching markdown hr styling, responsive floating input bar with linear gradient, action bars, auto-resetting textarea height `$effect`, and client-side citation tag transformer and filtering.
 - `apps/frontend/src/routes/app/chat/+page.svelte`: Applied auto-resetting textarea height `$effect` to main chat page input.
 - `apps/frontend/src/lib/state/conversations.store.svelte.ts`: Created reactive Svelte 5 conversation store for real-time sidebar synchronization.
 - `apps/frontend/src/lib/components/app/AppSidebar.svelte`: Connected recent chats list to `conversationsStore` for instant live updates.
 
 ## Connections
-- **Client (Frontend):** Calls `deleteTurn(conversationId, turnId)` helper, handles SSE streams, renders markdown with inline citation badges, and dynamically resets input heights.
+- **Client (Frontend):** Calls `deleteTurn(conversationId, turnId)` helper, renders modal confirmation dialogs, handles Sonner toasts, safely redirects invalid chat URLs to `/app/chat`, handles SSE streams, renders markdown with inline citation badges, and dynamically resets input heights.
 - **Deno API (Backend):** Manages sliding window memory, performs single turn deletion, executes hybrid search, streams SSE tokens, and filters references by citations before DB save.
 - **PostgreSQL (Database):** Holds `conversations` and `conversation_turns`, isolated strictly via `tenant_id`.
 - **LLM Provider (Gemini / Groq / OpenAI):** `gemini-3.1-flash-lite` used for security gatekeeping, query contextualization, and title generation, while selected main model streams the answer.
 
 ## Architectural Decisions
 1. **Single-Turn Hard Delete:** Chosen `DELETE FROM conversation_turns WHERE id = turnId AND tenant_id = tenantId` over truncating entire subsequent thread or soft-deleting answer fields. Surviving turns in the table automatically re-form the chronological sliding window during subsequent completions.
-2. **Strict Multi-Tenancy Isolation:** Every Drizzle ORM query (`deleteTurn`, `deleteConversation`, `updateTurnFeedback`) explicitly mandates `eq(conversationTurns.tenantId, tenantId)` to guarantee data isolation.
-3. **Responsive Absolute Floating Input:** Positioned `absolute bottom-0 left-0 right-0 z-30` inside the main layout content area. Automatically centers input capsule across Mobile screens, Desktop expanded sidebar, and Desktop collapsed sidebar without hardcoded CSS pixel offsets.
-4. **Auto-Resetting Textarea Height:** Utilizes Svelte 5 `$effect` observing `inputValue`. When `inputValue` is programmatically cleared upon message submission, `style.height` is reset to `'auto'` instantly, restoring default 1-line height (`min-h-[36px]`).
-5. **3-Layer Strict Citation Filtering:**
+2. **Svelte 5 `untrack()` Effect Guarding:** Wrapped history initialization in `untrack()` inside `$effect` to untrack transient `page.state` mutations during streaming, preventing infinite re-submission loops.
+3. **Invalid Conversation URL Protection:** Directly checking `convRes.error?.code === 'NOT_FOUND'` inside `loadConversation` when `initialQuestion` is absent. Automatically notifies user and redirects invalid UUID URLs back to `/app/chat`.
+4. **Strict Multi-Tenancy Isolation:** Every Drizzle ORM query (`deleteTurn`, `deleteConversation`, `updateTurnFeedback`) explicitly mandates `eq(conversationTurns.tenantId, tenantId)` to guarantee data isolation.
+5. **Responsive Absolute Floating Input:** Positioned `absolute bottom-0 left-0 right-0 z-30` inside the main layout content area. Automatically centers input capsule across Mobile screens, Desktop expanded sidebar, and Desktop collapsed sidebar without hardcoded CSS pixel offsets.
+6. **Auto-Resetting Textarea Height:** Utilizes Svelte 5 `$effect` observing `inputValue`. When `inputValue` is programmatically cleared upon message submission, `style.height` is reset to `'auto'` instantly, restoring default 1-line height (`min-h-[36px]`).
+7. **3-Layer Strict Citation Filtering:**
    - *System Prompt Rule 6:* Prevents LLM from emitting generic fallback list brackets (`[Doc 1; Doc 2; Doc 3]`) on negative answers.
    - *Server & Client Regex:* Requires page-specific citation tags (`[Doc N: Hlm. X]`). If no page-specific citations exist, `contextReferences` evaluates to `null` so `Source References` UI block is completely hidden.
    - *Fallback Stripping:* Strips any generic bracket tags from rendered HTML and copied clipboard text.
-6. **Sliding Window Memory (Max 3):** Chosen over full history injection to prevent token exhaustion and ensure LLM attention focuses on retrieved knowledge documents.
+8. **Sliding Window Memory (Max 3):** Chosen over full history injection to prevent token exhaustion and ensure LLM attention focuses on retrieved knowledge documents.

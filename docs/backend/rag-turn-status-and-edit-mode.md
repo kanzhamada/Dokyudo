@@ -135,3 +135,37 @@ Catatan: DB lokal tidak dikelola lewat `drizzle-kit migrate` (tabel `drizzle.__d
 **Lifecycle V2 (write-ahead + status):** 2026-08-07  
 **Edit mode + done event turnId:** 2026-08-07  
 **Blocked status + Redis blocklist:** 2026-08-07
+
+---
+
+## 14. User Feedback (good/bad) — Opsi A (kolom, bukan tabel)
+
+Keputusan desain: feedback 1:1 dengan satu turn per user → cukup **kolom di `conversation_turns`**, bukan tabel baru. Tabel baru hanya diperlukan jika satu turn bisa dinilai banyak user (multi-user per tenant), butuh riwayat perubahan rating, atau retention terpisah.
+
+### 14.1 DB (Migrasi `0020_eminent_master_chief`)
+
+- Enum `feedback_enum` (`good | bad`) + kolom `conversation_turns.feedback` dan `feedback_at` (keduanya nullable).
+- `feedback_at` terisi hanya saat ada rating (`null` saat dibatalkan).
+
+### 14.2 Endpoint
+
+`PATCH /api/rag/conversations/{id}/turns/{turnId}/feedback` — body `{ rating: 'good' | 'bad' | null }`:
+
+- Validasi kepemilikan turn (conversation + tenant) → 404 kalau bukan miliknya.
+- `rating: null` membersihkan feedback (toggle good → bad → batal).
+- **Tidak menyentuh `updated_at` conversation** — memberi rating tidak boleh menaikkan conversation ke atas sidebar.
+- `getConversation` mengembalikan `feedback` + `feedbackAt` per turn.
+
+### 14.3 Edit-Regenerasi Me-Reset Feedback
+
+Blok edit mode me-`SET feedback: null, feedbackAt: null` bersama answer/contextReferences — rating lama menunjuk ke jawaban yang sudah tidak ada.
+
+### 14.4 Frontend
+
+- Tombol 👍/👎 di-wire ke `toggleFeedback(msg, 'good'|'bad')`: update optimis + revert + toast saat gagal; klik rating yang sama lagi = batal; state aktif ditandai (`bg-white/10 text-white`).
+- `turnId` kini ada di pesan assistant juga (dari `getConversation` untuk history, dari event `done` untuk pesan baru) — jawaban baru bisa langsung di-rating tanpa reload.
+- `feedback` dimuat dari DB saat reload → rating bertahan setelah refresh.
+
+### 14.5 Completion Timestamp
+
+**Feedback (Opsi A):** 2026-08-07

@@ -167,3 +167,39 @@ Akar masalah bug: animasi typing (read loop mem-buffer seluruh SSE secepat jarin
 ### 5. Completion Timestamp
 
 **Iteration 2 (status tracking + edit mode + honest stop):** 2026-08-07
+
+---
+
+## Iteration 3 — Feedback Wiring & Toolbar Visibility (2026-08-07/08)
+
+### 1. Feedback (good/bad) di-Wire
+
+- Tombol 👍/👎 memanggil `toggleFeedback(msg, 'good'|'bad')`:
+  - Update **optimis** — klik langsung mengubah state; revert + `toast.error` jika API gagal.
+  - Klik rating yang sama lagi = **batal** (`rating: null`).
+  - State aktif ditandai `bg-white/10 text-white` (monokrom, konsisten tema).
+- `turnId` sekarang diisi di pesan **assistant** juga: dari `getConversation` (history) atau event `done` (pesan baru) — jawaban yang baru selesai bisa langsung di-rating tanpa reload.
+- `feedback` dimuat dari DB saat reload (`turn.feedback ?? null`) → rating bertahan.
+
+Backend: `PATCH /api/rag/conversations/{id}/turns/{turnId}/feedback` (lihat `docs/backend/rag-turn-status-and-edit-mode.md` §14).
+
+### 2. Toolbar Aksi Hanya Tampil Setelah Response Selesai
+
+Sebelumnya icon copy/feedback/action langsung muncul saat pesan dikirim/streaming. Sekarang:
+
+- **Toolbar pesan user** (Copy + Edit): dibungkus `{#if !(msg.id === lastUserMsgId && isGenerating)}` — sembunyi saat pesan itu adalah pesan user terakhir **dan** response masih diproses; turn-turn sebelumnya tetap tampil.
+- **Toolbar pesan assistant** (Copy, Thumbs, Retry, Menu): dibungkus `{#if !msg.isStreaming}` — sembunyi selama streaming, muncul setelah response tuntas (sukses/gagal/cancel).
+
+Efek: layar bersih selama proses; icon feedback tidak bisa diklik pada jawaban yang belum final. Catatan: satu bug nesting sempat terjadi saat wrap (`</div>` salah hitung) — sudah diperbaiki, `svelte-check` 0 error.
+
+### 3. File Mapping
+
+| File | Change |
+|---|---|
+| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | `toggleFeedback`, `turnId` di assistant messages, wrap toolbar user + assistant, thumbs active state |
+| `apps/frontend/src/lib/api/rag.ts` | `updateTurnFeedback()` |
+| `apps/frontend/src/lib/types/rag.types.ts` | `FeedbackRating`, `UpdateTurnFeedbackParams`, `ConversationTurn.feedback/feedbackAt` |
+
+### 4. Completion Timestamp
+
+**Iteration 3 (feedback + toolbar visibility):** 2026-08-07/08
