@@ -32,6 +32,7 @@
 		Plus,
 		Share2,
 		ShieldAlert,
+		TriangleAlert,
 		Menu
 	} from 'lucide-svelte';
 
@@ -1294,9 +1295,12 @@
 						try {
 							const parsed = JSON.parse(dataStr);
 							if (parsed.code === 'PROMPT_INJECTION') {
-								// Inject funny message into typewriter buffer — not saved to DB
+								// The server persists "Nice try, Diddy." + status=blocked;
+								// mirror both locally so the UI shows the blocked state
+								// immediately, without waiting for a reload.
 								streamBuffer = 'Nice try, Diddy.';
 								messages[asstIndex].isRejection = true;
+								messages[asstIndex].status = 'blocked';
 								console.log('[Chat Detail] Prompt injection detected via SSE warning event.');
 							}
 						} catch (e) {
@@ -2163,6 +2167,7 @@
 									<div
 										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 									>
+										<TriangleAlert class="size-3" />
 										<span>Response failed — regenerate or edit the question above</span>
 									</div>
 								{:else if !msg.isStreaming && msg.status === 'blocked'}
