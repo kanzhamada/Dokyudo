@@ -267,6 +267,9 @@
 
 	let activeResponseMenuMsgIndex = $state<number | null>(null);
 	let responseMenuPos = $state<{ x: number; y: number }>({ x: 0, y: 0 });
+	let speakingMessageId = $state<string | null>(null);
+	/** Cached speech voices — populated via the voiceschanged event (async load). */
+	let speechVoices: SpeechSynthesisVoice[] = $state([]);
 
 	function openTitleMenu(e: MouseEvent) {
 		e.preventDefault();
@@ -488,6 +491,7 @@
 
 	onDestroy(() => {
 		cancelActiveStream?.();
+		stopSpeaking();
 		stopThinkingTimer();
 		if (pulseCheckpointTimeout) clearTimeout(pulseCheckpointTimeout);
 		if (checkpointVisibilityTimeout) clearTimeout(checkpointVisibilityTimeout);
@@ -564,6 +568,7 @@
 	async function loadConversation(id: string) {
 		const requestId = ++conversationRequestId;
 		cancelActiveStream?.();
+		stopSpeaking();
 		messages = [];
 		conversationTitle = 'New Conversation';
 		branchOfTitle = null;
@@ -884,6 +889,18 @@
 		setTimeout(() => {
 			isMounted = true;
 		}, 50);
+
+		// Warm up speech voices — they load asynchronously. getVoices() returns []
+		// until the voiceschanged event fires, so listen for it and cache the list.
+		if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+			const synth = window.speechSynthesis;
+			speechVoices = synth.getVoices();
+			console.log('[ReadAloud] onMount warm-up voices =', speechVoices.length);
+			synth.addEventListener?.('voiceschanged', () => {
+				speechVoices = synth.getVoices();
+				console.log('[ReadAloud] voiceschanged: voices =', speechVoices.length);
+			});
+		}
 
 		if (textInput) textInput.focus();
 
@@ -1507,6 +1524,171 @@
 		conversationsStore.addOrUpdate(result.data.id, result.data.title);
 		toast.success('Branch created');
 		await goto(`/app/chat/${result.data.id}`);
+	}
+
+	// ---- Web Speech API (Read Aloud) ----
+	/** Cheap heuristic: counts language markers to pick an id/en voice. */
+	function detectSpeechLang(text: string): string {
+		const lower = text.toLowerCase();
+		const idMarkers = [' yang ', ' dan ', ' dengan ', ' untuk ', ' pada ', ' adalah ', ' tidak ', ' mohon '];
+		const enMarkers = [' the ', ' and ', ' with ', ' for ', ' is ', ' are ', ' not ', ' please '];
+		let idScore = 0;
+		let enScore = 0;
+		for (const m of idMarkers) if (lower.includes(m)) idScore++;
+		for (const m of enMarkers) if (lower.includes(m)) enScore++;
+		return idScore >= enScore ? 'id' : 'en';
+	}
+
+	function pickVoice(lang: string): SpeechSynthesisVoice | null {
+		// Use the cached voices (populated by voiceschanged) — a fresh
+		// getVoices() call can still return [] on the first click.
+		const voices = speechVoices;
+		console.log(
+			'[ReadAloud] pickVoice: voices =',
+			voices.length,
+			voices.map((v) => `${v.lang}:${v.name}`).slice(0, 8)
+		);
+		if (voices.length === 0) {
+			console.warn(
+				'[ReadAloud] No speech voices available — TTS may be disabled in this browser/OS ' +
+					'(common on Linux Chrome without a speech-dispatcher backend). speak() may silently do nothing.'
+			);
+			return null;
+		}
+		const normalized = lang.toLowerCase();
+		const chosen =
+			voices.find((v) => v.lang.toLowerCase().startsWith(normalized)) ??
+			voices.find((v) => v.lang.toLowerCase().startsWith('en')) ??
+			voices[0];
+		console.log('[ReadAloud] pickVoice: want =', normalized, '| chosen =', chosen?.lang, chosen?.name);
+		return chosen;
+	}
+
+	/** Strips citation tags and markdown syntax so the answer reads naturally. */
+	function textForSpeech(raw: string): string {
+		if (!raw) return '';
+		return raw
+			.replace(/\s*\[Doc [^\]]+\]/gi, '')
+			.replace(/```[\s\S]*?```/g, ' code block ')
+			.replace(/`([^`]*)`/g, '$1')
+			.replace(/^#{1,6}\s*/gm, '')
+			.replace(/\*\*([^*]+)\*\*/g, '$1')
+			.replace(/\*([^*]+)\*/g, '$1')
+			.replace(/__([^_]+)__/g, '$1')
+			.replace(/_([^_]+)_/g, '$1')
+			.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+			.replace(/^\s*[-*+]\s+/gm, '')
+			.replace(/^\s*\d+[.)]\s+/gm, '')
+			.replace(/\s+/g, ' ')
+			.trim();
+	}
+
+	function stopSpeaking() {
+		console.log('[ReadAloud] stopSpeaking()');
+		// SSR-safe: the page renders on the server where `window` doesn't exist.
+		if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+			// Only cancel when something is actually active. An unnecessary
+			// cancel() right before speak() can make Chrome silently drop the
+			// next utterance (known Chrome quirk).
+			if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+				console.log('[ReadAloud] stopSpeaking: cancel()');
+				window.speechSynthesis.cancel();
+			}
+		}
+		speakingMessageId = null;
+	}
+
+	function toggleReadAloud(msgIndex: number) {
+		const msg = messages[msgIndex];
+		console.log(
+			'[ReadAloud] toggleReadAloud() msgIndex =',
+			msgIndex,
+			'| msg =',
+			msg?.id,
+			'| speaking =',
+			speakingMessageId
+		);
+		if (!msg || msg.role !== 'assistant') return;
+		if (speakingMessageId === msg.id) {
+			stopSpeaking();
+			return;
+		}
+		if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+			console.log('[ReadAloud] speechSynthesis NOT supported');
+			toast.error('Text-to-speech is not supported in this browser');
+			return;
+		}
+		console.log(
+			'[ReadAloud] state: speaking =',
+			window.speechSynthesis.speaking,
+			'| paused =',
+			window.speechSynthesis.paused,
+			'| pending =',
+			window.speechSynthesis.pending
+		);
+		// Whether something was actively speaking before we reset (used to decide
+		// if speak() must be deferred past a real cancel()).
+		const wasActive = window.speechSynthesis.speaking || window.speechSynthesis.pending;
+		stopSpeaking();
+		const text = textForSpeech(msg.content);
+		console.log('[ReadAloud] text length =', text.length, '| raw length =', msg.content.length);
+		if (!text) {
+			toast.info('Nothing to read aloud');
+			return;
+		}
+		const lang = detectSpeechLang(text);
+		const utterance = new SpeechSynthesisUtterance(text);
+		const voice = pickVoice(lang);
+		if (voice) utterance.voice = voice;
+		else if (speechVoices.length === 0) {
+			// The environment has no TTS voices (e.g. Firefox/Linux without a
+			// speech backend) — surface it instead of failing silently.
+			toast.error('No speech voices available in this browser', {
+				description: 'On Linux, install a speech backend (speech-dispatcher) or use Chrome.'
+			});
+		}
+		// Always set an explicit lang — Chrome can pick a default voice for the
+		// language even when getVoices() is still empty.
+		utterance.lang = voice?.lang ?? (lang === 'id' ? 'id-ID' : 'en-US');
+		utterance.onstart = () => console.log('[ReadAloud] utterance.onstart fired');
+		utterance.onend = () => {
+			console.log('[ReadAloud] utterance.onend fired');
+			if (speakingMessageId === msg.id) speakingMessageId = null;
+		};
+		utterance.onerror = (event) => {
+			console.error('[ReadAloud] utterance.onerror:', event.error);
+			if (speakingMessageId === msg.id) speakingMessageId = null;
+		};
+		console.log(
+			'[ReadAloud] speak() -> lang =',
+			utterance.lang,
+			'| voice =',
+			utterance.voice?.name ?? '(default)',
+			'| len =',
+			text.length
+		);
+		const doSpeak = () => {
+			speakingMessageId = msg.id;
+			try {
+				window.speechSynthesis.speak(utterance);
+				console.log(
+					'[ReadAloud] speak() returned, speaking =',
+					window.speechSynthesis.speaking
+				);
+			} catch (err) {
+				console.error('[ReadAloud] speak() threw:', err);
+				speakingMessageId = null;
+			}
+		};
+		if (wasActive) {
+			// Chrome drops speak() called in the same tick right after a real
+			// cancel() — defer it slightly in that case only.
+			console.log('[ReadAloud] was active — deferring speak()');
+			setTimeout(doSpeak, 100);
+		} else {
+			// Clean slate: speak synchronously inside the click (user gesture).
+			doSpeak();
+		}
 	}
 
 	function openDeleteResponseDialog(messageIndex: number) {
@@ -2296,6 +2478,13 @@
 									</div>
 								{/if}
 
+								{#if speakingMessageId === msg.id}
+									<div class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-white/50">
+										<Volume2 class="size-3 animate-pulse" />
+										<span>Reading aloud…</span>
+									</div>
+								{/if}
+
 								<!-- Document Reference Chips -->
 								{#if !msg.isStreaming && !msg.isCancelled && msg.references && msg.references.length > 0}
 									<div class="mt-2 border-t border-white/10 pt-3">
@@ -3012,13 +3201,14 @@
 		<button
 			type="button"
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-			onclick={() => {
-				closeResponseMenu();
-				toast.info('Read aloud coming soon');
-			}}
+					onclick={() => {
+						const msgIndex = activeResponseMenuMsgIndex;
+						closeResponseMenu();
+						if (msgIndex !== null) toggleReadAloud(msgIndex);
+					}}
 		>
 			<Volume2 class="size-3.5 text-white/70" />
-			<span>Read aloud</span>
+			<span>{speakingMessageId === messages[activeResponseMenuMsgIndex!]?.id ? 'Stop reading' : 'Read aloud'}</span>
 		</button>
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
