@@ -1993,6 +1993,7 @@
 								</div>
 
 								<!-- Action Toolbar for User Question (Copy & Edit) -->
+								{#if !(msg.id === lastUserMsgId && isGenerating)}
 								<div class="flex items-center gap-1">
 									<Tooltip.Provider delayDuration={100}>
 										<Tooltip.Root>
@@ -2043,6 +2044,7 @@
 										</Tooltip.Provider>
 									{/if}
 								</div>
+								{/if}
 							</div>
 						</div>
 					{:else}
@@ -2294,6 +2296,7 @@
 								{/if}
 
 								<!-- Action Toolbar (Copy, Retry, Thumbs Up/Down, Dropdown Menu) -->
+								{#if !msg.isStreaming}
 								<div class="flex items-center gap-1 pt-1 text-white/40">
 									<Tooltip.Provider delayDuration={100}>
 										<Tooltip.Root>
@@ -2427,6 +2430,7 @@
 										</Tooltip.Root>
 									</Tooltip.Provider>
 								</div>
+								{/if}
 							</div>
 						</div>
 					{/if}
