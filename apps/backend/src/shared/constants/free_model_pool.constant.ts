@@ -5,10 +5,16 @@
  * free-tier RAG chat. It depends on `free_providers.constant.ts` for rate limit
  * metadata but does NOT import BYOK constants.
  *
- * Tier selection is based on estimated total prompt tokens:
- *   LIGHT  → < 4K tokens   (user query + small doc context)
- *   MEDIUM → 4K–12K tokens  (user query + multiple chunks)
- *   HEAVY  → 12K–30K tokens (user query + many/large documents)
+ * Tier selection is based on the USER QUESTION's estimated token count (the only
+ * meaningful variable — the RAG context is bounded by the search limit, so it is
+ * near-constant for every request):
+ *   LIGHT  → question ≤ 40 tokens   (short Q&A / chit-chat)
+ *   MEDIUM → question ≤ 200 tokens  (standard questions)
+ *   HEAVY  → question > 200 tokens  (long/complex questions)
+ *
+ * Two guards override the question-based classification:
+ *   - contextTokens > 12K  → HEAVY (large prompts need the big-context pools)
+ *   - totalTokens > 30K    → HEAVY (absolute ceiling — never route past it)
  *
  * Within each tier, models are ordered by a composite priority score:
  *   Primary:   RPM (sustain high concurrency)
@@ -44,14 +50,37 @@ export interface PoolEntry {
 // 2. TOKEN THRESHOLDS
 // ==============================================================================
 
+/**
+ * Absolute ceiling for any free-tier prompt (total tokens). Above this the
+ * request is forced to HEAVY (the caller may reject it outright).
+ */
 export const TIER_THRESHOLDS = {
-    /** Max tokens for LIGHT tier. Above this → MEDIUM. */
-    LIGHT_MAX: 4_000,
-    /** Max tokens for MEDIUM tier. Above this → HEAVY. */
-    MEDIUM_MAX: 12_000,
-    /** Max tokens for HEAVY tier. Above this → reject or use emergency. */
     HEAVY_MAX: 30_000,
 } as const;
+
+/**
+ * Question-length thresholds (tokens) — the PRIMARY classification signal.
+ *
+ * Why question-based instead of total-prompt-based: the RAG context is bounded
+ * by the search limit (fixed top-K chunks), so total-prompt tokens sit in a
+ * narrow band (≈4.5K–7K) no matter what the user asks. The old total-based
+ * thresholds were useless — LIGHT_MAX (4K) sat below the minimum RAG prompt
+ * size, so LIGHT could never fire and every request landed in MEDIUM. The
+ * user question is the only part that actually varies, so it drives the tier.
+ */
+export const QUESTION_TIER_THRESHOLDS = {
+    /** Max question tokens for LIGHT: short Q&A / chit-chat (~160 chars). */
+    LIGHT_MAX: 40,
+    /** Max question tokens for MEDIUM: standard questions (~800 chars). */
+    MEDIUM_MAX: 200,
+} as const;
+
+/**
+ * Context guard: when the retrieved context alone exceeds this many tokens,
+ * route to HEAVY regardless of question length — large prompts need the
+ * big-context / higher-quality pools.
+ */
+export const CONTEXT_HEAVY_MIN_TOKENS = 12_000;
 
 // ==============================================================================
 // 3. ROTATION POOLS (ordered by priority — index 0 = highest priority)
@@ -59,7 +88,7 @@ export const TIER_THRESHOLDS = {
 
 /**
  * LIGHT pool — optimize for RPM and RPD.
- * Best for: short queries + small document context (< 4K tokens).
+ * Best for: short questions / chit-chat (question ≤ 40 tokens).
  *
  * Priority rationale:
  * 1. Mistral ministral-3b  → 750 RPM — unmatched throughput, lightweight
@@ -93,7 +122,7 @@ export const LIGHT_POOL: readonly PoolEntry[] = [
 
 /**
  * MEDIUM pool — balance TPM headroom with quality.
- * Best for: standard queries + multiple document chunks (4K–12K tokens).
+ * Best for: standard questions (40–200 tokens).
  *
  * Priority rationale:
  * 1. Groq llama-4-scout    → 30K TPM — highest TPM in Groq free
@@ -126,7 +155,7 @@ export const MEDIUM_POOL: readonly PoolEntry[] = [
 
 /**
  * HEAVY pool — maximize context window and TPM.
- * Best for: large document sets (12K–30K tokens).
+ * Best for: long/complex questions (> 200 tokens) or contexts > 12K tokens.
  *
  * Priority rationale:
  * 1. Gemini 3.1-flash-lite → 1M ctx, 250K TPM, 500 RPD — best daily budget
@@ -161,14 +190,32 @@ export const ROTATION_POOLS = {
 // ==============================================================================
 
 /**
- * Selects the appropriate rotation tier based on estimated total prompt tokens.
- * Call this before routing to the LLM to determine which pool to iterate.
+ * Selects the appropriate rotation tier.
  *
- * @param estimatedTokens - Total tokens including system prompt + user query + doc context
+ * Classification is driven by the user question's token count (the only
+ * meaningful variable — the RAG context is near-constant), with guards that
+ * force HEAVY for very large contexts or prompts over the hard budget.
+ *
+ * @param params.questionTokens - Estimated tokens of the user question only
+ * @param params.contextTokens  - Estimated tokens of retrieved context (+ history)
+ * @param params.totalTokens    - Estimated tokens of the full prompt (all parts)
  */
-export function selectTier(estimatedTokens: number): RotationTier {
-    if (estimatedTokens <= TIER_THRESHOLDS.LIGHT_MAX) return "LIGHT";
-    if (estimatedTokens <= TIER_THRESHOLDS.MEDIUM_MAX) return "MEDIUM";
+export function selectTier(params: {
+    questionTokens: number;
+    contextTokens: number;
+    totalTokens: number;
+}): RotationTier {
+    const { questionTokens, contextTokens, totalTokens } = params;
+
+    // Hard budget — never route a prompt past the free tier's ceiling.
+    if (totalTokens > TIER_THRESHOLDS.HEAVY_MAX) return "HEAVY";
+
+    // Big context needs the big-model pools regardless of question length.
+    if (contextTokens > CONTEXT_HEAVY_MIN_TOKENS) return "HEAVY";
+
+    // Otherwise classify by question length (the meaningful variable).
+    if (questionTokens <= QUESTION_TIER_THRESHOLDS.LIGHT_MAX) return "LIGHT";
+    if (questionTokens <= QUESTION_TIER_THRESHOLDS.MEDIUM_MAX) return "MEDIUM";
     return "HEAVY";
 }
 

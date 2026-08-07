@@ -406,28 +406,37 @@ async function withTimeout<T>(
 export class FallbackLlmService {
     /**
      * Attempts to stream a response using the free provider rotation pool.
-     * Automatically selects the tier based on estimated total prompt tokens,
-     * then waterfalls through the priority-ordered pool until one succeeds.
+     * Selects the tier from the user question's token count (see
+     * `selectTier`), then waterfalls through the priority-ordered pool until
+     * one succeeds.
      *
      * @param params.messages         Full message array (system + user + context)
-     * @param params.estimatedTokens  Pre-computed token estimate for tier selection
+     * @param params.estimatedTokens  Pre-computed total prompt token estimate
+     * @param params.questionTokens   Estimated tokens of the user question only
+     * @param params.contextTokens    Estimated tokens of retrieved context + history
      * @param params.logContext       Optional log context for structured logging
      */
     static async generateStream(params: {
         messages: { role: string; content: string }[];
         estimatedTokens?: number;
+        questionTokens?: number;
+        contextTokens?: number;
         signal?: AbortSignal;
         logContext?: Record<string, any>;
     }): Promise<FallbackStreamResponse> {
         const { messages, signal, logContext } = params;
 
         const fullText = messages.map(m => m.content).join(" ");
-        const estimatedTokens = params.estimatedTokens ?? estimateTokenCount(fullText);
-        const tier = selectTier(estimatedTokens);
+        const totalTokens = params.estimatedTokens ?? estimateTokenCount(fullText);
+        const questionTokens = params.questionTokens ?? estimateTokenCount(messages[messages.length - 1]?.content ?? "");
+        const contextTokens = params.contextTokens ?? totalTokens;
+        const tier = selectTier({ questionTokens, contextTokens, totalTokens });
 
         if (logContext) {
             logContext.fallbackTier = tier;
-            logContext.estimatedTokens = estimatedTokens;
+            logContext.estimatedTokens = totalTokens;
+            logContext.estimatedQuestionTokens = questionTokens;
+            logContext.estimatedContextTokens = contextTokens;
         }
 
         // Try non-emergency pool first, then emergency

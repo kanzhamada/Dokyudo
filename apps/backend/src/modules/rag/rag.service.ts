@@ -18,6 +18,7 @@ import { decryptApiKey } from "../../shared/utils/crypto.util.ts";
 import { tenantKeys } from "../../shared/models/db.model.ts";
 import { redis } from "../../config/redis.ts";
 import { RedisKeys } from "../../shared/constants/redis_keys.constant.ts";
+import { estimateTokenCount } from "../../shared/constants/free_model_pool.constant.ts";
 
 // Hardcoded answer persisted for prompt-injection-blocked turns. Matches the
 // frontend's inline warning text so reloads stay consistent with the session.
@@ -694,6 +695,12 @@ ${question}
                     try {
                         const response = await FallbackLlmService.generateStream({
                             messages: [{ role: "user", content: augmentedPrompt }],
+                            // Tier classification is driven by the question (the
+                            // variable part) — the RAG context is near-constant.
+                            questionTokens: estimateTokenCount(question),
+                            contextTokens:
+                                estimateTokenCount(contextText) +
+                                estimateTokenCount(historyText),
                             signal: cancelSignal,
                             logContext,
                         });
