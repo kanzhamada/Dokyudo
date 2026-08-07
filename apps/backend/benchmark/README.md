@@ -70,6 +70,10 @@ Fallback env: `BENCHMARK_TENANT_ID`, `BENCHMARK_EVAL_SET`.
 
 ## Catatan penting
 
+- **Eval set terikat ke document id**: setelah re-ingest (upload ulang dokumen),
+  UUID dokumen berubah → `expectedDocumentIds` di eval set menjadi usang dan
+  recall/MRR akan 0%. Remap golden ids (cocokkan via judul dokumen) setelah
+  setiap re-ingest; pastikan berbentuk array datar string, bukan array bersarang.
 - **Benchmark memakai `skipQuota`** — tidak menghabiskan kuota search tenant
   (kuota tetap ditegakkan di endpoint HTTP produksi).
 - **Jangan menyimpulkan kekuatan sumber dari config `fts=0`/`vec=0` di laporan
