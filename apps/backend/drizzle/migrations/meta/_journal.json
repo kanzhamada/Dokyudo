@@ -127,6 +127,13 @@
       "when": 1786003425003,
       "tag": "0017_common_morgan_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786101835255,
+      "tag": "0018_jittery_cable",
+      "breakpoints": true
     }
   ]
 }

@@ -119,6 +119,7 @@ export const authProviderEnum = pgEnum("auth_provider_enum", [
 ]);
 
 export const turnStatusEnum = pgEnum("turn_status_enum", [
+    "processing",
     "complete",
     "stopped",
     "failed",

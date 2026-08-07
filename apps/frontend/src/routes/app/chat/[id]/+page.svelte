@@ -186,8 +186,8 @@
 		isRejection?: boolean;
 		/** Server turn id — needed to re-generate this turn in place (edit mode). */
 		turnId?: string;
-		/** Terminal status from the server: complete | stopped | failed. */
-		status?: 'complete' | 'stopped' | 'failed';
+		/** Terminal status from the server: processing | complete | stopped | failed. */
+		status?: 'processing' | 'complete' | 'stopped' | 'failed';
 	}
 
 	const PROVIDER_ICONS: Record<string, string> = {
@@ -2141,7 +2141,7 @@
 										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 									>
 										<Square class="size-3" />
-										<span>⏹ Response Stopped</span>
+										<span>Response Stopped</span>
 									</div>
 								{:else if !msg.isStreaming && msg.status === 'failed'}
 									<div
@@ -2834,5 +2834,3 @@
 		</button>
 	</div>
 {/if}
-
-

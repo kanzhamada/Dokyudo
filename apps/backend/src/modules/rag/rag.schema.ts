@@ -14,7 +14,7 @@ export const ChatBodySchema = z.object({
 });
 export type ChatBody = z.infer<typeof ChatBodySchema>;
 
-export type TurnStatus = "complete" | "stopped" | "failed";
+export type TurnStatus = "processing" | "complete" | "stopped" | "failed";
 
 export interface ChatServiceParams {
     tenantId: string;
@@ -68,7 +68,7 @@ export const ConversationTurnSchema = z.object({
     id: z.string().uuid(),
     question: z.string(),
     answer: z.string(),
-    status: z.enum(["complete", "stopped", "failed"]),
+    status: z.enum(["processing", "complete", "stopped", "failed"]),
     contextReferences: z.array(ContextReferenceSchema).nullable(),
     createdAt: z.string(),
     updatedAt: z.string().optional(),

@@ -9,7 +9,7 @@ import {
     conversationTurns,
     conversations,
 } from "../../shared/models/db.model.ts";
-import { desc, eq, and, lt, sql } from "drizzle-orm";
+import { desc, eq, and, lt, ne, sql } from "drizzle-orm";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 import { LlmRouterService } from "./llm_router.service.ts";
 import { FallbackLlmService } from "./fallback_llm.service.ts";
@@ -57,20 +57,23 @@ export class RagService {
         });
         if (signal?.aborted) return createClosedStream();
 
-        // 0. Edit Mode (optional): overwrite an existing turn instead of inserting
-        //    a new one. Persist the edited question and drop the now-stale answer /
-        //    references up front, so the edit survives even if generation is
-        //    cancelled or fails. History retrieval below then sees the edited
-        //    question instead of the original one.
-        if (editTurnId) {
-            if (!conversationId) {
-                throw new AppError({
-                    code: "VALIDATION_ERROR",
-                    message: "conversation_id is required when editing a turn",
-                    status: 400,
-                });
-            }
-            await withAuthDb(userId, async (tx) => {
+        // 0. Write-ahead turn record: the turn row is created (or, for edits,
+        //    reset to "processing") BEFORE any LLM work. This persists the user's
+        //    question immediately for tracking, and gives the state machine a
+        //    visible in-flight state: processing -> complete | stopped | failed.
+        const turnId = editTurnId ?? crypto.randomUUID();
+        let isNewConversation = false;
+        let cid = conversationId;
+
+        await withAuthDb(userId, async (tx) => {
+            if (editTurnId) {
+                if (!conversationId) {
+                    throw new AppError({
+                        code: "VALIDATION_ERROR",
+                        message: "conversation_id is required when editing a turn",
+                        status: 400,
+                    });
+                }
                 const [turn] = await tx
                     .select({ id: conversationTurns.id })
                     .from(conversationTurns)
@@ -88,18 +91,95 @@ export class RagService {
                         status: 404,
                     });
                 }
+                // Persist the edited question, drop the stale answer, and mark the
+                // turn as processing so it is excluded from LLM history until the
+                // regeneration completes.
                 await tx
                     .update(conversationTurns)
                     .set({
                         question,
                         answer: "",
                         contextReferences: null,
+                        status: "processing",
                         updatedAt: new Date(),
                     })
                     .where(eq(conversationTurns.id, editTurnId));
-            });
-            if (signal?.aborted) return createClosedStream();
-        }
+            } else {
+                // Resolve (or create) the parent conversation first — the turn row
+                // has a NOT NULL FK to it.
+                if (cid) {
+                    const existingConv = await tx
+                        .select({ id: conversations.id })
+                        .from(conversations)
+                        .where(
+                            and(
+                                eq(conversations.id, cid!),
+                                eq(conversations.tenantId, tenantId),
+                            ),
+                        );
+                    if (existingConv.length === 0) {
+                        await tx.insert(conversations).values({
+                            id: cid,
+                            tenantId,
+                            title:
+                                question.substring(0, 50) ||
+                                "New Conversation",
+                        });
+                        isNewConversation = true;
+                    }
+                } else {
+                    const [newConv] = await tx
+                        .insert(conversations)
+                        .values({
+                            tenantId,
+                            title:
+                                question.substring(0, 50) ||
+                                "New Conversation",
+                        })
+                        .returning({ id: conversations.id });
+                    cid = newConv.id;
+                    isNewConversation = true;
+                }
+
+                // Eager insert: the question is persisted up front with a
+                // "processing" status so the request is trackable from the start.
+                // modelUsed is NOT NULL — finalizeTurn overwrites it on completion.
+                await tx.insert(conversationTurns).values({
+                    id: turnId,
+                    tenantId,
+                    conversationId: cid!,
+                    question,
+                    answer: "",
+                    modelUsed: useByok ? (model || "auto") : "auto",
+                    status: "processing",
+                });
+            }
+        });
+
+        // Helper: mark the eagerly-inserted turn as "stopped" when the client bails
+        // before the stream starts (cancellation during gatekeeper/search/retrieval).
+        // Only touches rows still in "processing" — the in-stream finalize path is
+        // the single writer for the terminal state once streaming has begun.
+        const abortAsStopped = async (): Promise<ReadableStream> => {
+            try {
+                await withAuthDb(userId, async (tx) => {
+                    await tx
+                        .update(conversationTurns)
+                        .set({ status: "stopped", updatedAt: new Date() })
+                        .where(
+                            and(
+                                eq(conversationTurns.id, turnId),
+                                eq(conversationTurns.status, "processing"),
+                            ),
+                        );
+                });
+            } catch (dbErr: any) {
+                if (logContext) logContext.ragAbortMarkError = dbErr.message;
+            }
+            return createClosedStream();
+        };
+
+        if (signal?.aborted) return await abortAsStopped();
 
         // 0. LLM Gatekeeper for Prompt Injection
         const guardPrompt = `You are a strict security gatekeeper for a RAG (Retrieval-Augmented Generation) system.
@@ -116,12 +196,30 @@ ${question}`;
                 GEMINI_MODELS.llmDefault,
                 signal,
             );
-            if (signal?.aborted) return createClosedStream();
+            if (signal?.aborted) return await abortAsStopped();
             const guardDecision = guardResponse.text?.trim().toUpperCase();
 
             if (guardDecision?.includes("INJECTION")) {
                 if (logContext)
                     logContext.ragEvent = "prompt_injection_blocked";
+
+                // The eagerly-inserted turn records the rejected attempt; resolve it
+                // to a terminal state instead of leaving it stuck in "processing".
+                try {
+                    await withAuthDb(userId, async (tx) => {
+                        await tx
+                            .update(conversationTurns)
+                            .set({ status: "failed", updatedAt: new Date() })
+                            .where(
+                                and(
+                                    eq(conversationTurns.id, turnId),
+                                    eq(conversationTurns.status, "processing"),
+                                ),
+                            );
+                    });
+                } catch (_dbErr) {
+                    // non-fatal — the warning stream is still delivered
+                }
 
                 // Return a graceful SSE stream with a warning event — HTTP 200.
                 // Avoids crashing the frontend with a non-2xx status code.
@@ -140,7 +238,7 @@ ${question}`;
                 });
             }
         } catch (e: any) {
-            if (isAbortError(e, signal)) return createClosedStream();
+            if (isAbortError(e, signal)) return await abortAsStopped();
             if (e instanceof AppError) throw e;
             if (logContext) logContext.ragGatekeeperError = e.message;
         }
@@ -162,12 +260,17 @@ ${question}`;
                                     conversationId,
                                 ),
                                 eq(conversationTurns.tenantId, tenantId),
+                                // Only fully-completed turns with an actual answer
+                                // are usable as context — in-flight ("processing"),
+                                // stopped, and failed turns are excluded.
+                                eq(conversationTurns.status, "complete"),
+                                ne(conversationTurns.answer, ""),
                             ),
                         )
                         .orderBy(desc(conversationTurns.createdAt))
                         .limit(3);
                 });
-                if (signal?.aborted) return createClosedStream();
+                if (signal?.aborted) return await abortAsStopped();
 
                 if (previousTurns.length > 0) {
                     // Reverse to chronological order (oldest to newest among the last 3)
@@ -190,7 +293,7 @@ Rewritten Query:`;
                         GEMINI_MODELS.llmDefault,
                         signal,
                     );
-                    if (signal?.aborted) return createClosedStream();
+                    if (signal?.aborted) return await abortAsStopped();
                     const rewritten = rewriteResponse.text?.trim();
                     if (rewritten && rewritten.length > 0) {
                         searchQuery = rewritten;
@@ -199,7 +302,7 @@ Rewritten Query:`;
                     }
                 }
             } catch (e: any) {
-                if (isAbortError(e, signal)) return createClosedStream();
+                if (isAbortError(e, signal)) return await abortAsStopped();
                 if (logContext) logContext.ragHistoryError = e.message;
             }
         }
@@ -211,7 +314,7 @@ Rewritten Query:`;
             limit: 5,
             logContext,
         });
-        if (signal?.aborted) return createClosedStream();
+        if (signal?.aborted) return await abortAsStopped();
 
         // 2. Context Engineering (RAG Context Engineer Skill)
         interface DocInfo {
@@ -291,64 +394,12 @@ ${question}
         await withAuthDb(userId, async (tx) => {
             await TierQuotaUtil.incrementQa(tx, tenantId);
         });
-        if (signal?.aborted) return createClosedStream();
+        if (signal?.aborted) return await abortAsStopped();
 
-        // Resolve parent conversation existence & isNewConversation flag before streaming
-        let isNewConversation = false;
-        let cid = conversationId;
-
-        if (cid) {
-            const existingConv = await withAuthDb(
-                userId,
-                async (tx) => {
-                    return await tx
-                        .select({ id: conversations.id })
-                        .from(conversations)
-                        .where(
-                            and(
-                                eq(conversations.id, cid!),
-                                eq(conversations.tenantId, tenantId),
-                            ),
-                        );
-                },
-            );
-
-            if (existingConv.length === 0) {
-                await withAuthDb(userId, async (tx) => {
-                    await tx.insert(conversations).values({
-                        id: cid,
-                        tenantId,
-                        title:
-                            question.substring(0, 50) ||
-                            "New Conversation",
-                    });
-                });
-                isNewConversation = true;
-            }
-        } else {
-            const [newConv] = await withAuthDb(
-                userId,
-                async (tx) => {
-                    return await tx
-                        .insert(conversations)
-                        .values({
-                            tenantId,
-                            title:
-                                question.substring(0, 50) ||
-                                "New Conversation",
-                        })
-                        .returning({ id: conversations.id });
-                },
-            );
-            cid = newConv.id;
-            isNewConversation = true;
-        }
-
-        if (signal?.aborted) return createClosedStream();
-
-        // Pre-generate the turn id so the client can reference it for edits
-        // (sent in the `done` event) even before the DB row is persisted.
-        const turnId = editTurnId ?? crypto.randomUUID();
+        // 5. Stream construction
+        // (conversation resolution + write-ahead turn insert now happen up front;
+        //  turnId, cid and isNewConversation are already resolved above.)
+        if (signal?.aborted) return await abortAsStopped();
 
         // Internal abort controller for stream lifecycle — fires when consumer cancels the stream
         // (client disconnect, reader.cancel(), etc.) even after fetch() has resolved.
@@ -414,40 +465,17 @@ ${question}
                     pages: Array.from(item.pages).sort((a, b) => a - b),
                 }));
 
-                // Persist the turn (insert, or in-place update for edit mode) with a
-                // terminal status. Called for every outcome: complete / stopped / failed.
+                // Resolve the eagerly-inserted (or edited) turn to a terminal status.
+                // Always an UPDATE — the row already exists. The `status = processing`
+                // gate makes the state machine explicit and prevents a stale writer
+                // from clobbering an already-terminal state.
                 const finalizeTurn = async (status: TurnStatus, answer: string) => {
                     const latencyMs = Date.now() - startMs;
                     try {
                         await withAuthDb(userId, async (tx) => {
-                            if (editTurnId) {
-                                await tx
-                                    .update(conversationTurns)
-                                    .set({
-                                        answer,
-                                        modelUsed: successfulModel || modelUsedFallback,
-                                        latencyMs,
-                                        contextReferences:
-                                            RagService.filterReferencesByCitations(
-                                                answer,
-                                                references,
-                                            ),
-                                        status,
-                                        updatedAt: new Date(),
-                                    })
-                                    .where(
-                                        and(
-                                            eq(conversationTurns.id, editTurnId),
-                                            eq(conversationTurns.conversationId, cid!),
-                                            eq(conversationTurns.tenantId, tenantId),
-                                        ),
-                                    );
-                            } else {
-                                await tx.insert(conversationTurns).values({
-                                    id: turnId,
-                                    tenantId,
-                                    conversationId: cid!,
-                                    question,
+                            await tx
+                                .update(conversationTurns)
+                                .set({
                                     answer,
                                     modelUsed: successfulModel || modelUsedFallback,
                                     latencyMs,
@@ -457,8 +485,16 @@ ${question}
                                             references,
                                         ),
                                     status,
-                                });
-                            }
+                                    updatedAt: new Date(),
+                                })
+                                .where(
+                                    and(
+                                        eq(conversationTurns.id, turnId),
+                                        eq(conversationTurns.conversationId, cid!),
+                                        eq(conversationTurns.tenantId, tenantId),
+                                        eq(conversationTurns.status, "processing"),
+                                    ),
+                                );
 
                             // Explicitly touch the updatedAt field on the parent conversation
                             await tx
