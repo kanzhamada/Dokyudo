@@ -412,13 +412,15 @@ export class FallbackLlmService {
      *
      * @param params.messages         Full message array (system + user + context)
      * @param params.estimatedTokens  Pre-computed total prompt token estimate
+     * @param params.historyDepth     Number of previous turns carried in the prompt
      * @param params.questionTokens   Estimated tokens of the user question only
-     * @param params.contextTokens    Estimated tokens of retrieved context + history
+     * @param params.contextTokens    Estimated tokens of retrieved document context
      * @param params.logContext       Optional log context for structured logging
      */
     static async generateStream(params: {
         messages: { role: string; content: string }[];
         estimatedTokens?: number;
+        historyDepth?: number;
         questionTokens?: number;
         contextTokens?: number;
         signal?: AbortSignal;
@@ -428,13 +430,15 @@ export class FallbackLlmService {
 
         const fullText = messages.map(m => m.content).join(" ");
         const totalTokens = params.estimatedTokens ?? estimateTokenCount(fullText);
+        const historyDepth = params.historyDepth ?? 0;
         const questionTokens = params.questionTokens ?? estimateTokenCount(messages[messages.length - 1]?.content ?? "");
         const contextTokens = params.contextTokens ?? totalTokens;
-        const tier = selectTier({ questionTokens, contextTokens, totalTokens });
+        const tier = selectTier({ historyDepth, questionTokens, contextTokens, totalTokens });
 
         if (logContext) {
             logContext.fallbackTier = tier;
             logContext.estimatedTokens = totalTokens;
+            logContext.historyDepth = historyDepth;
             logContext.estimatedQuestionTokens = questionTokens;
             logContext.estimatedContextTokens = contextTokens;
         }

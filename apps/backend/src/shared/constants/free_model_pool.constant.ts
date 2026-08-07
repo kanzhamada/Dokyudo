@@ -5,16 +5,17 @@
  * free-tier RAG chat. It depends on `free_providers.constant.ts` for rate limit
  * metadata but does NOT import BYOK constants.
  *
- * Tier selection is based on the USER QUESTION's estimated token count (the only
- * meaningful variable — the RAG context is bounded by the search limit, so it is
- * near-constant for every request):
- *   LIGHT  → question ≤ 40 tokens   (short Q&A / chit-chat)
- *   MEDIUM → question ≤ 200 tokens  (standard questions)
- *   HEAVY  → question > 200 tokens  (long/complex questions)
+ * Tier selection is driven by the CONVERSATION HISTORY DEPTH (number of previous
+ * turns carried into the prompt) — the strongest real signal, since the RAG
+ * context is bounded by the search limit and therefore near-constant:
+ *   LIGHT  → 0 previous turns (fresh conversation)
+ *   MEDIUM → 1–2 previous turns
+ *   HEAVY  → 3 previous turns (deep context)
  *
- * Two guards override the question-based classification:
- *   - contextTokens > 12K  → HEAVY (large prompts need the big-context pools)
- *   - totalTokens > 30K    → HEAVY (absolute ceiling — never route past it)
+ * Three guards override the depth-based classification:
+ *   - questionTokens > 200    → HEAVY (very long questions need more capacity)
+ *   - contextTokens > 12K     → HEAVY (large prompts need the big-context pools)
+ *   - totalTokens > 30K       → HEAVY (absolute ceiling — never route past it)
  *
  * Within each tier, models are ordered by a composite priority score:
  *   Primary:   RPM (sustain high concurrency)
@@ -47,7 +48,7 @@ export interface PoolEntry {
 }
 
 // ==============================================================================
-// 2. TOKEN THRESHOLDS
+// 2. TOKEN & DEPTH THRESHOLDS
 // ==============================================================================
 
 /**
@@ -59,26 +60,32 @@ export const TIER_THRESHOLDS = {
 } as const;
 
 /**
- * Question-length thresholds (tokens) — the PRIMARY classification signal.
- *
- * Why question-based instead of total-prompt-based: the RAG context is bounded
- * by the search limit (fixed top-K chunks), so total-prompt tokens sit in a
- * narrow band (≈4.5K–7K) no matter what the user asks. The old total-based
- * thresholds were useless — LIGHT_MAX (4K) sat below the minimum RAG prompt
- * size, so LIGHT could never fire and every request landed in MEDIUM. The
- * user question is the only part that actually varies, so it drives the tier.
+ * Question-length threshold (tokens): questions above this are always routed
+ * to HEAVY — they need more reasoning capacity regardless of conversation
+ * depth. (~800 characters at the 1-token-per-4-chars rule of thumb.)
  */
-export const QUESTION_TIER_THRESHOLDS = {
-    /** Max question tokens for LIGHT: short Q&A / chit-chat (~160 chars). */
-    LIGHT_MAX: 40,
-    /** Max question tokens for MEDIUM: standard questions (~800 chars). */
-    MEDIUM_MAX: 200,
+export const QUESTION_HEAVY_MIN_TOKENS = 200;
+
+/**
+ * Conversation-depth thresholds — the PRIMARY classification signal.
+ *
+ * Why history-based instead of total-prompt-based: the RAG context is bounded
+ * by the search limit (fixed top-K chunks), so the retrieved-document part is
+ * near-constant. The only variables that actually move the prompt size are the
+ * conversation history (0–3 previous turns) and the question. Deeper history
+ * means the model must carry and reconcile more prior Q&A, so it drives the tier:
+ *   0 previous turns (fresh conversation) → LIGHT
+ *   1–2 previous turns                    → MEDIUM
+ *   3 previous turns                      → HEAVY
+ */
+export const HISTORY_DEPTH_THRESHOLDS = {
+    /** Max history depth that still maps to MEDIUM (above this → HEAVY). */
+    MEDIUM_MAX_DEPTH: 2,
 } as const;
 
 /**
- * Context guard: when the retrieved context alone exceeds this many tokens,
- * route to HEAVY regardless of question length — large prompts need the
- * big-context / higher-quality pools.
+ * Context guard: when the retrieved document context alone exceeds this many
+ * tokens, route to HEAVY regardless of question length or history depth.
  */
 export const CONTEXT_HEAVY_MIN_TOKENS = 12_000;
 
@@ -192,30 +199,35 @@ export const ROTATION_POOLS = {
 /**
  * Selects the appropriate rotation tier.
  *
- * Classification is driven by the user question's token count (the only
- * meaningful variable — the RAG context is near-constant), with guards that
- * force HEAVY for very large contexts or prompts over the hard budget.
+ * Classification is driven by conversation history depth (the strongest real
+ * signal), with guards that force HEAVY for very long questions, very large
+ * contexts, or prompts over the hard budget. All inputs are pre-computed token
+ * estimates — the function itself is O(1).
  *
+ * @param params.historyDepth   - Number of previous turns carried in the prompt
  * @param params.questionTokens - Estimated tokens of the user question only
- * @param params.contextTokens  - Estimated tokens of retrieved context (+ history)
+ * @param params.contextTokens  - Estimated tokens of retrieved document context
  * @param params.totalTokens    - Estimated tokens of the full prompt (all parts)
  */
 export function selectTier(params: {
+    historyDepth: number;
     questionTokens: number;
     contextTokens: number;
     totalTokens: number;
 }): RotationTier {
-    const { questionTokens, contextTokens, totalTokens } = params;
+    const { historyDepth, questionTokens, contextTokens, totalTokens } = params;
 
-    // Hard budget — never route a prompt past the free tier's ceiling.
+    // Guards (safety) — checked first, cheapest to evaluate.
+    // Hard budget: never route a prompt past the free tier's ceiling.
     if (totalTokens > TIER_THRESHOLDS.HEAVY_MAX) return "HEAVY";
-
-    // Big context needs the big-model pools regardless of question length.
+    // Very large retrieved context needs the big-context pools.
     if (contextTokens > CONTEXT_HEAVY_MIN_TOKENS) return "HEAVY";
+    // Very long questions need more reasoning capacity regardless of depth.
+    if (questionTokens > QUESTION_HEAVY_MIN_TOKENS) return "HEAVY";
 
-    // Otherwise classify by question length (the meaningful variable).
-    if (questionTokens <= QUESTION_TIER_THRESHOLDS.LIGHT_MAX) return "LIGHT";
-    if (questionTokens <= QUESTION_TIER_THRESHOLDS.MEDIUM_MAX) return "MEDIUM";
+    // Primary signal: conversation history depth.
+    if (historyDepth === 0) return "LIGHT";
+    if (historyDepth <= HISTORY_DEPTH_THRESHOLDS.MEDIUM_MAX_DEPTH) return "MEDIUM";
     return "HEAVY";
 }
 

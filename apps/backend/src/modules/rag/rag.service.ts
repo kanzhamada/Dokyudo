@@ -293,6 +293,7 @@ ${question}`;
 
         // 0.5. Retrieve Conversation History & Rewrite Query
         let historyText = "";
+        let historyDepth = 0;
         let searchQuery = question;
 
         if (conversationId) {
@@ -319,6 +320,7 @@ ${question}`;
                         .limit(3);
                 });
                 if (signal?.aborted) return await abortAsStopped();
+                historyDepth = previousTurns.length;
 
                 if (previousTurns.length > 0) {
                     // Reverse to chronological order (oldest to newest among the last 3)
@@ -695,12 +697,11 @@ ${question}
                     try {
                         const response = await FallbackLlmService.generateStream({
                             messages: [{ role: "user", content: augmentedPrompt }],
-                            // Tier classification is driven by the question (the
-                            // variable part) — the RAG context is near-constant.
+                            // Tier classification is driven by conversation depth
+                            // (the strongest real variable) — pass it through.
+                            historyDepth,
                             questionTokens: estimateTokenCount(question),
-                            contextTokens:
-                                estimateTokenCount(contextText) +
-                                estimateTokenCount(historyText),
+                            contextTokens: estimateTokenCount(contextText),
                             signal: cancelSignal,
                             logContext,
                         });
