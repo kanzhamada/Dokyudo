@@ -2161,13 +2161,13 @@
 									</div>
 								{:else if !msg.isStreaming && msg.status === 'failed'}
 									<div
-										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300/80"
+										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 									>
 										<span>Response failed — regenerate or edit the question above</span>
 									</div>
 								{:else if !msg.isStreaming && msg.status === 'blocked'}
 									<div
-										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-300/80"
+										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 									>
 										<ShieldAlert class="size-3" />
 										<span>Response blocked by security filter</span>
@@ -2284,7 +2284,7 @@
 										</Tooltip.Root>
 									</Tooltip.Provider>
 
-									{#if !msg.isRejection && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
+									{#if !msg.isRejection && msg.status !== 'blocked' && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
 										<DropdownMenu.Root>
 											<Tooltip.Provider delayDuration={100}>
 												<Tooltip.Root>
