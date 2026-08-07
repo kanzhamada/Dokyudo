@@ -141,6 +141,34 @@ ragRoutes.openapi(
 ragRoutes.openapi(
     createRoute({
         method: "delete",
+        path: "/conversations/{id}/turns/{turnId}",
+        tags: ["RAG"],
+        summary: "Delete Turn",
+        description: "Deletes a single turn from a conversation.",
+        request: {
+            params: RagSchema.TurnFeedbackParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Success",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Not found",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleDeleteTurn as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "delete",
         path: "/conversations/{id}",
         tags: ["RAG"],
         summary: "Delete Conversation",

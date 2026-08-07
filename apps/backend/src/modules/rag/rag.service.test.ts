@@ -356,6 +356,47 @@ describe("RagService Isolated Tests", () => {
         });
     });
 
+    describe("deleteTurn", () => {
+        it("positive: deletes turn successfully", async () => {
+            const turnId = crypto.randomUUID();
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                question: "Question to delete",
+                answer: "Answer to delete",
+                status: "complete",
+            });
+
+            await RagService.deleteTurn({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                turnId,
+            });
+
+            const rows = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.id, turnId));
+            assertEquals(rows.length, 0);
+        });
+
+        it("negative: throws 404 if turn does not exist", async () => {
+            await assertRejects(
+                () =>
+                    RagService.deleteTurn({
+                        userId: TEST_USER_ID,
+                        tenantId: TEST_TENANT_ID,
+                        conversationId: TEST_CONVERSATION_ID,
+                        turnId: crypto.randomUUID(),
+                    }),
+                AppError,
+                "Turn not found",
+            );
+        });
+    });
+
     describe("deleteConversation", () => {
         it("negative: throws 404 if conversation does not exist", async () => {
             await assertRejects(

@@ -8,7 +8,8 @@ import type {
 	UpdateConversationResponse,
 	DeleteConversationResponse,
 	UpdateTurnFeedbackParams,
-	UpdateTurnFeedbackResponse
+	UpdateTurnFeedbackResponse,
+	DeleteTurnResponse
 } from '../types/rag.types';
 
 /**
@@ -69,6 +70,19 @@ export function updateTurnFeedback(
 	return apiRequest<UpdateTurnFeedbackResponse>(
 		`/api/rag/conversations/${conversationId}/turns/${turnId}/feedback`,
 		{ method: 'PATCH', body: params }
+	);
+}
+
+/**
+ * Deletes a single turn (question and response) from a conversation.
+ */
+export function deleteTurn(
+	conversationId: string,
+	turnId: string
+): Promise<ApiResult<DeleteTurnResponse>> {
+	return apiRequest<DeleteTurnResponse>(
+		`/api/rag/conversations/${conversationId}/turns/${turnId}`,
+		{ method: 'DELETE' }
 	);
 }
 

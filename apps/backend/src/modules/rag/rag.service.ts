@@ -1017,6 +1017,36 @@ ${question}
         });
     }
 
+    static async deleteTurn(params: {
+        userId: string;
+        tenantId: string;
+        conversationId: string;
+        turnId: string;
+    }) {
+        const { userId, tenantId, conversationId, turnId } = params;
+
+        await withAuthDb(userId, async (tx) => {
+            const result = await tx
+                .delete(conversationTurns)
+                .where(
+                    and(
+                        eq(conversationTurns.id, turnId),
+                        eq(conversationTurns.conversationId, conversationId),
+                        eq(conversationTurns.tenantId, tenantId),
+                    ),
+                )
+                .returning({ id: conversationTurns.id });
+
+            if (result.length === 0) {
+                throw new AppError({
+                    code: "NOT_FOUND",
+                    message: "Turn not found",
+                    status: 404,
+                });
+            }
+        });
+    }
+
     static async deleteConversation(params: {
         userId: string;
         tenantId: string;

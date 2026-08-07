@@ -43,6 +43,12 @@ export interface UpdateTurnFeedbackResponse {
 	};
 }
 
+export interface DeleteTurnResponse {
+	data: {
+		success: boolean;
+	};
+}
+
 export interface ContextReference {
 	documentId: string;
 	title?: string;

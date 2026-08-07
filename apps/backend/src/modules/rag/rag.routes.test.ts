@@ -249,6 +249,23 @@ describe("RAG Routes", () => {
         });
     });
 
+    describe("DELETE /api/rag/conversations/:id/turns/:turnId", () => {
+        it("negative: returns 404 for non-existent turn", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(
+                `/api/rag/conversations/${testConversationId}/turns/${crypto.randomUUID()}`,
+                "DELETE",
+                undefined,
+                headers
+            );
+
+            if (!validToken) return;
+            assertEquals(res.status, 404);
+            const json = await res.json();
+            assertEquals(json.error.code, "NOT_FOUND");
+        });
+    });
+
     describe("DELETE /api/rag/conversations/:id", () => {
         it("positive: deletes conversation successfully", async () => {
             const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};

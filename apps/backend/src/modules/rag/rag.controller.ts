@@ -71,6 +71,25 @@ export async function handleUpdateTurnFeedback(c: Context) {
     return c.json({ data: { success: true } });
 }
 
+export async function handleDeleteTurn(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { id: conversationId, turnId } = c.req.valid("param" as never) as {
+        id: string;
+        turnId: string;
+    };
+
+    await RagService.deleteTurn({
+        userId,
+        tenantId,
+        conversationId,
+        turnId,
+    });
+
+    return c.json({ data: { success: true } });
+}
+
 export async function handleDeleteConversation(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, userId } = extractor.extractAuthContext();
