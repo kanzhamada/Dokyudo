@@ -112,7 +112,7 @@ sequenceDiagram
 
 4. **Removing Per-Word Animation**: keyframes wordFadeIn with filter blur caused every word already visible on screen to re-animate when new tokens arrived (because Svelte re-renders the html block). The cleanest fix was to remove all per-word animation entirely, keeping rendering pure and flicker-free.
 
-5. **Typewriter Drain vs Network Stream — Dua Hal Berbeda**: `isStreamDone` (event `done` dari SSE) menandakan **network stream selesai**, tapi typewriter masih "menguras" `streamBuffer` (3 char/18ms). Ini penting untuk UX stop: stream selesai ≠ teks selesai ditampilkan. Tombol stop harus tetap berfungsi selama typewriter masih menguras buffer.
+5. **Typewriter Drain vs Network Stream (Diperbarui 2026-08-07)**: `isStreamDone` (event `done` dari SSE) menandakan **network stream selesai**. *Iterasi awal*: typewriter tetap "menguras" `streamBuffer` (3 char/18ms) setelah done, dan tombol stop tetap aktif selama drain — ini menghasilkan bug: user klik stop saat stream sebenarnya sudah selesai → UI bilang "stopped" padahal DB menyimpan `complete`. *Perbaikan*: saat `isStreamDone`, typewriter langsung **flush seluruh buffer** (`content = streamBuffer`) dan selesai → `isGenerating = false` → tombol stop **hanya aktif selama stream benar-benar sedang generasi**. Abort selalu mendarat di tengah SSE, sehingga backend menyimpan jawaban parsial `stopped` dan UI konsisten setelah reload.
 
 6. **Cancel Tiga Lapis di Frontend**:
    - `abortController.abort()` — membatalkan fetch request. **Hanya efektif sebelum** response headers diterima; setelah SSE mulai mengalir, sinyal ini tidak lagi menghentikan response body reader.
@@ -121,6 +121,49 @@ sequenceDiagram
 
 7. **`reader.read()` di-Race dengan AbortSignal**: Setiap iterasi loop membaca body menggunakan `Promise.race([reader.read(), abortPromise])`. Saat user klik stop, `abortPromise` langsung reject → loop keluar tanpa menunggu chunk berikutnya. Rejection dari `reader.read()` yang "kalah race" diserap dengan `.catch(() => {})` untuk mencegah `Uncaught (in promise) DOMException`.
 
-8. **`cancelActiveStream` Dipertahankan Selama Typewriter Menguras**: Bug: setelah network stream selesai (misal `done` event diterima), `cancelActiveStream` di-set `null` di `finally` — padahal typewriter masih mengetik. Akibatnya klik stop tidak bereaksi. Perbaikan: `cancelActiveStream` hanya di-null saat tidak ada `streamBuffer` tersisa untuk ditampilkan, atau oleh typewriter completion handler setelah buffer habis. Dengan ini, `isGenerating` tetap `true` (tombol tetap "stop") sampai teks selesai ditampilkan.
+8. **`cancelActiveStream` & Stop yang Jujur (Diperbarui 2026-08-07)**: Awalnya `cancelActiveStream` dipertahankan selama typewriter menguras buffer (agar tombol stop tetap bisa ditekan). Setelah perbaikan di poin #5 (flush on done), handler stop kini: `abortController.abort()` + `reader.cancel()`, membekukan konten di `streamBuffer` (semua yang benar-benar diterima — itulah parsial yang disimpan backend), lalu `status = isStreamDone ? 'complete' : 'stopped'`. UI tidak bisa lagi mengklaim `stopped` padahal DB menyimpan `complete`.
 
 9. **Delayed Source References**: Event `references` dari SSE di-buffer ke `pendingReferences` dan hanya di-assign ke `messages[idx].references` pada typewriter completion handler — yaitu saat stream benar-benar DONE (event `done` diterima, typewriter selesai menguras buffer, dan tidak ada error). Alasan: menampilkan references saat AI masih mengetik membuat UI terasa "belum selesai" dan references bisa berubah-ubah. Guard `streamHadError` mencegah references muncul pada respons yang gagal.
+
+---
+
+## Turn Status & Edit Mode — Iteration 2 (2026-08-07)
+
+### 1. Edit In-Place (Prompt Terakhir)
+
+- `saveEditMessage()` kini memotong `messages` lokal dari pesan yang diedit ke bawah, lalu memanggil `streamChatTurn(editedPrompt, selectedModel, msg.turnId)` — payload `edit_turn_id` dikirim ke `POST /api/rag/chat`, server meng-update **row turn yang sama** (bukan INSERT turn baru).
+- Sumber `turnId`:
+  - Pesan historis → `getConversation` (message key `${turn.id}-user`).
+  - Pesan yang baru di-stream → event `done` yang kini membawa `{"turnId": "..."}` (id pre-generated server), sehingga edit bisa dilakukan **tanpa reload**.
+- Tombol edit hanya muncul di pesan user terakhir (`lastUserMsgId`) — konsisten dengan desain "edit prompt terakhir".
+
+### 2. Status Marker (stopped / failed / blocked)
+
+- `status` dari server dirender sebagai chip netral konsisten (`border-white/10 bg-white/5 text-white/50`):
+  - `stopped` → icon `Square` + "Response Stopped"
+  - `failed` → icon `TriangleAlert` + "Response failed — regenerate or edit the question above"
+  - `blocked` → icon `ShieldAlert` + "Response blocked by security filter"
+- Sumber status:
+  - **Reload**: dipetakan dari `turn.status` di `loadConversation` (`status ?? 'complete'`).
+  - **Sesi aktif**: cancel → `status='stopped'`; SSE `error` → `status='failed'`; SSE `warning` (PROMPT_INJECTION) → `status='blocked'` — chip "Response blocked by security filter" langsung tampil **tanpa menunggu reload**.
+- Tombol retry ("Try Again" / "Regenerate response") disembunyikan untuk `status === 'blocked'` — pertanyaan yang terdeteksi injeksi tidak layak di-retry (akan di-block lagi), sementara `failed` tetap bisa di-retry.
+
+### 3. Flow Stop (Setelah Fix Bug "UI stopped, DB complete")
+
+Akar masalah bug: animasi typing (read loop mem-buffer seluruh SSE secepat jaringan) tertinggal di belakang stream — user klik stop saat stream sebenarnya sudah selesai diterima, sehingga backend sudah menyimpan `complete`. Perbaikan berlapis:
+
+1. Stream selesai → typewriter **flush seluruh buffer** → tombol stop hilang (`isGenerating=false`). Stop hanya bisa ditekan saat generasi benar-benar berjalan.
+2. User klik stop saat stream live → `abortController.abort()` + `reader.cancel()` → konten dibekukan di `streamBuffer` → `status='stopped'` → backend menghentikan loop token dan menyimpan jawaban parsial `stopped`.
+3. Backend juga re-check sinyal abort live di titik finalize — menutup race "abort tiba tepat setelah token terakhir" agar request yang di-cancel tidak pernah tercatat `complete`.
+
+### 4. File Mapping
+
+| File | Change |
+|---|---|
+| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | `saveEditMessage` (truncate + `edit_turn_id`), `streamChatTurn(editTurnId?)`, parse `turnId` dari event `done`, typewriter flush on done, honest stop, status markers + icons (`Square`/`TriangleAlert`/`ShieldAlert`), retry hidden untuk blocked |
+| `apps/frontend/src/lib/types/rag.types.ts` | `TurnStatus` union (`processing \| complete \| stopped \| failed \| blocked`), `ConversationTurn.status` + `updatedAt` |
+| Backend | `docs/backend/rag-turn-status-and-edit-mode.md` |
+
+### 5. Completion Timestamp
+
+**Iteration 2 (status tracking + edit mode + honest stop):** 2026-08-07

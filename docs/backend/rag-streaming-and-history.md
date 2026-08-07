@@ -3,6 +3,8 @@
 ## 1. Core Logic
 Fitur ini meng-handle Q&A dari pengguna dengan melakukan *Hybrid Search* (Semantic + Full-Text) ke Upstash Vector, merakit (Context Engineering) hasilnya, dan memberikan jawaban *streaming* menggunakan Google Gemini (SSE Stream). Selain itu, fitur ini juga menyimpan riwayat *chat* ke PostgreSQL dan memungkinkan pengguna mengambil daftar percakapan (*history list*) yang terurut berdasarkan waktu paling mutakhir (berdasarkan *timestamp* turn terakhir).
 
+> **UPDATE (2026-08-07):** Sejak *Lifecycle V2*, turn dibuat **write-ahead** di awal request dengan `status='processing'` dan selalu dituntaskan (`complete | stopped | failed | blocked`). Cancel kini **menyimpan jawaban parsial** sebagai `stopped` (bukan dilewati), dan `conversation_turns` sudah punya kolom `status` + `updated_at` serta `model_used` nullable. Dokumentasi lengkap: [`rag-turn-status-and-edit-mode.md`](./rag-turn-status-and-edit-mode.md).
+
 ## 2. Flow Diagram
 ```mermaid
 sequenceDiagram
@@ -24,10 +26,10 @@ sequenceDiagram
         Note over Hono: cancelSignal = AbortSignal.any([reqSignal, streamAbort.signal])
         Hono-->>Gemini: check cancelSignal.aborted per chunk / fetch(signal)
         Note over Hono: isConsumerGone() → desiredSize <= 0 x10
-        Note over Hono: Skip DB save & title generation
+        Note over Hono: UPDATE turn → status='stopped', answer parsial (sejak Lifecycle V2)
     else Stream Completes
         Gemini-->>Hono: [DONE]
-        Hono->>PostgreSQL: INSERT conversation_turns
+        Hono->>PostgreSQL: UPDATE turn → status='complete' (row sudah ada via write-ahead)
         Hono->>PostgreSQL: UPDATE conversations SET updated_at = NOW()
     end
     
@@ -85,7 +87,7 @@ sequenceDiagram
   2. `controller.desiredSize <= 0` selama ≥10 iterasi berturut-turut — deteksi backpressure saat HTTP layer berhenti menarik data (client disconnect tanpa signal eksplisit).
   
   Selain itu `controller.enqueue()` di-wrap `try/catch` — jika stream sudah ditutup consumer, `enqueue()` melempar dan loop berhenti.
-- **DB Save Guard**: Setelah `controller.close()`, pengecekan `cancelled || cancelSignal.aborted` dilakukan sebelum `INSERT conversation_turns` dan generasi title, sehingga turn yang dibatalkan tidak pernah tercatat di riwayat.
+- **DB Save Guard (Iterasi 1 — digantikan Lifecycle V2)**: Awalnya pengecekan `cancelled || cancelSignal.aborted` sebelum `INSERT` membuat turn yang dibatalkan tidak tercatat di riwayat. Sejak Lifecycle V2 (lihat [`rag-turn-status-and-edit-mode.md`](./rag-turn-status-and-edit-mode.md)), turn dibuat write-ahead di awal dan **selalu** dituntaskan: cancel → `stopped` (parsial), selesai → `complete`, gagal server → `failed`, injeksi → `blocked`. Re-check sinyal abort live tetap dilakukan di finalize agar request yang di-cancel tidak pernah tercatat `complete`.
 
 ## 6. Context References & Citation Rendering
 
@@ -121,4 +123,4 @@ Contoh: `[Doc 1: 48]`, `[Doc 1: Hlm. 48]`, `[Doc 1: Pages 48, 50]`.
 - **Saat load history**, `loadConversation()` memetakan `contextReferences` dari API ke `DocReference` dengan field `index`, `id`, `name`, dan `pages`, lalu me-render ulang markdown dengan references tersebut.
 
 ### 6.4 Abort on Cancel
-Tidak ada endpoint cancel terpisah. Frontend membatalkan dengan `AbortController.abort()` pada request `POST /api/rag/chat`. Backend menerima sinyal tersebut via `c.req.raw.signal` dan langsung menghentikan konsumsi LLM serta melewati DB save.
+Tidak ada endpoint cancel terpisah. Frontend membatalkan dengan `AbortController.abort()` pada request `POST /api/rag/chat`. Backend menerima sinyal tersebut via `c.req.raw.signal`, langsung menghentikan konsumsi LLM, dan — sejak Lifecycle V2 — **menyimpan jawaban parsial** dengan `status='stopped'` (sebelumnya dilewati begitu saja).
