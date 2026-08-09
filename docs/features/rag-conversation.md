@@ -131,7 +131,11 @@ Allows users to pin important conversations so they stay at the top of the sideb
 #### 6.3 REST Endpoint & Partial Update (`PATCH /api/rag/conversations/{id}`)
 - Updated `UpdateConversationBodySchema` to accept optional `title` and/or `isPinned` properties.
 - Service `RagService.updateConversation` dynamically sets `title` and/or `isPinned` and updates `updatedAt`.
-- `listConversations` & `getConversation` return `isPinned: boolean`.
+#### 6.4 UI Mutually-Exclusive Icon Swap Structure
+- Inside `Sidebar.MenuAction`, the static Pin icon and action button (`MoreHorizontal`) are placed inside mutually-exclusive `div` containers:
+  - Static Pin icon: `group-hover/menu-item:hidden group-focus-within/menu-item:hidden data-[state=open]:hidden`
+  - Action button (`MoreHorizontal`): `hidden group-hover/menu-item:flex group-focus-within/menu-item:flex data-[state=open]:flex`
+- Prevents icon overlap when focus remains on `Sidebar.MenuItem` after closing the dropdown menu.
 
 ### 7. Completion Timestamps
 - **Branching:** 2026-08-08

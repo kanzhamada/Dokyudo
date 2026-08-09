@@ -1,6 +1,7 @@
 export interface ConversationItem {
 	id: string;
 	title: string;
+	isPinned: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -16,7 +17,8 @@ export interface GetConversationsParams {
 }
 
 export type UpdateConversationParams = {
-	title: string;
+	title?: string;
+	isPinned?: boolean;
 };
 
 export interface UpdateConversationResponse {
@@ -80,6 +82,7 @@ export interface BranchOf {
 export interface GetConversationResponse {
 	id: string;
 	title: string;
+	isPinned: boolean;
 	/** Parent conversation when this one is a branch. Null otherwise. */
 	branchOf?: BranchOf | null;
 	createdAt: string;

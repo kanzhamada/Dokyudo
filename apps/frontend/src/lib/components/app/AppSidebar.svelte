@@ -61,6 +61,15 @@
 	let deletingConversation = $state<ConversationItem | null>(null);
 	let isDeleting = $state(false);
 
+	function sortConversations(list: ConversationItem[]): ConversationItem[] {
+		return [...list].sort((a, b) => {
+			if (a.isPinned !== b.isPinned) {
+				return b.isPinned ? 1 : -1;
+			}
+			return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+		});
+	}
+
 	async function fetchConversations(cursor?: string) {
 		if (isLoadingConversations) return;
 		isLoadingConversations = true;
@@ -69,9 +78,9 @@
 			const result = await getConversations({ limit: 20, cursor });
 			if (result.ok) {
 				if (cursor) {
-					conversations = [...conversations, ...result.data.conversations];
+					conversations = sortConversations([...conversations, ...result.data.conversations]);
 				} else {
-					conversations = result.data.conversations;
+					conversations = sortConversations(result.data.conversations);
 				}
 				conversationsStore.set(conversations);
 				nextCursor = result.data.nextCursor;
@@ -125,9 +134,10 @@
 				console.log('[Auth Conversations] Update success:', result.data);
 				const targetId = editingConversation.id;
 				const updatedTitle = editTitle.trim();
-				conversations = conversations.map((c) =>
-					c.id === targetId ? { ...c, title: updatedTitle } : c
+				conversations = sortConversations(
+					conversations.map((c) => (c.id === targetId ? { ...c, title: updatedTitle } : c))
 				);
+				conversationsStore.addOrUpdate(targetId, updatedTitle);
 				isEditDialogOpen = false;
 				editingConversation = null;
 			} else {
@@ -137,6 +147,48 @@
 			console.error('[Auth Conversations] Update Catch Error:', err);
 		} finally {
 			isUpdating = false;
+		}
+	}
+
+	async function handleTogglePin(item: ConversationItem) {
+		const newPinnedState = !item.isPinned;
+		const now = new Date().toISOString();
+
+		console.log('[Auth Conversations] Toggling pin:', {
+			id: item.id,
+			isPinned: newPinnedState
+		});
+
+		// Instantly blur active element to prevent lingering focus-within styles on dropdown trigger button
+		if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
+
+		// Realtime illusion: Optimistically update local state & store with new timestamp so pinned item instantly moves to index 0 (top of sidebar)
+		conversations = sortConversations(
+			conversations.map((c) =>
+				c.id === item.id ? { ...c, isPinned: newPinnedState, updatedAt: now } : c
+			)
+		);
+		conversationsStore.togglePin(item.id, newPinnedState);
+
+		try {
+			const result = await updateConversation(item.id, { isPinned: newPinnedState });
+			if (result.ok) {
+				console.log('[Auth Conversations] Pin toggle backend response:', result.data);
+			} else {
+				console.error('[Auth Conversations] Pin toggle failed, reverting:', result.error);
+				conversations = sortConversations(
+					conversations.map((c) => (c.id === item.id ? { ...c, isPinned: item.isPinned } : c))
+				);
+				conversationsStore.togglePin(item.id, item.isPinned);
+			}
+		} catch (err) {
+			console.error('[Auth Conversations] Pin toggle catch error, reverting:', err);
+			conversations = sortConversations(
+				conversations.map((c) => (c.id === item.id ? { ...c, isPinned: item.isPinned } : c))
+			);
+			conversationsStore.togglePin(item.id, item.isPinned);
 		}
 	}
 
@@ -514,13 +566,28 @@
 			{/snippet}
 		</Sidebar.MenuButton>
 
-		<!-- Action Menu visible on hover -->
+		<!-- Action Menu & Pin Indicator -->
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger class="cursor-pointer">
 				{#snippet child({ props })}
-					<Sidebar.MenuAction showOnHover {...props}>
-						<MoreHorizontal />
-					</Sidebar.MenuAction>
+					{#if item.isPinned}
+						<Sidebar.MenuAction showOnHover={false} {...props}>
+							<div
+								class="flex size-full items-center justify-center group-hover/menu-item:hidden data-[state=open]:hidden"
+							>
+								<Pin class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
+							</div>
+							<div
+								class="hidden size-full items-center justify-center group-hover/menu-item:flex data-[state=open]:flex"
+							>
+								<MoreHorizontal class="size-4" />
+							</div>
+						</Sidebar.MenuAction>
+					{:else}
+						<Sidebar.MenuAction showOnHover={true} {...props}>
+							<MoreHorizontal class="size-4" />
+						</Sidebar.MenuAction>
+					{/if}
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content class="w-48 border-white/10 bg-sidebar text-sidebar-foreground">
@@ -539,9 +606,10 @@
 				</DropdownMenu.Item>
 				<DropdownMenu.Item
 					class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+					onclick={() => handleTogglePin(item)}
 				>
 					<Pin class="mr-2 size-4" />
-					<span>Pin</span>
+					<span>{item.isPinned ? 'Unpin' : 'Pin'}</span>
 				</DropdownMenu.Item>
 				<DropdownMenu.Separator class="bg-white/10" />
 				<DropdownMenu.Item
