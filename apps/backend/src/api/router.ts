@@ -14,8 +14,17 @@ const router = createApp();
 
 // Apply auth middleware to all API routes EXCEPT the auth module
 router.use("*", async (c, next) => {
-    // Bypass auth middleware for public endpoints
-    if (c.req.path.startsWith("/api/auth") || c.req.path === "/api/payments/webhook") {
+    // Bypass auth middleware for public endpoints. Only the GET read of a
+    // share link is public — POST /shares/{code}/continue and DELETE routes
+    // still require authentication.
+    const isPublicShareRead =
+        c.req.method === "GET" &&
+        /^\/api\/rag\/shares\/[^/]+$/.test(c.req.path);
+    if (
+        c.req.path.startsWith("/api/auth") ||
+        c.req.path === "/api/payments/webhook" ||
+        isPublicShareRead
+    ) {
         return await next();
     }
     return await authMiddleware(c, next);

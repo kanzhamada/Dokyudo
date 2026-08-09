@@ -1,5 +1,6 @@
 import { createApp } from "../../config/hono.ts";
 import { createRoute } from "@hono/zod-openapi";
+import { z } from "zod";
 import * as ragController from "./rag.controller.ts";
 import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
 import * as RagSchema from "./rag.schema.ts";
@@ -320,4 +321,211 @@ ragRoutes.openapi(
         },
     }),
     ragController.handleGetConversation as any,
+);
+
+// ==============================================================================
+// Public Share (read-only conversation sharing)
+// ==============================================================================
+
+ragRoutes.openapi(
+    createRoute({
+        method: "post",
+        path: "/conversations/{id}/share",
+        tags: ["RAG"],
+        summary: "Create Public Share",
+        description:
+            "Creates a public read-only share of the conversation, snapshotted up to its last turn. Returns the short code.",
+        request: {
+            params: RagSchema.ConversationParamSchema,
+            body: {
+                content: {
+                    "application/json": {
+                        schema: RagSchema.CreateShareBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Success — returns the short share code",
+                content: {
+                    "application/json": {
+                        schema: RagSchema.ShareCreatedResponseSchema,
+                    },
+                },
+            },
+            400: {
+                description: "Validation error",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Conversation not found",
+            },
+            409: {
+                description: "Custom code already taken",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleCreateShare as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "get",
+        path: "/shares/{code}",
+        tags: ["RAG"],
+        summary: "Get Public Share (unauthenticated)",
+        description:
+            "Public read of a share link: returns the immutable snapshot of the conversation. Does not require authentication.",
+        request: {
+            params: RagSchema.ShareParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Success",
+                content: {
+                    "application/json": {
+                        schema: RagSchema.PublicShareResponseSchema,
+                    },
+                },
+            },
+            400: {
+                description: "Validation error",
+            },
+            404: {
+                description: "Share not found or expired",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleGetPublicShare as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "post",
+        path: "/shares/{code}/continue",
+        tags: ["RAG"],
+        summary: "Continue Chat From Public Share",
+        description:
+            "Authenticated: creates a new conversation owned by the caller, rebuilt from the share's snapshot.",
+        request: {
+            params: RagSchema.ShareParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Success — returns the new conversation id",
+                content: {
+                    "application/json": {
+                        schema: RagSchema.ContinueShareResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Share not found or expired",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleContinueShare as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "delete",
+        path: "/shares/{code}",
+        tags: ["RAG"],
+        summary: "Delete Public Share",
+        description: "Revokes a share link owned by the caller's tenant.",
+        request: {
+            params: RagSchema.ShareParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Success",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Share not found",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleDeleteShare as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "delete",
+        path: "/conversations/{id}/shares",
+        tags: ["RAG"],
+        summary: "Delete All Public Shares",
+        description:
+            "Revokes every active public share of a conversation (stop sharing).",
+        request: {
+            params: RagSchema.ConversationParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Success",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Conversation not found",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleDeleteAllShares as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "get",
+        path: "/conversations/{id}/shares",
+        tags: ["RAG"],
+        summary: "List Public Shares",
+        description: "Lists the active share links of a conversation.",
+        request: {
+            params: RagSchema.ConversationParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Success",
+                content: {
+                    "application/json": {
+                        schema: z.object({ shares: z.array(RagSchema.ShareListItemSchema) }),
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleListShares as any,
 );

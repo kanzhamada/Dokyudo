@@ -9,6 +9,7 @@ import {
     conversationTurns,
     conversations,
     turnAlternatives,
+    chatShares,
 } from "../../shared/models/db.model.ts";
 import { desc, eq, and, lt, ne, sql } from "drizzle-orm";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
@@ -1332,8 +1333,20 @@ data: ${JSON.stringify(startedPayload)}
         let results: any[] = [];
 
         await withAuthDb(userId, async (tx) => {
+            // Whether the conversation currently has at least one active public
+            // share — powers the sidebar indicator. RLS scopes the subquery to
+            // the caller's own tenant rows.
+            const hasActiveShare = sql<boolean>`EXISTS (SELECT 1 FROM chat_shares cs WHERE cs.conversation_id = ${conversations.id} AND (cs.expires_at IS NULL OR cs.expires_at > now()))`;
+
             let query = tx
-                .select()
+                .select({
+                    id: conversations.id,
+                    title: conversations.title,
+                    isPinned: conversations.isPinned,
+                    createdAt: conversations.createdAt,
+                    updatedAt: conversations.updatedAt,
+                    hasActiveShare,
+                })
                 .from(conversations)
                 .where(
                     cursor
@@ -1359,6 +1372,7 @@ data: ${JSON.stringify(startedPayload)}
                 id: c.id,
                 title: c.title,
                 isPinned: c.isPinned,
+                hasActiveShare: c.hasActiveShare,
                 createdAt: c.createdAt.toISOString(),
                 updatedAt: c.updatedAt.toISOString(),
             })),
@@ -1692,6 +1706,23 @@ data: ${JSON.stringify(startedPayload)}
     }) {
         const { userId, tenantId, conversationId } = params;
 
+        // Collect the public share codes BEFORE the cascade delete — deleting the
+        // conversation removes the chat_shares rows, so the Redis share cache
+        // must be purged explicitly or the public links keep serving from cache.
+        let shareCodes: string[] = [];
+        await withAuthDb(userId, async (tx) => {
+            const rows = await tx
+                .select({ code: chatShares.code })
+                .from(chatShares)
+                .where(
+                    and(
+                        eq(chatShares.conversationId, conversationId),
+                        eq(chatShares.tenantId, tenantId),
+                    ),
+                );
+            shareCodes = rows.map((r) => r.code);
+        });
+
         await withAuthDb(userId, async (tx) => {
             const result = await tx
                 .delete(conversations)
@@ -1711,6 +1742,17 @@ data: ${JSON.stringify(startedPayload)}
                 });
             }
         });
+
+        if (shareCodes.length > 0) {
+            try {
+                await redis.del(...shareCodes.flatMap((code) => [
+                    RedisKeys.shareCache(code),
+                    RedisKeys.shareCodeTaken(code),
+                ]));
+            } catch {
+                // non-fatal — stale cache entries expire on their own
+            }
+        }
     }
 
     public static filterReferencesByCitations<

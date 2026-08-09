@@ -169,6 +169,13 @@
       "when": 1786255332077,
       "tag": "0023_shiny_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786262355500,
+      "tag": "0024_nebulous_kid_colt",
+      "breakpoints": true
     }
   ]
 }

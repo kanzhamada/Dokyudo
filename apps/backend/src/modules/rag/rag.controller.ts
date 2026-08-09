@@ -1,6 +1,7 @@
 import { Context } from "hono";
 import { ContextExtractor } from "../../shared/utils/context.util.ts";
 import { RagService } from "./rag.service.ts";
+import { ShareService } from "./share.service.ts";
 import * as RagSchema from "./rag.schema.ts";
 
 export async function handleChat(c: Context) {
@@ -154,4 +155,83 @@ export async function handleBranchConversation(c: Context) {
     });
 
     return c.json({ id: result.id, title: result.title });
+}
+
+// ==============================================================================
+// Public Share
+// ==============================================================================
+
+export async function handleCreateShare(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { id: conversationId } = c.req.valid("param" as never) as { id: string };
+    const body = extractor.extractValidJson<RagSchema.CreateShareBody>();
+
+    const result = await ShareService.createShare({
+        userId,
+        tenantId,
+        conversationId,
+        expiresInHours: body.expires_in_hours,
+        customCode: body.custom_code,
+    });
+
+    return c.json({ code: result.code });
+}
+
+/** Public, unauthenticated read of a share link. */
+export async function handleGetPublicShare(c: Context) {
+    const { code } = c.req.valid("param" as never) as { code: string };
+
+    const result = await ShareService.getPublicShare({ code });
+
+    return c.json(result);
+}
+
+export async function handleContinueShare(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { code } = c.req.valid("param" as never) as { code: string };
+
+    const result = await ShareService.continueShare({ userId, tenantId, code });
+
+    return c.json({ id: result.id, title: result.title });
+}
+
+export async function handleDeleteShare(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { code } = c.req.valid("param" as never) as { code: string };
+
+    await ShareService.deleteShare({ userId, tenantId, code });
+
+    return c.json({ data: { success: true } });
+}
+
+export async function handleDeleteAllShares(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { id: conversationId } = c.req.valid("param" as never) as { id: string };
+
+    const result = await ShareService.deleteAllShares({
+        userId,
+        tenantId,
+        conversationId,
+    });
+
+    return c.json({ data: { success: true, deleted: result.deleted } });
+}
+
+export async function handleListShares(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { id: conversationId } = c.req.valid("param" as never) as { id: string };
+
+    const result = await ShareService.listShares({ userId, tenantId, conversationId });
+
+    return c.json({ shares: result });
 }

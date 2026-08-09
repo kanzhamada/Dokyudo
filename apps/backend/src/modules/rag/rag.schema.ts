@@ -80,21 +80,12 @@ export const ConversationItemSchema = z.object({
     id: z.string().uuid(),
     title: z.string(),
     isPinned: z.boolean(),
+    /** True when the conversation currently has at least one active public share. */
+    hasActiveShare: z.boolean(),
     createdAt: z.string(),
     updatedAt: z.string(),
 });
 export type ConversationItem = z.infer<typeof ConversationItemSchema>;
-
-export const ListConversationsQuerySchema = z.object({
-    limit: z.coerce.number().min(1).max(100).default(20),
-    cursor: z.string().datetime().optional(), // ISO string of updatedAt
-});
-
-export const ListConversationsResponseSchema = z.object({
-    conversations: z.array(ConversationItemSchema),
-    nextCursor: z.string().nullable().optional(),
-});
-export type ListConversationsResponse = z.infer<typeof ListConversationsResponseSchema>;
 
 export const ContextReferenceSchema = z.object({
     documentId: z.string(),
@@ -138,3 +129,85 @@ export const GetConversationResponseSchema = ConversationItemSchema.extend({
 });
 export type GetConversationResponse = z.infer<typeof GetConversationResponseSchema>;
 
+// ==============================================================================
+// PUBLIC SHARE
+// ==============================================================================
+
+export const CreateShareBodySchema = z.object({
+    /**
+     * Link lifetime in hours (1h - 1 year). Absent/undefined = never expires.
+     * Presets: 1 | 24 | 168 | 720.
+     */
+    expires_in_hours: z.number().int().min(1).max(8760).optional(),
+    /**
+     * Optional user-chosen short code (custom URL). 4-32 chars of letters,
+     * digits, '-' or '_'. Absent = auto-generated base62 code.
+     */
+    custom_code: z
+        .string()
+        .regex(/^[a-zA-Z0-9_-]{4,32}$/)
+        .optional(),
+});
+export type CreateShareBody = z.infer<typeof CreateShareBodySchema>;
+
+export const ShareParamSchema = z.object({
+    code: z
+        .string()
+        .min(3, "Invalid share code")
+        .max(32, "Invalid share code")
+        .regex(/^[a-zA-Z0-9_-]+$/, "Invalid share code"),
+});
+
+export const ShareCreatedResponseSchema = z.object({
+    code: z.string(),
+});
+export type ShareCreatedResponse = z.infer<typeof ShareCreatedResponseSchema>;
+
+export const PublicShareTurnSchema = z.object({
+    question: z.string(),
+    answer: z.string(),
+    modelUsed: z.string().nullable(),
+    status: z.enum(["complete", "stopped", "failed", "blocked"]),
+    contextReferences: z.array(ContextReferenceSchema).nullable(),
+    createdAt: z.string(),
+});
+export type PublicShareTurn = z.infer<typeof PublicShareTurnSchema>;
+
+export const PublicShareResponseSchema = z.object({
+    code: z.string(),
+    title: z.string(),
+    expiresAt: z.string().nullable(),
+    createdAt: z.string(),
+    /** Id of the original conversation — used by the "continue chat" flow. */
+    conversationId: z.string().uuid(),
+    /** Last turn included in the snapshot — the continue-chat boundary. */
+    boundaryTurnId: z.string().uuid().nullable(),
+    turns: z.array(PublicShareTurnSchema),
+});
+export type PublicShareResponse = z.infer<typeof PublicShareResponseSchema>;
+
+export const ContinueShareResponseSchema = z.object({
+    id: z.string().uuid(),
+    title: z.string(),
+});
+export type ContinueShareResponse = z.infer<typeof ContinueShareResponseSchema>;
+
+export const ShareListItemSchema = z.object({
+    code: z.string(),
+    title: z.string(),
+    isCustom: z.boolean(),
+    expiresAt: z.string().nullable(),
+    createdAt: z.string(),
+});
+export type ShareListItem = z.infer<typeof ShareListItemSchema>;
+
+export const ListConversationsQuerySchema = z.object({
+    limit: z.coerce.number().min(1).max(100).default(20),
+    cursor: z.string().datetime().optional(), // ISO string of updatedAt
+});
+
+export const ListConversationsResponseSchema = z.object({
+    conversations: z.array(ConversationItemSchema),
+    nextCursor: z.string().nullable().optional(),
+});
+export type ListConversationsResponse = z.infer<typeof ListConversationsResponseSchema>;
