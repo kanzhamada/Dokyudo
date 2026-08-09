@@ -1,8 +1,8 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import { scale } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { Avatar } from '$lib/components/ui/avatar/index.js';
@@ -18,7 +18,7 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import Share from '@lucide/svelte/icons/share';
-	import Edit from '@lucide/svelte/icons/pen';
+	import Pencil from 'lucide-svelte';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Pin from '@lucide/svelte/icons/pin';
 	import PinOff from '@lucide/svelte/icons/pin-off';
@@ -64,6 +64,20 @@
 	let isDeleteDialogOpen = $state(false);
 	let deletingConversation = $state<ConversationItem | null>(null);
 	let isDeleting = $state(false);
+
+	let isUserMenuOpen = $state(false);
+	let activeConversationMenu = $state<{ item: ConversationItem; x: number; y: number } | null>(null);
+
+	function openConversationMenu(e: MouseEvent, item: ConversationItem) {
+		e.preventDefault();
+		e.stopPropagation();
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		activeConversationMenu = {
+			item,
+			x: rect.left,
+			y: rect.top + rect.height
+		};
+	}
 
 	function sortConversations(list: ConversationItem[]): ConversationItem[] {
 		return [...list].sort((a, b) => {
@@ -463,81 +477,40 @@
 		<div class="mx-2 mb-2 h-px bg-white/10"></div>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<!-- Entire footer block acts as the trigger -->
-							<Sidebar.MenuButton
-								{...props}
-								size="lg"
-								tooltipContent="Profile"
-								class="w-full cursor-pointer p-2 hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
-							>
-								<AvatarPrimitive.Root
-									class="size-8 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
-								>
-									{#if userProfile?.user?.profilePictureUrl}
-										<AvatarPrimitive.Image
-											src={userProfile.user.profilePictureUrl}
-											alt={displayName}
-											class="size-full object-cover"
-										/>
-									{/if}
-									<AvatarPrimitive.Fallback
-										class="flex size-full items-center justify-center rounded-md bg-sidebar-avatar font-geist text-sm font-medium text-sidebar"
-									>
-										{userInitials}
-									</AvatarPrimitive.Fallback>
-								</AvatarPrimitive.Root>
-								<div
-									class="ml-2 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
-								>
-									<span class="truncate font-geist text-sm font-medium text-white"
-										>{displayName}</span
-									>
-									<span class="truncate font-geist text-xs text-sidebar-muted-foreground"
-										>{subscriptionTier}</span
-									>
-								</div>
-								<ChevronsUpDown
-									class="size-4 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
-								/>
-							</Sidebar.MenuButton>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content
-						side="top"
-						align="center"
-						class="mb-2 w-56 min-w-56 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+				<Sidebar.MenuButton
+					size="lg"
+					tooltipContent="Profile"
+					class="w-full cursor-pointer p-2 hover:bg-sidebar-accent"
+					onclick={() => (isUserMenuOpen = !isUserMenuOpen)}
+				>
+					<AvatarPrimitive.Root
+						class="size-8 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
 					>
-						<DropdownMenu.Label class="px-2.5 py-1.5 font-sans text-xs font-semibold text-white/45">
-							My Account
-						</DropdownMenu.Label>
-						<DropdownMenu.Separator class="my-1 h-px bg-white/10" />
-						<DropdownMenu.Group>
-							<DropdownMenu.Item
-								class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-							>
-								<Settings class="size-3.5 text-white/60" />
-								<span>Settings</span>
-							</DropdownMenu.Item>
-							<DropdownMenu.Item
-								class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-							>
-								<CreditCard class="size-3.5 text-white/60" />
-								<span>Billing</span>
-							</DropdownMenu.Item>
-						</DropdownMenu.Group>
-						<DropdownMenu.Separator class="my-1 h-px bg-white/10" />
-						<DropdownMenu.Item
-							class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
-							onclick={() => (isLogoutDialogOpen = true)}
+						{#if userProfile?.user?.profilePictureUrl}
+							<AvatarPrimitive.Image
+								src={userProfile.user.profilePictureUrl}
+								alt={displayName}
+								class="size-full object-cover"
+							/>
+						{/if}
+						<AvatarPrimitive.Fallback
+							class="flex size-full items-center justify-center rounded-md bg-sidebar-avatar font-geist text-sm font-medium text-sidebar"
 						>
-							<LogOut class="size-3.5 shrink-0 text-red-400" />
-							<span>Log out</span>
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+							{userInitials}
+						</AvatarPrimitive.Fallback>
+					</AvatarPrimitive.Root>
+					<div
+						class="ml-2 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
+					>
+						<span class="truncate font-geist text-sm font-medium text-white">{displayName}</span>
+						<span class="truncate font-geist text-xs text-sidebar-muted-foreground"
+							>{subscriptionTier}</span
+						>
+					</div>
+					<ChevronsUpDown
+						class="size-4 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
+					/>
+				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Footer>
@@ -591,69 +564,155 @@
 		</Sidebar.MenuButton>
 
 		<!-- Action Menu & Pin Indicator -->
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger class="cursor-pointer">
-				{#snippet child({ props })}
-					{#if item.isPinned}
-						<Sidebar.MenuAction showOnHover={false} {...props}>
-							<div
-								class="flex size-full items-center justify-center group-hover/menu-item:hidden data-[state=open]:hidden"
-							>
-								<Pin class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
-							</div>
-							<div
-								class="hidden size-full items-center justify-center group-hover/menu-item:flex data-[state=open]:flex"
-							>
-								<MoreHorizontal class="size-4" />
-							</div>
-						</Sidebar.MenuAction>
-					{:else}
-						<Sidebar.MenuAction showOnHover={true} {...props}>
-							<MoreHorizontal class="size-4" />
-						</Sidebar.MenuAction>
-					{/if}
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content
-				class="w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+		{#if item.isPinned}
+			<Sidebar.MenuAction
+				showOnHover={false}
+				class="cursor-pointer"
+				onclick={(e) => openConversationMenu(e, item)}
 			>
-				<DropdownMenu.Item
-					class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
+				<div
+					class="flex size-full items-center justify-center group-hover/menu-item:hidden"
+					class:hidden={activeConversationMenu?.item.id === item.id}
 				>
-					<Share class="size-3.5 text-white/60" />
-					<span>Share</span>
-				</DropdownMenu.Item>
-				<DropdownMenu.Item
-					class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-					onclick={() => openEditModal(item)}
+					<Pin class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
+				</div>
+				<div
+					class="hidden size-full items-center justify-center group-hover/menu-item:flex"
+					class:flex={activeConversationMenu?.item.id === item.id}
 				>
-					<Edit class="size-3.5 text-white/60" />
-					<span>Edit</span>
-				</DropdownMenu.Item>
-				<DropdownMenu.Item
-					class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-					onclick={() => handleTogglePin(item)}
-				>
-					{#if item.isPinned}
-						<PinOff class="size-3.5 text-white/60" />
-						<span>Unpin</span>
-					{:else}
-						<Pin class="size-3.5 text-white/60" />
-						<span>Pin</span>
-					{/if}
-				</DropdownMenu.Item>
-				<DropdownMenu.Separator class="my-1 h-px bg-white/10" />
-				<DropdownMenu.Item
-					class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
-					onclick={() => openDeleteModal(item)}
-				>
-					<Trash2 class="size-3.5 shrink-0 text-red-400" />
-					<span>Delete</span>
-				</DropdownMenu.Item>
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
+					<MoreHorizontal class="size-4" />
+				</div>
+			</Sidebar.MenuAction>
+		{:else}
+			<Sidebar.MenuAction
+				showOnHover={true}
+				class="cursor-pointer"
+				onclick={(e) => openConversationMenu(e, item)}
+			>
+				<MoreHorizontal class="size-4" />
+			</Sidebar.MenuAction>
+		{/if}
 	</Sidebar.MenuItem>
 {/snippet}
+
+<!-- Floating User Account Menu -->
+{#if isUserMenuOpen}
+	<!-- Backdrop to capture click outside -->
+	<div
+		role="presentation"
+		class="fixed inset-0 z-50 bg-transparent"
+		onclick={() => (isUserMenuOpen = false)}
+		onkeydown={() => (isUserMenuOpen = false)}
+	></div>
+
+	<!-- Positioned Floating User Account Menu -->
+	<div
+		transition:scale={{ duration: 150, start: 0.95 }}
+		class="fixed bottom-16 left-3 z-50 w-56 min-w-56 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+	>
+		<div class="px-2.5 py-1.5 font-sans text-xs font-semibold text-white/45">My Account</div>
+		<div class="my-1 h-px bg-white/10"></div>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => (isUserMenuOpen = false)}
+		>
+			<Settings class="size-3.5 text-white/60" />
+			<span>Settings</span>
+		</button>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => (isUserMenuOpen = false)}
+		>
+			<CreditCard class="size-3.5 text-white/60" />
+			<span>Billing</span>
+		</button>
+		<div class="my-1 h-px bg-white/10"></div>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
+			onclick={() => {
+				isUserMenuOpen = false;
+				isLogoutDialogOpen = true;
+			}}
+		>
+			<LogOut class="size-3.5 shrink-0 text-red-400" />
+			<span>Log out</span>
+		</button>
+	</div>
+{/if}
+
+<!-- Floating Conversation Action Menu -->
+{#if activeConversationMenu}
+	<!-- Backdrop to capture click outside -->
+	<div
+		role="presentation"
+		class="fixed inset-0 z-50 bg-transparent"
+		onclick={() => (activeConversationMenu = null)}
+		onkeydown={() => (activeConversationMenu = null)}
+	></div>
+
+	<!-- Positioned Floating Menu -->
+	<div
+		transition:scale={{ duration: 150, start: 0.95 }}
+		style={`position: fixed; top: ${Math.min(activeConversationMenu.y + 4, window.innerHeight - 170)}px; left: ${Math.min(Math.max(16, activeConversationMenu.x - 140), window.innerWidth - 200)}px;`}
+		class="z-50 w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+	>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => {
+				activeConversationMenu = null;
+			}}
+		>
+			<Share class="size-3.5 text-white/60" />
+			<span>Share</span>
+		</button>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => {
+				const item = activeConversationMenu?.item;
+				activeConversationMenu = null;
+				if (item) openEditModal(item);
+			}}
+		>
+			<Pencil class="size-3.5 text-white/60" />
+			<span>Edit</span>
+		</button>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => {
+				const item = activeConversationMenu?.item;
+				activeConversationMenu = null;
+				if (item) handleTogglePin(item);
+			}}
+		>
+			{#if activeConversationMenu.item.isPinned}
+				<PinOff class="size-3.5 text-white/60" />
+				<span>Unpin</span>
+			{:else}
+				<Pin class="size-3.5 text-white/60" />
+				<span>Pin</span>
+			{/if}
+		</button>
+		<div class="my-1 h-px bg-white/10"></div>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
+			onclick={() => {
+				const item = activeConversationMenu?.item;
+				activeConversationMenu = null;
+				if (item) openDeleteModal(item);
+			}}
+		>
+			<Trash2 class="size-3.5 shrink-0 text-red-400" />
+			<span>Delete</span>
+		</button>
+	</div>
+{/if}
 
 <!-- Confirmation Dialog for Logout -->
 <Dialog.Root bind:open={isLogoutDialogOpen}>
