@@ -3,7 +3,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Input } from '$lib/components/ui/input';
-	import { Check, Copy, Link2, Mail, Share2, X } from 'lucide-svelte';
+	import { Check, Copy, Globe2, Link2, LockKeyhole, Mail, Share2, X } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import { createShare } from '$lib/api/rag';
 
@@ -25,8 +25,10 @@
 	];
 
 	type SocialNetwork = 'x' | 'facebook' | 'reddit' | 'linkedin';
+	type ShareMode = 'public' | 'private';
 
 	let selectedExpiry = $state<number | null>(24);
+	let shareMode = $state<ShareMode>('public');
 	let customCode = $state('');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
@@ -52,12 +54,24 @@
 
 	function resetDialogState() {
 		customCode = '';
+		shareMode = 'public';
 		lastCreatedUrl = null;
 		errorMessage = '';
 		inviteMessage = '';
 		recipientInput = '';
 		recipients = [];
 		copiedCode = null;
+	}
+
+	function setShareMode(mode: ShareMode) {
+		if (shareMode === mode) return;
+		shareMode = mode;
+		lastCreatedUrl = null;
+		copiedCode = null;
+		errorMessage = '';
+		inviteMessage = '';
+		recipientInput = '';
+		recipients = [];
 	}
 
 	async function handleCreate() {
@@ -204,9 +218,77 @@
 				</div>
 			{/if}
 
-			<section aria-labelledby="link-heading" class="space-y-3">
+			<section aria-labelledby="expiry-heading" class="space-y-3">
 				<div>
-					<h2 id="link-heading" class="text-sm font-medium text-white/90">Create a share link</h2>
+					<h2 id="expiry-heading" class="text-sm font-medium text-white/90">Link expiry</h2>
+					<p class="mt-1 text-xs leading-5 text-white/42">Choose how long the link stays active.</p>
+				</div>
+				<div
+					class="grid grid-cols-4 overflow-hidden rounded-lg border border-white/[0.12] bg-white/[0.035]"
+				>
+					{#each EXPIRY_OPTIONS as option (option.label)}
+						<button
+							type="button"
+							aria-pressed={selectedExpiry === option.hours}
+							class="min-h-9 border-r border-white/[0.1] px-2 text-[11px] text-white/48 transition-colors last:border-r-0 hover:bg-white/[0.06] hover:text-white/80 {selectedExpiry ===
+							option.hours
+								? 'bg-white/[0.1] text-white'
+								: ''}"
+							onclick={() => (selectedExpiry = option.hours)}
+						>
+							{option.label}
+						</button>
+					{/each}
+				</div>
+			</section>
+
+			<section aria-labelledby="access-heading" class="space-y-3 border-t border-white/[0.09] pt-5">
+				<div>
+					<h2 id="access-heading" class="text-sm font-medium text-white/90">Share access</h2>
+					<p class="mt-1 text-xs leading-5 text-white/42">
+						{shareMode === 'public'
+							? 'Anyone with the link can view this conversation.'
+							: 'Create the link first. It will not be public; only people you invite can view it.'}
+					</p>
+				</div>
+
+				<div
+					role="group"
+					aria-label="Share access"
+					class="grid grid-cols-2 gap-1 rounded-lg border border-white/[0.12] bg-white/[0.035] p-1"
+				>
+					<button
+						type="button"
+						aria-pressed={shareMode === 'public'}
+						class="flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs transition-colors {shareMode ===
+						'public'
+							? 'bg-white/[0.1] text-white'
+							: 'text-white/45 hover:bg-white/[0.05] hover:text-white/75'}"
+						onclick={() => setShareMode('public')}
+					>
+						<Globe2 class="size-3.5" strokeWidth={1.8} />
+						Public
+					</button>
+					<button
+						type="button"
+						aria-pressed={shareMode === 'private'}
+						class="flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs transition-colors {shareMode ===
+						'private'
+							? 'bg-white/[0.1] text-white'
+							: 'text-white/45 hover:bg-white/[0.05] hover:text-white/75'}"
+						onclick={() => setShareMode('private')}
+					>
+						<LockKeyhole class="size-3.5" strokeWidth={1.8} />
+						Private
+					</button>
+				</div>
+			</section>
+
+			<section aria-labelledby="link-heading" class="space-y-3 border-t border-white/[0.09] pt-5">
+				<div>
+					<h2 id="link-heading" class="text-sm font-medium text-white/90">
+						{shareMode === 'public' ? 'Create a public link' : 'Create a private link'}
+					</h2>
 					<p class="mt-1 text-xs leading-5 text-white/42">
 						Leave the custom link empty to generate one automatically.
 					</p>
@@ -244,27 +326,6 @@
 					<p class="truncate font-mono text-[11px] text-white/35">{previewUrl}</p>
 				{/if}
 
-				<div class="space-y-2">
-					<p class="text-xs font-medium text-white/55">Link expires</p>
-					<div
-						class="grid grid-cols-4 overflow-hidden rounded-lg border border-white/[0.12] bg-white/[0.035]"
-					>
-						{#each EXPIRY_OPTIONS as option (option.label)}
-							<button
-								type="button"
-								aria-pressed={selectedExpiry === option.hours}
-								class="min-h-9 border-r border-white/[0.1] px-2 text-[11px] text-white/48 transition-colors last:border-r-0 hover:bg-white/[0.06] hover:text-white/80 {selectedExpiry ===
-								option.hours
-									? 'bg-white/[0.1] text-white'
-									: ''}"
-								onclick={() => (selectedExpiry = option.hours)}
-							>
-								{option.label}
-							</button>
-						{/each}
-					</div>
-				</div>
-
 				{#if lastCreatedUrl}
 					<div
 						class="flex items-center gap-2 rounded-lg border border-white/[0.1] bg-black/20 px-3 py-2"
@@ -287,134 +348,144 @@
 				{/if}
 			</section>
 
-			<section aria-labelledby="email-heading" class="space-y-3 border-t border-white/[0.09] pt-5">
-				<div>
-					<h2 id="email-heading" class="text-sm font-medium text-white/90">Invite by email</h2>
-					<p class="mt-1 text-xs leading-5 text-white/42">
-						Only invited people can view this link.
-					</p>
-				</div>
-
-				<div class="flex items-center gap-2">
-					<div class="relative min-w-0 flex-1">
-						<Mail
-							class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/35"
-							strokeWidth={1.8}
-						/>
-						<Input
-							bind:value={recipientInput}
-							placeholder="name@example.com"
-							aria-label="Email address"
-							onkeydown={handleRecipientKeydown}
-							onblur={addRecipient}
-							class="h-10 border-white/[0.12] bg-white/[0.055] pl-9 text-sm text-white placeholder:text-white/28 focus-visible:border-white/30 focus-visible:ring-2 focus-visible:ring-white/10"
-						/>
+			{#if shareMode === 'private'}
+				<section
+					aria-labelledby="email-heading"
+					class="space-y-3 border-t border-white/[0.09] pt-5"
+				>
+					<div>
+						<h2 id="email-heading" class="text-sm font-medium text-white/90">Invite by email</h2>
+						<p class="mt-1 text-xs leading-5 text-white/42">
+							Only invited people can view this link.
+						</p>
 					</div>
-					<Button
-						variant="outline"
-						disabled={!lastCreatedUrl || isCreating}
-						class="h-10 shrink-0 border-white/[0.15] bg-transparent px-4 text-[13px] text-white/80 hover:bg-white/[0.08] hover:text-white"
-						onclick={handleInvite}
-					>
-						Send invite
-					</Button>
-				</div>
 
-				{#if recipients.length > 0}
-					<div class="flex flex-wrap gap-1.5">
-						{#each recipients as email (email)}
-							<span
-								class="inline-flex max-w-full items-center gap-1 rounded-md bg-white/[0.08] px-2 py-1 text-[11px] text-white/75"
-							>
-								<span class="max-w-[180px] truncate">{email}</span>
-								<button
-									type="button"
-									class="text-white/40 transition-colors hover:text-white"
-									aria-label={`Remove ${email}`}
-									onclick={() => removeRecipient(email)}
+					<div class="flex items-center gap-2">
+						<div class="relative min-w-0 flex-1">
+							<Mail
+								class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/35"
+								strokeWidth={1.8}
+							/>
+							<Input
+								bind:value={recipientInput}
+								placeholder="name@example.com"
+								aria-label="Email address"
+								onkeydown={handleRecipientKeydown}
+								onblur={addRecipient}
+								class="h-10 border-white/[0.12] bg-white/[0.055] pl-9 text-sm text-white placeholder:text-white/28 focus-visible:border-white/30 focus-visible:ring-2 focus-visible:ring-white/10"
+							/>
+						</div>
+						<Button
+							variant="outline"
+							disabled={!lastCreatedUrl || isCreating}
+							class="h-10 shrink-0 border-white/[0.15] bg-transparent px-4 text-[13px] text-white/80 hover:bg-white/[0.08] hover:text-white"
+							onclick={handleInvite}
+						>
+							Send invite
+						</Button>
+					</div>
+
+					{#if recipients.length > 0}
+						<div class="flex flex-wrap gap-1.5">
+							{#each recipients as email (email)}
+								<span
+									class="inline-flex max-w-full items-center gap-1 rounded-md bg-white/[0.08] px-2 py-1 text-[11px] text-white/75"
 								>
-									<X class="size-3" strokeWidth={2} />
-								</button>
-							</span>
-						{/each}
+									<span class="max-w-[180px] truncate">{email}</span>
+									<button
+										type="button"
+										class="text-white/40 transition-colors hover:text-white"
+										aria-label={`Remove ${email}`}
+										onclick={() => removeRecipient(email)}
+									>
+										<X class="size-3" strokeWidth={2} />
+									</button>
+								</span>
+							{/each}
+						</div>
+					{/if}
+
+					<label class="flex cursor-pointer items-center gap-2 text-xs text-white/55">
+						<input
+							type="checkbox"
+							bind:checked={notifyRecipients}
+							class="size-3.5 rounded border-white/20 bg-transparent text-[#f1eee9] accent-[#f1eee9] focus:ring-1 focus:ring-white/30"
+						/>
+						Notify people by email
+					</label>
+
+					{#if inviteMessage}
+						<p class="text-[11px] text-amber-200/80">{inviteMessage}</p>
+					{/if}
+				</section>
+			{:else}
+				<section
+					aria-labelledby="social-heading"
+					class="space-y-3 border-t border-white/[0.09] pt-5"
+				>
+					<div>
+						<h2 id="social-heading" class="text-sm font-medium text-white/90">Share elsewhere</h2>
+						<p class="mt-1 text-xs leading-5 text-white/42">
+							Create a link before sharing it publicly.
+						</p>
 					</div>
-				{/if}
 
-				<label class="flex cursor-pointer items-center gap-2 text-xs text-white/55">
-					<input
-						type="checkbox"
-						bind:checked={notifyRecipients}
-						class="size-3.5 rounded border-white/20 bg-transparent text-[#f1eee9] accent-[#f1eee9] focus:ring-1 focus:ring-white/30"
-					/>
-					Notify people by email
-				</label>
-
-				{#if inviteMessage}
-					<p class="text-[11px] text-amber-200/80">{inviteMessage}</p>
-				{/if}
-			</section>
-
-			<section aria-labelledby="social-heading" class="space-y-3 border-t border-white/[0.09] pt-5">
-				<div>
-					<h2 id="social-heading" class="text-sm font-medium text-white/90">Share elsewhere</h2>
-					<p class="mt-1 text-xs leading-5 text-white/42">Share the link with your audience.</p>
-				</div>
-
-				<div class="grid grid-cols-4 gap-2">
-					<button
-						type="button"
-						disabled={!lastCreatedUrl}
-						class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
-						onclick={() => openSocialShare('x')}
-					>
-						<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
-							><path
-								d="M18.901 1.153h3.68l-8.04 9.19L24 22.847h-7.406l-5.804-7.584-6.64 7.584H.468l8.6-9.83L0 1.154h7.594l5.246 6.932 6.06-6.932Zm-1.291 19.49h2.039L6.486 3.24H4.298L17.61 20.643Z"
-							/></svg
+					<div class="grid grid-cols-4 gap-2">
+						<button
+							type="button"
+							disabled={!lastCreatedUrl}
+							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
+							onclick={() => openSocialShare('x')}
 						>
-						<span class="text-[10px]">X</span>
-					</button>
-					<button
-						type="button"
-						disabled={!lastCreatedUrl}
-						class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
-						onclick={() => openSocialShare('facebook')}
-					>
-						<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
-							><path
-								d="M13.5 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5h1.7V4a22 22 0 0 0-2.5-.1c-2.5 0-4.2 1.5-4.2 4.2V10H7.3v3h2.8v8h3.4Z"
-							/></svg
+							<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
+								><path
+									d="M18.901 1.153h3.68l-8.04 9.19L24 22.847h-7.406l-5.804-7.584-6.64 7.584H.468l8.6-9.83L0 1.154h7.594l5.246 6.932 6.06-6.932Zm-1.291 19.49h2.039L6.486 3.24H4.298L17.61 20.643Z"
+								/></svg
+							>
+							<span class="text-[10px]">X</span>
+						</button>
+						<button
+							type="button"
+							disabled={!lastCreatedUrl}
+							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
+							onclick={() => openSocialShare('facebook')}
 						>
-						<span class="text-[10px]">Facebook</span>
-					</button>
-					<button
-						type="button"
-						disabled={!lastCreatedUrl}
-						class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
-						onclick={() => openSocialShare('reddit')}
-					>
-						<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
-							><path
-								d="M14.6 3.4a2.15 2.15 0 1 1 1.8 2.8 7.1 7.1 0 0 1 3.4 2.2 2.12 2.12 0 1 1-1.3 1.2 5.9 5.9 0 0 0-3.4-2.1l-.7 3.6c1.5.2 2.5.8 2.5 1.8 0 1.3-1.5 2.1-3.7 2.1s-3.7-.8-3.7-2.1c0-1 .9-1.6 2.5-1.8l-.7-3.6a5.9 5.9 0 0 0-3.4 2.1 2.1 2.1 0 1 1-1.3-1.2 7.1 7.1 0 0 1 3.4-2.2 2.15 2.15 0 1 1 4.6-2.8Zm-3 9.4c-.8.1-1.4.3-1.4.7s.7.7 2 .7 2-.3 2-.7-.6-.6-1.4-.7l-.6 0-.6 0Zm-.7 4.4c.9.7 2.3.7 3.2 0l.7.9c-1.3 1-3.3 1-4.6 0l.7-.9Z"
-							/></svg
+							<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
+								><path
+									d="M13.5 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5h1.7V4a22 22 0 0 0-2.5-.1c-2.5 0-4.2 1.5-4.2 4.2V10H7.3v3h2.8v8h3.4Z"
+								/></svg
+							>
+							<span class="text-[10px]">Facebook</span>
+						</button>
+						<button
+							type="button"
+							disabled={!lastCreatedUrl}
+							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
+							onclick={() => openSocialShare('reddit')}
 						>
-						<span class="text-[10px]">Reddit</span>
-					</button>
-					<button
-						type="button"
-						disabled={!lastCreatedUrl}
-						class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
-						onclick={() => openSocialShare('linkedin')}
-					>
-						<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
-							><path
-								d="M5.2 7.1A2.1 2.1 0 1 1 5.2 3a2.1 2.1 0 0 1 0 4.1ZM3.4 21h3.6V8.4H3.4V21Zm5.8-12.6h3.4v1.7h.1c.5-.9 1.7-2.1 3.7-2.1 3.9 0 4.6 2.5 4.6 5.8V21h-3.6v-6.4c0-1.5 0-3.4-2.1-3.4s-2.4 1.6-2.4 3.3V21H9.2V8.4Z"
-							/></svg
+							<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
+								><path
+									d="M14.6 3.4a2.15 2.15 0 1 1 1.8 2.8 7.1 7.1 0 0 1 3.4 2.2 2.12 2.12 0 1 1-1.3 1.2 5.9 5.9 0 0 0-3.4-2.1l-.7 3.6c1.5.2 2.5.8 2.5 1.8 0 1.3-1.5 2.1-3.7 2.1s-3.7-.8-3.7-2.1c0-1 .9-1.6 2.5-1.8l-.7-3.6a5.9 5.9 0 0 0-3.4 2.1 2.1 2.1 0 1 1-1.3-1.2 7.1 7.1 0 0 1 3.4-2.2 2.15 2.15 0 1 1 4.6-2.8Zm-3 9.4c-.8.1-1.4.3-1.4.7s.7.7 2 .7 2-.3 2-.7-.6-.6-1.4-.7l-.6 0-.6 0Zm-.7 4.4c.9.7 2.3.7 3.2 0l.7.9c-1.3 1-3.3 1-4.6 0l.7-.9Z"
+								/></svg
+							>
+							<span class="text-[10px]">Reddit</span>
+						</button>
+						<button
+							type="button"
+							disabled={!lastCreatedUrl}
+							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
+							onclick={() => openSocialShare('linkedin')}
 						>
-						<span class="text-[10px]">LinkedIn</span>
-					</button>
-				</div>
-			</section>
+							<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
+								><path
+									d="M5.2 7.1A2.1 2.1 0 1 1 5.2 3a2.1 2.1 0 0 1 0 4.1ZM3.4 21h3.6V8.4H3.4V21Zm5.8-12.6h3.4v1.7h.1c.5-.9 1.7-2.1 3.7-2.1 3.9 0 4.6 2.5 4.6 5.8V21h-3.6v-6.4c0-1.5 0-3.4-2.1-3.4s-2.4 1.6-2.4 3.3V21H9.2V8.4Z"
+								/></svg
+							>
+							<span class="text-[10px]">LinkedIn</span>
+						</button>
+					</div>
+				</section>
+			{/if}
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
