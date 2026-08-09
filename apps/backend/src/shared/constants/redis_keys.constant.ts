@@ -31,4 +31,12 @@ export const RedisKeys = {
         const hash = await hashTextSHA256(question);
         return `guard:injection:${hash}`;
     },
+
+    // Public share cache — full public payload of a share link. TTL follows the
+    // share's expiry (sliding renewal on every successful read, max 1 month).
+    shareCache: (code: string): string => `share:v1:${code}`,
+
+    // Custom share code taken marker — fast pre-check for the create dialog.
+    // The DB unique index stays the source of truth (race-safe via 23505).
+    shareCodeTaken: (code: string): string => `share:code_taken:${code}`,
 } as const;
