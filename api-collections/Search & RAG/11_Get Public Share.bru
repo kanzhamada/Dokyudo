@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/rag/shares/{{shareCode}}
+  url: {{baseUrl}}/api/rag/shares/{{shareCode}}?invite={{shareInviteToken}}
   body: none
   auth: none
 }
@@ -16,14 +16,17 @@ headers {
 
 docs {
   PUBLIC read of a share link — no authentication required (the backend
-  ignores the Authorization header when present). Returns the immutable
-  snapshot of the conversation.
+  ignores the Authorization header when present). Private shares REQUIRE the
+  access token from the invite email as `?invite=<token>`, otherwise 403
+  PRIVATE_SHARE.
 
-  Response: { code, title, expiresAt, createdAt, conversationId,
-              boundaryTurnId, turns: [...] }
+  Response: { code, title, authorName, isPrivate, expiresAt, createdAt,
+              conversationId, turns: [...] }
 
+  - 403 PRIVATE_SHARE when the link is invite-only and the token is missing
+    or wrong.
   - 404 when the link does not exist or has expired (expired rows are
     lazy-deleted on read).
-  - Public viewers only receive the snapshot columns — tenant_id / created_by
-    are never exposed (column-level grants + RLS).
+  - Public viewers only receive the snapshot columns — tenant_id / created_by /
+    access_token are never exposed (column-level grants + RLS).
 }

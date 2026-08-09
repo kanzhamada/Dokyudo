@@ -223,6 +223,8 @@ export const ShareListItemSchema = z.object({
     /** True when invite-only. The owner's token lets them reopen private links. */
     isPrivate: z.boolean(),
     accessToken: z.string().nullable(),
+    /** Source conversation — used for grouping in the account-level dialog. */
+    conversationId: z.string().uuid(),
     expiresAt: z.string().nullable(),
     createdAt: z.string(),
 });

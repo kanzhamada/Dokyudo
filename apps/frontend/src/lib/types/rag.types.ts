@@ -170,6 +170,8 @@ export interface ShareListItem {
 	/** True when invite-only. The owner's token lets them reopen private links. */
 	isPrivate: boolean;
 	accessToken: string | null;
+	/** Source conversation — used for grouping in the account-level dialog. */
+	conversationId: string;
 	expiresAt: string | null;
 	createdAt: string;
 }

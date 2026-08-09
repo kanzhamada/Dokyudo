@@ -247,17 +247,6 @@ export async function handleDeleteAllShares(c: Context) {
     return c.json({ data: { success: true, deleted: result.deleted } });
 }
 
-export async function handleListShares(c: Context) {
-    const extractor = new ContextExtractor(c);
-    const { tenantId, userId } = extractor.extractAuthContext();
-
-    const { id: conversationId } = c.req.valid("param" as never) as { id: string };
-
-    const result = await ShareService.listShares({ userId, tenantId, conversationId });
-
-    return c.json({ shares: result });
-}
-
 export async function handleListAllShares(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, userId } = extractor.extractAuthContext();

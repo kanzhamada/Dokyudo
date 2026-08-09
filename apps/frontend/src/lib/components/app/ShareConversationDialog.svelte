@@ -270,11 +270,6 @@
 		return `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
 	}
 
-	function openSocialShare(network: SocialNetwork) {
-		const url = socialShareUrl(network);
-		if (url) window.open(url, '_blank', 'noopener,noreferrer');
-	}
-
 	async function loadCurrentUserEmail() {
 		const result = await getMe();
 		if (result.ok) {
@@ -583,11 +578,15 @@
 					</div>
 
 					<div class="grid grid-cols-4 gap-2">
-						<button
-							type="button"
-							disabled={!lastCreatedUrl}
-							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
-							onclick={() => openSocialShare('x')}
+						<a
+							href={socialShareUrl('x')}
+							target="_blank"
+							rel="noopener noreferrer"
+							aria-disabled={!lastCreatedUrl}
+							tabindex={lastCreatedUrl ? 0 : -1}
+							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white {lastCreatedUrl
+								? ''
+								: 'pointer-events-none opacity-35'}"
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
 								><path
@@ -595,12 +594,16 @@
 								/></svg
 							>
 							<span class="text-[10px]">X</span>
-						</button>
-						<button
-							type="button"
-							disabled={!lastCreatedUrl}
-							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
-							onclick={() => openSocialShare('facebook')}
+						</a>
+						<a
+							href={socialShareUrl('facebook')}
+							target="_blank"
+							rel="noopener noreferrer"
+							aria-disabled={!lastCreatedUrl}
+							tabindex={lastCreatedUrl ? 0 : -1}
+							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white {lastCreatedUrl
+								? ''
+								: 'pointer-events-none opacity-35'}"
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
 								><path
@@ -608,25 +611,33 @@
 								/></svg
 							>
 							<span class="text-[10px]">Facebook</span>
-						</button>
-						<button
-							type="button"
-							disabled={!lastCreatedUrl}
-							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
-							onclick={() => openSocialShare('reddit')}
+						</a>
+						<a
+							href={socialShareUrl('reddit')}
+							target="_blank"
+							rel="noopener noreferrer"
+							aria-disabled={!lastCreatedUrl}
+							tabindex={lastCreatedUrl ? 0 : -1}
+							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white {lastCreatedUrl
+								? ''
+								: 'pointer-events-none opacity-35'}"
 						>
-							<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
+							<svg viewBox="0 0 256 256" aria-hidden="true" class="size-[18px] fill-current"
 								><path
-									d="M14.6 3.4a2.15 2.15 0 1 1 1.8 2.8 7.1 7.1 0 0 1 3.4 2.2 2.12 2.12 0 1 1-1.3 1.2 5.9 5.9 0 0 0-3.4-2.1l-.7 3.6c1.5.2 2.5.8 2.5 1.8 0 1.3-1.5 2.1-3.7 2.1s-3.7-.8-3.7-2.1c0-1 .9-1.6 2.5-1.8l-.7-3.6a5.9 5.9 0 0 0-3.4 2.1 2.1 2.1 0 1 1-1.3-1.2 7.1 7.1 0 0 1 3.4-2.2 2.15 2.15 0 1 1 4.6-2.8Zm-3 9.4c-.8.1-1.4.3-1.4.7s.7.7 2 .7 2-.3 2-.7-.6-.6-1.4-.7l-.6 0-.6 0Zm-.7 4.4c.9.7 2.3.7 3.2 0l.7.9c-1.3 1-3.3 1-4.6 0l.7-.9Z"
+									d="M248,104a31.99228,31.99228,0,0,0-52.9375-24.19043c-16.75439-8.90112-36.76172-14.279-57.666-15.52539l5.19581-31.17578,21.83105,3.3584a24.00409,24.00409,0,1,0,2.43506-15.814l-29.64209-4.56006a7.996,7.996,0,0,0-9.10742,6.5918l-6.91309,41.478c-21.83887.94165-42.813,6.37891-60.2583,15.647a31.99266,31.99266,0,0,0-42.59229,47.74024A59.04669,59.04669,0,0,0,16,144c0,21.93457,12.042,42.35156,33.90723,57.48926C70.875,216.00588,98.60938,224,128,224s57.125-7.99414,78.09277-22.51074C227.958,186.35158,240,165.93459,240,144a59.01726,59.01726,0,0,0-2.3457-16.44922A32.17163,32.17163,0,0,0,248,104ZM72,132a16,16,0,1,1,16,16A16.01833,16.01833,0,0,1,72,132Zm92.69629,51.10938a80.122,80.122,0,0,1-73.39209,0,8,8,0,0,1,7.34033-14.2168,64.09433,64.09433,0,0,0,58.71094,0,8.00008,8.00008,0,0,1,7.34082,14.2168ZM168,148a16,16,0,1,1,16-16A16.01833,16.01833,0,0,1,168,148Z"
 								/></svg
 							>
 							<span class="text-[10px]">Reddit</span>
-						</button>
-						<button
-							type="button"
-							disabled={!lastCreatedUrl}
-							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-35"
-							onclick={() => openSocialShare('linkedin')}
+						</a>
+						<a
+							href={socialShareUrl('linkedin')}
+							target="_blank"
+							rel="noopener noreferrer"
+							aria-disabled={!lastCreatedUrl}
+							tabindex={lastCreatedUrl ? 0 : -1}
+							class="group flex h-[62px] flex-col items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] text-white/55 transition-colors hover:border-white/25 hover:bg-white/[0.06] hover:text-white {lastCreatedUrl
+								? ''
+								: 'pointer-events-none opacity-35'}"
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true" class="size-[18px] fill-current"
 								><path
@@ -634,7 +645,7 @@
 								/></svg
 							>
 							<span class="text-[10px]">LinkedIn</span>
-						</button>
+						</a>
 					</div>
 				</section>
 			{/if}

@@ -6,6 +6,7 @@
 		Check,
 		Copy,
 		ExternalLink,
+		FileText,
 		Link2,
 		LockKeyhole,
 		RefreshCw,
@@ -13,7 +14,7 @@
 		Trash2
 	} from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
-	import { deleteAllTenantShares, deleteShare, listAllShares } from '$lib/api/rag';
+	import { deleteAllShares, deleteAllTenantShares, deleteShare, listAllShares } from '$lib/api/rag';
 	import type { ShareListItem } from '$lib/types/rag.types';
 
 	const PAGE_SIZE = 10;
@@ -29,6 +30,7 @@
 	let shares = $state<ShareListItem[]>([]);
 	let isLoading = $state(false);
 	let isDeletingAll = $state(false);
+	let deletingConversationId = $state<string | null>(null);
 	let errorMessage = $state('');
 	let copiedCode = $state<string | null>(null);
 	let searchQuery = $state('');
@@ -43,10 +45,34 @@
 		);
 	});
 
-	const totalPages = $derived(Math.max(1, Math.ceil(filteredShares.length / PAGE_SIZE)));
-	const pageShares = $derived(
-		filteredShares.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-	);
+	interface ShareGroup {
+		conversationId: string;
+		title: string;
+		shares: ShareListItem[];
+		updatedAt: string;
+	}
+
+	const groups = $derived.by(() => {
+		const byConversation: Record<string, ShareGroup> = {};
+		for (const share of filteredShares) {
+			const existing = byConversation[share.conversationId];
+			if (existing) {
+				existing.shares.push(share);
+				if (share.createdAt > existing.updatedAt) existing.updatedAt = share.createdAt;
+			} else {
+				byConversation[share.conversationId] = {
+					conversationId: share.conversationId,
+					title: share.title,
+					shares: [share],
+					updatedAt: share.createdAt
+				};
+			}
+		}
+		return Object.values(byConversation).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+	});
+
+	const totalPages = $derived(Math.max(1, Math.ceil(groups.length / PAGE_SIZE)));
+	const pageGroups = $derived(groups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE));
 
 	function setSearchQuery(value: string) {
 		searchQuery = value;
@@ -109,6 +135,24 @@
 			toast.error('Unable to revoke shared links');
 		} finally {
 			isDeletingAll = false;
+		}
+	}
+
+	async function revokeConversation(conversationId: string) {
+		if (deletingConversationId) return;
+		deletingConversationId = conversationId;
+		try {
+			const result = await deleteAllShares(conversationId);
+			if (result.ok) {
+				shares = shares.filter((share) => share.conversationId !== conversationId);
+				toast.success('Conversation shares revoked');
+			} else {
+				toast.error(result.error.message);
+			}
+		} catch {
+			toast.error('Unable to revoke conversation shares');
+		} finally {
+			deletingConversationId = null;
 		}
 	}
 
@@ -243,62 +287,98 @@
 					</p>
 				</div>
 			{:else}
-				<div class="divide-y divide-white/[0.09] border-y border-white/[0.09]">
-					{#each pageShares as share (share.code)}
-						<div class="flex items-center gap-3 py-3">
+				<div class="space-y-4">
+					{#each pageGroups as group (group.conversationId)}
+						<div class="overflow-hidden rounded-lg border border-white/[0.1]">
 							<div
-								class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.07]"
+								class="flex items-center gap-2.5 border-b border-white/[0.08] bg-white/[0.035] px-3 py-2"
 							>
-								<Link2 class="size-3.5 text-white/45" strokeWidth={1.8} />
-							</div>
-							<div class="min-w-0 flex-1">
-								<div class="flex items-center gap-2">
-									<p class="truncate text-sm text-white/80">{share.title}</p>
-									{#if share.isPrivate}
-										<span
-											class="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-white/55 uppercase"
-										>
-											<LockKeyhole class="size-2.5" strokeWidth={1.8} />
-											Private
-										</span>
-									{/if}
+								<div
+									class="flex size-7 shrink-0 items-center justify-center rounded-md bg-white/[0.07]"
+								>
+									<FileText class="size-3.5 text-white/45" strokeWidth={1.8} />
 								</div>
-								<p class="mt-0.5 truncate font-mono text-[10px] text-white/35">
-									{shareUrl(share.code)}
+								<p class="min-w-0 flex-1 truncate text-xs font-medium text-white/75">
+									{group.title}
 								</p>
-								<p class="mt-1 text-[10px] text-white/35">
-									Created {formatDate(share.createdAt)} · {formatExpiry(share.expiresAt)}
-								</p>
-							</div>
-							<div class="flex shrink-0 items-center gap-0.5">
+								<span class="shrink-0 text-[10px] text-white/35">
+									{group.shares.length}
+									{group.shares.length === 1 ? 'link' : 'links'}
+								</span>
 								<button
 									type="button"
-									aria-label={`Open ${share.title}`}
-									class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
-									onclick={() => openLink(share)}
+									class="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-white/45 transition-colors hover:bg-red-500/[0.1] hover:text-red-300 disabled:pointer-events-none disabled:opacity-40"
+									aria-label={`Delete all links for ${group.title}`}
+									disabled={deletingConversationId !== null}
+									onclick={() => revokeConversation(group.conversationId)}
 								>
-									<ExternalLink class="size-3.5" strokeWidth={1.8} />
-								</button>
-								<button
-									type="button"
-									class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
-									aria-label={`Copy ${share.title}`}
-									onclick={() => copyLink(share)}
-								>
-									{#if copiedCode === share.code}
-										<Check class="size-3.5 text-emerald-300" strokeWidth={2} />
+									{#if deletingConversationId === group.conversationId}
+										<RefreshCw class="size-3 animate-spin" strokeWidth={1.8} />
 									{:else}
-										<Copy class="size-3.5" strokeWidth={1.8} />
+										<Trash2 class="size-3" strokeWidth={1.8} />
 									{/if}
+									Delete
 								</button>
-								<button
-									type="button"
-									class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/35 transition-colors hover:bg-red-500/[0.1] hover:text-red-300"
-									aria-label={`Revoke ${share.title}`}
-									onclick={() => revokeLink(share.code)}
-								>
-									<Trash2 class="size-3.5" strokeWidth={1.8} />
-								</button>
+							</div>
+							<div class="divide-y divide-white/[0.07]">
+								{#each group.shares as share (share.code)}
+									<div class="flex items-center gap-3 py-2.5 pr-2.5 pl-3">
+										<div
+											class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]"
+										>
+											<Link2 class="size-3.5 text-white/45" strokeWidth={1.8} />
+										</div>
+										<div class="min-w-0 flex-1">
+											<div class="flex items-center gap-2">
+												<p class="truncate text-sm text-white/80">{share.title}</p>
+												{#if share.isPrivate}
+													<span
+														class="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-white/55 uppercase"
+													>
+														<LockKeyhole class="size-2.5" strokeWidth={1.8} />
+														Private
+													</span>
+												{/if}
+											</div>
+											<p class="mt-0.5 truncate font-mono text-[10px] text-white/35">
+												{shareUrl(share.code)}
+											</p>
+											<p class="mt-1 text-[10px] text-white/35">
+												Created {formatDate(share.createdAt)} · {formatExpiry(share.expiresAt)}
+											</p>
+										</div>
+										<div class="flex shrink-0 items-center gap-0.5">
+											<button
+												type="button"
+												aria-label={`Open ${share.title}`}
+												class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
+												onclick={() => openLink(share)}
+											>
+												<ExternalLink class="size-3.5" strokeWidth={1.8} />
+											</button>
+											<button
+												type="button"
+												class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
+												aria-label={`Copy ${share.title}`}
+												onclick={() => copyLink(share)}
+											>
+												{#if copiedCode === share.code}
+													<Check class="size-3.5 text-emerald-300" strokeWidth={2} />
+												{:else}
+													<Copy class="size-3.5" strokeWidth={1.8} />
+												{/if}
+											</button>
+											<button
+												type="button"
+												class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/35 transition-colors hover:bg-red-500/[0.1] hover:text-red-300"
+												aria-label={`Revoke ${share.title}`}
+												onclick={() => revokeLink(share.code)}
+											>
+												<Trash2 class="size-3.5" strokeWidth={1.8} />
+											</button>
+										</div>
+									</div>
+								{/each}
 							</div>
 						</div>
 					{/each}

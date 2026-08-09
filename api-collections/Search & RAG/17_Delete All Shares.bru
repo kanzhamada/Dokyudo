@@ -1,0 +1,23 @@
+meta {
+  name: Delete All Shares
+  type: http
+  seq: 17
+}
+
+delete {
+  url: {{baseUrl}}/api/rag/shares
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Revokes EVERY share link owned by the caller's tenant (account-level
+  cleanup — "Delete all" in the Shared Links dialog). Cascades to
+  share_invitees and purges all related Redis caches.
+
+  Response: { "data": { "success": true, "deleted": <count> } }
+}

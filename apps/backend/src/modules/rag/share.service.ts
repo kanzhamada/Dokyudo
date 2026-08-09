@@ -773,58 +773,6 @@ export class ShareService {
         return { deleted: codes.length };
     }
 
-    /** Lists the active shares of a conversation (manage dialog). */
-    static async listShares(params: {
-        userId: string;
-        tenantId: string;
-        conversationId: string;
-    }): Promise<
-        Array<{
-            code: string;
-            title: string;
-            isCustom: boolean;
-            isPrivate: boolean;
-            accessToken: string | null;
-            expiresAt: string | null;
-            createdAt: string;
-        }>
-    > {
-        const { userId, tenantId, conversationId } = params;
-
-        let rows: any[] = [];
-        await withAuthDb(userId, async (tx) => {
-            rows = await tx
-                .select({
-                    code: chatShares.code,
-                    title: chatShares.title,
-                    isCustom: chatShares.isCustom,
-                    isPrivate: chatShares.isPrivate,
-                    accessToken: chatShares.accessToken,
-                    expiresAt: chatShares.expiresAt,
-                    createdAt: chatShares.createdAt,
-                })
-                .from(chatShares)
-                .where(
-                    and(
-                        eq(chatShares.conversationId, conversationId),
-                        eq(chatShares.tenantId, tenantId),
-                    ),
-                )
-                .orderBy(desc(chatShares.createdAt))
-                .limit(50);
-        });
-
-        return rows.map((r) => ({
-            code: r.code,
-            title: r.title,
-            isCustom: r.isCustom,
-            isPrivate: r.isPrivate,
-            accessToken: r.accessToken,
-            expiresAt: r.expiresAt?.toISOString() ?? null,
-            createdAt: r.createdAt.toISOString(),
-        }));
-    }
-
     /** Lists every active share owned by the tenant for account-level management. */
     static async listAllShares(params: {
         userId: string;
@@ -836,6 +784,7 @@ export class ShareService {
             isCustom: boolean;
             isPrivate: boolean;
             accessToken: string | null;
+            conversationId: string;
             expiresAt: string | null;
             createdAt: string;
         }>
@@ -851,6 +800,7 @@ export class ShareService {
                     isCustom: chatShares.isCustom,
                     isPrivate: chatShares.isPrivate,
                     accessToken: chatShares.accessToken,
+                    conversationId: chatShares.conversationId,
                     expiresAt: chatShares.expiresAt,
                     createdAt: chatShares.createdAt,
                 })
@@ -874,6 +824,7 @@ export class ShareService {
             isCustom: r.isCustom,
             isPrivate: r.isPrivate,
             accessToken: r.accessToken,
+            conversationId: r.conversationId,
             expiresAt: r.expiresAt?.toISOString() ?? null,
             createdAt: r.createdAt.toISOString(),
         }));

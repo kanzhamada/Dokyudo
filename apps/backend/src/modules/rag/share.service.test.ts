@@ -318,13 +318,14 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
         await db.delete(conversations).where(eq(conversations.id, result.id));
     });
 
-    it("listShares + deleteShare: revoke makes the link 404", async () => {
-        const list = await ShareService.listShares({
+    it("listAllShares + deleteShare: revoke makes the link 404", async () => {
+        const list = await ShareService.listAllShares({
             userId: TEST_USER_ID,
             tenantId: TEST_TENANT_ID,
-            conversationId: TEST_CONVERSATION_ID,
         });
         assertEquals(list.length >= 1, true);
+        assertEquals(list.some((s) => s.code === shareCode), true);
+        assertEquals(typeof list[0].conversationId === "string", true);
 
         await ShareService.deleteShare({
             userId: TEST_USER_ID,

@@ -600,33 +600,3 @@ ragRoutes.openapi(
     }),
     ragController.handleDeleteTenantShares as any,
 );
-
-ragRoutes.openapi(
-    createRoute({
-        method: "get",
-        path: "/conversations/{id}/shares",
-        tags: ["RAG"],
-        summary: "List Public Shares",
-        description: "Lists the active share links of a conversation.",
-        request: {
-            params: RagSchema.ConversationParamSchema,
-        },
-        responses: {
-            200: {
-                description: "Success",
-                content: {
-                    "application/json": {
-                        schema: RagSchema.ShareListResponseSchema,
-                    },
-                },
-            },
-            401: {
-                description: "Unauthorized",
-            },
-            500: {
-                description: "Internal server error",
-            },
-        },
-    }),
-    ragController.handleListShares as any,
-);

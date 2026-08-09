@@ -1,0 +1,27 @@
+meta {
+  name: List All Shares
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/api/rag/shares
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Lists EVERY active (non-expired) share link owned by the caller's tenant,
+  newest first (max 100) — powers the account-level "Shared Links" dialog.
+
+  Response: { "shares": [{ code, title, isCustom, isPrivate, accessToken,
+                           expiresAt, createdAt }] }
+
+  - isPrivate: true when the link is invite-only.
+  - accessToken: the owner's token — lets the owner reopen/copy private links
+    with `?invite=<accessToken>`.
+}

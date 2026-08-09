@@ -18,20 +18,28 @@ headers {
 body:json {
   {
     "expires_in_hours": 24,
-    "custom_code": "my-custom-link"
+    "custom_code": "my-custom-link",
+    "emails": ["tamu@example.com"],
+    "notify": true
   }
 }
 
 docs {
-  Creates a public read-only share of the conversation, snapshotted up to its
-  last turn. Returns the short code; the frontend composes the URL.
+  Creates a read-only share of the conversation, snapshotted up to its last
+  turn. Passing `emails` makes the share PRIVATE: an access token is generated,
+  invitees are stored, and (with `notify: true`) invite emails are sent.
 
-  Response: { "code": "..." }
+  Response: { "code": "...", "accessToken": "..." }
 
-  - expires_in_hours: link lifetime in hours (1h - 1 year). OMIT the field for
-    a never-expiring link. Presets: 1 | 24 | 168 | 720.
+  - expires_in_hours: link lifetime in hours (1h - 1 year). OMIT for a
+    never-expiring link. Presets: 1 | 24 | 168 | 720.
   - custom_code: optional user-chosen short code (4-32 chars: letters, digits,
     '-' or '_'). Omit for an auto-generated base62 code.
+  - emails: optional invitees for a private share (max 100). Normalized
+    (lowercase), deduped, and must NOT include your own email.
+  - notify: send invite emails immediately (default false).
+  - accessToken: non-null only for private shares — embed in invite links as
+    `?invite=<accessToken>`.
   - 409 CODE_TAKEN when the custom code is already in use.
   - The snapshot is immutable: turns added or edited AFTER sharing never leak
     into the public view.

@@ -248,3 +248,41 @@ Efek: layar bersih selama proses; icon feedback tidak bisa diklik pada jawaban y
 ### 6. Completion Timestamp
 
 **Iteration 4 (retry variants + browser UI + status marker ikut varian + toolbar nav):** 2026-08-09
+
+---
+
+## Iteration 5 — Reusable ChatInput & ConfigureByokDialog Extraction (2026-08-09)
+
+### 1. Kapsul input dipindah ke `ChatInput.svelte`
+
+Markup kapsul input (file chips, attach + tooltip kuota, textarea auto-resize, model dropdown, tombol send/stop) dan seluruh logika terkait dipindah dari halaman ini ke komponen shared `apps/frontend/src/lib/components/chat/ChatInput.svelte` (dipakai juga oleh `/chat`). Ukuran/style detail (`max-w-4xl`, `bg-[#232323]/[0.85] shadow-2xl backdrop-blur-[42px]`) dijadikan baseline komponen.
+
+- State yang pindah: `fileInput`, `textInput`, `modelSearchQuery`, `modelGroups`, auto-reset height effect, `triggerFileInput`, `handleFileChange`, `removeFile`, derived `currentUploadCount`/`currentStorageBytes`/`maxFileSizeMB`, focus-on-mount.
+- `showError` tetap di halaman (dipakai juga oleh alur streaming error).
+- Model dropdown rich (search + grup + Configure) kini berada di dalam ChatInput; halaman tinggal melempar `onconfigure`.
+
+### 2. Dialog Configure BYOK → `ConfigureByokDialog.svelte`
+
+Dialog "Configure BYOK" (tab provider Google AI/Mistral/OpenRouter, masked-key "API Key Configured", reset, input key, save) diextract menjadi komponen reusable `apps/frontend/src/lib/components/chat/ConfigureByokDialog.svelte`, dipakai oleh **kedua** halaman chat.
+
+- Props: `bind:open`, `onSaved` (dipanggil setelah save/reset agar halaman me-refresh `llmOptions`).
+- Mengelola sendiri: `BYOK_PROVIDER_OPTIONS`, `provider`, `apiKey`, `keyMasks` (di-load via `getKeys()` saat dialog dibuka), `isSavingKey`/`isResettingKey`, `error`, `saveConfigureKey`/`resetConfigureKey` (`upsertKey`/`deleteKey`).
+- Halaman ini kini hanya menyisakan `isConfigureDialogOpen` + `openConfigureDialog()`; `loadLlmOptions` disederhanakan (tanpa `configuredKeyMasks`).
+- Styling glassmorphic seragam dengan input chat: `bg-[#232323]/[0.85] backdrop-blur-[42px] border-white/[0.16]` (sebelumnya solid `bg-[#232323]`). Dropdown model juga `bg-[#232323]/[0.85]` (atau `[0.40]` saat `transparent`).
+
+### 3. View Transitions & penghapusan fade `isMounted`
+
+- Root div halaman **tidak lagi** memakai `transition-opacity duration-500` + `isMounted` (opacity 0→1) — fade ini beradu dengan SvelteKit View Transition dan membuat input berkedip. State `isMounted` dihapus.
+- Transisi submit chat kini ditangani global: `onNavigate` di `app/+layout.svelte` (hanya `goto` dari `/app/chat` → `/app/chat/<id>`), crossfade 700ms pada `app-main` di bawah sidebar, kapsul input ikut capture `app-main` (tanpa nama sendiri → tanpa artefak sudut tajam). Detail: `docs/frontend/app-chat.md` §Iteration 2.
+
+### 4. File Mapping
+
+| File | Change |
+|---|---|
+| `apps/frontend/src/lib/components/chat/ChatInput.svelte` | Komponen baru (baseline style dari halaman ini) |
+| `apps/frontend/src/lib/components/chat/ConfigureByokDialog.svelte` | Komponen baru (dialog BYOK, diextract dari halaman ini) |
+| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | Pakai ChatInput + ConfigureByokDialog; hapus state/fungsi configure & file, derived usage, fade isMounted |
+
+### 5. Completion Timestamp
+
+**Iteration 5 (ChatInput/ConfigureByokDialog extraction, hapus fade isMounted):** 2026-08-09

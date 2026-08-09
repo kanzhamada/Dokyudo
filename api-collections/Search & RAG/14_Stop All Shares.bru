@@ -15,8 +15,8 @@ headers {
 }
 
 docs {
-  Revokes EVERY public share of a conversation ("stop sharing" — used from the
-  sidebar context menu). Purges all related Redis caches.
+  Revokes EVERY share of a conversation (conversation-level stop sharing).
+  Cascades to share_invitees and purges all related Redis caches.
 
   Response: { "data": { "success": true, "deleted": <count> } }
 }
