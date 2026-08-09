@@ -2,7 +2,20 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { Copy, Check, Lock, MessageSquare, User, GitBranch, Clock, Share2 } from 'lucide-svelte';
+	import {
+		Copy,
+		Check,
+		FileText,
+		BookOpen,
+		Square,
+		TriangleAlert,
+		ShieldAlert,
+		Lock,
+		GitBranch,
+		Clock,
+		Share2
+	} from 'lucide-svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Button } from '$lib/components/ui/button';
 	import CodeBlockPreview from '$lib/components/chat/CodeBlockPreview.svelte';
@@ -26,14 +39,6 @@
 		renderer: customRenderer
 	});
 
-	function escapeHtml(value: string): string {
-		return value
-			.replace(/&/g, '&amp;')
-			.replace(/"/g, '&quot;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;');
-	}
-
 	function formatPageNumbers(raw: string): string {
 		if (!raw) return '';
 		const expanded = raw.replace(/(\d+)\s*-\s*(\d+)/g, (_m, startStr, endStr) => {
@@ -53,37 +58,52 @@
 			.join(', ');
 	}
 
+	function escapeHtml(value: string): string {
+		return value
+			.replace(/&/g, '&amp;')
+			.replace(/"/g, '&quot;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
+	}
+
 	/**
-	 * Read-only citation chips: show document title + pages from the snapshot.
-	 * No preview links — public viewers have no access to the documents.
+	 * Inline citation chips — identical look to the chat page, but static:
+	 * no document preview (public viewers have no document access) and no
+	 * tooltip interaction. Title + pages come from the share snapshot.
 	 */
 	function transformCitationTags(
 		html: string,
 		references?: PublicShareTurn['contextReferences']
 	): string {
-		if (!references || references.length === 0) {
-			return html.replace(/\s*\[Doc [^\]]+\]/gi, '');
-		}
-
 		const isNegativeAnswer =
 			/(Mohon maaf|tidak mengandung informasi|tidak ditemukan|tidak ada informasi|does not contain|cannot answer|no information available)/i.test(
 				html
 			);
-		if (isNegativeAnswer) return html.replace(/\s*\[Doc [^\]]+\]/gi, '');
+		if (isNegativeAnswer) {
+			return html.replace(/\s*\[Doc [^\]]+\]/gi, '');
+		}
 
-		let result = html.replace(/\[Doc \d+:[^\]]*;[^\]]*\]/gi, '');
-		result = result.replace(
+		let cleanHtml = html.replace(/\[Doc \d+:[^\]]*;[^\]]*\]/gi, '');
+
+		let result = cleanHtml.replace(
 			/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi,
 			(_match, docIdxStr, rawPageInfo) => {
 				const docIdx = Number(docIdxStr);
-				const refDoc = references.find((r) => r.index === docIdx) ?? references[docIdx - 1];
-				const docDisplayName = refDoc?.title
-					? refDoc.title.replace(/\.[^/.]+$/, '')
-					: `Doc ${docIdx}`;
+				let docDisplayName = `Doc ${docIdx}`;
+
+				if (references && references.length > 0) {
+					const refDoc = references.find((r) => r.index === docIdx) ?? references[docIdx - 1];
+					if (refDoc && refDoc.title) {
+						const cleanName = refDoc.title.replace(/\.[^/.]+$/, '');
+						docDisplayName = cleanName.length > 22 ? cleanName.slice(0, 22) + '...' : cleanName;
+					}
+				}
+
 				const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
 				const label = pageFormatted
 					? `${escapeHtml(docDisplayName)} <span class="text-white/40 font-normal">• ${escapeHtml(pageFormatted)}</span>`
 					: escapeHtml(docDisplayName);
+
 				return `<span class="relative inline-flex items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 mx-0.5 my-0.5 whitespace-nowrap">${label}</span>`;
 			}
 		);
@@ -94,10 +114,22 @@
 	function renderMarkdown(text: string, references?: PublicShareTurn['contextReferences']): string {
 		if (!text) return '';
 		try {
-			return transformCitationTags(marked.parse(text) as string, references);
+			const rawHtml = marked.parse(text) as string;
+			return transformCitationTags(rawHtml, references);
 		} catch {
 			return text;
 		}
+	}
+
+	// Map snapshot references to the chat page's reference shape (id/name/pages/snippet).
+	function refsOf(turn: PublicShareTurn) {
+		return (turn.contextReferences ?? []).map((r) => ({
+			id: r.documentId,
+			index: r.index ?? 1,
+			name: r.title || r.documentId,
+			pages: r.pages ?? [],
+			snippet: (r as { snippet?: string }).snippet
+		}));
 	}
 
 	const code = $derived(page.params.code ?? '');
@@ -105,7 +137,7 @@
 	let isLoading = $state(true);
 	let notFound = $state(false);
 	let isContinuing = $state(false);
-	let copiedTurnId = $state<string | null>(null);
+	let copiedMessageId = $state<string | null>(null);
 	let codeBlockInstances: { el: HTMLElement; unmount: () => void }[] = [];
 
 	onMount(() => {
@@ -129,7 +161,7 @@
 		isLoading = false;
 	}
 
-	// Mount code-block previews whenever the share content renders.
+	// Mount interactive code-block previews (same mechanism as the chat page).
 	$effect(() => {
 		if (!share) return;
 		untrack(() => {
@@ -152,12 +184,12 @@
 		});
 	});
 
-	async function copyTurn(turnId: string, text: string) {
+	async function copyToClipboard(text: string, id: string) {
 		try {
 			await navigator.clipboard.writeText(text);
-			copiedTurnId = turnId;
+			copiedMessageId = id;
 			setTimeout(() => {
-				if (copiedTurnId === turnId) copiedTurnId = null;
+				if (copiedMessageId === id) copiedMessageId = null;
 			}, 1500);
 		} catch {
 			// clipboard unavailable — silently ignore on public pages
@@ -196,79 +228,274 @@
 			minute: '2-digit'
 		})}`;
 	}
-
-	function turnLabel(turnId: string): string {
-		return `turn-${turnId}`;
-	}
 </script>
 
 <svelte:head>
 	<title>{share ? `${share.title} — Dokyudo` : 'Dokyudo'}</title>
 </svelte:head>
 
-<div class="flex min-h-svh flex-col bg-[#141414] text-white">
-	<!-- Header -->
-	<header class="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/90 backdrop-blur">
-		<div class="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-3 px-4">
-			<a href="/" class="flex min-w-0 items-center gap-2">
+<div class="relative flex h-svh w-full flex-col overflow-hidden bg-[#1F1E1D]">
+	<!-- Ambient Background Glow Circle (Matching App Shell Layout) -->
+	<div
+		class="pointer-events-none absolute -top-[318px] -left-[295px] z-0 h-[1190px] w-[1190px] rounded-full opacity-[0.07]"
+		style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
+	></div>
+
+	<!-- Floating Conversation Capsule (same visual as the chat page header) -->
+	<div
+		class="pointer-events-auto absolute top-3 right-3 left-3 z-30 overflow-hidden rounded-[24px] border border-white/15 bg-[#232323]/90 shadow-2xl backdrop-blur-[42px]"
+	>
+		<div class="flex h-14 items-center justify-between px-3">
+			<!-- Brand -->
+			<a href="/" class="flex shrink-0 items-center gap-1.5" aria-label="Dokyudo beranda">
 				<img src={favicon} alt="Dokyudo" class="h-6 w-auto" />
-				<span class="truncate font-sans text-sm font-medium tracking-tight text-white/80">
+				<span class="hidden font-sans text-sm font-medium tracking-tight text-white/80 sm:block">
 					Dokyudo
 				</span>
 			</a>
 
-			{#if share}
-				<div class="flex min-w-0 items-center gap-2">
-					<span
-						class="flex shrink-0 items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/60"
-					>
-						<Lock class="size-3 text-white/50" />
-						Read-only
-					</span>
-					<span
-						class="hidden shrink-0 items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-white/60 sm:flex"
-					>
-						<Clock class="size-3 text-white/50" />
-						{formatExpiry(share.expiresAt)}
-					</span>
-				</div>
-			{/if}
-		</div>
-	</header>
-
-	<main class="shared-chat-body mx-auto w-full max-w-3xl flex-1 px-4 py-6">
-		{#if isLoading}
-			<div class="flex items-center justify-center py-24">
-				<Spinner class="size-5 text-white/40" />
+			<!-- Shared conversation title -->
+			<div class="flex min-w-0 flex-1 items-center justify-center px-2">
+				<span class="max-w-full truncate text-xs font-medium text-white/75" title={share?.title}>
+					{share?.title ?? 'Shared conversation'}
+				</span>
 			</div>
-		{:else if notFound}
-			<div class="flex flex-col items-center justify-center gap-3 py-24 text-center">
-				<Share2 class="size-8 text-white/25" />
-				<h1 class="text-lg font-semibold">Link tidak valid atau sudah kedaluwarsa</h1>
-				<p class="max-w-sm text-sm text-white/45">
-					Link publik ini sudah dihentikan oleh pemiliknya, atau masa berlakunya sudah habis.
-				</p>
-				<Button
-					class="mt-2 cursor-pointer bg-amber-500 text-black hover:bg-amber-400"
-					onclick={() => goto('/')}
+
+			<!-- Share-specific actions -->
+			<div class="flex shrink-0 items-center gap-1.5">
+				<span
+					class="hidden items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/60 sm:flex"
+					title={share ? formatExpiry(share.expiresAt) : undefined}
 				>
-					Ke beranda
+					<Clock class="size-3 text-white/50" />
+					{share?.expiresAt ? 'Ada batas waktu' : 'Tanpa batas waktu'}
+				</span>
+				<Button
+					size="sm"
+					class="cursor-pointer border border-white/20 bg-white/15 text-xs font-medium text-white hover:bg-white/25 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+					disabled={isContinuing || !share}
+					onclick={handleContinue}
+				>
+					{#if isContinuing}
+						<Spinner class="mr-1.5 size-3" />
+						Menyiapkan...
+					{:else}
+						<GitBranch class="mr-1.5 size-3.5" />
+						Lanjutkan chat
+					{/if}
 				</Button>
 			</div>
-		{:else if share}
-			<!-- Conversation header -->
-			<div class="mb-6">
-				<h1 class="text-xl font-semibold tracking-tight">{share.title}</h1>
-				<p class="mt-1 text-xs text-white/40">
-					Dibagikan {new Date(share.createdAt).toLocaleDateString('id-ID', {
-						day: 'numeric',
-						month: 'short',
-						year: 'numeric'
-					})}
-					· {share.turns.length} turn
-				</p>
+		</div>
+	</div>
 
-				<div class="mt-4 flex items-center gap-3">
+	<!-- Main Content -->
+	<main
+		class="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
+	>
+		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
+			{#if isLoading}
+				<div class="flex flex-1 items-center justify-center py-24">
+					<Spinner class="size-5 text-white/40" />
+				</div>
+			{:else if notFound}
+				<div class="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
+					<Share2 class="size-8 text-white/25" />
+					<h1 class="text-lg font-semibold text-white">Link tidak valid atau sudah kedaluwarsa</h1>
+					<p class="max-w-sm text-sm text-white/45">
+						Link publik ini sudah dihentikan oleh pemiliknya, atau masa berlakunya sudah habis.
+					</p>
+					<Button
+						class="mt-2 cursor-pointer bg-amber-500 text-black hover:bg-amber-400"
+						onclick={() => goto('/')}
+					>
+						Ke beranda
+					</Button>
+				</div>
+			{:else if share}
+				<!-- Read-only notice + share meta -->
+				<div class="flex flex-col gap-2 pt-1">
+					<div class="flex items-center gap-2">
+						<span
+							class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
+						>
+							<Lock class="size-3" />
+							<span>Read-only share</span>
+						</span>
+						<span class="text-xs text-white/40">
+							Dibagikan {new Date(share.createdAt).toLocaleDateString('id-ID', {
+								day: 'numeric',
+								month: 'short',
+								year: 'numeric'
+							})}
+							· {share.turns.length} turn
+						</span>
+					</div>
+				</div>
+
+				{#each share.turns as turn, i (turn.createdAt + i)}
+					<!-- User Message (Clean Pill — same as chat page) -->
+					<div class="flex w-full justify-end">
+						<div class="flex max-w-[85%] flex-col items-end gap-1.5 md:max-w-[70%]">
+							<div
+								class="w-fit rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md"
+							>
+								<p class="leading-relaxed whitespace-pre-wrap">{turn.question}</p>
+							</div>
+
+							<!-- Action Toolbar (Copy only — no edit on a shared chat) -->
+							<div class="flex items-center gap-1">
+								<Tooltip.Provider delayDuration={100}>
+									<Tooltip.Root>
+										<Tooltip.Trigger>
+											{#snippet child({ props })}
+												<Button
+													{...props}
+													variant="ghost"
+													size="icon"
+													class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+													onclick={() => copyToClipboard(turn.question, `q-${i}`)}
+													aria-label="Copy question"
+												>
+													{#if copiedMessageId === `q-${i}`}
+														<Check class="size-3 text-green-400" />
+													{:else}
+														<Copy class="size-3" />
+													{/if}
+												</Button>
+											{/snippet}
+										</Tooltip.Trigger>
+										<Tooltip.Content
+											class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+										>
+											<p>{copiedMessageId === `q-${i}` ? 'Copied!' : 'Copy question'}</p>
+										</Tooltip.Content>
+									</Tooltip.Root>
+								</Tooltip.Provider>
+							</div>
+						</div>
+					</div>
+
+					<!-- Assistant Response (Flat & Clean — same as chat page) -->
+					<div class="flex w-full justify-start py-2">
+						<div class="flex w-full flex-col gap-3">
+							<!-- Markdown Content View -->
+							<div
+								role="none"
+								class="prose prose-sm max-w-none text-white/90 prose-invert prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-li:my-1 prose-tr:border-b prose-tr:border-white/10 prose-th:border-b prose-th:border-white/20 prose-td:border-b prose-td:border-white/10 prose-hr:my-4 prose-hr:border-white/10"
+							>
+								{#if turn.answer}
+									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+									{@html renderMarkdown(turn.answer, turn.contextReferences)}
+								{:else}
+									<div
+										class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
+									>
+										<span>Menunggu respons…</span>
+									</div>
+								{/if}
+							</div>
+
+							<!-- Terminal Status Marker (stopped / failed / blocked) -->
+							{#if turn.status === 'stopped'}
+								<div
+									class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
+								>
+									<Square class="size-3" />
+									<span>Response Stopped</span>
+								</div>
+							{:else if turn.status === 'failed'}
+								<div
+									class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
+								>
+									<TriangleAlert class="size-3" />
+									<span>Response failed</span>
+								</div>
+							{:else if turn.status === 'blocked'}
+								<div
+									class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
+								>
+									<ShieldAlert class="size-3" />
+									<span>Response blocked by security filter</span>
+								</div>
+							{/if}
+
+							<!-- Document Reference Chips (static — no document preview) -->
+							{#if refsOf(turn).length > 0}
+								<div class="mt-2 border-t border-white/10 pt-3">
+									<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
+										<BookOpen class="size-3.5 text-white/60" />
+										<span>Source References ({refsOf(turn).length})</span>
+									</div>
+									<div class="flex flex-wrap gap-2">
+										{#each refsOf(turn) as ref (ref.id)}
+											<Tooltip.Provider delayDuration={100}>
+												<Tooltip.Root>
+													<Tooltip.Trigger
+														class="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#2B2A29] px-3 py-1 text-xs text-white/80"
+													>
+														<FileText class="size-3 text-white/60" />
+														<span class="font-medium">{ref.name}</span>
+														{#if ref.pages && ref.pages.length > 0}
+															<span class="text-white/40">• {ref.pages.join(', ')}</span>
+														{/if}
+													</Tooltip.Trigger>
+													<Tooltip.Content
+														class="max-w-xs rounded-md border-0 bg-white px-3 py-1.5 text-xs text-black shadow-md"
+													>
+														<p class="font-semibold text-black">{ref.name}</p>
+														{#if ref.snippet}
+															<p class="mt-1 text-black/70 italic">"{ref.snippet}"</p>
+														{/if}
+													</Tooltip.Content>
+												</Tooltip.Root>
+											</Tooltip.Provider>
+										{/each}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Action Toolbar (Copy only — no retry/feedback/dropdown on a shared chat) -->
+							<div class="flex items-center justify-between gap-2 pt-1 text-white/40">
+								<div class="flex items-center gap-1">
+									<Tooltip.Provider delayDuration={100}>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<Button
+														{...props}
+														variant="ghost"
+														size="icon"
+														class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+														onclick={() => copyToClipboard(turn.answer, `a-${i}`)}
+														aria-label="Copy response"
+													>
+														{#if copiedMessageId === `a-${i}`}
+															<Check class="size-3.5 text-green-400" />
+														{:else}
+															<Copy class="size-3.5" />
+														{/if}
+													</Button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content
+												class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+											>
+												<p>{copiedMessageId === `a-${i}` ? 'Copied!' : 'Copy response'}</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									</Tooltip.Provider>
+								</div>
+							</div>
+						</div>
+					</div>
+				{/each}
+
+				<!-- Footer CTA -->
+				<div class="flex flex-col items-center gap-3 border-t border-white/10 pt-6 text-center">
+					<p class="text-xs text-white/35">
+						Dibagikan secara read-only via Dokyudo — {share.turns.length} turn, tidak termasuk percakapan
+						selanjutnya.
+					</p>
 					<Button
 						class="cursor-pointer bg-amber-500 text-black hover:bg-amber-400 disabled:opacity-60"
 						onclick={handleContinue}
@@ -288,133 +515,7 @@
 							: 'Masuk dulu untuk melanjutkan chat ini di akunmu.'}
 					</p>
 				</div>
-			</div>
-
-			<!-- Turns -->
-			<div class="space-y-5">
-				{#each share.turns as turn, i (turnLabel(turn.createdAt + i))}
-					<!-- User question -->
-					<div class="flex items-start gap-3">
-						<div
-							class="flex size-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5"
-						>
-							<User class="size-3.5 text-white/50" />
-						</div>
-						<div class="min-w-0 flex-1">
-							<div class="group flex items-start justify-between gap-2">
-								<p class="text-[15px] leading-relaxed whitespace-pre-wrap text-white/90">
-									{turn.question}
-								</p>
-								<button
-									type="button"
-									class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-white/30 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white/10 hover:text-white"
-									onclick={() => copyTurn(`q-${i}`, turn.question)}
-									aria-label="Salin prompt"
-								>
-									{#if copiedTurnId === `q-${i}`}
-										<Check class="size-3.5 text-emerald-400" />
-									{:else}
-										<Copy class="size-3.5" />
-									{/if}
-								</button>
-							</div>
-						</div>
-					</div>
-
-					<!-- Assistant answer -->
-					<div class="flex items-start gap-3">
-						<div
-							class="flex size-7 shrink-0 items-center justify-center rounded-full border border-amber-400/20 bg-amber-400/10"
-						>
-							<MessageSquare class="size-3.5 text-amber-300/80" />
-						</div>
-						<div class="min-w-0 flex-1">
-							<div class="mb-1 flex items-center gap-2">
-								<span class="text-xs font-medium text-white/50">
-									{turn.modelUsed ?? 'Dokyudo AI'}
-								</span>
-								{#if turn.status === 'stopped' || turn.status === 'failed'}
-									<span
-										class="rounded-full border border-red-400/20 bg-red-400/10 px-2 py-0.5 text-[10px] font-medium text-red-300/80"
-									>
-										{turn.status === 'stopped' ? 'Dihentikan' : 'Gagal'}
-									</span>
-								{/if}
-							</div>
-							<div class="group relative">
-								<div
-									class="markdown-body rounded-xl border border-white/10 bg-[#1D1C1B] px-4 py-3 text-[15px] leading-relaxed text-white/85"
-								>
-									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-									{@html renderMarkdown(turn.answer, turn.contextReferences)}
-								</div>
-								<button
-									type="button"
-									class="absolute top-2 right-2 flex size-7 cursor-pointer items-center justify-center rounded-md bg-[#1D1C1B] text-white/30 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white/10 hover:text-white"
-									onclick={() => copyTurn(`a-${i}`, turn.answer)}
-									aria-label="Salin respons"
-								>
-									{#if copiedTurnId === `a-${i}`}
-										<Check class="size-3.5 text-emerald-400" />
-									{:else}
-										<Copy class="size-3.5" />
-									{/if}
-								</button>
-							</div>
-						</div>
-					</div>
-				{/each}
-			</div>
-
-			<!-- Footer CTA -->
-			<div class="mt-10 border-t border-white/10 pt-6 text-center">
-				<p class="text-xs text-white/35">
-					Dibagikan secara read-only via Dokyudo — {share.turns.length} turn, tidak termasuk percakapan
-					selanjutnya.
-				</p>
-			</div>
-		{/if}
+			{/if}
+		</div>
 	</main>
 </div>
-
-<style>
-	.markdown-body :global(pre) {
-		overflow-x: auto;
-	}
-	.markdown-body :global(p) {
-		margin: 0.5rem 0;
-	}
-	.markdown-body :global(p:first-child) {
-		margin-top: 0;
-	}
-	.markdown-body :global(p:last-child) {
-		margin-bottom: 0;
-	}
-	.markdown-body :global(h1),
-	.markdown-body :global(h2),
-	.markdown-body :global(h3) {
-		margin: 0.75rem 0 0.5rem;
-		font-weight: 600;
-		line-height: 1.3;
-	}
-	.markdown-body :global(ul),
-	.markdown-body :global(ol) {
-		padding-left: 1.25rem;
-		margin: 0.5rem 0;
-	}
-	.markdown-body :global(li) {
-		margin: 0.2rem 0;
-	}
-	.markdown-body :global(table) {
-		width: 100%;
-		border-collapse: collapse;
-		margin: 0.75rem 0;
-		font-size: 0.85rem;
-	}
-	.markdown-body :global(th),
-	.markdown-body :global(td) {
-		border: 1px solid rgba(255, 255, 255, 0.15);
-		padding: 0.4rem 0.6rem;
-		text-align: left;
-	}
-</style>
