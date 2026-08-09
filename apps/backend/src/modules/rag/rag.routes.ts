@@ -382,9 +382,10 @@ ragRoutes.openapi(
         tags: ["RAG"],
         summary: "Get Public Share (unauthenticated)",
         description:
-            "Public read of a share link: returns the immutable snapshot of the conversation. Does not require authentication.",
+            "Public read of a share link: returns the immutable snapshot of the conversation. Private shares require the access token from the invite email as `?invite=`.",
         request: {
             params: RagSchema.ShareParamSchema,
+            query: RagSchema.ShareReadQuerySchema,
         },
         responses: {
             200: {
@@ -398,6 +399,9 @@ ragRoutes.openapi(
             400: {
                 description: "Validation error",
             },
+            403: {
+                description: "Private share — invitation required",
+            },
             404: {
                 description: "Share not found or expired",
             },
@@ -407,6 +411,54 @@ ragRoutes.openapi(
         },
     }),
     ragController.handleGetPublicShare as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "post",
+        path: "/shares/{code}/invitees",
+        tags: ["RAG"],
+        summary: "Add Share Invitees",
+        description:
+            "Adds email invitees to an existing share owned by the caller's tenant and (optionally) sends them invite emails. Adding the first invitee makes the share private.",
+        request: {
+            params: RagSchema.ShareParamSchema,
+            body: {
+                content: {
+                    "application/json": {
+                        schema: RagSchema.AddShareInviteesBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Success — returns newly added emails and the share access token",
+                content: {
+                    "application/json": {
+                        schema: z.object({
+                            added: z.array(z.string()),
+                            accessToken: z.string().nullable(),
+                        }),
+                    },
+                },
+            },
+            400: {
+                description: "Validation error",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            404: {
+                description: "Share not found or expired",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleAddShareInvitees as any,
 );
 
 ragRoutes.openapi(

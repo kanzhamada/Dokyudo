@@ -176,6 +176,13 @@
       "when": 1786262355500,
       "tag": "0024_nebulous_kid_colt",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786350000000,
+      "tag": "0025_share_invitees",
+      "breakpoints": true
     }
   ]
 }

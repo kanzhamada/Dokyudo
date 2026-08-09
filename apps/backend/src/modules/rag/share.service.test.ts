@@ -141,11 +141,101 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
         const pub = await ShareService.getPublicShare({ code: shareCode });
         assertEquals(pub.title, "Share Test Conversation");
         assertEquals(pub.authorName, "Share Service Test Tenant");
+        assertEquals(pub.isPrivate, false);
         assertEquals(pub.turns.length, 2);
         assertEquals(pub.turns[0].question, "Pertanyaan pertama");
         assertEquals(pub.turns[1].answer, "Jawaban kedua");
         assertEquals(pub.expiresAt !== null, true);
         assertEquals(pub.boundaryTurnId !== null, true);
+    });
+
+    it("createShare: rejects inviting the sharer's own email", async () => {
+        await assertRejects(
+            () =>
+                ShareService.createShare({
+                    userId: TEST_USER_ID,
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: TEST_CONVERSATION_ID,
+                    emails: [`share-test-${TEST_USER_ID}@example.com`],
+                }),
+            AppError,
+            "own email",
+        );
+    });
+
+    it("private share: gated behind the access token, invitees stored", async () => {
+        const created = await ShareService.createShare({
+            userId: TEST_USER_ID,
+            tenantId: TEST_TENANT_ID,
+            conversationId: TEST_CONVERSATION_ID,
+            emails: ["tamu@example.com", "tamu2@example.com"],
+            notify: false,
+        });
+        assertEquals(created.accessToken !== null, true);
+        const privateCode = created.code;
+
+        // No token → 403 PRIVATE_SHARE.
+        await assertRejects(
+            () => ShareService.getPublicShare({ code: privateCode }),
+            AppError,
+            "invitation is required",
+        );
+
+        // Wrong token → still 403.
+        await assertRejects(
+            () =>
+                ShareService.getPublicShare({
+                    code: privateCode,
+                    inviteToken: "wrong-token",
+                }),
+            AppError,
+            "invitation is required",
+        );
+
+        // Correct token → full read with isPrivate.
+        const pub = await ShareService.getPublicShare({
+            code: privateCode,
+            inviteToken: created.accessToken!,
+        });
+        assertEquals(pub.isPrivate, true);
+        assertEquals(pub.turns.length, 2);
+    });
+
+    it("addShareInvitees: promotes a public share to private, dedupes, and returns new emails", async () => {
+        const created = await ShareService.createShare({
+            userId: TEST_USER_ID,
+            tenantId: TEST_TENANT_ID,
+            conversationId: TEST_CONVERSATION_ID,
+        });
+        assertEquals(created.accessToken, null);
+
+        const first = await ShareService.addShareInvitees({
+            userId: TEST_USER_ID,
+            tenantId: TEST_TENANT_ID,
+            code: created.code,
+            emails: ["satu@example.com", "dua@example.com"],
+            notify: false,
+        });
+        assertEquals(first.added.length, 2);
+        assertEquals(first.accessToken !== null, true);
+
+        // Re-adding the same email only returns newly added ones.
+        const second = await ShareService.addShareInvitees({
+            userId: TEST_USER_ID,
+            tenantId: TEST_TENANT_ID,
+            code: created.code,
+            emails: ["dua@example.com", "tiga@example.com"],
+            notify: false,
+        });
+        assertEquals(second.added, ["tiga@example.com"]);
+        assertEquals(second.accessToken, first.accessToken);
+
+        // Share is now private — no token → 403.
+        await assertRejects(
+            () => ShareService.getPublicShare({ code: created.code }),
+            AppError,
+            "invitation is required",
+        );
     });
 
     it("getPublicShare: a new turn added after sharing is NOT included", async () => {

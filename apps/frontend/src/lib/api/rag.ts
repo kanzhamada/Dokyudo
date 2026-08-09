@@ -122,17 +122,44 @@ export function createShare(
 		method: 'POST',
 		body: {
 			...(params.expiresInHours !== undefined ? { expires_in_hours: params.expiresInHours } : {}),
-			...(params.customCode ? { custom_code: params.customCode } : {})
+			...(params.customCode ? { custom_code: params.customCode } : {}),
+			...(params.emails?.length ? { emails: params.emails } : {}),
+			...(params.notify !== undefined ? { notify: params.notify } : {})
 		}
 	});
 }
 
 /**
  * Public (unauthenticated) read of a share link. Safe to call without a
- * session — the backend ignores the token when present.
+ * session — the backend ignores the token when present. Private shares
+ * require the access token from the invite email (`?invite=`).
  */
-export function getPublicShare(code: string): Promise<ApiResult<PublicShare>> {
-	return apiRequest<PublicShare>(`/api/rag/shares/${code}`, { method: 'GET' });
+export function getPublicShare(
+	code: string,
+	inviteToken?: string
+): Promise<ApiResult<PublicShare>> {
+	const query = inviteToken ? `?invite=${encodeURIComponent(inviteToken)}` : '';
+	return apiRequest<PublicShare>(`/api/rag/shares/${code}${query}`, { method: 'GET' });
+}
+
+/**
+ * Adds email invitees to an existing share (private mode) and optionally
+ * sends them invite emails. Adding the first invitee makes the share private.
+ */
+export function addShareInvitees(
+	code: string,
+	params: { emails: string[]; notify?: boolean }
+): Promise<ApiResult<{ added: string[]; accessToken: string | null }>> {
+	return apiRequest<{ added: string[]; accessToken: string | null }>(
+		`/api/rag/shares/${code}/invitees`,
+		{
+			method: 'POST',
+			body: {
+				emails: params.emails,
+				...(params.notify !== undefined ? { notify: params.notify } : {})
+			}
+		}
+	);
 }
 
 /**

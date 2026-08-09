@@ -2,7 +2,16 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Spinner } from '$lib/components/ui/spinner';
-	import { Check, Copy, ExternalLink, Link2, RefreshCw, Search, Trash2 } from 'lucide-svelte';
+	import {
+		Check,
+		Copy,
+		ExternalLink,
+		Link2,
+		LockKeyhole,
+		RefreshCw,
+		Search,
+		Trash2
+	} from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import { deleteAllTenantShares, deleteShare, listAllShares } from '$lib/api/rag';
 	import type { ShareListItem } from '$lib/types/rag.types';
@@ -44,12 +53,14 @@
 		currentPage = 1;
 	}
 
-	function shareUrl(code: string): string {
-		return `${origin}/s/${code}`;
+	function shareUrl(code: string, accessToken?: string | null): string {
+		return accessToken
+			? `${origin}/s/${code}?invite=${encodeURIComponent(accessToken)}`
+			: `${origin}/s/${code}`;
 	}
 
-	function openLink(code: string) {
-		window.open(shareUrl(code), '_blank', 'noopener,noreferrer');
+	function openLink(share: ShareListItem) {
+		window.open(shareUrl(share.code, share.accessToken), '_blank', 'noopener,noreferrer');
 	}
 
 	function formatDate(iso: string): string {
@@ -101,12 +112,12 @@
 		}
 	}
 
-	async function copyLink(code: string) {
+	async function copyLink(share: ShareListItem) {
 		try {
-			await navigator.clipboard.writeText(shareUrl(code));
-			copiedCode = code;
+			await navigator.clipboard.writeText(shareUrl(share.code, share.accessToken));
+			copiedCode = share.code;
 			setTimeout(() => {
-				if (copiedCode === code) copiedCode = null;
+				if (copiedCode === share.code) copiedCode = null;
 			}, 1600);
 		} catch {
 			toast.error('Unable to copy the link');
@@ -241,7 +252,17 @@
 								<Link2 class="size-3.5 text-white/45" strokeWidth={1.8} />
 							</div>
 							<div class="min-w-0 flex-1">
-								<p class="truncate text-sm text-white/80">{share.title}</p>
+								<div class="flex items-center gap-2">
+									<p class="truncate text-sm text-white/80">{share.title}</p>
+									{#if share.isPrivate}
+										<span
+											class="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-white/55 uppercase"
+										>
+											<LockKeyhole class="size-2.5" strokeWidth={1.8} />
+											Private
+										</span>
+									{/if}
+								</div>
 								<p class="mt-0.5 truncate font-mono text-[10px] text-white/35">
 									{shareUrl(share.code)}
 								</p>
@@ -254,7 +275,7 @@
 									type="button"
 									aria-label={`Open ${share.title}`}
 									class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
-									onclick={() => openLink(share.code)}
+									onclick={() => openLink(share)}
 								>
 									<ExternalLink class="size-3.5" strokeWidth={1.8} />
 								</button>
@@ -262,7 +283,7 @@
 									type="button"
 									class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
 									aria-label={`Copy ${share.title}`}
-									onclick={() => copyLink(share.code)}
+									onclick={() => copyLink(share)}
 								>
 									{#if copiedCode === share.code}
 										<Check class="size-3.5 text-emerald-300" strokeWidth={2} />

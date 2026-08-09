@@ -9,10 +9,11 @@
 
 	// SvelteKit View Transitions — scoped strictly to the "new chat submit"
 	// navigation (/app/chat → /app/chat/<id> via goto, i.e. type === 'goto').
-	// Only the main content area (below the sidebar) cross-fades, via the
-	// `app-main` view-transition-name on <main>; the sidebar and app chrome stay
-	// static. The shared input capsule morphs in place through its own
-	// `chat-input` name (see ChatInput.svelte). CSS lives in src/routes/layout.css.
+	// Only the main content area (below the sidebar) cross-fades as one flat
+	// unit, via the `app-main` view-transition-name on <main>; the sidebar and
+	// app chrome stay static. The input capsule is intentionally part of that
+	// capture (no nested view-transition-name) to avoid sharp corner artifacts.
+	// CSS lives in src/routes/layout.css.
 	onNavigate((navigation) => {
 		const from = navigation.from?.url.pathname ?? '';
 		const to = navigation.to?.url.pathname ?? '';

@@ -179,13 +179,14 @@
 </script>
 
 <!-- Main Input Capsule.
-     view-transition-name is shared across chat pages so the capsule morphs in place
-     (no flicker) when submitting a new chat via SvelteKit's View Transitions. -->
+     The capsule is intentionally NOT given its own view-transition-name: it
+     stays inside the `app-main` capture so it cross-fades with the content
+     area as one flat unit (a separate capture would carve a rectangular hole
+     in `app-main` and leave sharp corner artifacts during the transition). -->
 <div
 	class="group flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] px-4 py-2 backdrop-blur-[42px] transition-all {transparent
 		? 'bg-[#232323]/[0.40]'
 		: 'bg-[#232323]/[0.85] shadow-2xl'}"
-	style="view-transition-name: chat-input;"
 >
 	<!-- Row 1: Attached Files -->
 	{#if attachedFiles.length > 0}
@@ -287,7 +288,9 @@
 					{#if onconfigure}
 						<!-- Rich dropdown: search + grouped models + Configure -->
 						<DropdownMenu.Content
-							class="w-80 border border-white/[0.16] bg-[#232323]/95 p-0 text-white backdrop-blur-[42px]"
+							class="w-80 border border-white/[0.16] p-0 text-white backdrop-blur-[42px] {transparent
+								? 'bg-[#232323]/[0.40]'
+								: 'bg-[#232323]/[0.85]'}"
 						>
 							<div class="max-h-72 overflow-y-auto px-1 py-1">
 								<Input
@@ -332,7 +335,9 @@
 					{:else}
 						<!-- Simple flat list of models -->
 						<DropdownMenu.Content
-							class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] bg-[#232323]/40 text-white backdrop-blur-[42px]"
+							class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] text-white backdrop-blur-[42px] {transparent
+								? 'bg-[#232323]/[0.40]'
+								: 'bg-[#232323]/[0.85]'}"
 						>
 							{#each llmOptions as option}
 								<DropdownMenu.Item

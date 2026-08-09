@@ -95,12 +95,16 @@ function renderImage(metadata: ShareMetadata): string {
 </svg>`;
 }
 
-export async function GET({ params, fetch }): Promise<Response> {
+export async function GET({ params, fetch, url }): Promise<Response> {
 	const code = params.code;
 	if (!code) return new Response('Not found', { status: 404 });
 
 	try {
-		const response = await fetch(`${PUBLIC_API_URL}/api/rag/shares/${encodeURIComponent(code)}`);
+		const invite = url.searchParams.get('invite');
+		const query = invite ? `?invite=${encodeURIComponent(invite)}` : '';
+		const response = await fetch(
+			`${PUBLIC_API_URL}/api/rag/shares/${encodeURIComponent(code)}${query}`
+		);
 		if (!response.ok) return new Response('Not found', { status: 404 });
 
 		const metadata = (await response.json()) as ShareMetadata;

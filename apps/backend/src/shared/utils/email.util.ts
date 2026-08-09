@@ -116,3 +116,87 @@ export async function sendRecoveryEmail(
         });
     }
 }
+
+export async function sendShareInviteEmail(params: {
+    email: string;
+    sharerName: string;
+    conversationTitle: string;
+    shareUrl: string;
+    expiresAt: string | null;
+    shareCode: string;
+}) {
+    const { email, sharerName, conversationTitle, shareUrl, expiresAt, shareCode } = params;
+
+    const expiryLine = expiresAt
+        ? `This link expires on ${new Date(expiresAt).toLocaleDateString("en-US", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+          })}.`
+        : "This link never expires.";
+
+    const { error } = await resend.emails.send(
+        {
+            from: "Dokyudo <team@dokyudo.my.id>",
+            to: [email],
+            subject: `${sharerName} shared a conversation with you on Dokyudo`,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #1F1E1D;">You have been invited to view a conversation</h2>
+                    <p>${escapeHtml(sharerName)} shared a private conversation with you on Dokyudo:</p>
+                    <p style="margin: 24px 0;">
+                        <a href="${shareUrl}" style="background-color: #DB8F5E; color: #1F1E1D; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                            View Conversation
+                        </a>
+                    </p>
+                    <p style="color: #666; font-size: 14px;">
+                        If the button above does not work, copy and paste this link into your browser:
+                        <br/>
+                        <a href="${shareUrl}">${shareUrl}</a>
+                    </p>
+                    <div style="background-color: #f7f4ef; border: 1px solid #e5ddd2; border-radius: 8px; padding: 14px 16px; margin: 20px 0;">
+                        <p style="margin: 0 0 4px; font-weight: bold; color: #1F1E1D;">${escapeHtml(conversationTitle)}</p>
+                        <p style="margin: 0; color: #666; font-size: 13px;">${expiryLine}</p>
+                    </div>
+                    <p style="color: #666; font-size: 14px; margin-top: 24px;">
+                        You are receiving this email because ${escapeHtml(sharerName)} invited you to view this
+                        private conversation on Dokyudo.
+                    </p>
+                </div>
+            `,
+        },
+        {
+            // One idempotent email per invitee per share — retries never double-send.
+            idempotencyKey: `share-invite/${shareCode}/${email}`,
+        },
+    );
+
+    if (error) {
+        console.error(
+            "Failed to send share invite email via Resend:",
+            error.message,
+        );
+        if (Deno.env.get("NODE_ENV") === "test" || Deno.env.get("NODE_ENV") === "dev") {
+            console.warn("[TEST/DEV] Bypassing Resend email error in non-production environment.");
+            return;
+        }
+        throw new AppError({
+            code: "INTERNAL_ERROR",
+            message: "Failed to send share invite email. Please try again.",
+            status: 500,
+        });
+    }
+}
+
+function escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (character) => {
+        const entities: Record<string, string> = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+        };
+        return entities[character];
+    });
+}

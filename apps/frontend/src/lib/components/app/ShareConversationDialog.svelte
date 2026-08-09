@@ -15,7 +15,7 @@
 		X
 	} from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
-	import { createShare } from '$lib/api/rag';
+	import { addShareInvitees, createShare } from '$lib/api/rag';
 	import { getMe } from '$lib/api/me';
 
 	interface Props {
@@ -42,7 +42,7 @@
 	type SocialNetwork = 'x' | 'facebook' | 'reddit' | 'linkedin';
 	type ShareMode = 'public' | 'private';
 
-	let selectedExpiry = $state<number | null>(24);
+	let selectedExpiry = $state<number | null>(null);
 	let shareMode = $state<ShareMode>('public');
 	let customCode = $state('');
 	let isCreating = $state(false);
@@ -50,6 +50,8 @@
 	let copiedCode = $state<string | null>(null);
 	let lastCreatedUrl = $state<string | null>(null);
 	let lastCreatedCode = $state<string | null>(null);
+	let lastAccessToken = $state<string | null>(null);
+	let isInviting = $state(false);
 	let recipientInput = $state('');
 	let recipients = $state<string[]>([]);
 	let currentUserEmail = $state<string | null>(null);
@@ -65,13 +67,17 @@
 	const previewUrl = $derived(customCode.trim() ? `${origin}/s/${customCode.trim()}` : null);
 	const hasValidRecipients = $derived(recipients.length > 0);
 	const ogImageUrl = $derived(
-		lastCreatedCode ? `${origin}/s/${lastCreatedCode}/opengraph-image.svg` : null
+		lastCreatedCode
+			? `${origin}/s/${lastCreatedCode}/opengraph-image.svg${lastAccessToken ? `?invite=${lastAccessToken}` : ''}`
+			: null
 	);
 	const previewTitle = $derived(conversationTitle?.trim() || 'Untitled conversation');
 	const normalizedUserEmail = $derived(currentUserEmail?.trim().toLowerCase() ?? '');
 
-	function shareUrlOf(code: string): string {
-		return `${origin}/s/${code}`;
+	function shareUrlOf(code: string, accessToken?: string | null): string {
+		return accessToken
+			? `${origin}/s/${code}?invite=${encodeURIComponent(accessToken)}`
+			: `${origin}/s/${code}`;
 	}
 
 	function resetDialogState() {
@@ -79,6 +85,7 @@
 		shareMode = 'public';
 		lastCreatedUrl = null;
 		lastCreatedCode = null;
+		lastAccessToken = null;
 		errorMessage = '';
 		inviteMessage = '';
 		recipientInput = '';
@@ -90,6 +97,8 @@
 		if (shareMode === mode) return;
 		shareMode = mode;
 		lastCreatedUrl = null;
+		lastCreatedCode = null;
+		lastAccessToken = null;
 		copiedCode = null;
 		errorMessage = '';
 		inviteMessage = '';
@@ -111,11 +120,15 @@
 		try {
 			const result = await createShare(conversationId, {
 				...(selectedExpiry !== null ? { expiresInHours: selectedExpiry } : {}),
-				...(code ? { customCode: code } : {})
+				...(code ? { customCode: code } : {}),
+				...(shareMode === 'private' && recipients.length > 0
+					? { emails: recipients, notify: notifyRecipients }
+					: {})
 			});
 
 			if (result.ok) {
-				lastCreatedUrl = shareUrlOf(result.data.code);
+				lastAccessToken = result.data.accessToken ?? null;
+				lastCreatedUrl = shareUrlOf(result.data.code, lastAccessToken);
 				lastCreatedCode = result.data.code;
 				customCode = '';
 				const copied = await copyText(lastCreatedUrl, 'created');
@@ -188,20 +201,64 @@
 		}
 	}
 
-	function handleInvite() {
-		if (!lastCreatedUrl) {
-			inviteMessage = 'Create a link before inviting people.';
-			return;
-		}
+	async function handleInvite() {
 		if (recipientInput.trim()) addRecipient();
 		if (!hasValidRecipients) {
 			inviteMessage = 'Add at least one email address.';
 			return;
 		}
 		inviteMessage = '';
-		toast.success(
-			notifyRecipients ? 'Invite emails are ready to send' : 'Invite link is ready to share'
-		);
+		isInviting = true;
+		try {
+			// No link yet? Generate one with a random code (current expiry),
+			// then invite — the backend handles both in a single call.
+			if (!lastCreatedCode) {
+				const result = await createShare(conversationId, {
+					...(selectedExpiry !== null ? { expiresInHours: selectedExpiry } : {}),
+					emails: recipients,
+					notify: notifyRecipients
+				});
+				if (result.ok) {
+					lastAccessToken = result.data.accessToken ?? null;
+					lastCreatedCode = result.data.code;
+					lastCreatedUrl = shareUrlOf(result.data.code, lastAccessToken);
+					recipients = [];
+					recipientInput = '';
+					toast.success(
+						notifyRecipients
+							? 'Share link created and invite emails sent'
+							: 'Share link created and invite added'
+					);
+				} else {
+					inviteMessage = result.error.message;
+				}
+				return;
+			}
+
+			const result = await addShareInvitees(lastCreatedCode, {
+				emails: recipients,
+				notify: notifyRecipients
+			});
+			if (result.ok) {
+				// A freshly created link may have been public — the backend
+				// promotes it to private and returns the access token.
+				lastAccessToken = result.data.accessToken ?? lastAccessToken;
+				lastCreatedUrl = shareUrlOf(lastCreatedCode, lastAccessToken);
+				recipients = [];
+				recipientInput = '';
+				toast.success(
+					notifyRecipients
+						? 'Invite emails sent'
+						: `${result.data.added.length} ${result.data.added.length === 1 ? 'person' : 'people'} invited`
+				);
+			} else {
+				inviteMessage = result.error.message;
+			}
+		} catch {
+			inviteMessage = 'Unable to send invitations. Try again.';
+		} finally {
+			isInviting = false;
+		}
 	}
 
 	function socialShareUrl(network: SocialNetwork): string | null {
@@ -255,7 +312,7 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
-		<div class="space-y-5 px-5 py-5">
+		<div class="min-w-0 space-y-5 px-5 py-5">
 			{#if errorMessage}
 				<div
 					class="rounded-lg border border-red-400/25 bg-red-400/[0.08] px-3 py-2 text-xs text-red-200"
@@ -294,7 +351,7 @@
 					<p class="mt-1 text-xs leading-5 text-white/42">
 						{shareMode === 'public'
 							? 'Anyone with the link can view this conversation.'
-							: 'Create the link first. It will not be public; only people you invite can view it.'}
+							: 'Create the link first, then invite people. Only invited emails can view it.'}
 					</p>
 				</div>
 
@@ -397,9 +454,12 @@
 
 				{#if lastCreatedUrl}
 					<div
-						class="flex items-center gap-2 rounded-lg border border-white/[0.1] bg-black/20 px-3 py-2"
+						class="flex min-w-0 items-center gap-2 overflow-hidden rounded-lg border border-white/[0.1] bg-black/20 px-3 py-2"
 					>
-						<code class="min-w-0 flex-1 truncate text-xs text-white/65">{lastCreatedUrl}</code>
+						<code
+							class="block min-w-0 flex-1 truncate font-mono text-xs text-white/65"
+							title={lastCreatedUrl}>{lastCreatedUrl}</code
+						>
 						<button
 							type="button"
 							class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white"
@@ -460,11 +520,15 @@
 						</Button>
 						<Button
 							variant="outline"
-							disabled={!lastCreatedUrl || isCreating}
+							disabled={isCreating || isInviting || !hasValidRecipients}
 							class="h-10 shrink-0 cursor-pointer border-white/[0.15] bg-transparent px-4 text-[13px] text-white/80 hover:bg-white/[0.08] hover:text-white"
 							onclick={handleInvite}
 						>
-							Send invite
+							{#if isInviting}
+								<Spinner class="size-4" />
+							{:else}
+								Send invite
+							{/if}
 						</Button>
 					</div>
 

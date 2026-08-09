@@ -4,6 +4,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
+	import ConfigureByokDialog from '$lib/components/chat/ConfigureByokDialog.svelte';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { getMeUsage } from '$lib/api/me';
@@ -18,6 +19,7 @@
 	import mistralIcon from '$lib/assets/llm/mistral.svg';
 	import openaiIcon from '$lib/assets/llm/openai.svg';
 	import openrouterIcon from '$lib/assets/llm/openrouter.svg';
+	import freeIcon from '$lib/assets/llm/free.svg';
 
 	interface LlmOption {
 		name: string;
@@ -25,6 +27,8 @@
 		model: string;
 		icon: string;
 	}
+
+	type ByokProvider = 'gemini' | 'mistral' | 'openrouter';
 
 	const PROVIDER_ICONS: Record<string, string> = {
 		gemini: geminiIcon,
@@ -37,14 +41,17 @@
 		meta: metaIcon
 	};
 
-	let llmOptions: LlmOption[] = $state([
-		{ name: 'Free Auto', provider: 'auto', model: 'auto', icon: geminiIcon }
-	]);
+	const INITIAL_LLM_OPTIONS: LlmOption[] = [
+		{ name: 'Free Auto', provider: 'auto', model: 'auto', icon: freeIcon }
+	];
+
+	let llmOptions: LlmOption[] = $state(INITIAL_LLM_OPTIONS);
 
 	let activeMode = $state('chat');
 	let inputValue = $state('');
 	let selectedModel: LlmOption = $state(llmOptions[0]);
 	let attachedFiles: File[] = $state([]);
+	let isConfigureDialogOpen = $state(false);
 
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
@@ -98,37 +105,48 @@
 			console.error('[Chat Page] Failed to fetch usage:', err);
 		}
 
-		try {
-			console.log('[Chat Page] Fetching BYOK Keys');
-			const keysRes = await getKeys();
-			console.log('[Chat Page] Keys Response:', keysRes);
-
-			if (keysRes.ok && keysRes.data?.data && keysRes.data.data.length > 0) {
-				const dynamicOptions: LlmOption[] = [
-					{ name: 'Free Auto', provider: 'auto', model: 'auto', icon: geminiIcon }
-				];
-
-				for (const item of keysRes.data.data) {
-					const icon = PROVIDER_ICONS[item.provider.toLowerCase()] || geminiIcon;
-					if (Array.isArray(item.models)) {
-						for (const model of item.models) {
-							dynamicOptions.push({
-								name: model,
-								provider: item.provider,
-								model: model,
-								icon
-							});
-						}
-					}
-				}
-
-				llmOptions = dynamicOptions;
-				selectedModel = llmOptions[0];
-			}
-		} catch (err) {
-			console.error('[Chat Page] Failed to fetch keys:', err);
-		}
+		await loadLlmOptions();
 	});
+
+	function isByokProvider(provider: string): provider is ByokProvider {
+		return provider === 'gemini' || provider === 'mistral' || provider === 'openrouter';
+	}
+
+	async function loadLlmOptions() {
+		try {
+			const keysRes = await getKeys();
+			if (!keysRes.ok) return;
+
+			const dynamicOptions: LlmOption[] = [...INITIAL_LLM_OPTIONS];
+
+			for (const item of keysRes.data.data ?? []) {
+				const provider = item.provider.toLowerCase();
+				if (!isByokProvider(provider)) continue;
+
+				const icon = PROVIDER_ICONS[provider] || geminiIcon;
+				for (const model of item.models ?? []) {
+					dynamicOptions.push({
+						name: model,
+						provider,
+						model,
+						icon
+					});
+				}
+			}
+
+			const selectedKey = `${selectedModel.provider}:${selectedModel.model}`;
+			llmOptions = dynamicOptions;
+			selectedModel =
+				dynamicOptions.find((option) => `${option.provider}:${option.model}` === selectedKey) ??
+				dynamicOptions[0];
+		} catch (err) {
+			console.error('[Chat Page] Failed to fetch BYOK keys:', err);
+		}
+	}
+
+	function openConfigureDialog() {
+		isConfigureDialogOpen = true;
+	}
 
 	function handleSubmit() {
 		if (!inputValue.trim()) return;
@@ -271,6 +289,7 @@
 			{maxStorage}
 			{maxFileSizeBytes}
 			onsend={handleSubmit}
+			onconfigure={openConfigureDialog}
 		/>
 
 		<!-- 2. Lower Row: Mode Toggles & Usage Info -->
@@ -429,3 +448,5 @@
 		</div>
 	</div>
 </div>
+
+<ConfigureByokDialog bind:open={isConfigureDialogOpen} onSaved={loadLlmOptions} />

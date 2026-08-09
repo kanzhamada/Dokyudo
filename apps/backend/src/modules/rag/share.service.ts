@@ -5,18 +5,22 @@ import {
     chatShares,
     conversations,
     conversationTurns,
+    shareInvitees,
     tenants,
     users,
 } from "../../shared/models/db.model.ts";
 import { generateShareCode } from "../../shared/utils/base62.util.ts";
+import { sendShareInviteEmail } from "../../shared/utils/email.util.ts";
 import { redis } from "../../config/redis.ts";
 import { RedisKeys } from "../../shared/constants/redis_keys.constant.ts";
+import { getEnv } from "../../config/env.ts";
 
 // Public-facing columns anon viewers may SELECT (granted at the DB level).
 const PUBLIC_SHARE_COLUMNS = {
     code: chatShares.code,
     title: chatShares.title,
     snapshot: chatShares.snapshot,
+    isPrivate: chatShares.isPrivate,
     expiresAt: chatShares.expiresAt,
     conversationId: chatShares.conversationId,
     boundaryTurnId: chatShares.boundaryTurnId,
@@ -31,9 +35,81 @@ const MAX_SHARE_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60; // 1 month
 const MIN_SHARE_CACHE_TTL_SECONDS = 60;
 
 const CUSTOM_CODE_REGEX = /^[a-zA-Z0-9_-]{4,32}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const AUTO_CODE_MAX_ATTEMPTS = 3;
 
 const PG_UNIQUE_VIOLATION = "23505";
+
+/** Normalizes and dedupes emails: lowercase, trimmed, unique, valid. */
+function normalizeEmails(emails: string[]): string[] {
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+    for (const raw of emails) {
+        const email = raw.trim().toLowerCase();
+        if (!EMAIL_REGEX.test(email)) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: `Invalid email address: ${raw}`,
+                status: 400,
+            });
+        }
+        if (!seen.has(email)) {
+            seen.add(email);
+            normalized.push(email);
+        }
+    }
+    return normalized;
+}
+
+function generateAccessToken(): string {
+    return crypto.randomUUID().replace(/-/g, "");
+}
+
+/**
+ * Sends invite emails (fire-and-forget). A delivery failure never breaks the
+ * share creation — the invitees are stored regardless, and `notified_at` is
+ * stamped only for emails Resend actually accepted.
+ */
+async function deliverInviteEmails(params: {
+    shareCode: string;
+    emails: string[];
+    sharerName: string;
+    conversationTitle: string;
+    accessToken: string;
+    expiresAt: string | null;
+}): Promise<void> {
+    const { shareCode, emails, sharerName, conversationTitle, accessToken, expiresAt } = params;
+    const baseUrl = getEnv("FRONTEND_URL");
+    const shareUrl = `${baseUrl}/s/${shareCode}?invite=${accessToken}`;
+
+    for (const email of emails) {
+        try {
+            await sendShareInviteEmail({
+                email,
+                sharerName,
+                conversationTitle,
+                shareUrl,
+                expiresAt,
+                shareCode,
+            });
+            try {
+                await db
+                    .update(shareInvitees)
+                    .set({ notifiedAt: new Date() })
+                    .where(
+                        and(
+                            eq(shareInvitees.code, shareCode),
+                            eq(shareInvitees.email, email),
+                        ),
+                    );
+            } catch (err: any) {
+                console.error("[Share] Failed to stamp notified_at:", err.message);
+            }
+        } catch (err: any) {
+            console.error(`[Share] Invite email to ${email} failed:`, err.message);
+        }
+    }
+}
 
 // Drizzle wraps Postgres errors in DrizzleQueryError — the SQLSTATE code lives
 // on the inner `cause` (postgres-js PostgresError), not on the wrapper itself.
@@ -82,6 +158,8 @@ export class ShareService {
      * Creates a public share of a conversation. The turns are snapshotted at
      * this moment (immutable) — later edits/new turns never reach the public
      * view. Returns the short code; the frontend composes the full URL.
+     * When `emails` are supplied the share becomes private: an access token is
+     * generated, invitees are persisted, and (optionally) invite emails sent.
      */
     static async createShare(params: {
         userId: string;
@@ -89,8 +167,10 @@ export class ShareService {
         conversationId: string;
         expiresInHours?: number;
         customCode?: string;
-    }): Promise<{ code: string }> {
-        const { userId, tenantId, conversationId, expiresInHours, customCode } = params;
+        emails?: string[];
+        notify?: boolean;
+    }): Promise<{ code: string; accessToken: string | null }> {
+        const { userId, tenantId, conversationId, expiresInHours, customCode, notify } = params;
 
         const custom = customCode?.trim();
         if (custom && !CUSTOM_CODE_REGEX.test(custom)) {
@@ -102,10 +182,22 @@ export class ShareService {
             });
         }
 
+        const inviteEmails = params.emails?.length ? normalizeEmails(params.emails) : [];
+        const sharerEmail = await ShareService.lookupSharerEmail(userId);
+        if (inviteEmails.length > 0 && sharerEmail && inviteEmails.includes(sharerEmail)) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: "You cannot invite your own email address",
+                status: 400,
+            });
+        }
+        const accessToken = inviteEmails.length > 0 ? generateAccessToken() : null;
+
         let conversationTitle = "";
         let snapshot: SnapshotTurn[] = [];
         let boundaryTurnId: string | null = null;
         let insertedCode: string | null = null;
+        let expiresAt: Date | null = null;
 
         await withAuthDb(userId, async (tx) => {
             const [conv] = await tx
@@ -167,9 +259,11 @@ export class ShareService {
             }));
             boundaryTurnId = turns[turns.length - 1].id;
 
-            const expiresAt = expiresInHours
+            expiresAt = expiresInHours
                 ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000)
                 : null;
+
+            const isPrivate = inviteEmails.length > 0;
 
             if (custom) {
                 try {
@@ -182,6 +276,8 @@ export class ShareService {
                         title: conversationTitle,
                         snapshot,
                         isCustom: true,
+                        isPrivate,
+                        accessToken,
                         expiresAt,
                     });
                     insertedCode = custom;
@@ -208,6 +304,8 @@ export class ShareService {
                             title: conversationTitle,
                             snapshot,
                             isCustom: false,
+                            isPrivate,
+                            accessToken,
                             expiresAt,
                         });
                         insertedCode = code;
@@ -224,26 +322,178 @@ export class ShareService {
                     });
                 }
             }
+
+            if (inviteEmails.length > 0) {
+                await tx.insert(shareInvitees).values(
+                    inviteEmails.map((email) => ({ code: insertedCode!, email })),
+                );
+            }
         });
 
-        return { code: insertedCode! };
+        if (inviteEmails.length > 0 && notify && insertedCode && accessToken) {
+            const sharerName = await ShareService.lookupSharerName(userId, tenantId);
+            void deliverInviteEmails({
+                shareCode: insertedCode,
+                emails: inviteEmails,
+                sharerName,
+                conversationTitle,
+                accessToken,
+                expiresAt: expiresAt?.toISOString() ?? null,
+            });
+        }
+
+        return { code: insertedCode!, accessToken };
+    }
+
+    /** The sharer's own email (authoritative backend check for self-invites). */
+    static async lookupSharerEmail(userId: string): Promise<string | null> {
+        const [row] = await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+        return row?.email?.trim().toLowerCase() ?? null;
+    }
+
+    /** Display name for the email greeting — tenant name, else email prefix. */
+    static async lookupSharerName(userId: string, tenantId: string): Promise<string> {
+        const [row] = await db
+            .select({
+                tenantName: tenants.name,
+                email: users.email,
+            })
+            .from(users)
+            .leftJoin(tenants, eq(tenants.id, tenantId))
+            .where(eq(users.id, userId))
+            .limit(1);
+        if (row?.tenantName?.trim()) return row.tenantName.trim();
+        if (row?.email) return row.email.split("@")[0];
+        return "Someone";
+    }
+
+    /**
+     * Adds invitees to an existing share (private mode). The share must belong
+     * to the caller's tenant and must not be expired. When `notify` is set,
+     * invite emails are sent with the share's access token.
+     */
+    static async addShareInvitees(params: {
+        userId: string;
+        tenantId: string;
+        code: string;
+        emails: string[];
+        notify?: boolean;
+    }): Promise<{ added: string[]; accessToken: string | null }> {
+        const { userId, tenantId, code, notify } = params;
+        const emails = normalizeEmails(params.emails);
+
+        if (emails.length === 0) return { added: [], accessToken: null };
+
+        const sharerEmail = await ShareService.lookupSharerEmail(userId);
+        if (sharerEmail && emails.includes(sharerEmail)) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: "You cannot invite your own email address",
+                status: 400,
+            });
+        }
+
+        let accessToken: string | null = null;
+        let conversationTitle = "";
+        let expiresAt: string | null = null;
+        const added: string[] = [];
+
+        await withAuthDb(userId, async (tx) => {
+            const [share] = await tx
+                .select({
+                    code: chatShares.code,
+                    title: chatShares.title,
+                    accessToken: chatShares.accessToken,
+                    expiresAt: chatShares.expiresAt,
+                })
+                .from(chatShares)
+                .where(
+                    and(
+                        eq(chatShares.code, code),
+                        eq(chatShares.tenantId, tenantId),
+                        or(
+                            isNull(chatShares.expiresAt),
+                            gt(chatShares.expiresAt, new Date()),
+                        ),
+                    ),
+                )
+                .limit(1);
+
+            if (!share) {
+                throw new AppError({
+                    code: "NOT_FOUND",
+                    message: "Share link not found or expired",
+                    status: 404,
+                });
+            }
+            conversationTitle = share.title;
+            expiresAt = share.expiresAt?.toISOString() ?? null;
+
+            // Promote an existing public share to private on first invite.
+            if (!share.accessToken) {
+                accessToken = generateAccessToken();
+                await tx
+                    .update(chatShares)
+                    .set({ isPrivate: true, accessToken })
+                    .where(eq(chatShares.code, code));
+            } else {
+                accessToken = share.accessToken;
+            }
+
+            const existing = await tx
+                .select({ email: shareInvitees.email })
+                .from(shareInvitees)
+                .where(eq(shareInvitees.code, code));
+            const existingSet = new Set(existing.map((r) => r.email));
+
+            const fresh = emails.filter((email) => !existingSet.has(email));
+            if (fresh.length > 0) {
+                await tx.insert(shareInvitees).values(
+                    fresh.map((email) => ({ code, email })),
+                );
+                added.push(...fresh);
+            }
+        });
+
+        if (added.length > 0 && notify && accessToken) {
+            const sharerName = await ShareService.lookupSharerName(userId, tenantId);
+            void deliverInviteEmails({
+                shareCode: code,
+                emails: added,
+                sharerName,
+                conversationTitle,
+                accessToken,
+                expiresAt,
+            });
+        }
+
+        return { added, accessToken };
     }
 
     /**
      * Public (unauthenticated) read of a share. Served from Redis when warm;
      * the DB is the source of truth and the TTL follows the share's expiry.
+     * Private shares require the access token that was emailed to invitees.
      */
-    static async getPublicShare(params: { code: string }): Promise<{
+    static async getPublicShare(params: {
+        code: string;
+        inviteToken?: string;
+    }): Promise<{
         code: string;
         title: string;
         authorName: string | null;
+        isPrivate: boolean;
         expiresAt: string | null;
         createdAt: string;
         conversationId: string;
         boundaryTurnId: string | null;
         turns: SnapshotTurn[];
     }> {
-        const { code } = params;
+        const { code, inviteToken } = params;
         const cacheKey = RedisKeys.shareCache(code);
 
         // 1. Cache hit — renew the sliding TTL and serve.
@@ -264,7 +514,15 @@ export class ShareService {
                         ex: shareCacheTtlSeconds(expiresAt),
                     });
                 }
-                return { ...payload, authorName: payload.authorName ?? null };
+                const isPrivate = payload.isPrivate ?? false;
+                if (isPrivate) {
+                    await ShareService.verifyPrivateAccess(code, inviteToken);
+                }
+                return {
+                    ...payload,
+                    authorName: payload.authorName ?? null,
+                    isPrivate,
+                };
             }
         } catch (err: any) {
             // Cache failures must never break the public read — fall through.
@@ -277,6 +535,7 @@ export class ShareService {
             code: string;
             title: string;
             snapshot: unknown;
+            isPrivate: boolean;
             expiresAt: Date | null;
             conversationId: string;
             boundaryTurnId: string | null;
@@ -316,10 +575,15 @@ export class ShareService {
             });
         }
 
+        if (row.isPrivate) {
+            await ShareService.verifyPrivateAccess(code, inviteToken);
+        }
+
         const payload = {
             code: row.code,
             title: row.title,
             authorName: await lookupShareAuthorName(code),
+            isPrivate: row.isPrivate,
             expiresAt: row.expiresAt?.toISOString() ?? null,
             createdAt: row.createdAt.toISOString(),
             conversationId: row.conversationId,
@@ -336,6 +600,28 @@ export class ShareService {
         }
 
         return payload;
+    }
+
+    /**
+     * Gates a private share behind its access token. Uses the superuser
+     * connection: `access_token` is deliberately not exposed to the anon role,
+     * and verification must never leak it.
+     */
+    static async verifyPrivateAccess(code: string, inviteToken?: string): Promise<void> {
+        const [share] = await db
+            .select({ accessToken: chatShares.accessToken })
+            .from(chatShares)
+            .where(eq(chatShares.code, code))
+            .limit(1);
+
+        const expected = share?.accessToken ?? null;
+        if (!expected || !inviteToken || expected !== inviteToken) {
+            throw new AppError({
+                code: "PRIVATE_SHARE",
+                message: "This link is private. An invitation is required to view it.",
+                status: 403,
+            });
+        }
     }
 
     /**
@@ -506,6 +792,8 @@ export class ShareService {
             code: string;
             title: string;
             isCustom: boolean;
+            isPrivate: boolean;
+            accessToken: string | null;
             expiresAt: string | null;
             createdAt: string;
         }>
@@ -519,6 +807,8 @@ export class ShareService {
                     code: chatShares.code,
                     title: chatShares.title,
                     isCustom: chatShares.isCustom,
+                    isPrivate: chatShares.isPrivate,
+                    accessToken: chatShares.accessToken,
                     expiresAt: chatShares.expiresAt,
                     createdAt: chatShares.createdAt,
                 })
@@ -537,6 +827,8 @@ export class ShareService {
             code: r.code,
             title: r.title,
             isCustom: r.isCustom,
+            isPrivate: r.isPrivate,
+            accessToken: r.accessToken,
             expiresAt: r.expiresAt?.toISOString() ?? null,
             createdAt: r.createdAt.toISOString(),
         }));
@@ -551,6 +843,8 @@ export class ShareService {
             code: string;
             title: string;
             isCustom: boolean;
+            isPrivate: boolean;
+            accessToken: string | null;
             expiresAt: string | null;
             createdAt: string;
         }>
@@ -564,6 +858,8 @@ export class ShareService {
                     code: chatShares.code,
                     title: chatShares.title,
                     isCustom: chatShares.isCustom,
+                    isPrivate: chatShares.isPrivate,
+                    accessToken: chatShares.accessToken,
                     expiresAt: chatShares.expiresAt,
                     createdAt: chatShares.createdAt,
                 })
@@ -585,6 +881,8 @@ export class ShareService {
             code: r.code,
             title: r.title,
             isCustom: r.isCustom,
+            isPrivate: r.isPrivate,
+            accessToken: r.accessToken,
             expiresAt: r.expiresAt?.toISOString() ?? null,
             createdAt: r.createdAt.toISOString(),
         }));

@@ -124,10 +124,16 @@ export interface CreateShareParams {
 	expiresInHours?: number;
 	/** Optional user-chosen short code (4-32 chars: letters, digits, '-', '_'). */
 	customCode?: string;
+	/** Email invitees for a private share (invite-only access). */
+	emails?: string[];
+	/** Send invite emails to the listed addresses immediately. */
+	notify?: boolean;
 }
 
 export interface CreateShareResponse {
 	code: string;
+	/** Present when the share is private — embed in invite links as `?invite=`. */
+	accessToken: string | null;
 }
 
 export interface PublicShareTurn {
@@ -143,6 +149,8 @@ export interface PublicShare {
 	code: string;
 	title: string;
 	authorName: string | null;
+	/** True when the share is invite-only and gated behind an access token. */
+	isPrivate: boolean;
 	expiresAt: string | null;
 	createdAt: string;
 	/** Id of the original conversation — used by the "continue chat" flow. */
@@ -161,6 +169,9 @@ export interface ShareListItem {
 	code: string;
 	title: string;
 	isCustom: boolean;
+	/** True when invite-only. The owner's token lets them reopen private links. */
+	isPrivate: boolean;
+	accessToken: string | null;
 	expiresAt: string | null;
 	createdAt: string;
 }

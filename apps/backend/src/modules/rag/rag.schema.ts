@@ -147,8 +147,29 @@ export const CreateShareBodySchema = z.object({
         .string()
         .regex(/^[a-zA-Z0-9_-]{4,32}$/)
         .optional(),
+    /**
+     * Optional email invitees for a private share. When present the share is
+     * marked private and gated behind an access token sent to each invitee.
+     * Emails are normalized (lowercased), deduplicated, and must not include
+     * the sharer's own email.
+     */
+    emails: z.array(z.string().email()).max(100).optional(),
+    /** Send invite emails to the listed addresses immediately. Default false. */
+    notify: z.boolean().optional(),
 });
 export type CreateShareBody = z.infer<typeof CreateShareBodySchema>;
+
+export const AddShareInviteesBodySchema = z.object({
+    emails: z.array(z.string().email()).min(1).max(100),
+    /** Send invite emails to the listed addresses immediately. Default false. */
+    notify: z.boolean().optional(),
+});
+export type AddShareInviteesBody = z.infer<typeof AddShareInviteesBodySchema>;
+
+export const ShareReadQuerySchema = z.object({
+    /** Access token for private shares — present on invite links as `?invite=`. */
+    invite: z.string().optional(),
+});
 
 export const ShareParamSchema = z.object({
     code: z
@@ -160,6 +181,8 @@ export const ShareParamSchema = z.object({
 
 export const ShareCreatedResponseSchema = z.object({
     code: z.string(),
+    /** Present when the share is private — embed in invite links as `?invite=`. */
+    accessToken: z.string().nullable(),
 });
 export type ShareCreatedResponse = z.infer<typeof ShareCreatedResponseSchema>;
 
@@ -177,6 +200,8 @@ export const PublicShareResponseSchema = z.object({
     code: z.string(),
     title: z.string(),
     authorName: z.string().nullable(),
+    /** True when the share is invite-only and gated behind an access token. */
+    isPrivate: z.boolean(),
     expiresAt: z.string().nullable(),
     createdAt: z.string(),
     /** Id of the original conversation — used by the "continue chat" flow. */
@@ -197,6 +222,9 @@ export const ShareListItemSchema = z.object({
     code: z.string(),
     title: z.string(),
     isCustom: z.boolean(),
+    /** True when invite-only. The owner's token lets them reopen private links. */
+    isPrivate: z.boolean(),
+    accessToken: z.string().nullable(),
     expiresAt: z.string().nullable(),
     createdAt: z.string(),
 });

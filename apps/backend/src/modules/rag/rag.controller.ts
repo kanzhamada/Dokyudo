@@ -174,18 +174,40 @@ export async function handleCreateShare(c: Context) {
         conversationId,
         expiresInHours: body.expires_in_hours,
         customCode: body.custom_code,
+        emails: body.emails,
+        notify: body.notify ?? false,
     });
 
-    return c.json({ code: result.code });
+    return c.json({ code: result.code, accessToken: result.accessToken });
 }
 
-/** Public, unauthenticated read of a share link. */
+/** Public, unauthenticated read of a share link (private shares need `?invite=`). */
 export async function handleGetPublicShare(c: Context) {
     const { code } = c.req.valid("param" as never) as { code: string };
+    const { invite } = (c.req.valid("query" as never) as { invite?: string }) ?? {};
 
-    const result = await ShareService.getPublicShare({ code });
+    const result = await ShareService.getPublicShare({ code, inviteToken: invite });
 
     return c.json(result);
+}
+
+/** Adds email invitees to an existing share and optionally notifies them. */
+export async function handleAddShareInvitees(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const { code } = c.req.valid("param" as never) as { code: string };
+    const body = extractor.extractValidJson<RagSchema.AddShareInviteesBody>();
+
+    const result = await ShareService.addShareInvitees({
+        userId,
+        tenantId,
+        code,
+        emails: body.emails,
+        notify: body.notify ?? false,
+    });
+
+    return c.json({ added: result.added, accessToken: result.accessToken });
 }
 
 export async function handleContinueShare(c: Context) {

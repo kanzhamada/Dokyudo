@@ -365,6 +365,12 @@ export const chatShares = pgTable("chat_shares", {
     // Immutable copy of the shared turns at share time.
     snapshot: jsonb("snapshot").notNull(),
     isCustom: boolean("is_custom").default(false).notNull(),
+    // True once at least one email invitee exists: the link is then gated
+    // behind `accessToken` (see share_invitees).
+    isPrivate: boolean("is_private").default(false).notNull(),
+    // View credential for private shares — embedded in invite links as
+    // `?invite=`. Never exposed to anon DB role or in public responses.
+    accessToken: varchar("access_token", { length: 64 }),
     // Nullable: NULL means the link never expires.
     expiresAt: timestamp("expires_at", {
         mode: "date",
@@ -391,6 +397,34 @@ export const chatShares = pgTable("chat_shares", {
     conversationIdx: index("idx_chat_shares_conversation").on(
         table.conversationId,
     ),
+}));
+
+// ==============================================================================
+// 7.7. SHARE INVITEES TABLE (Private Share Access List)
+// ==============================================================================
+// One row per invited email for a share. A share with at least one invitee is
+// private: reading it requires the share's `access_token` (sent to invitees by
+// email). `notified_at` records when the invite email was actually delivered.
+export const shareInvitees = pgTable("share_invitees", {
+    code: varchar("code", { length: 32 })
+        .notNull()
+        .references(() => chatShares.code, { onDelete: "cascade" }),
+    email: varchar("email", { length: 255 }).notNull(),
+    notifiedAt: timestamp("notified_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    }),
+    createdAt: timestamp("created_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    })
+        .defaultNow()
+        .notNull(),
+}, (table) => ({
+    pk: primaryKey({ columns: [table.code, table.email] }),
+    emailIdx: index("idx_share_invitees_email").on(table.email),
 }));
 
 // ==============================================================================

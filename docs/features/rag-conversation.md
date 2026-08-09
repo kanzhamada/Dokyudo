@@ -176,6 +176,9 @@ Allows users to pin important conversations so they stay at the top of the sideb
 - **Deno API (Backend):** Validates payload with Zod OpenAPI schema, enforces multi-tenancy `tenant_id` filter, executes DB update, and orders `listConversations` with `isPinned` priority.
 - **PostgreSQL (Database):** Persists `conversations.is_pinned` column.
 
+## Related
+- **Public Share Chat (read-only):** membagikan percakapan ke publik dengan snapshot immutable, custom URL, expiry, dan "continue chat" dari snapshot — lihat `docs/features/public-share.md`.
+
 ## Architectural Decisions
 1. **Single-Turn Hard Delete:** Chosen `DELETE FROM conversation_turns WHERE id = turnId AND tenant_id = tenantId` over truncating entire subsequent thread or soft-deleting answer fields.
 2. **Partial Resource Update via Single PATCH Endpoint:** Reused `PATCH /api/rag/conversations/{id}` for both renaming title and toggling `isPinned` status instead of polluting the routing table with extra endpoints (`/pin`, `/unpin`).

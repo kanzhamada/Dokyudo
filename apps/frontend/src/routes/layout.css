@@ -281,8 +281,9 @@
    Runs solely for the new-chat submit navigation (/app/chat → /app/chat/<id>).
    The root is left untouched (animation: none) so the sidebar and app chrome
    stay static; only the <main> content area (tagged `app-main` in the app
-   layout) cross-fades, and the shared input capsule morphs in place through
-   its own `chat-input` name (see ChatInput.svelte). */
+   layout) cross-fades as one flat unit — the input capsule is deliberately
+   part of that capture (no nested view-transition-name) so no rectangular
+   hole/sharp corners can appear around it during the transition. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
     animation: none;

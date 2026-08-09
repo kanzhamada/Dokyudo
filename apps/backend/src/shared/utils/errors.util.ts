@@ -9,6 +9,7 @@ export type ErrorCode =
     | "PROVIDER_UNAVAILABLE"
     | "NOT_FOUND"
     | "CODE_TAKEN"
+    | "PRIVATE_SHARE"
     | "INTERNAL_ERROR";
 
 interface AppErrorOptions {

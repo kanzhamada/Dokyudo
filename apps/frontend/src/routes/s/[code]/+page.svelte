@@ -33,9 +33,11 @@
 	}
 
 	const code = $derived(page.params.code ?? '');
+	const inviteToken = $derived(page.url.searchParams.get('invite') ?? undefined);
 	let share = $state<PublicShare | null>(untrack(() => data.share));
 	let isLoading = $state(!untrack(() => data.share));
 	let notFound = $state(false);
+	let isPrivateLocked = $state(false);
 	let isContinuing = $state(false);
 	let copiedMessageId = $state<string | null>(null);
 	let codeBlockInstances: { el: HTMLElement; unmount: () => void }[] = [];
@@ -47,12 +49,18 @@
 			: 'Sign in to continue this chat in your account.'
 	);
 	let copiedLink = $state(false);
-	const shareUrl = $derived(`${page.url.origin}/s/${code}`);
-	const ogImageUrl = $derived(`${shareUrl}/opengraph-image.svg`);
+	const shareUrl = $derived(
+		inviteToken
+			? `${page.url.origin}/s/${code}?invite=${inviteToken}`
+			: `${page.url.origin}/s/${code}`
+	);
+	const ogImageUrl = $derived(
+		`${page.url.origin}/s/${code}/opengraph-image.svg${inviteToken ? `?invite=${encodeURIComponent(inviteToken)}` : ''}`
+	);
 	const metaTitle = $derived(share ? `${share.title} — Dokyudo` : 'Shared conversation — Dokyudo');
 	const metaDescription = $derived(
 		share
-			? `A shared conversation by ${share.authorName || 'a Dokyudo user'}.`
+			? `A shared ${share.isPrivate ? 'private ' : ''}conversation by ${share.authorName || 'a Dokyudo user'}.`
 			: 'A shared conversation on Dokyudo.'
 	);
 
@@ -67,12 +75,17 @@
 	async function loadShare() {
 		isLoading = true;
 		notFound = false;
+		isPrivateLocked = false;
 		share = null;
-		const result = await getPublicShare(code);
+		const result = await getPublicShare(code, inviteToken);
 		if (result.ok) {
 			share = result.data;
 		} else {
-			notFound = true;
+			if (result.error.code === 'PRIVATE_SHARE') {
+				isPrivateLocked = true;
+			} else {
+				notFound = true;
+			}
 		}
 		isLoading = false;
 	}
@@ -325,6 +338,20 @@
 				<div class="flex flex-1 items-center justify-center py-24">
 					<Spinner class="size-5 text-white/40" />
 				</div>
+			{:else if isPrivateLocked}
+				<div class="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
+					<Lock class="size-8 text-white/25" />
+					<h1 class="text-lg font-semibold text-white">This link is private</h1>
+					<p class="max-w-sm text-sm text-white/45">
+						Only people invited by the owner can view this conversation.
+					</p>
+					<Button
+						class="mt-2 cursor-pointer bg-amber-500 text-black hover:bg-amber-400"
+						onclick={() => goto('/')}
+					>
+						Go to home
+					</Button>
+				</div>
 			{:else if notFound}
 				<div class="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
 					<Share2 class="size-8 text-white/25" />
@@ -347,7 +374,7 @@
 							class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 						>
 							<Lock class="size-3" />
-							<span>Read-only share</span>
+							<span>{share.isPrivate ? 'Private share' : 'Read-only share'}</span>
 						</span>
 						<span class="text-xs text-white/40">
 							By {share.authorName || 'Dokyudo user'} · Shared {formatSharedDate(share.createdAt)}
