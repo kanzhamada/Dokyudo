@@ -3,9 +3,20 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Input } from '$lib/components/ui/input';
-	import { Check, Copy, Globe2, Link2, LockKeyhole, Mail, Share2, X } from 'lucide-svelte';
+	import {
+		Check,
+		Copy,
+		Globe2,
+		Link2,
+		LockKeyhole,
+		Mail,
+		Share2,
+		UserRound,
+		X
+	} from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import { createShare } from '$lib/api/rag';
+	import { getMe } from '$lib/api/me';
 
 	interface Props {
 		open?: boolean;
@@ -41,6 +52,7 @@
 	let lastCreatedCode = $state<string | null>(null);
 	let recipientInput = $state('');
 	let recipients = $state<string[]>([]);
+	let currentUserEmail = $state<string | null>(null);
 	let notifyRecipients = $state(true);
 	let inviteMessage = $state('');
 	let rejectedCodes = $state(new Set<string>());
@@ -56,6 +68,7 @@
 		lastCreatedCode ? `${origin}/s/${lastCreatedCode}/opengraph-image.svg` : null
 	);
 	const previewTitle = $derived(conversationTitle?.trim() || 'Untitled conversation');
+	const normalizedUserEmail = $derived(currentUserEmail?.trim().toLowerCase() ?? '');
 
 	function shareUrlOf(code: string): string {
 		return `${origin}/s/${code}`;
@@ -139,16 +152,29 @@
 		return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 	}
 
-	function addRecipient() {
-		const email = recipientInput.trim().replace(/,$/, '');
-		if (!email) return;
+	function normalizeEmail(email: string): string {
+		return email.trim().toLowerCase();
+	}
+
+	function addRecipient(): boolean {
+		const email = normalizeEmail(recipientInput);
+		if (!email) return false;
 		if (!isValidEmail(email)) {
 			inviteMessage = 'Enter a valid email address.';
-			return;
+			return false;
 		}
-		if (!recipients.includes(email)) recipients.push(email);
+		if (recipients.includes(email)) {
+			inviteMessage = `${email} is already invited.`;
+			return false;
+		}
+		if (normalizedUserEmail && email === normalizedUserEmail) {
+			inviteMessage = 'You cannot invite your own email address.';
+			return false;
+		}
+		recipients.push(email);
 		recipientInput = '';
 		inviteMessage = '';
+		return true;
 	}
 
 	function removeRecipient(email: string) {
@@ -192,9 +218,17 @@
 		if (url) window.open(url, '_blank', 'noopener,noreferrer');
 	}
 
+	async function loadCurrentUserEmail() {
+		const result = await getMe();
+		if (result.ok) {
+			currentUserEmail = result.data.user.email ?? null;
+		}
+	}
+
 	$effect(() => {
 		if (open) {
 			resetDialogState();
+			void loadCurrentUserEmail();
 		}
 	});
 </script>
@@ -389,7 +423,14 @@
 					class="space-y-3 border-t border-white/[0.09] pt-5"
 				>
 					<div>
-						<h2 id="email-heading" class="text-sm font-medium text-white/90">Invite by email</h2>
+						<div class="flex items-baseline justify-between gap-3">
+							<h2 id="email-heading" class="text-sm font-medium text-white/90">Invite by email</h2>
+							{#if recipients.length > 0}
+								<span class="text-[10px] text-white/40">
+									{recipients.length} invited
+								</span>
+							{/if}
+						</div>
 						<p class="mt-1 text-xs leading-5 text-white/42">
 							Only invited people can view this link.
 						</p>
@@ -406,14 +447,21 @@
 								placeholder="name@example.com"
 								aria-label="Email address"
 								onkeydown={handleRecipientKeydown}
-								onblur={addRecipient}
 								class="h-10 border-white/[0.12] bg-white/[0.055] pl-9 text-sm text-white placeholder:text-white/28 focus-visible:border-white/30 focus-visible:ring-2 focus-visible:ring-white/10"
 							/>
 						</div>
 						<Button
 							variant="outline"
+							disabled={!recipientInput.trim()}
+							class="h-10 shrink-0 cursor-pointer border-white/[0.15] bg-transparent px-4 text-[13px] text-white/80 hover:bg-white/[0.08] hover:text-white"
+							onclick={addRecipient}
+						>
+							Add
+						</Button>
+						<Button
+							variant="outline"
 							disabled={!lastCreatedUrl || isCreating}
-							class="h-10 shrink-0 border-white/[0.15] bg-transparent px-4 text-[13px] text-white/80 hover:bg-white/[0.08] hover:text-white"
+							class="h-10 shrink-0 cursor-pointer border-white/[0.15] bg-transparent px-4 text-[13px] text-white/80 hover:bg-white/[0.08] hover:text-white"
 							onclick={handleInvite}
 						>
 							Send invite
@@ -421,21 +469,26 @@
 					</div>
 
 					{#if recipients.length > 0}
-						<div class="flex flex-wrap gap-1.5">
+						<div
+							class="divide-y divide-white/[0.09] rounded-lg border border-white/[0.12] bg-white/[0.035]"
+						>
 							{#each recipients as email (email)}
-								<span
-									class="inline-flex max-w-full items-center gap-1 rounded-md bg-white/[0.08] px-2 py-1 text-[11px] text-white/75"
-								>
-									<span class="max-w-[180px] truncate">{email}</span>
+								<div class="flex items-center gap-2.5 px-3 py-2">
+									<div
+										class="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/[0.08]"
+									>
+										<UserRound class="size-3.5 text-white/45" strokeWidth={1.8} />
+									</div>
+									<span class="min-w-0 flex-1 truncate text-xs text-white/75">{email}</span>
 									<button
 										type="button"
-										class="text-white/40 transition-colors hover:text-white"
+										class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.1] hover:text-white"
 										aria-label={`Remove ${email}`}
 										onclick={() => removeRecipient(email)}
 									>
 										<X class="size-3" strokeWidth={2} />
 									</button>
-								</span>
+								</div>
 							{/each}
 						</div>
 					{/if}

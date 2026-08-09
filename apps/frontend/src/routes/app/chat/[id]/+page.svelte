@@ -30,7 +30,6 @@
 		RotateCw,
 		Square,
 		Trash2,
-		Settings2,
 		KeyRound,
 		Plus,
 		Share2,
@@ -48,7 +47,6 @@
 	import * as Resizable from '$lib/components/ui/resizable';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Input } from '$lib/components/ui/input';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import { Button } from '$lib/components/ui/button';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -78,6 +76,7 @@
 	import { mount, unmount, untrack } from 'svelte';
 	import TurnStatusBadge from '$lib/components/chat/TurnStatusBadge.svelte';
 	import SourceReferences from '$lib/components/chat/SourceReferences.svelte';
+	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import { renderMarkdown } from '$lib/utils/markdown';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
@@ -213,10 +212,6 @@
 	];
 
 	// UI & Transition State
-	let isMounted = $state(false);
-	let activeMode = $state('chat');
-	let fileInput: HTMLInputElement | null = $state(null);
-	let textInput: HTMLTextAreaElement | null = $state(null);
 	let chatContainer: HTMLDivElement | null = $state(null);
 	let inputValue = $state('');
 	let llmOptions: LlmOption[] = $state(INITIAL_LLM_OPTIONS);
@@ -296,36 +291,10 @@
 	let isSavingKey = $state(false);
 	let isResettingKey = $state(false);
 	let configureError = $state('');
-	let modelSearchQuery = $state('');
 	let configuredKeyMasks = $state<Record<ByokProvider, string>>({
 		gemini: '',
 		mistral: '',
 		openrouter: ''
-	});
-
-	let modelGroups = $derived.by(() => {
-		const query = modelSearchQuery.trim().toLowerCase();
-		const groupLabels: Record<string, string> = {
-			auto: 'Free Models Router',
-			gemini: 'Google AI',
-			mistral: 'Mistral',
-			openrouter: 'OpenRouter'
-		};
-		const groupOrder = ['auto', 'gemini', 'mistral', 'openrouter'];
-
-		return groupOrder
-			.map((provider) => ({
-				provider,
-				label: groupLabels[provider],
-				options: llmOptions.filter(
-					(option) =>
-						option.provider.toLowerCase() === provider &&
-						(!query ||
-							option.name.toLowerCase().includes(query) ||
-							groupLabels[provider].toLowerCase().includes(query))
-				)
-			}))
-			.filter((group) => group.options.length > 0);
 	});
 
 	let conversationReferences = $derived.by(() =>
@@ -478,13 +447,6 @@
 		citationTooltipInstances = [];
 	});
 
-	// Auto-reset textarea height when input is cleared
-	$effect(() => {
-		if (!inputValue && textInput) {
-			textInput.style.height = 'auto';
-		}
-	});
-
 	// Instances of CitationTooltip mounted inside citation chips, keyed by their chip element.
 
 	// Instances of CitationTooltip mounted inside citation chips, keyed by their chip element.
@@ -594,14 +556,6 @@
 	let maxSearches = $state(100);
 	let qaCount = $state(0);
 	let maxQa = $state(50);
-
-	// Derived UI states
-	let currentUploadCount = $derived(baseUploads + attachedFiles.length);
-	let currentStorageBytes = $derived(
-		baseStorage + attachedFiles.reduce((acc, file) => acc + file.size, 0)
-	);
-
-	let maxFileSizeMB = $derived((maxFileSizeBytes / (1024 * 1024)).toFixed(0));
 
 	async function loadConversation(id: string) {
 		const requestId = ++conversationRequestId;
@@ -759,7 +713,6 @@
 	}
 
 	function openConfigureDialog(provider: ByokProvider = configureProvider) {
-		modelSearchQuery = '';
 		configureProvider = provider;
 		configureApiKey = '';
 		configureError = '';
@@ -985,9 +938,6 @@
 
 	onMount(async () => {
 		console.log(`[Chat Detail] Mounted view for chat ID: ${chatId}`);
-		setTimeout(() => {
-			isMounted = true;
-		}, 50);
 
 		// Warm up speech voices — they load asynchronously. getVoices() returns []
 		// until the voiceschanged event fires, so listen for it and cache the list.
@@ -1000,8 +950,6 @@
 				console.log('[ReadAloud] voiceschanged: voices =', speechVoices.length);
 			});
 		}
-
-		if (textInput) textInput.focus();
 
 		try {
 			const res = await getMeUsage();
@@ -1063,66 +1011,12 @@
 		if (closestId) activeCheckpointId = closestId;
 	}
 
-	function triggerFileInput() {
-		if (fileInput) fileInput.click();
-	}
-
 	function showError(msg: string) {
 		if (window.matchMedia('(max-width: 767px)').matches) {
 			mobileHeaderState.showError(msg);
 		} else {
 			toast.error('Error', { description: msg });
 		}
-	}
-
-	function handleFileChange(e: Event) {
-		const target = e.target as HTMLInputElement;
-		if (target.files && target.files.length > 0) {
-			const validFiles: File[] = [];
-
-			for (let i = 0; i < target.files.length; i++) {
-				const file = target.files[i];
-
-				const allowedExtensions = ['.pdf', '.docx', '.txt'];
-				const lowerName = file.name.toLowerCase();
-				if (!allowedExtensions.some((ext) => lowerName.endsWith(ext))) {
-					showError(
-						`File "${file.name}" has an invalid extension. Only PDF, DOCX, and TXT are allowed.`
-					);
-					continue;
-				}
-
-				if (file.size > maxFileSizeBytes) {
-					showError(
-						`File "${file.name}" exceeds the ${maxFileSizeMB}MB limit for your plan and was rejected.`
-					);
-					continue;
-				}
-
-				if (attachedFiles.length + validFiles.length + 1 > maxUploads - baseUploads) {
-					showError(`Cannot attach "${file.name}": Exceeds maximum upload limit of ${maxUploads}.`);
-					continue;
-				}
-
-				const upcomingSize =
-					currentStorageBytes + validFiles.reduce((acc, f) => acc + f.size, 0) + file.size;
-				if (upcomingSize > maxStorage) {
-					showError(`Cannot attach "${file.name}": Exceeds storage limit for your plan.`);
-					continue;
-				}
-
-				validFiles.push(file);
-			}
-
-			if (validFiles.length > 0) {
-				attachedFiles = [...attachedFiles, ...validFiles];
-			}
-			target.value = '';
-		}
-	}
-
-	function removeFile(index: number) {
-		attachedFiles.splice(index, 1);
 	}
 
 	async function streamChatTurn(
@@ -2021,11 +1915,7 @@
 	}
 </script>
 
-<div
-	class="relative flex h-full w-full overflow-hidden bg-[#1F1E1D] font-sans text-white transition-opacity duration-500 ease-in-out {isMounted
-		? 'opacity-100'
-		: 'opacity-0'}"
->
+<div class="relative flex h-full w-full overflow-hidden bg-[#1F1E1D] font-sans text-white">
 	{#if citationPreview}
 		<!-- Mobile: full-screen preview -->
 		<div class="h-full w-full md:hidden">
@@ -3050,169 +2940,23 @@
 			style="font-family: 'Inter', sans-serif;"
 		>
 			<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">
-				<!-- Main Input Capsule -->
-				<div
-					class="group flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.85] px-4 py-2 shadow-2xl backdrop-blur-[42px] transition-all"
-				>
-					<!-- Row 1: Attached Files -->
-					{#if attachedFiles.length > 0}
-						<div class="flex flex-wrap gap-2 pt-1 pb-1">
-							{#each attachedFiles as file, index}
-								<div
-									class="flex items-center gap-2 rounded-full bg-[#121212]/[0.80] py-1.5 pr-2 pl-3 text-sm text-white/[0.80] backdrop-blur-[20px] transition-all"
-								>
-									<span class="max-w-[200px] truncate">{file.name}</span>
-									<button
-										class="flex cursor-pointer items-center justify-center rounded-full p-0.5 text-white/[0.40] transition-colors hover:bg-white/[0.16] hover:text-white"
-										onclick={() => removeFile(index)}
-										aria-label="Remove file"
-									>
-										<X class="size-3.5" />
-									</button>
-								</div>
-							{/each}
-						</div>
-					{/if}
-
-					<!-- Row 2: Input Controls -->
-					<div class="flex w-full flex-row items-end gap-3">
-						<!-- Attach Button -->
-						<div class="relative flex h-9 items-center">
-							<Tooltip.Provider delayDuration={100}>
-								<Tooltip.Root>
-									<Tooltip.Trigger
-										class="flex cursor-pointer items-center text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69]"
-										aria-label="Attach Document"
-										onclick={triggerFileInput}
-									>
-										<Paperclip class="size-5" />
-									</Tooltip.Trigger>
-									<Tooltip.Content
-										class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
-										arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
-									>
-										<p>Attach Document (PDF, TXT, DOCX)</p>
-										<p class="text-xs text-white/[0.69]">
-											{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
-										</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
-							</Tooltip.Provider>
-						</div>
-						<Input
-							type="file"
-							bind:ref={fileInput}
-							id="file-upload-detail"
-							accept=".pdf,.txt,.docx"
-							class="hidden"
-							multiple
-							onchange={handleFileChange}
-						/>
-
-						<!-- Textarea -->
-						<Textarea
-							bind:ref={textInput}
-							bind:value={inputValue}
-							maxlength={690}
-							rows={1}
-							placeholder="Ask a follow-up question..."
-							class="max-h-32 min-h-[36px] flex-1 resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 text-white shadow-none ring-0 transition-colors outline-none placeholder:text-white/[0.40] focus-within:text-white hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-							onkeydown={(e) => {
-								if (e.key === 'Enter' && !e.shiftKey) {
-									e.preventDefault();
-									handleSendMessage();
-								}
-							}}
-							oninput={(e) => {
-								const target = e.currentTarget as HTMLTextAreaElement;
-								if (target) {
-									target.style.height = 'auto';
-									if (target.value) {
-										target.style.height = Math.min(target.scrollHeight, 128) + 'px';
-									}
-								}
-							}}
-						/>
-
-						<!-- Model Switcher Dropdown -->
-						<div class="group/model relative flex h-9 items-center">
-							<DropdownMenu.Root
-								onOpenChange={(open) => {
-									if (!open) modelSearchQuery = '';
-								}}
-							>
-								<DropdownMenu.Trigger
-									class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors group-focus-within/model:text-white/[0.69] group-hover/model:text-white/[0.69] focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
-								>
-									<img
-										src={selectedModel.icon}
-										alt={selectedModel.name}
-										class="size-5 opacity-40 brightness-0 invert transition-opacity group-focus-within/model:opacity-[0.69] group-hover/model:opacity-[0.69]"
-									/>
-									<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
-									<ChevronDown class="size-4" />
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Content
-									class="w-80 border border-white/[0.16] bg-[#232323]/95 p-0 text-white backdrop-blur-[42px]"
-								>
-									<div class="max-h-72 overflow-y-auto px-1 py-1">
-										<Input
-											type="search"
-											bind:value={modelSearchQuery}
-											placeholder="Select a model..."
-											class="h-9 rounded-none border-0 border-b border-white/10 bg-transparent px-2.5 text-xs text-white shadow-none focus-visible:border-white/20 focus-visible:ring-0"
-											onkeydown={(event) => event.stopPropagation()}
-										/>
-										{#each modelGroups as group (group.provider)}
-											<div class="px-2.5 pt-3 pb-1 text-[11px] font-medium text-white/40">
-												{group.label}
-											</div>
-											{#each group.options as option (`${option.provider}:${option.model}`)}
-												<DropdownMenu.Item
-													class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/75 focus:bg-white/[0.16] focus:text-white data-highlighted:bg-white/[0.12]"
-													onclick={() => (selectedModel = option)}
-												>
-													<img
-														src={option.icon}
-														alt={option.name}
-														class="size-4 opacity-60 brightness-0 invert"
-													/>
-													<span class="min-w-0 flex-1 truncate">{option.name}</span>
-													{#if selectedModel.provider === option.provider && selectedModel.model === option.model}
-														<Check class="size-3.5 text-[#DB8F5E]" />
-													{/if}
-												</DropdownMenu.Item>
-											{/each}
-										{/each}
-									</div>
-									<div class="border-t border-white/10 p-1">
-										<DropdownMenu.Item
-											class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 focus:bg-white/[0.12] focus:text-white data-highlighted:bg-white/[0.12]"
-											onclick={() => openConfigureDialog()}
-										>
-											<Settings2 class="size-3.5" />
-											<span>Configure</span>
-										</DropdownMenu.Item>
-									</div>
-								</DropdownMenu.Content>
-							</DropdownMenu.Root>
-						</div>
-
-						<!-- Send Button -->
-						<button
-							class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
-							disabled={!isGenerating && !inputValue.trim() && attachedFiles.length === 0}
-							onclick={isGenerating ? stopCurrentStream : handleSendMessage}
-							aria-label={isGenerating ? 'Stop generating' : 'Send Message'}
-						>
-							{#if isGenerating}
-								<Square class="size-4" />
-							{:else}
-								<SendHorizontal class="size-5 -rotate-90" />
-							{/if}
-						</button>
-					</div>
-				</div>
+				<!-- Main Input Capsule (reusable ChatInput) -->
+				<ChatInput
+					bind:value={inputValue}
+					bind:attachedFiles
+					bind:selectedModel
+					{llmOptions}
+					placeholder="Ask a follow-up question..."
+					{isGenerating}
+					{baseUploads}
+					{maxUploads}
+					{baseStorage}
+					{maxStorage}
+					{maxFileSizeBytes}
+					onsend={handleSendMessage}
+					onstop={stopCurrentStream}
+					onconfigure={() => openConfigureDialog()}
+				/>
 
 				<!-- Lower Row: Disclaimer & Counter -->
 				<div class="flex w-full items-center justify-between px-2 text-xs text-white/40">

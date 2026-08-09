@@ -1,30 +1,14 @@
 <script lang="ts">
-	import {
-		Paperclip,
-		Bot,
-		SendHorizontal,
-		MessageSquare,
-		Search,
-		ChevronDown,
-		Activity,
-		Keyboard,
-		FileUp,
-		Database,
-		X
-	} from 'lucide-svelte';
+	import { Bot, MessageSquare, Search, Activity, Keyboard, FileUp, Database } from 'lucide-svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
-	import { Input } from '$lib/components/ui/input';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { toast } from 'svelte-sonner';
+	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
 	import { getKeys } from '$lib/api/keys';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
-
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
 	import cohereIcon from '$lib/assets/llm/cohere.svg';
@@ -58,23 +42,13 @@
 	]);
 
 	let activeMode = $state('chat');
-	let fileInput: HTMLInputElement | null = $state(null);
-	let textInput: HTMLTextAreaElement | null = $state(null);
 	let inputValue = $state('');
 	let selectedModel: LlmOption = $state(llmOptions[0]);
 	let attachedFiles: File[] = $state([]);
 
-	// Auto-reset textarea height when input is cleared
-	$effect(() => {
-		if (!inputValue && textInput) {
-			textInput.style.height = 'auto';
-		}
-	});
-
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
 	let maxUploads = $state(10);
-
 	let baseStorage = $state(0);
 	let maxStorage = $state(100 * 1024 * 1024); // 100MB default
 
@@ -103,10 +77,7 @@
 		return `${usedMB}/${maxMB}MB`;
 	});
 
-	let maxFileSizeMB = $derived((maxFileSizeBytes / (1024 * 1024)).toFixed(0));
-
 	onMount(async () => {
-		if (textInput) textInput.focus();
 		try {
 			const res = await getMeUsage();
 			if (res.ok) {
@@ -114,7 +85,7 @@
 				baseStorage = res.data.storageUsedBytes;
 				searchesCount = res.data.searchesCount;
 				qaCount = res.data.qaCount;
-				
+
 				const userTier: TierType = (res.data.tier as TierType) ?? 'FREE';
 				const limits = TIER_LIMITS[userTier] ?? TIER_LIMITS.FREE;
 				maxUploads = limits.maxUploadsPerMonth;
@@ -159,76 +130,6 @@
 		}
 	});
 
-	$effect(() => {
-		let currentMode = activeMode;
-		if (textInput) {
-			setTimeout(() => textInput?.focus(), 0);
-		}
-	});
-
-	function triggerFileInput() {
-		if (fileInput) fileInput.click();
-	}
-
-	function showError(msg: string) {
-		if (window.matchMedia('(max-width: 767px)').matches) {
-			mobileHeaderState.showError(msg);
-		} else {
-			toast.error('Error', { description: msg });
-		}
-	}
-
-	function handleFileChange(e: Event) {
-		const target = e.target as HTMLInputElement;
-		if (target.files && target.files.length > 0) {
-			const validFiles: File[] = [];
-
-			for (let i = 0; i < target.files.length; i++) {
-				const file = target.files[i];
-
-				// 0. Extension validation
-				const allowedExtensions = ['.pdf', '.docx', '.txt'];
-				const lowerName = file.name.toLowerCase();
-				if (!allowedExtensions.some(ext => lowerName.endsWith(ext))) {
-					showError(`File "${file.name}" has an invalid extension. Only PDF, DOCX, and TXT are allowed.`);
-					continue;
-				}
-
-				// 1. Individual size check per tier limit
-				if (file.size > maxFileSizeBytes) {
-					showError(`File "${file.name}" exceeds the ${maxFileSizeMB}MB limit for your plan and was rejected.`);
-					continue;
-				}
-
-				// 2. Global count check
-				if (attachedFiles.length + validFiles.length + 1 > maxUploads - baseUploads) {
-					showError(
-						`Cannot attach "${file.name}": Exceeds maximum upload limit of ${maxUploads}.`
-					);
-					continue;
-				}
-
-				// 3. Global size check
-				const upcomingSize = currentStorageBytes + validFiles.reduce((acc, f) => acc + f.size, 0) + file.size;
-				if (upcomingSize > maxStorage) {
-					showError(`Cannot attach "${file.name}": Exceeds storage limit for your plan.`);
-					continue;
-				}
-
-				validFiles.push(file);
-			}
-
-			if (validFiles.length > 0) {
-				attachedFiles = [...attachedFiles, ...validFiles];
-			}
-			target.value = ''; // Reset input to allow selecting the same file again
-		}
-	}
-
-	function removeFile(index: number) {
-		attachedFiles.splice(index, 1);
-	}
-
 	function handleSubmit() {
 		if (!inputValue.trim()) return;
 
@@ -245,13 +146,6 @@
 					selectedModel: $state.snapshot(selectedModel)
 				}
 			});
-		}
-	}
-
-	function handleKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && !e.shiftKey) {
-			e.preventDefault();
-			handleSubmit();
 		}
 	}
 </script>
@@ -346,7 +240,7 @@
 
 	<!-- Background Video -->
 	<video
-		src="/videos/infiniteloop_bg_pingpong.mp4"
+		src="/videos/9737873-uhd_3840_2160_24fps.mp4"
 		class="absolute inset-0 -z-10 h-full w-full object-cover"
 		autoplay
 		muted
@@ -356,131 +250,28 @@
 
 	<!-- Chat Interface Container -->
 	<div
-		class="absolute bottom-12 left-1/2 flex w-full max-w-6xl -translate-x-1/2 flex-col items-center gap-4 px-4"
+		class="absolute bottom-4 left-1/2 flex w-full max-w-4xl -translate-x-1/2 flex-col items-center gap-3 px-4"
 		style="font-family: 'Inter', sans-serif;"
 	>
-		<!-- Main Input Capsule -->
-		<div
-			class="group flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.40] px-4 py-2 backdrop-blur-[42px] transition-all"
-		>
-			<!-- Row 1: Attached Files -->
-			{#if attachedFiles.length > 0}
-				<div class="flex flex-wrap gap-2 pt-1 pb-1">
-					{#each attachedFiles as file, index}
-						<div
-							class="flex items-center gap-2 rounded-full bg-[#121212]/[0.80] py-1.5 pr-2 pl-3 text-sm text-white/[0.80] backdrop-blur-[20px] transition-all"
-						>
-							<span class="max-w-[200px] truncate">{file.name}</span>
-							<button
-								class="flex cursor-pointer items-center justify-center rounded-full p-0.5 text-white/[0.40] transition-colors hover:bg-white/[0.16] hover:text-white"
-								onclick={() => removeFile(index)}
-								aria-label="Remove file"
-							>
-								<X class="size-3.5" />
-							</button>
-						</div>
-					{/each}
-				</div>
-			{/if}
-
-			<!-- Row 2: Input Controls -->
-			<div class="flex w-full flex-row items-end gap-3">
-				<!-- Element 1.1: Attach Document -->
-				<div class="relative flex h-9 items-center">
-					<Tooltip.Provider delayDuration={100}>
-						<Tooltip.Root>
-							<Tooltip.Trigger
-								class="flex cursor-pointer items-center text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69]"
-								aria-label="Attach Document"
-								onclick={triggerFileInput}
-							>
-								<Paperclip class="size-5" />
-							</Tooltip.Trigger>
-							<Tooltip.Content
-								class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
-								arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
-							>
-								<p>Attach Document (PDF, TXT, DOCX)</p>
-								<p class="text-xs text-white/[0.69]">
-									{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
-								</p>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
-				</div>
-				<Input
-					type="file"
-					bind:ref={fileInput}
-					id="file-upload"
-					accept=".pdf,.txt,.docx"
-					class="hidden"
-					multiple
-					onchange={handleFileChange}
-				/>
-
-				<!-- Element 1.2: Input Text Field -->
-				<Textarea
-					bind:ref={textInput}
-					bind:value={inputValue}
-					maxlength={690}
-					rows={1}
-					placeholder={activeMode === 'search'
-						? 'Search documents using semantic search...'
-						: 'Ask a question about your documents...'}
-					class="max-h-32 min-h-[36px] flex-1 resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 text-white/[0.40] shadow-none ring-0 transition-colors outline-none placeholder:text-white/[0.40] focus-within:text-white/[0.69] focus-within:placeholder-white/[0.69] hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-					onkeydown={handleKeyDown}
-					oninput={(e) => {
-						const target = e.currentTarget as HTMLTextAreaElement;
-						if (target) {
-							target.style.height = 'auto';
-							if (target.value) {
-								target.style.height = Math.min(target.scrollHeight, 128) + 'px';
-							}
-						}
-					}}
-				/>
-
-				<!-- Element 1.3: Model Dropdown Switch -->
-				{#if activeMode === 'chat'}
-					<div class="relative flex h-9 items-center">
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger
-								class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
-							>
-								<img
-									src={selectedModel.icon}
-									alt={selectedModel.name}
-									class="size-5 opacity-40 brightness-0 invert transition-opacity focus-within:opacity-[0.69] hover:opacity-[0.69]"
-								/>
-								<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
-								<ChevronDown class="size-4" />
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Content
-								class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] bg-[#232323]/40 text-white backdrop-blur-[42px]"
-							>
-								{#each llmOptions as option}
-									<DropdownMenu.Item
-										class="flex cursor-pointer items-center gap-2 focus:bg-white/[0.16] focus:text-white"
-										onclick={() => (selectedModel = option)}
-									>
-										<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
-										<span class="truncate">{option.name}</span>
-									</DropdownMenu.Item>
-								{/each}
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
-					</div>
-				{/if}
-
-				<!-- Element 1.4: Send Button -->
-				<button
-					class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-[#B8B5B5]/[0] text-white/[0.80] backdrop-blur-[31.16px]"
-					onclick={handleSubmit}
-				>
-					<SendHorizontal class="size-5 -rotate-90" />
-				</button>
-			</div>
-		</div>
+		<!-- Main Input Capsule (reusable ChatInput) -->
+		<ChatInput
+			bind:value={inputValue}
+			bind:attachedFiles
+			bind:selectedModel
+			{llmOptions}
+			placeholder={activeMode === 'search'
+				? 'Search documents using semantic search...'
+				: 'Ask a question about your documents...'}
+			showModelSelector={activeMode === 'chat'}
+			refocusKey={activeMode}
+			transparent
+			{baseUploads}
+			{maxUploads}
+			{baseStorage}
+			{maxStorage}
+			{maxFileSizeBytes}
+			onsend={handleSubmit}
+		/>
 
 		<!-- 2. Lower Row: Mode Toggles & Usage Info -->
 		<div class="@container flex w-full flex-row items-center justify-between px-2">

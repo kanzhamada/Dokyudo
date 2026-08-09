@@ -277,6 +277,50 @@
     }
 }
 
+/* ─── SvelteKit View Transitions (submit-chat only) ───
+   Runs solely for the new-chat submit navigation (/app/chat → /app/chat/<id>).
+   The root is left untouched (animation: none) so the sidebar and app chrome
+   stay static; only the <main> content area (tagged `app-main` in the app
+   layout) cross-fades, and the shared input capsule morphs in place through
+   its own `chat-input` name (see ChatInput.svelte). */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation: none;
+}
+
+::view-transition-old(app-main) {
+    animation: dk-view-fade-out 700ms ease-in-out both;
+}
+
+::view-transition-new(app-main) {
+    animation: dk-view-fade-in 700ms ease-in-out both;
+}
+
+@keyframes dk-view-fade-out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes dk-view-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(app-main),
+    ::view-transition-new(app-main) {
+        animation-duration: 0.01ms;
+    }
+}
+
 /* ─── Sonner Toast Overrides (Glassmorphic Capsule) ─── */
 [data-sonner-toaster] [data-sonner-toast] {
     --normal-bg: transparent;
