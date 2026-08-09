@@ -338,6 +338,62 @@ export const turnAlternatives = pgTable("turn_alternatives", {
 }));
 
 // ==============================================================================
+// 7.6. CHAT SHARES TABLE (Public Read-Only Share Links)
+// ==============================================================================
+// One row per public share link. The `snapshot` column is an immutable copy of
+// the conversation turns (question/answer/references/model/status/timestamps)
+// taken at share time — later edits or new turns never leak into the public
+// view. `conversation_id` + `boundary_turn_id` are kept for the authenticated
+// "continue this chat" flow, which rebuilds a conversation from the snapshot.
+export const chatShares = pgTable("chat_shares", {
+    code: varchar("code", { length: 32 }).primaryKey(),
+    tenantId: uuid("tenant_id")
+        .notNull()
+        .references(() => tenants.id, { onDelete: "cascade" }),
+    // Nullable: survives the sharer's account being deleted.
+    createdBy: uuid("created_by").references(() => users.id, {
+        onDelete: "set null",
+    }),
+    // Cascade: deleting the conversation revokes its public shares.
+    conversationId: uuid("conversation_id")
+        .notNull()
+        .references(() => conversations.id, { onDelete: "cascade" }),
+    // Lineage pointer (NO FK — mirrors branchedFromTurnId): points at the last
+    // turn included in the snapshot, used as the continue-chat boundary.
+    boundaryTurnId: uuid("boundary_turn_id"),
+    title: text("title").notNull(),
+    // Immutable copy of the shared turns at share time.
+    snapshot: jsonb("snapshot").notNull(),
+    isCustom: boolean("is_custom").default(false).notNull(),
+    // Nullable: NULL means the link never expires.
+    expiresAt: timestamp("expires_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    }),
+    createdAt: timestamp("created_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    })
+        .defaultNow()
+        .notNull(),
+    updatedAt: timestamp("updated_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    })
+        .defaultNow()
+        .notNull()
+        .$onUpdateFn(() => new Date()),
+}, (table) => ({
+    tenantIdx: index("idx_chat_shares_tenant").on(table.tenantId),
+    conversationIdx: index("idx_chat_shares_conversation").on(
+        table.conversationId,
+    ),
+}));
+
+// ==============================================================================
 // 8. OUTBOX EVENTS TABLE (Transactional Outbox)
 // ==============================================================================
 export const outboxEvents = pgTable("outbox_events", {
