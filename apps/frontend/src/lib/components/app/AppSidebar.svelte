@@ -152,7 +152,6 @@
 
 	async function handleTogglePin(item: ConversationItem) {
 		const newPinnedState = !item.isPinned;
-		const now = new Date().toISOString();
 
 		console.log('[Auth Conversations] Toggling pin:', {
 			id: item.id,
@@ -164,11 +163,9 @@
 			document.activeElement.blur();
 		}
 
-		// Realtime illusion: Optimistically update local state & store with new timestamp so pinned item instantly moves to index 0 (top of sidebar)
+		// Realtime illusion: Optimistically update local state & store without altering updatedAt
 		conversations = sortConversations(
-			conversations.map((c) =>
-				c.id === item.id ? { ...c, isPinned: newPinnedState, updatedAt: now } : c
-			)
+			conversations.map((c) => (c.id === item.id ? { ...c, isPinned: newPinnedState } : c))
 		);
 		conversationsStore.togglePin(item.id, newPinnedState);
 

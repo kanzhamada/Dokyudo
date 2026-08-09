@@ -1168,7 +1168,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
             });
         }
 
-        const updates: Record<string, any> = { updatedAt: new Date() };
+        const updates: Record<string, any> = {};
         if (title !== undefined) updates.title = title;
         if (isPinned !== undefined) updates.isPinned = isPinned;
 

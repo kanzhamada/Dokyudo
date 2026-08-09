@@ -27,8 +27,7 @@ function createConversationsStore() {
 				const updated: ConversationItem = {
 					...existing,
 					title: title !== undefined ? title : existing.title,
-					isPinned: isPinned !== undefined ? isPinned : existing.isPinned,
-					updatedAt: now
+					isPinned: isPinned !== undefined ? isPinned : existing.isPinned
 				};
 				items = sortItems([updated, ...items.filter((_, i) => i !== index)]);
 			} else {
@@ -39,8 +38,7 @@ function createConversationsStore() {
 			}
 		},
 		togglePin(id: string, isPinned: boolean) {
-			const now = new Date().toISOString();
-			items = sortItems(items.map((c) => (c.id === id ? { ...c, isPinned, updatedAt: now } : c)));
+			items = sortItems(items.map((c) => (c.id === id ? { ...c, isPinned } : c)));
 		},
 		remove(id: string) {
 			items = items.filter((conversation) => conversation.id !== id);
