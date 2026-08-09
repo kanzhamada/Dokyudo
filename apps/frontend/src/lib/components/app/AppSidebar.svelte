@@ -120,31 +120,43 @@
 		if (!editingConversation || !editTitle.trim() || isUpdating) return;
 		isUpdating = true;
 
+		const targetId = editingConversation.id;
+		const updatedTitle = editTitle.trim();
+		const oldTitle = editingConversation.title;
+
 		console.log('[Auth Conversations] Updating conversation:', {
-			id: editingConversation.id,
-			title: editTitle.trim()
+			id: targetId,
+			title: updatedTitle
 		});
 
+		// Optimistically update local list & store for instant real-time feel
+		conversations = sortConversations(
+			conversations.map((c) => (c.id === targetId ? { ...c, title: updatedTitle } : c))
+		);
+		conversationsStore.addOrUpdate(targetId, updatedTitle);
+		isEditDialogOpen = false;
+		editingConversation = null;
+
 		try {
-			const result = await updateConversation(editingConversation.id, {
-				title: editTitle.trim()
+			const result = await updateConversation(targetId, {
+				title: updatedTitle
 			});
 
 			if (result.ok) {
 				console.log('[Auth Conversations] Update success:', result.data);
-				const targetId = editingConversation.id;
-				const updatedTitle = editTitle.trim();
-				conversations = sortConversations(
-					conversations.map((c) => (c.id === targetId ? { ...c, title: updatedTitle } : c))
-				);
-				conversationsStore.addOrUpdate(targetId, updatedTitle);
-				isEditDialogOpen = false;
-				editingConversation = null;
 			} else {
-				console.error('[Auth Conversations] Update failed:', result.error);
+				console.error('[Auth Conversations] Update failed, reverting:', result.error);
+				conversations = sortConversations(
+					conversations.map((c) => (c.id === targetId ? { ...c, title: oldTitle } : c))
+				);
+				conversationsStore.addOrUpdate(targetId, oldTitle);
 			}
 		} catch (err) {
-			console.error('[Auth Conversations] Update Catch Error:', err);
+			console.error('[Auth Conversations] Update Catch Error, reverting:', err);
+			conversations = sortConversations(
+				conversations.map((c) => (c.id === targetId ? { ...c, title: oldTitle } : c))
+			);
+			conversationsStore.addOrUpdate(targetId, oldTitle);
 		} finally {
 			isUpdating = false;
 		}

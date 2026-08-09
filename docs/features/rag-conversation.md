@@ -138,10 +138,11 @@ Allows users to pin important conversations so they stay at the top of the sideb
   - Static Pin icon: `group-hover/menu-item:hidden data-[state=open]:hidden`
   - Action button (`MoreHorizontal`): `hidden group-hover/menu-item:flex data-[state=open]:flex`
 - Prevents icon overlap when focus remains on `Sidebar.MenuItem` after closing the dropdown menu.
-- **Header Title Dropdown Menu Integration (`/app/chat/[id]`)**:
+- **Header Title Dropdown Menu Integration & 2-Way Real-time Sync (`/app/chat/[id]`)**:
   - Added `isPinned` state and `togglePinConversation()` handler in `+page.svelte`.
   - Added Pin indicator icon to Desktop and Mobile header title buttons.
   - Added "Pin conversation" / "Unpin conversation" action item to Desktop title dropdown menu (`isTitleMenuOpen`) and Mobile title actions panel (`isMobileTitleActionsOpen`).
+  - **Reactive 2-Way Title Sync**: Added `$effect` in `+page.svelte` listening to `conversationsStore.list`. When a conversation title is updated from the Sidebar, the Header Title on `/app/chat/[id]` instantly syncs in real-time. Both Sidebar (`AppSidebar.svelte`) and Header (`+page.svelte`) implement Optimistic UI updates with fallback revert on API error.
 
 ### 7. Completion Timestamps
 - **Branching:** 2026-08-08

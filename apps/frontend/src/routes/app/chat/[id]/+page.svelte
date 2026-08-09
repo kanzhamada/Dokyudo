@@ -536,6 +536,15 @@
 	let isPinned = $state(false);
 	let isTitleLoading = $state(false);
 
+	// Sync conversationTitle reactively if updated from sidebar via conversationsStore
+	$effect(() => {
+		const currentStoreItem = conversationsStore.list.find((c) => c.id === chatId);
+		if (currentStoreItem && currentStoreItem.title && currentStoreItem.title !== conversationTitle) {
+			console.log('[Chat Detail] Syncing header title from conversationsStore:', currentStoreItem.title);
+			conversationTitle = currentStoreItem.title;
+		}
+	});
+
 	// Conversation Messages
 	let messages: ChatMessage[] = $state([]);
 	let conversationCheckpoints = $derived(
@@ -725,19 +734,27 @@
 		if (!nextTitle || isTitleSaving) return;
 
 		isTitleSaving = true;
+		const oldTitle = conversationTitle;
+
+		// Realtime illusion: Optimistically update local title & store for instant response
+		conversationTitle = nextTitle;
+		conversationsStore.addOrUpdate(chatId, nextTitle);
+		isTitleEditDialogOpen = false;
+
 		try {
 			const result = await updateConversation(chatId, { title: nextTitle });
-			if (!result.ok) {
+			if (result.ok) {
+				toast.success('Conversation title updated');
+			} else {
+				console.error('[Chat Detail] Update title failed, reverting:', result.error);
+				conversationTitle = oldTitle;
+				conversationsStore.addOrUpdate(chatId, oldTitle);
 				toast.error(result.error.message);
-				return;
 			}
-
-			conversationTitle = nextTitle;
-			conversationsStore.addOrUpdate(chatId, nextTitle);
-			isTitleEditDialogOpen = false;
-			toast.success('Conversation title updated');
 		} catch (err) {
 			console.error('[Chat Detail] Failed to update conversation title:', err);
+			conversationTitle = oldTitle;
+			conversationsStore.addOrUpdate(chatId, oldTitle);
 			toast.error('Failed to update conversation title');
 		} finally {
 			isTitleSaving = false;
