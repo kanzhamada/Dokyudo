@@ -508,33 +508,32 @@
 					<DropdownMenu.Content
 						side="top"
 						align="center"
-						class="mb-2 w-56 min-w-56 rounded-lg border-white/10 bg-sidebar text-sidebar-foreground"
+						class="mb-2 w-56 min-w-56 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
-						<DropdownMenu.Label
-							class="p-2 font-geist text-xs font-medium text-sidebar-muted-foreground"
-							>My Account</DropdownMenu.Label
-						>
-						<DropdownMenu.Separator class="bg-white/10" />
+						<DropdownMenu.Label class="px-2.5 py-1.5 font-sans text-xs font-semibold text-white/45">
+							My Account
+						</DropdownMenu.Label>
+						<DropdownMenu.Separator class="my-1 h-px bg-white/10" />
 						<DropdownMenu.Group>
 							<DropdownMenu.Item
-								class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+								class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
 							>
-								<Settings class="mr-2 size-4" />
+								<Settings class="size-3.5 text-white/60" />
 								<span>Settings</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item
-								class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+								class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
 							>
-								<CreditCard class="mr-2 size-4" />
+								<CreditCard class="size-3.5 text-white/60" />
 								<span>Billing</span>
 							</DropdownMenu.Item>
 						</DropdownMenu.Group>
-						<DropdownMenu.Separator class="bg-white/10" />
+						<DropdownMenu.Separator class="my-1 h-px bg-white/10" />
 						<DropdownMenu.Item
-							class="cursor-pointer text-[#FB6363] hover:bg-[#FB6363]/10 hover:text-[#FB6363] focus:bg-[#FB6363]/10 focus:text-[#FB6363]"
+							class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
 							onclick={() => (isLogoutDialogOpen = true)}
 						>
-							<LogOut class="mr-2 size-4" />
+							<LogOut class="size-3.5 shrink-0 text-red-400" />
 							<span>Log out</span>
 						</DropdownMenu.Item>
 					</DropdownMenu.Content>
@@ -615,38 +614,40 @@
 					{/if}
 				{/snippet}
 			</DropdownMenu.Trigger>
-			<DropdownMenu.Content class="w-48 border-white/10 bg-sidebar text-sidebar-foreground">
+			<DropdownMenu.Content
+				class="w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+			>
 				<DropdownMenu.Item
-					class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+					class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
 				>
-					<Share class="mr-2 size-4" />
+					<Share class="size-3.5 text-white/60" />
 					<span>Share</span>
 				</DropdownMenu.Item>
 				<DropdownMenu.Item
-					class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+					class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
 					onclick={() => openEditModal(item)}
 				>
-					<Edit class="mr-2 size-4" />
+					<Edit class="size-3.5 text-white/60" />
 					<span>Edit</span>
 				</DropdownMenu.Item>
 				<DropdownMenu.Item
-					class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+					class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
 					onclick={() => handleTogglePin(item)}
 				>
 					{#if item.isPinned}
-						<PinOff class="mr-2 size-4" />
+						<PinOff class="size-3.5 text-white/60" />
 						<span>Unpin</span>
 					{:else}
-						<Pin class="mr-2 size-4" />
+						<Pin class="size-3.5 text-white/60" />
 						<span>Pin</span>
 					{/if}
 				</DropdownMenu.Item>
-				<DropdownMenu.Separator class="bg-white/10" />
+				<DropdownMenu.Separator class="my-1 h-px bg-white/10" />
 				<DropdownMenu.Item
-					class="cursor-pointer text-[#FB6363] hover:bg-[#FB6363]/10 hover:text-[#FB6363] focus:bg-[#FB6363]/10 focus:text-[#FB6363]"
+					class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
 					onclick={() => openDeleteModal(item)}
 				>
-					<Trash2 class="mr-2 size-4" />
+					<Trash2 class="size-3.5 shrink-0 text-red-400" />
 					<span>Delete</span>
 				</DropdownMenu.Item>
 			</DropdownMenu.Content>
