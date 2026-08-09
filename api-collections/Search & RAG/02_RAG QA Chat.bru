@@ -19,11 +19,17 @@ headers {
 body:json {
   {
     "question": "Siapa Komisaris Independen PT Harum Energy Tbk pada 2020?"
+  //   "conversation_id": "{{conversationId}}",
+  
+  //   BYOK
   //   "provider": "gemini",
   //   "model": "gemini-3.5-flash",
   //   "useByok": true,
-  //   "conversation_id": "{{conversationId}}",
+    
+  //   Edit Prompt
   //   "edit_turn_id": "{{turnId}}",
+    
+  //   Retry Response
   //   "retry_turn_id": "{{turnId}}",
   //   "selected_variant_id": "{{variantId}}"
   }
@@ -31,14 +37,14 @@ body:json {
 
 docs {
   Streams answer tokens back using Server-Sent Events (SSE). Retrieves top 5 chunks, builds context prompt, and calls AI Gateway.
-
+  
   ## Body Fields
   - `question` — user prompt (wajib)
   - `conversation_id` — untuk turn lanjutan / follow-up
   - `edit_turn_id` — edit mode: jawaban stream menimpa turn ini (in-place regenerate)
   - `retry_turn_id` — retry mode: jawaban stream disimpan sebagai **varian baru** (`turn_alternatives`) dari turn terakhir ini; wajib disertai `conversation_id`; hanya boleh untuk turn terakhir (400 kalau bukan)
   - `selected_variant_id` — follow-up: jawaban varian ini dipakai sebagai konteks history, dipromosikan menjadi jawaban kanonik turn saat sukses, dan varian yang tidak dipilih dihapus
-
+  
   ## SSE Event Types
   - `event: turn_started` — id write-target di awal stream (`data: { "turnId": "...", "variantId": "..." }`; `variantId` hanya untuk retry). Membuat turn yang di-stop tetap bisa di-retry/edit tanpa reload.
   - `event: token` — answer text chunk (`data: { "token": "..." }`)
@@ -47,11 +53,11 @@ docs {
   - `event: warning` — e.g. prompt-injection detection (`data: { "code": "PROMPT_INJECTION" }`)
   - `event: done` — stream complete (`data: { "turnId": "...", "variantId": "..." }` untuk retry)
   - `event: error` — stream error (`data: { "message": "..." }`)
-
+  
   ## Frontend Example — AbortController + signal
   ```ts
   const abortController = new AbortController();
-
+  
   const res = await fetch(`${API_URL}/api/rag/chat`, {
       method: 'POST',
       headers: {
@@ -61,18 +67,18 @@ docs {
       body: JSON.stringify({ question: "Hello" }),
       signal: abortController.signal,  // ← dikirim ke backend via c.req.raw.signal
   });
-
+  
   // Baca SSE stream...
-
+  
   // User klik stop → batalkan stream
   abortController.abort();
   ```
-
+  
   ## Stream Cancellation (Backend)
   Saat client meng-abort (AbortController / disconnect), server menerima sinyal via `c.req.raw.signal`:
   - Menghentikan konsumsi stream dari LLM provider (check `signal.aborted` di loop SDK, atau `fetch` abort untuk HTTP-based provider)
   - Menyimpan jawaban parsial ke `conversation_turns` dengan `status='stopped'`
   - Melewatkan generasi judul otomatis
-
+  
   Tidak diperlukan endpoint terpisah — gunakan sinyal abort native HTTP.
 }
