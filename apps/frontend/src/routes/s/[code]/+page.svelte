@@ -12,6 +12,7 @@
 	import { renderMarkdown } from '$lib/utils/markdown';
 	import { continueShare, getPublicShare } from '$lib/api/rag';
 	import { sessionStore } from '$lib/state/session.store.svelte';
+	import { toast } from 'svelte-sonner';
 	import { mount, unmount, untrack } from 'svelte';
 	import type { PublicShare, PublicShareTurn } from '$lib/types/rag.types';
 	import favicon from '$lib/assets/favicon.svg';
@@ -89,12 +90,16 @@
 	});
 
 	async function copyToClipboard(text: string, id: string) {
+		// Strip inline citation tags ([Doc N: Page X]) — same as the chat page,
+		// so copied answers don't carry the source reference markers.
+		const cleanText = text.replace(/\s*\[Doc [^\]]+\]/gi, '').trim();
 		try {
-			await navigator.clipboard.writeText(text);
+			await navigator.clipboard.writeText(cleanText);
 			copiedMessageId = id;
+			toast.success('Copied to clipboard');
 			setTimeout(() => {
 				if (copiedMessageId === id) copiedMessageId = null;
-			}, 1500);
+			}, 2000);
 		} catch {
 			// clipboard unavailable — silently ignore on public pages
 		}
@@ -166,9 +171,9 @@
 		style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
 	></div>
 
-	<!-- ================= Mobile Header (documents-style capsule, logo left) ================= -->
+	<!-- ================= Mobile Header (documents-style capsule, logo left, title centered) ================= -->
 	<div
-		class="pointer-events-auto fixed inset-x-4 top-4 z-50 flex h-14 items-center justify-between overflow-hidden rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.40] px-4 shadow-lg backdrop-blur-[42px] transition-all duration-500 md:hidden"
+		class="pointer-events-auto fixed inset-x-4 top-4 z-50 grid h-14 grid-cols-[auto_1fr_auto] items-center overflow-hidden rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.40] px-4 shadow-lg backdrop-blur-[42px] transition-all duration-500 md:hidden"
 	>
 		<a href="/" class="flex shrink-0 items-center gap-0.5" aria-label="Dokyudo home">
 			<div class="flex items-center [&_path]:fill-white [&>svg]:size-6">
@@ -177,37 +182,38 @@
 			<span class="font-geist text-lg font-bold tracking-tight text-white">okyudo</span>
 		</a>
 
-		<div class="flex min-w-0 flex-1 items-center justify-end gap-1.5 pl-3">
-			<span class="max-w-[40%] truncate text-xs font-medium text-white/75" title={share?.title}>
+		<div class="flex min-w-0 items-center justify-center px-2">
+			<span class="max-w-full truncate text-xs font-medium text-white/75" title={share?.title}>
 				{share?.title ?? 'Shared conversation'}
 			</span>
-			<Tooltip.Provider delayDuration={100}>
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<button
-								{...props}
-								type="button"
-								class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-								onclick={copyShareLink}
-								aria-label="Copy share link"
-							>
-								{#if copiedLink}
-									<Check class="size-4 text-green-400" />
-								{:else}
-									<Share2 class="size-4" />
-								{/if}
-							</button>
-						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content
-						class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
-					>
-						<p>{copiedLink ? 'Copied!' : 'Copy link'}</p>
-					</Tooltip.Content>
-				</Tooltip.Root>
-			</Tooltip.Provider>
 		</div>
+
+		<Tooltip.Provider delayDuration={100}>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<button
+							{...props}
+							type="button"
+							class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+							onclick={copyShareLink}
+							aria-label="Copy share link"
+						>
+							{#if copiedLink}
+								<Check class="size-4 text-green-400" />
+							{:else}
+								<Share2 class="size-4" />
+							{/if}
+						</button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content
+					class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+				>
+					<p>{copiedLink ? 'Copied!' : 'Copy link'}</p>
+				</Tooltip.Content>
+			</Tooltip.Root>
+		</Tooltip.Provider>
 	</div>
 
 	<!-- ================= Desktop Header (Gradient Bar — same as chat page) ================= -->
@@ -218,10 +224,10 @@
 			<div class="flex justify-start">
 				<a
 					href="/"
-					class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+					class="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
 				>
 					<img src={favicon} alt="Dokyudo" class="h-5 w-auto" />
-					<span class="font-sans font-medium tracking-tight">Dokyudo</span>
+					<span class="font-sans font-medium tracking-tight">okyudo</span>
 				</a>
 			</div>
 
