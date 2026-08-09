@@ -235,3 +235,11 @@ export async function handleListShares(c: Context) {
 
     return c.json({ shares: result });
 }
+
+export async function handleListAllShares(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const result = await ShareService.listAllShares({ userId, tenantId });
+    return c.json({ shares: result });
+}

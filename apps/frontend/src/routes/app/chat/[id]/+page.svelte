@@ -866,10 +866,6 @@
 		isShareDialogOpen = true;
 	}
 
-	function handleShareDialogShared() {
-		conversationsStore.setHasActiveShare(chatId, true);
-	}
-
 	function scrollToCheckpoint(messageId: string) {
 		activeCheckpointId = messageId;
 		if (pulseCheckpointTimeout) clearTimeout(pulseCheckpointTimeout);
@@ -3370,8 +3366,7 @@
 <ShareConversationDialog
 	bind:open={isShareDialogOpen}
 	conversationId={chatId}
-	conversationTitle={conversationTitle}
-	onShared={handleShareDialogShared}
+	{conversationTitle}
 	onClose={() => (isShareDialogOpen = false)}
 />
 

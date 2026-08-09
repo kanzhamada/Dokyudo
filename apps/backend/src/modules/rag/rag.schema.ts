@@ -202,6 +202,10 @@ export const ShareListItemSchema = z.object({
 });
 export type ShareListItem = z.infer<typeof ShareListItemSchema>;
 
+export const ShareListResponseSchema = z.object({
+    shares: z.array(ShareListItemSchema),
+});
+
 export const ListConversationsQuerySchema = z.object({
     limit: z.coerce.number().min(1).max(100).default(20),
     cursor: z.string().datetime().optional(), // ISO string of updatedAt

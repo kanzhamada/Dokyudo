@@ -503,6 +503,33 @@ ragRoutes.openapi(
 ragRoutes.openapi(
     createRoute({
         method: "get",
+        path: "/shares",
+        tags: ["RAG"],
+        summary: "List All Public Shares",
+        description: "Lists every active share link owned by the caller's tenant.",
+        responses: {
+            200: {
+                description: "Success",
+                content: {
+                    "application/json": {
+                        schema: RagSchema.ShareListResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleListAllShares as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "get",
         path: "/conversations/{id}/shares",
         tags: ["RAG"],
         summary: "List Public Shares",
@@ -515,7 +542,7 @@ ragRoutes.openapi(
                 description: "Success",
                 content: {
                     "application/json": {
-                        schema: z.object({ shares: z.array(RagSchema.ShareListItemSchema) }),
+                        schema: RagSchema.ShareListResponseSchema,
                     },
                 },
             },

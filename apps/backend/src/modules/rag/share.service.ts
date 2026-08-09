@@ -541,4 +541,52 @@ export class ShareService {
             createdAt: r.createdAt.toISOString(),
         }));
     }
+
+    /** Lists every active share owned by the tenant for account-level management. */
+    static async listAllShares(params: {
+        userId: string;
+        tenantId: string;
+    }): Promise<
+        Array<{
+            code: string;
+            title: string;
+            isCustom: boolean;
+            expiresAt: string | null;
+            createdAt: string;
+        }>
+    > {
+        const { userId, tenantId } = params;
+
+        let rows: any[] = [];
+        await withAuthDb(userId, async (tx) => {
+            rows = await tx
+                .select({
+                    code: chatShares.code,
+                    title: chatShares.title,
+                    isCustom: chatShares.isCustom,
+                    expiresAt: chatShares.expiresAt,
+                    createdAt: chatShares.createdAt,
+                })
+                .from(chatShares)
+                .where(
+                    and(
+                        eq(chatShares.tenantId, tenantId),
+                        or(
+                            isNull(chatShares.expiresAt),
+                            gt(chatShares.expiresAt, new Date()),
+                        ),
+                    ),
+                )
+                .orderBy(desc(chatShares.createdAt))
+                .limit(100);
+        });
+
+        return rows.map((r) => ({
+            code: r.code,
+            title: r.title,
+            isCustom: r.isCustom,
+            expiresAt: r.expiresAt?.toISOString() ?? null,
+            createdAt: r.createdAt.toISOString(),
+        }));
+    }
 }

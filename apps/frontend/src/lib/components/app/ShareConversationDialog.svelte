@@ -12,16 +12,13 @@
 		conversationId: string;
 		conversationTitle?: string;
 		onClose?: () => void;
-		/** Fired after a share is created — lets the parent refresh share indicators. */
-		onShared?: () => void;
 	}
 
 	let {
 		open = $bindable(false),
 		conversationId,
 		conversationTitle = 'Untitled conversation',
-		onClose,
-		onShared
+		onClose
 	}: Props = $props();
 
 	const EXPIRY_OPTIONS: { label: string; hours: number | null }[] = [
@@ -108,7 +105,6 @@
 				lastCreatedUrl = shareUrlOf(result.data.code);
 				lastCreatedCode = result.data.code;
 				customCode = '';
-				onShared?.();
 				const copied = await copyText(lastCreatedUrl, 'created');
 				toast.success(copied ? 'Share link created and copied' : 'Share link created');
 			} else {

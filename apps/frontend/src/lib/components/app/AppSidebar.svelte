@@ -18,7 +18,7 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import Share from '@lucide/svelte/icons/share';
-	import X from '@lucide/svelte/icons/x';
+	import Link2 from '@lucide/svelte/icons/link-2';
 	import { Pencil } from 'lucide-svelte';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Pin from '@lucide/svelte/icons/pin';
@@ -42,13 +42,9 @@
 	import DeleteConversationDialog from '$lib/components/app/DeleteConversationDialog.svelte';
 	import { authLogout } from '$lib/api/auth';
 	import { getMe } from '$lib/api/me';
-	import {
-		getConversations,
-		updateConversation,
-		deleteConversation,
-		deleteAllShares
-	} from '$lib/api/rag';
+	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
 	import ShareConversationDialog from '$lib/components/app/ShareConversationDialog.svelte';
+	import SharedLinksDialog from '$lib/components/app/SharedLinksDialog.svelte';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
 	import type { UserProfileResponse } from '$lib/types/auth.types';
@@ -241,40 +237,11 @@
 
 	let isShareDialogOpen = $state(false);
 	let sharingConversation = $state<ConversationItem | null>(null);
+	let isSharedLinksDialogOpen = $state(false);
 
 	function openShareDialog(item: ConversationItem) {
 		sharingConversation = item;
 		isShareDialogOpen = true;
-	}
-
-	/** Keeps the sidebar list and the conversations store in sync on share changes. */
-	function updateLocalShareFlag(id: string, hasActiveShare: boolean) {
-		conversations = conversations.map((c) => (c.id === id ? { ...c, hasActiveShare } : c));
-		conversationsStore.setHasActiveShare(id, hasActiveShare);
-	}
-
-	async function handleStopSharing(item: ConversationItem) {
-		const targetId = item.id;
-		console.log('[Auth Conversations] Stopping sharing for:', targetId);
-
-		// Optimistic: hide the indicator immediately, revert on failure.
-		updateLocalShareFlag(targetId, false);
-
-		try {
-			const result = await deleteAllShares(targetId);
-			if (result.ok) {
-				console.log('[Auth Conversations] Stop sharing success:', result.data);
-				toast.success('Sharing dihentikan — link publik tidak lagi aktif');
-			} else {
-				console.error('[Auth Conversations] Stop sharing failed:', result.error);
-				updateLocalShareFlag(targetId, true);
-				toast.error(result.error.message);
-			}
-		} catch (err) {
-			console.error('[Auth Conversations] Stop sharing catch error:', err);
-			updateLocalShareFlag(targetId, true);
-			toast.error('Gagal menghentikan sharing');
-		}
 	}
 
 	async function handleDeleteConversation() {
@@ -611,41 +578,14 @@
 			{/snippet}
 		</Sidebar.MenuButton>
 
-		<!-- Action Menu & Indicators (pin / public share) -->
-		{#if item.isPinned || item.hasActiveShare}
-			<Sidebar.MenuAction
-				showOnHover={false}
-				class="cursor-pointer"
-				onclick={(e) => openConversationMenu(e, item)}
-			>
-				<div
-					class="flex size-full items-center justify-center gap-1 group-hover/menu-item:hidden"
-					class:hidden={activeConversationMenu?.item.id === item.id}
-					title={item.hasActiveShare ? 'Sedang dishare ke publik' : undefined}
-				>
-					{#if item.isPinned}
-						<Pin class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
-					{/if}
-					{#if item.hasActiveShare}
-						<Share class="size-3.5 text-amber-400/90" />
-					{/if}
-				</div>
-				<div
-					class="hidden size-full items-center justify-center group-hover/menu-item:flex"
-					class:flex={activeConversationMenu?.item.id === item.id}
-				>
-					<MoreHorizontal class="size-4" />
-				</div>
-			</Sidebar.MenuAction>
-		{:else}
-			<Sidebar.MenuAction
-				showOnHover={true}
-				class="cursor-pointer"
-				onclick={(e) => openConversationMenu(e, item)}
-			>
-				<MoreHorizontal class="size-4" />
-			</Sidebar.MenuAction>
-		{/if}
+		<!-- Conversation actions stay hidden until hover; sharing is managed from the profile menu. -->
+		<Sidebar.MenuAction
+			showOnHover={true}
+			class="cursor-pointer"
+			onclick={(e) => openConversationMenu(e, item)}
+		>
+			<MoreHorizontal class="size-4" />
+		</Sidebar.MenuAction>
 	</Sidebar.MenuItem>
 {/snippet}
 
@@ -681,6 +621,17 @@
 		>
 			<CreditCard class="size-3.5 text-white/60" />
 			<span>Billing</span>
+		</button>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => {
+				isUserMenuOpen = false;
+				isSharedLinksDialogOpen = true;
+			}}
+		>
+			<Link2 class="size-3.5 text-white/60" />
+			<span>Shared links</span>
 		</button>
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
@@ -725,20 +676,6 @@
 			<Share class="size-3.5 text-white/60" />
 			<span>Share</span>
 		</button>
-		{#if activeConversationMenu.item.hasActiveShare}
-			<button
-				type="button"
-				class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
-				onclick={() => {
-					const item = activeConversationMenu?.item;
-					activeConversationMenu = null;
-					if (item) handleStopSharing(item);
-				}}
-			>
-				<X class="size-3.5 shrink-0 text-red-400" />
-				<span>Stop sharing</span>
-			</button>
-		{/if}
 		<button
 			type="button"
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
@@ -849,10 +786,14 @@
 		bind:open={isShareDialogOpen}
 		conversationId={sharingConversation.id}
 		conversationTitle={sharingConversation.title}
-		onShared={() => updateLocalShareFlag(sharingConversation!.id, true)}
 		onClose={() => {
 			isShareDialogOpen = false;
 			sharingConversation = null;
 		}}
 	/>
 {/if}
+
+<SharedLinksDialog
+	bind:open={isSharedLinksDialogOpen}
+	onClose={() => (isSharedLinksDialogOpen = false)}
+/>

@@ -176,3 +176,8 @@ export function listShares(
 		{ method: 'GET' }
 	);
 }
+
+/** Lists every active share link owned by the current tenant. */
+export function listAllShares(): Promise<ApiResult<{ shares: ShareListItem[] }>> {
+	return apiRequest<{ shares: ShareListItem[] }>('/api/rag/shares', { method: 'GET' });
+}
