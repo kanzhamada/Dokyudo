@@ -8,6 +8,7 @@ export type ErrorCode =
     | "DOCUMENT_NOT_READY"
     | "PROVIDER_UNAVAILABLE"
     | "NOT_FOUND"
+    | "CODE_TAKEN"
     | "INTERNAL_ERROR";
 
 interface AppErrorOptions {
