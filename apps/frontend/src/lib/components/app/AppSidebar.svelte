@@ -36,6 +36,7 @@
 
 	import { onMount } from 'svelte';
 	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
+	import DeleteConversationDialog from '$lib/components/app/DeleteConversationDialog.svelte';
 	import { authLogout } from '$lib/api/auth';
 	import { getMe } from '$lib/api/me';
 	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
@@ -682,36 +683,12 @@
 />
 
 <!-- Delete Conversation Confirmation Dialog -->
-<Dialog.Root bind:open={isDeleteDialogOpen}>
-	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-[425px]">
-		<Dialog.Header>
-			<Dialog.Title class="font-sans text-xl font-medium text-white">Delete Conversation</Dialog.Title>
-			<Dialog.Description class="text-sm text-white/70">
-				Are you sure you want to delete <span class="font-medium text-white">"{deletingConversation?.title}"</span>? This action cannot be undone.
-			</Dialog.Description>
-		</Dialog.Header>
-
-		<Dialog.Footer class="mt-4 flex gap-2 sm:justify-end">
-			<Button
-				variant="outline"
-				disabled={isDeleting}
-				onclick={() => (isDeleteDialogOpen = false)}
-				class="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-			>
-				Cancel
-			</Button>
-			<Button
-				disabled={isDeleting}
-				onclick={handleDeleteConversation}
-				class="bg-[#FB6363] text-white hover:bg-[#FB6363]/90"
-			>
-				{#if isDeleting}
-					<Spinner class="mr-2 size-4" />
-					Deleting...
-				{:else}
-					Delete
-				{/if}
-			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+<DeleteConversationDialog
+	bind:open={isDeleteDialogOpen}
+	isDeleting={isDeleting}
+	onConfirm={handleDeleteConversation}
+	onClose={() => {
+		isDeleteDialogOpen = false;
+		deletingConversation = null;
+	}}
+/>

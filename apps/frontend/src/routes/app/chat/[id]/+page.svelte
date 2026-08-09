@@ -40,6 +40,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
+	import DeleteConversationDialog from '$lib/components/app/DeleteConversationDialog.svelte';
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -3138,38 +3139,12 @@
 	onClose={() => (isTitleEditDialogOpen = false)}
 />
 
-<Dialog.Root bind:open={isDeleteConversationDialogOpen}>
-	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title class="text-lg font-semibold text-white">Delete conversation?</Dialog.Title>
-			<Dialog.Description class="text-sm text-white/45">
-				This will permanently delete this conversation and its history.
-			</Dialog.Description>
-		</Dialog.Header>
-		<Dialog.Footer class="mt-1 flex gap-2 sm:justify-end">
-			<Button
-				variant="ghost"
-				class="cursor-pointer text-white/60 hover:bg-white/10 hover:text-white"
-				disabled={isConversationDeleting}
-				onclick={() => (isDeleteConversationDialogOpen = false)}
-			>
-				Cancel
-			</Button>
-			<Button
-				class="cursor-pointer bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
-				disabled={isConversationDeleting}
-				onclick={deleteCurrentConversation}
-			>
-				{#if isConversationDeleting}
-					<Spinner class="mr-2" />
-					Deleting...
-				{:else}
-					Delete conversation
-				{/if}
-			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+<DeleteConversationDialog
+	bind:open={isDeleteConversationDialogOpen}
+	isDeleting={isConversationDeleting}
+	onConfirm={deleteCurrentConversation}
+	onClose={() => (isDeleteConversationDialogOpen = false)}
+/>
 
 <Dialog.Root bind:open={isDeleteResponseDialogOpen}>
 	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">
