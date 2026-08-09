@@ -244,6 +244,20 @@
 		return msg.references ?? [];
 	}
 
+	/** Terminal status of the answer currently displayed (variant or canonical). */
+	function displayedStatusOf(msg: ChatMessage): ChatMessage['status'] {
+		const variant = activeVariantOf(msg);
+		if (variant) return variant.status;
+		return msg.status;
+	}
+
+	/** True when the displayed answer (variant or canonical) was cancelled/stopped. */
+	function displayedCancelledOf(msg: ChatMessage): boolean {
+		const variant = activeVariantOf(msg);
+		if (variant) return variant.status === 'stopped';
+		return msg.isCancelled === true;
+	}
+
 	const PROVIDER_ICONS: Record<string, string> = {
 		gemini: geminiIcon,
 		mistral: mistralIcon,
@@ -1568,7 +1582,22 @@
 						}
 					}
 
-					if (eventName === 'references' && dataStr) {
+					if (eventName === 'turn_started' && dataStr) {
+						try {
+							const parsed = JSON.parse(dataStr);
+							// The write-target id arrives before any token, so a stream that gets
+							// cancelled still leaves the turn id needed for retry/edit — no reload.
+							const startedVar = activeRetryVariant();
+							if (parsed.variantId && startedVar) {
+								startedVar.id = parsed.variantId;
+							} else if (parsed.turnId && userMsg) {
+								userMsg.turnId = parsed.turnId;
+								messages[asstIndex].turnId = parsed.turnId;
+							}
+						} catch (e) {
+							console.error('[Chat Detail] Failed to parse turn_started event:', e);
+						}
+					} else 					if (eventName === 'references' && dataStr) {
 						try {
 							const parsed = JSON.parse(dataStr);
 							if (parsed.references) {
@@ -2796,21 +2825,21 @@
 								</div>
 
 								<!-- Terminal Status Marker (stopped / failed) -->
-								{#if !msg.isStreaming && msg.status === 'stopped'}
+								{#if !msg.isStreaming && displayedStatusOf(msg) === 'stopped'}
 									<div
 										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 									>
 										<Square class="size-3" />
 										<span>Response Stopped</span>
 									</div>
-								{:else if !msg.isStreaming && msg.status === 'failed'}
+								{:else if !msg.isStreaming && displayedStatusOf(msg) === 'failed'}
 									<div
 										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 									>
 										<TriangleAlert class="size-3" />
 										<span>Response failed — regenerate or edit the question above</span>
 									</div>
-								{:else if !msg.isStreaming && msg.status === 'blocked'}
+								{:else if !msg.isStreaming && displayedStatusOf(msg) === 'blocked'}
 									<div
 										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 									>
@@ -2820,30 +2849,6 @@
 								{/if}
 
 
-								<!-- Retry Variant Browser (prev/next + counter) -->
-								{#if msg.role === 'assistant' && msg.variants && msg.variants.length > 0}
-									<div class="mt-2 inline-flex items-center gap-1 self-start rounded-full border border-white/10 bg-white/5 px-1 py-0.5 text-[11px] font-medium text-white/50">
-										<button
-											type="button"
-											class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-											onclick={() => browseVariant(msg, -1)}
-											disabled={isGenerating || (msg.variantIndex ?? 0) <= 0}
-											aria-label="Previous response"
-											>
-												<ChevronLeft class="size-3" />
-											</button>
-										<span class="px-1.5 text-xs tabular-nums">{(msg.variantIndex ?? 0) + 1} / {(msg.variants?.length ?? 0) + 1}</span>
-										<button
-											type="button"
-											class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-											onclick={() => browseVariant(msg, 1)}
-											disabled={isGenerating || (msg.variantIndex ?? 0) >= (msg.variants?.length ?? 0)}
-											aria-label="Next response"
-											>
-												<ChevronRight class="size-3" />
-											</button>
-										</div>
-								{/if}
 								{#if speakingMessageId === msg.id}
 									<div class="mt-2 inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 py-1 pr-1.5 pl-3">
 										<Volume2 class="size-3.5 shrink-0 animate-pulse text-white/60" />
@@ -2861,7 +2866,7 @@
 								{/if}
 
 								<!-- Document Reference Chips -->
-								{#if !msg.isStreaming && !msg.isRetrying && !msg.isCancelled && displayedRefsOf(msg).length > 0}
+								{#if !msg.isStreaming && !msg.isRetrying && !displayedCancelledOf(msg) && displayedRefsOf(msg).length > 0}
 									<div class="mt-2 border-t border-white/10 pt-3">
 										<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
 											<BookOpen class="size-3.5 text-white/60" />
@@ -2902,7 +2907,8 @@
 
 								<!-- Action Toolbar (Copy, Retry, Thumbs Up/Down, Dropdown Menu) -->
 								{#if !msg.isStreaming}
-								<div class="flex items-center gap-1 pt-1 text-white/40">
+								<div class="flex items-center justify-between gap-2 pt-1 text-white/40">
+									<div class="flex items-center gap-1">
 									<Tooltip.Provider delayDuration={100}>
 										<Tooltip.Root>
 											<Tooltip.Trigger>
@@ -3035,6 +3041,30 @@
 										</Tooltip.Root>
 									</Tooltip.Provider>
 								</div>
+									{#if msg.variants && msg.variants.length > 0}
+										<div class="inline-flex items-center gap-0.5 rounded-full border border-white/10 bg-white/5 px-1 py-0.5 text-[11px] font-medium text-white/50">
+											<button
+												type="button"
+												class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+												onclick={() => browseVariant(msg, -1)}
+												disabled={isGenerating || (msg.variantIndex ?? 0) <= 0}
+												aria-label="Previous response"
+												>
+													<ChevronLeft class="size-3" />
+												</button>
+											<span class="px-1.5 text-xs tabular-nums">{(msg.variantIndex ?? 0) + 1} / {(msg.variants?.length ?? 0) + 1}</span>
+											<button
+												type="button"
+												class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+												onclick={() => browseVariant(msg, 1)}
+												disabled={isGenerating || (msg.variantIndex ?? 0) >= (msg.variants?.length ?? 0)}
+												aria-label="Next response"
+												>
+													<ChevronRight class="size-3" />
+												</button>
+										</div>
+									{/if}
+</div>
 								{/if}
 							</div>
 						</div>

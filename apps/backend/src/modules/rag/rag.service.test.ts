@@ -1175,6 +1175,15 @@ describe("RagService Isolated Tests", () => {
             assertEquals(donePayload.variantId, variants[0].id);
             assertEquals(donePayload.turnId, turnId);
 
+            // The turn_started event (first in the stream) carries the same ids,
+            // so a cancelled/stopped stream still leaves the client with the
+            // turn id needed to retry or edit — no page reload required.
+            const startedMatch = payload.match(/event: turn_started\ndata: (\{[^\n]+\})/);
+            assertExists(startedMatch);
+            const startedPayload = JSON.parse(startedMatch[1]);
+            assertEquals(startedPayload.variantId, donePayload.variantId);
+            assertEquals(startedPayload.turnId, turnId);
+
             // The canonical turn row must be untouched by the retry.
             const [turn] = await db
                 .select()

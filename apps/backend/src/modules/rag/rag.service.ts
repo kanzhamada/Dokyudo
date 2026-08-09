@@ -378,9 +378,21 @@ export class RagService {
                 start(controller) {
                     const encode = (data: string) =>
                         new TextEncoder().encode(data);
-                    controller.enqueue(
-                        encode(
-                            `event: warning\ndata: ${JSON.stringify({ code: "PROMPT_INJECTION" })}\n\n`,
+							// Report the write-target id up front (blocked turns still keep theirs).
+							const startedPayload = isRetry
+								? { turnId: retryTurnId, variantId: turnId }
+								: { turnId };
+							controller.enqueue(
+								encode(
+									`event: turn_started
+data: ${JSON.stringify(startedPayload)}
+
+`,
+								),
+							);
+							controller.enqueue(
+								encode(
+									`event: warning)\ndata: ${JSON.stringify({ code: "PROMPT_INJECTION" })}\n\n`,
                         ),
                     );
                     controller.enqueue(encode(`event: done\ndata: {}\n\n`));
@@ -857,9 +869,22 @@ Always include the document references ([Doc N: Page X]) in your answer.
                     start(controller) {
                         const encode = (data: string) =>
                             new TextEncoder().encode(data);
-                        controller.enqueue(
-                            encode(
-                                `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: "All free LLM providers are currently quota-exhausted or unavailable. Please try again later." })}\n\n`,
+								// Report the write-target id up front so the client can edit or retry
+								// this turn even when the stream ends early (cancelled/stopped/failed).
+								const startedPayload = isRetry
+									? { turnId: retryTurnId, variantId: turnId }
+									: { turnId };
+								controller.enqueue(
+									encode(
+										`event: turn_started
+data: ${JSON.stringify(startedPayload)}
+
+`,
+									),
+								);
+								controller.enqueue(
+									encode(
+										`event: error)\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: "All free LLM providers are currently quota-exhausted or unavailable. Please try again later." })}\n\n`,
                             ),
                         );
                         controller.enqueue(encode(`event: done\ndata: {}\n\n`));
@@ -917,12 +942,27 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 // Listen on the COMBINED signal so both request-abort and stream-cancel
                 // (client disconnect mid-stream) trigger closeOnCancel.
                 cancelSignal.addEventListener("abort", closeOnCancel, { once: true });
-                if (cancelled) {
-                    closeOnCancel();
-                    return;
-                }
+								if (cancelled) {
+									closeOnCancel();
+									return;
+								}
 
-                // 4.5 Check BYOK Key if requested
+								// Report the write-target id up front — the client needs it to edit or
+								// retry this turn even if the stream is cancelled before `done` (e.g. a
+								// stopped turn keeps its id for a later retry without a page reload).
+								const startedPayload = isRetry
+									? { turnId: retryTurnId, variantId: turnId }
+									: { turnId };
+								controller.enqueue(
+									encoder.encode(
+										`event: turn_started
+data: ${JSON.stringify(startedPayload)}
+
+`,
+									),
+								);
+
+								// 4.5 Check BYOK Key if requested
                 let byokKey: string | undefined = undefined;
                 if (useByok) {
                     try {
