@@ -12,7 +12,6 @@
 		ShieldAlert,
 		Lock,
 		GitBranch,
-		Clock,
 		Share2
 	} from 'lucide-svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -149,6 +148,7 @@
 			? 'Continue in your private chat (a copy of this link).'
 			: 'Sign in to continue this chat in your account.'
 	);
+	let copiedLink = $state(false);
 
 	onMount(() => {
 		loadShare();
@@ -200,6 +200,19 @@
 			copiedMessageId = id;
 			setTimeout(() => {
 				if (copiedMessageId === id) copiedMessageId = null;
+			}, 1500);
+		} catch {
+			// clipboard unavailable — silently ignore on public pages
+		}
+	}
+
+	/** Copies the current share page URL (header share button). */
+	async function copyShareLink() {
+		try {
+			await navigator.clipboard.writeText(window.location.href);
+			copiedLink = true;
+			setTimeout(() => {
+				copiedLink = false;
 			}, 1500);
 		} catch {
 			// clipboard unavailable — silently ignore on public pages
@@ -275,13 +288,32 @@
 			</div>
 
 			<div class="flex shrink-0 items-center gap-1.5">
-				<span
-					class="flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-white/60"
-					title={share ? formatExpiry(share.expiresAt) : undefined}
-				>
-					<Clock class="size-3 text-white/50" />
-					{share?.expiresAt ? 'Expires' : 'No expiry'}
-				</span>
+				<Tooltip.Provider delayDuration={100}>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									type="button"
+									class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+									onclick={copyShareLink}
+									aria-label="Copy share link"
+								>
+									{#if copiedLink}
+										<Check class="size-4 text-green-400" />
+									{:else}
+										<Share2 class="size-4" />
+									{/if}
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content
+							class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+						>
+							<p>{copiedLink ? 'Copied!' : 'Copy link'}</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
 			</div>
 		</div>
 	</div>
@@ -332,27 +364,32 @@
 			</div>
 
 			<div class="flex justify-end gap-1">
-				<span
-					class="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/60"
-					title={share ? formatExpiry(share.expiresAt) : undefined}
-				>
-					<Lock class="size-3 text-white/50" />
-					<span>Read-only</span>
-				</span>
-				<Button
-					size="sm"
-					class="cursor-pointer border border-white/20 bg-white/15 text-xs font-medium text-white hover:bg-white/25 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-					disabled={isContinuing || !share}
-					onclick={handleContinue}
-				>
-					{#if isContinuing}
-						<Spinner class="mr-1.5 size-3" />
-						Preparing...
-					{:else}
-						<GitBranch class="mr-1.5 size-3.5" />
-						Continue chat
-					{/if}
-				</Button>
+				<Tooltip.Provider delayDuration={100}>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									type="button"
+									class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white"
+									onclick={copyShareLink}
+									aria-label="Copy share link"
+								>
+									{#if copiedLink}
+										<Check class="size-4 text-green-400" />
+									{:else}
+										<Share2 class="size-4" />
+									{/if}
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content
+							class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+						>
+							<p>{copiedLink ? 'Copied!' : 'Copy link'}</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
 			</div>
 		</div>
 	</div>
