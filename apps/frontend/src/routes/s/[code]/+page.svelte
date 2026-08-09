@@ -134,6 +134,7 @@
 		try {
 			await navigator.clipboard.writeText(window.location.href);
 			copiedLink = true;
+			toast.success('Share link copied to clipboard');
 			setTimeout(() => {
 				copiedLink = false;
 			}, 1500);

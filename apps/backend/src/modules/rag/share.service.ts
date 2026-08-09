@@ -23,7 +23,6 @@ const PUBLIC_SHARE_COLUMNS = {
     isPrivate: chatShares.isPrivate,
     expiresAt: chatShares.expiresAt,
     conversationId: chatShares.conversationId,
-    boundaryTurnId: chatShares.boundaryTurnId,
     createdAt: chatShares.createdAt,
 } as const;
 
@@ -195,7 +194,6 @@ export class ShareService {
 
         let conversationTitle = "";
         let snapshot: SnapshotTurn[] = [];
-        let boundaryTurnId: string | null = null;
         let insertedCode: string | null = null;
         let expiresAt: Date | null = null;
 
@@ -257,7 +255,6 @@ export class ShareService {
                 contextReferences: t.contextReferences,
                 createdAt: t.createdAt.toISOString(),
             }));
-            boundaryTurnId = turns[turns.length - 1].id;
 
             expiresAt = expiresInHours
                 ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000)
@@ -272,7 +269,6 @@ export class ShareService {
                         tenantId,
                         createdBy: userId,
                         conversationId,
-                        boundaryTurnId,
                         title: conversationTitle,
                         snapshot,
                         isCustom: true,
@@ -300,7 +296,6 @@ export class ShareService {
                             tenantId,
                             createdBy: userId,
                             conversationId,
-                            boundaryTurnId,
                             title: conversationTitle,
                             snapshot,
                             isCustom: false,
@@ -490,7 +485,6 @@ export class ShareService {
         expiresAt: string | null;
         createdAt: string;
         conversationId: string;
-        boundaryTurnId: string | null;
         turns: SnapshotTurn[];
     }> {
         const { code, inviteToken } = params;
@@ -538,7 +532,6 @@ export class ShareService {
             isPrivate: boolean;
             expiresAt: Date | null;
             conversationId: string;
-            boundaryTurnId: string | null;
             createdAt: Date;
         } | null = null;
 
@@ -587,7 +580,6 @@ export class ShareService {
             expiresAt: row.expiresAt?.toISOString() ?? null,
             createdAt: row.createdAt.toISOString(),
             conversationId: row.conversationId,
-            boundaryTurnId: row.boundaryTurnId,
             turns: (row.snapshot ?? []) as SnapshotTurn[],
         };
 
@@ -643,7 +635,6 @@ export class ShareService {
                 title: chatShares.title,
                 snapshot: chatShares.snapshot,
                 conversationId: chatShares.conversationId,
-                boundaryTurnId: chatShares.boundaryTurnId,
                 expiresAt: chatShares.expiresAt,
             })
             .from(chatShares)

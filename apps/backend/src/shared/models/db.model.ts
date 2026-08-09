@@ -343,8 +343,8 @@ export const turnAlternatives = pgTable("turn_alternatives", {
 // One row per public share link. The `snapshot` column is an immutable copy of
 // the conversation turns (question/answer/references/model/status/timestamps)
 // taken at share time — later edits or new turns never leak into the public
-// view. `conversation_id` + `boundary_turn_id` are kept for the authenticated
-// "continue this chat" flow, which rebuilds a conversation from the snapshot.
+// view. `conversation_id` is kept for the authenticated "continue this chat"
+// flow, which rebuilds a conversation from the snapshot.
 export const chatShares = pgTable("chat_shares", {
     code: varchar("code", { length: 32 }).primaryKey(),
     tenantId: uuid("tenant_id")
@@ -358,9 +358,6 @@ export const chatShares = pgTable("chat_shares", {
     conversationId: uuid("conversation_id")
         .notNull()
         .references(() => conversations.id, { onDelete: "cascade" }),
-    // Lineage pointer (NO FK — mirrors branchedFromTurnId): points at the last
-    // turn included in the snapshot, used as the continue-chat boundary.
-    boundaryTurnId: uuid("boundary_turn_id"),
     title: text("title").notNull(),
     // Immutable copy of the shared turns at share time.
     snapshot: jsonb("snapshot").notNull(),

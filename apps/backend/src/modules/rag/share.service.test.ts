@@ -146,7 +146,6 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
         assertEquals(pub.turns[0].question, "Pertanyaan pertama");
         assertEquals(pub.turns[1].answer, "Jawaban kedua");
         assertEquals(pub.expiresAt !== null, true);
-        assertEquals(pub.boundaryTurnId !== null, true);
     });
 
     it("createShare: rejects inviting the sharer's own email", async () => {

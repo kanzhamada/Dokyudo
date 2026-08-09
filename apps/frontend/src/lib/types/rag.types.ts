@@ -155,8 +155,6 @@ export interface PublicShare {
 	createdAt: string;
 	/** Id of the original conversation — used by the "continue chat" flow. */
 	conversationId: string;
-	/** Last turn included in the snapshot — the continue-chat boundary. */
-	boundaryTurnId: string | null;
 	turns: PublicShareTurn[];
 }
 

@@ -206,8 +206,6 @@ export const PublicShareResponseSchema = z.object({
     createdAt: z.string(),
     /** Id of the original conversation — used by the "continue chat" flow. */
     conversationId: z.string().uuid(),
-    /** Last turn included in the snapshot — the continue-chat boundary. */
-    boundaryTurnId: z.string().uuid().nullable(),
     turns: z.array(PublicShareTurnSchema),
 });
 export type PublicShareResponse = z.infer<typeof PublicShareResponseSchema>;
