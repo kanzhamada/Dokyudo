@@ -18,7 +18,7 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import Share from '@lucide/svelte/icons/share';
-	import Pencil from 'lucide-svelte';
+	import {Pencil} from 'lucide-svelte';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Pin from '@lucide/svelte/icons/pin';
 	import PinOff from '@lucide/svelte/icons/pin-off';
