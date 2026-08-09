@@ -4,6 +4,8 @@
 Fitur ini meng-handle Q&A dari pengguna dengan melakukan *Hybrid Search* (Semantic + Full-Text) ke Upstash Vector, merakit (Context Engineering) hasilnya, dan memberikan jawaban *streaming* menggunakan Google Gemini (SSE Stream). Selain itu, fitur ini juga menyimpan riwayat *chat* ke PostgreSQL dan memungkinkan pengguna mengambil daftar percakapan (*history list*) yang terurut berdasarkan waktu paling mutakhir (berdasarkan *timestamp* turn terakhir).
 
 > **UPDATE (2026-08-07):** Sejak *Lifecycle V2*, turn dibuat **write-ahead** di awal request dengan `status='processing'` dan selalu dituntaskan (`complete | stopped | failed | blocked`). Cancel kini **menyimpan jawaban parsial** sebagai `stopped` (bukan dilewati), dan `conversation_turns` sudah punya kolom `status` + `updated_at` serta `model_used` nullable. Dokumentasi lengkap: [`rag-turn-status-and-edit-mode.md`](./rag-turn-status-and-edit-mode.md).
+>
+> **UPDATE (2026-08-09):** Fitur **retry variants** — `POST /api/rag/chat` menerima `retry_turn_id` (stream jawaban alternatif ke `turn_alternatives`, hanya turn terakhir) dan `selected_variant_id` (follow-up memakai jawaban varian sebagai konteks history; dipromosikan ke turn kanonik saat sukses, varian lain dihapus). Event SSE baru `turn_started` (id write-target di awal stream — turn `stopped` tetap bisa di-retry tanpa reload). `GET /api/rag/conversations/:id` kini mengembalikan `turns[].alternatives`. Detail: [`rag-turn-status-and-edit-mode.md` §15](./rag-turn-status-and-edit-mode.md).
 
 ## 2. Flow Diagram
 ```mermaid
@@ -124,3 +126,33 @@ Contoh: `[Doc 1: 48]`, `[Doc 1: Hlm. 48]`, `[Doc 1: Pages 48, 50]`.
 
 ### 6.4 Abort on Cancel
 Tidak ada endpoint cancel terpisah. Frontend membatalkan dengan `AbortController.abort()` pada request `POST /api/rag/chat`. Backend menerima sinyal tersebut via `c.req.raw.signal`, langsung menghentikan konsumsi LLM, dan — sejak Lifecycle V2 — **menyimpan jawaban parsial** dengan `status='stopped'` (sebelumnya dilewati begitu saja).
+
+## 7. Retry Variants & History Override (2026-08-09)
+
+### 7.1 Event `turn_started`
+
+Event pertama di setiap stream (main, prompt-injection block, provider-unavailable):
+
+```
+event: turn_started
+data: {"turnId":"...","variantId":"..."}   // variantId hanya untuk retry
+```
+
+Id write-target dilaporkan sebelum token pertama. Sebelumnya frontend hanya tahu id turn dari `event: done` — stream yang di-cancel (turn `stopped`) tidak punya id, sehingga retry/edit butuh reload. Dengan `turn_started`, id sudah ada sejak awal.
+
+### 7.2 Retry (`retry_turn_id`)
+
+- Hanya turn terakhir (`ORDER BY createdAt DESC, id DESC`), bukan `processing`; wajib `conversation_id`.
+- Pipeline penuh dijalankan ulang dengan `turn.question` (dari DB, bukan body); stream ditulis ke baris `turn_alternatives` (bukan `conversation_turns`) — state machine write-ahead/finalize sama.
+- `event: done` membawa `variantId`.
+
+### 7.3 Follow-up dengan `selected_variant_id`
+
+Saat follow-up normal menyertakan `selected_variant_id`:
+
+1. Jawaban varian tersebut **menggantikan** jawaban kanonik turn terakhir di `historyText` (query-rewrite memakainya) — validasi varian milik turn terakhir, turn in-flight (hasil write-ahead) di-exclude.
+2. Jika turn baru finalize `complete`: varian terpilih **dipromosikan** ke baris turn kanonik (answer/model/latency/references, `status='complete'`, feedback direset), lalu **semua** varian turn itu dihapus. Tanpa seleksi → semua varian dihapus. Follow-up `stopped`/`failed` tidak menghapus apa pun.
+
+### 7.4 `getConversation` — `alternatives`
+
+Setiap turn mengembalikan `alternatives` (hanya varian terminal non-kosong, `contextReferences` difilter ulang per varian). Frontend memakainya untuk browser `◀ N/M ▶` dan tetap konsisten setelah reload.

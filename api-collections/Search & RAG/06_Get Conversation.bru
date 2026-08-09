@@ -31,5 +31,19 @@ docs {
       }
     ]
     ```
+  - `alternatives`: retry variants of this turn (1:N di `turn_alternatives`), hanya varian terminal non-kosong:
+    ```json
+    [
+      {
+        "id": "...",
+        "answer": "...",
+        "status": "complete",
+        "modelUsed": "...",
+        "latencyMs": 1234,
+        "contextReferences": null,
+        "createdAt": "..."
+      }
+    ]
+    ```
   - `modelUsed`, `createdAt`, etc.
 }

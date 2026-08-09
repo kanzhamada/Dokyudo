@@ -13,6 +13,7 @@ Key capabilities:
 - **User Question & AI Response Action Bars:**
   - **User Question:** Copy button (`Copy`/`Check`) and Edit button (`Pencil`).
   - **AI Response:** Copy button (`Copy`/`Check`), Retry button (`RotateCw`), Thumbs Up/Down, and a Triple-dot Dropdown (`Ellipsis`) menu containing "Branch in new chat" (`GitBranch`), "Read aloud" (`Volume2`), and "Delete response" (`Trash2`).
+- **Retry as Alternative Responses (Varian):** "Try Again" pada turn terakhir kini membuat **varian jawaban baru** (`turn_alternatives`, bukan turn duplikat), ditelusuri dengan `◀ N/M ▶` di baris toolbar — tanpa tombol "pilih"; jawaban yang sedang ditampilkan itulah pilihan. Saat follow-up dikirim, jawaban varian terpilih dipakai sebagai konteks history dan **dipromosikan** menjadi jawaban kanonik turn; varian yang tidak dipilih dihapus setelah follow-up sukses. Edit prompt menghapus semua varian turn tersebut. Backend: `retry_turn_id` / `selected_variant_id` di `POST /api/rag/chat` (detail: `docs/backend/rag-turn-status-and-edit-mode.md` §15).
 - **Interactive Feedback System with Sonner Toasts:**
   - Explicit semi-transparent hover state (`hover:bg-white/20 hover:text-white`) for active feedback buttons to prevent theme fallback to opaque white.
   - Sonner toast notifications on rating toggle (`toast.success` for Helpful, `toast.info` for Needs Improvement / Cleared).

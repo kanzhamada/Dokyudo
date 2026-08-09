@@ -203,3 +203,48 @@ Efek: layar bersih selama proses; icon feedback tidak bisa diklik pada jawaban y
 ### 4. Completion Timestamp
 
 **Iteration 3 (feedback + toolbar visibility):** 2026-08-07/08
+
+---
+
+## Iteration 4 — Retry Variants (Alternative Responses) (2026-08-09)
+
+### 1. Alur Retry (Varian, bukan Turn Duplikat)
+
+- Tombol "Try Again" (dropdown RotateCw) kini memanggil `streamChatTurn(userMsg.content, selectedModel, { retryTurnId: msg.turnId })` — **tidak lagi membuat turn duplikat**; jawaban stream masuk sebagai varian baru dari turn terakhir.
+- `streamChatTurn(questionText, modelChoice, opts)` menerima `{ editTurnId?, retryTurnId?, selectedVariantId? }`.
+- Mode retry tidak push pesan user/assistant baru — target pesan assistant terakhir; varian lokal (`ChatVariant extends TurnAlternative` + `references`/`isStreaming`) di-push ke `msg.variants`, `variantIndex` diarahkan ke varian baru.
+- Event SSE `done` retry membawa `variantId` → id placeholder lokal diganti id server.
+
+### 2. Browser Varian (`◀ N/M ▶`)
+
+- Tampil hanya untuk pesan assistant terakhir yang punya varian; tombol prev/next nonaktif saat `isGenerating`.
+- Counter `{(variantIndex ?? 0) + 1} / {(variants?.length ?? 0) + 1}` — posisi 1 = jawaban kanonik, posisi k+1 = `variants[k-1]`.
+- Jawaban yang sedang ditampilkan = pilihan (tanpa tombol "pilih"); `displayedContentOf(msg)` / `displayedRefsOf(msg)` / `displayedStatusOf(msg)` / `displayedCancelledOf(msg)` membaca varian aktif.
+- **Reaktivitas**: semua baca/tulis streaming varian lewat `activeRetryVariant()` yang me-resolve `messages[asstIndex].variants[...]` melalui proxy `$state` — mutasi objek mentah di luar proxy tidak memicu re-render (bug "output retry tidak muncul").
+- Navigasi `◀ ▶` + counter berada **satu baris dengan toolbar aksi** (Copy/Thumbs/Retry/More), rata kanan (`justify-between`).
+
+### 3. Status Marker Mengikuti Jawaban yang Ditampilkan
+
+- Marker stopped/failed/blocked dirender dari `displayedStatusOf(msg)` — status **varian aktif**, bukan status kanonik pesan:
+  - Retry berhasil (varian `complete`) → marker "Response Stopped" hilang.
+  - Browse balik ke jawaban kanonik/varian yang `stopped` → marker muncul lagi.
+  - Saat varian streaming (`processing`) → marker disembunyikan.
+- Blok Source References memakai `displayedCancelledOf(msg)` — referensi varian sukses dari turn yang pernah di-stop tetap tampil.
+
+### 4. Follow-up dengan Varian Terpilih
+
+- `handleSendMessage` mengirim `selected_variant_id` = id varian aktif bila `variantIndex > 0`; kosong bila menampilkan jawaban asli.
+- Setelah follow-up sukses (`done` tanpa error): prune lokal — varian pesan sebelumnya dihapus; bila ada seleksi, konten varian terpilih menjadi konten kanonik pesan (mirror promosi server).
+- Event `turn_started` (event SSE pertama) menyediakan `turnId`/`variantId` sejak awal stream — turn `stopped` tetap bisa di-retry/di-edit **tanpa reload**.
+
+### 5. File Mapping
+
+| File | Change |
+|---|---|
+| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | `ChatMessage.variants/variantIndex/isRetrying`, `ChatVariant`, `activeVariantOf`/`displayed*Of`, `streamChatTurn(opts)`, `browseVariant`, `retryMessage` → retry turn, prune on follow-up, `turn_started` handler, marker ikut varian, nav varian di toolbar |
+| `apps/frontend/src/lib/types/rag.types.ts` | `TurnAlternative`, `ConversationTurn.alternatives` |
+| Backend | `docs/backend/rag-turn-status-and-edit-mode.md` §15 |
+
+### 6. Completion Timestamp
+
+**Iteration 4 (retry variants + browser UI + status marker ikut varian + toolbar nav):** 2026-08-09

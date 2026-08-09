@@ -25,7 +25,8 @@ Aturan emas: **`processing` tidak boleh jadi status akhir**. Semua jalur kode wa
 
 1. **Cek quota** (`checkQaQuota`, check-only) — dilakukan **sebelum** insert, sehingga request yang ditolak (`QUOTA_EXHAUSTED`) tidak meninggalkan row `processing` yang macet.
 2. **Resolusi conversation + eager insert** (satu transaksi `withAuthDb`):
-   - Edit mode (`edit_turn_id`): validasi turn milik conversation+tenant → `UPDATE` question baru, `answer=""`, `contextReferences=null`, `status='processing'`.
+   - Edit mode (`edit_turn_id`): validasi turn milik conversation+tenant → `UPDATE` question baru, `answer=""`, `contextReferences=null`, `status='processing'`, plus `DELETE turn_alternatives` milik turn tersebut.
+   - Retry mode (`retry_turn_id`): validasi turn milik conversation+tenant **dan merupakan turn terakhir** (bukan `processing`) → `INSERT` baris `turn_alternatives` dengan `status='processing'` — baris turn kanonik tidak disentuh sama sekali.
    - Mode baru: buat conversation bila belum ada (FK turn ke conversation NOT NULL) → `INSERT` turn dengan `id` pre-generated (`turnId`), `status='processing'`, `answer=""`, `model_used=null`.
 3. **Gatekeeper injeksi**: cek Redis blocklist dulu (lihat §7) → jika hit, block tanpa panggil guard model. Jika miss, panggil guard → `INJECTION` → tulis Redis + block.
 4. **History + rewrite query** — hanya turn `status='complete' AND answer != ''` yang dipakai sebagai konteks (lihat §6).
@@ -86,6 +87,7 @@ Efek samping yang diinginkan: turn yang sedang `processing` (termasuk yang sedan
 - Server: validasi turn milik conversation+tenant (404 kalau bukan miliknya) → update question + clear answer/references + `status='processing'` → regenerate → `finalizeTurn` meng-`UPDATE` **row yang sama** (bukan INSERT turn baru).
 - `event: done` kini membawa `{"turnId": "..."}` (id pre-generated di server, dipakai juga saat INSERT). Ini memungkinkan frontend meng-edit turn yang baru saja di-stream **tanpa reload** — sebelumnya id turn hanya diketahui dari `getConversation`.
 - Edit hanya untuk prompt terakhir (frontend membatasi tombol edit ke `lastUserMsgId`); karena itu tidak perlu truncation turn yang lebih baru.
+- **Varian retry ikut terhapus saat edit** — blok edit mengeksekusi `DELETE FROM turn_alternatives WHERE turn_id = edit_turn_id` dalam transaksi yang sama dengan reset turn. Jawaban lama (dan semua variannya) dianggap basi begitu prompt berubah, apa pun hasil regenerasinya (lihat §15).
 
 ## 9. Pencatatan Model Saat Stop (Free Auto)
 
@@ -169,3 +171,112 @@ Blok edit mode me-`SET feedback: null, feedbackAt: null` bersama answer/contextR
 ### 14.5 Completion Timestamp
 
 **Feedback (Opsi A):** 2026-08-07
+
+---
+
+## 15. Retry Variants (`turn_alternatives`) — Alternatif Jawaban per Turn
+
+Fitur retry memungkinkan user meminta ulang jawaban **hanya pada turn terakhir**, dengan semua hasil tersimpan sebagai varian yang bisa ditelusuri (`◀ 1/3 ▶`). Jawaban yang sedang ditampilkan itulah "pilihan" — selection **tidak dipersist**, tidak ada tombol "pilih response ini".
+
+### 15.1 Keputusan Desain: Tabel Baru, bukan Kolom
+
+| Opsi | Putusan |
+|---|---|
+| **Tabel baru `turn_alternatives` (1:N ke `conversation_turns`)** | ✅ Dipilih |
+| Kolom JSONB `alternatives` di `conversation_turns` | ❌ — finalize jadi read-modify-write di baris yang sama dengan penulis lain (feedback, edit) tanpa gate status; history query ikut berisiko |
+| Reuse `conversation_turns` dengan self-FK `variant_of_turn_id` | ❌ — setiap query turn (history, getConversation, branch copy) wajib filter varian |
+
+Alasan tabel baru:
+1. Varian berbentuk entitas: `answer`, `modelUsed`, `latencyMs`, `contextReferences`, `status` (processing → terminal) — persis baris turn minus question.
+2. State machine write-ahead + `finalizeTurn` (gate `status='processing'`) dipakai ulang 1:1 — alur retry = alur turn biasa dengan target tabel berbeda.
+3. Query history untuk follow-up (`status='complete' AND answer != ''`) **tidak berubah** — varian di tabel lain, tidak bisa bocor jadi konteks.
+4. Cleanup = satu `DELETE`; cascade delete otomatis saat turn/conversation dihapus.
+5. Konsisten dengan gaya skema codebase (JSONB hanya untuk payload seperti `context_references`).
+
+### 15.2 Skema (Migrasi `0023_shiny_eternity`)
+
+```ts
+export const turnAlternatives = pgTable("turn_alternatives", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+    turnId: uuid("turn_id").notNull().references(() => conversationTurns.id, { onDelete: "cascade" }),
+    answer: text("answer").notNull(),
+    modelUsed: varchar("model_used", { length: 100 }),
+    latencyMs: integer("latency_ms"),
+    contextReferences: jsonb("context_references"),
+    status: turnStatusEnum("status").notNull().default("complete"),
+    updatedAt: timestamp(...),
+    createdAt: timestamp(...),
+}, (table) => ({
+    turnIdx: index("idx_turn_alternatives_turn").on(table.turnId),
+}));
+```
+
+Catatan migrasi: Supabase auto-enable RLS di tabel baru, sedangkan `conversations`/`conversation_turns` RLS-nya off (isolasi tenant dijaga filter `tenant_id` di aplikasi). File migrasi menambahkan `ALTER TABLE "turn_alternatives" DISABLE ROW LEVEL SECURITY` agar konsisten — tanpa ini semua akses via `withAuthDb` gagal diam-diam (0 baris terpengaruh, tanpa error).
+
+### 15.3 API
+
+`POST /api/rag/chat` — dua field baru (opsional):
+
+- `retry_turn_id` (uuid) — **wajib** disertai `conversation_id` (400 kalau tidak). Validasi: turn milik conversation+tenant (404), bukan `processing` (400), dan **turn terakhir** (`ORDER BY createdAt DESC, id DESC` — 400 kalau bukan). Question yang dipakai pipeline = `turn.question` (diambil dari DB, bukan body) agar tidak divergen.
+- `selected_variant_id` (uuid) — hanya untuk follow-up normal (bukan retry/edit). Validasi: varian harus milik **turn terakhir** (turn in-flight hasil write-ahead di-*exclude* dari pengecekan), 404/400 kalau tidak.
+
+### 15.4 Alur Retry
+
+1. Write-ahead: `INSERT turn_alternatives (status='processing')` — baris turn kanonik tidak disentuh.
+2. Pipeline penuh dijalankan ulang (gatekeeper, history, search, fallback router) dengan question turn — retry bisa memilih model berbeda, itu tujuannya.
+3. `abortAsStopped` / `blockAsInjection` / `finalizeTurn` mendapat cabang `isRetry` → UPDATE `turn_alternatives` (gate `status='processing'`), bukan `conversation_turns`.
+4. `event: done` membawa `{ "turnId": <turn asli>, "variantId": <id varian> }`.
+
+### 15.5 Follow-up dengan Varian Terpilih (History Override + Promote)
+
+Saat follow-up dikirim dengan `selected_variant_id`:
+
+1. **History context**: jawaban varian menggantikan jawaban kanonik turn terakhir di `historyText` (query-rewrite ikut memakai varian tersebut).
+2. **Promosi + cleanup** — hanya jika turn baru finalize `complete` (follow-up `stopped`/`failed` tidak menghapus apa pun):
+   - Ada seleksi → `answer`, `modelUsed`, `latencyMs`, `contextReferences` varian **dipromosikan** ke baris turn kanonik; `status='complete'`, `feedback`/`feedbackAt` direset (rating lama menunjuk jawaban yang sudah tidak ada).
+   - Tanpa seleksi (user menampilkan jawaban asli) → semua varian dihapus.
+   - Setelah promosi, **semua** baris `turn_alternatives` turn itu dihapus — varian terpilih sudah menjadi jawaban kanonik, tidak ada data hilang, konsisten setelah reload.
+
+### 15.6 Siklus Hidup Varian
+
+| Kejadian | Efek |
+|---|---|
+| Retry (turn terakhir) | `INSERT` varian `processing` → terminal (complete/stopped/failed/blocked) |
+| Edit turn yang punya varian | **Semua** varian dihapus di write-ahead (jawaban lama basi) |
+| Follow-up sukses (complete) | Varian terpilih dipromosikan → semua varian dihapus |
+| Follow-up stopped/failed | Varian bertahan (belum "berhasil") |
+| Delete turn / conversation | Cascade delete via FK |
+| Branch conversation | Varian **tidak** ikut dicopy (branch memakai jawaban kanonik) |
+
+### 15.7 `getConversation`
+
+Response turn bertambah `alternatives: [{ id, answer, status, modelUsed, latencyMs, contextReferences, createdAt }]` — hanya varian **terminal** (`status != 'processing'`) dengan `answer != ''` (varian junk tidak dirender), `contextReferences` difilter ulang via `filterReferencesByCitations` per varian, urut `createdAt` ASC.
+
+### 15.8 Event SSE `turn_started`
+
+Event pertama di setiap stream (main, prompt-injection block, provider-unavailable):
+
+```
+event: turn_started
+data: {"turnId":"...","variantId":"..."}   // variantId hanya untuk retry
+```
+
+Id write-target dilaporkan **sebelum token pertama**, sehingga turn yang di-stop (stream terpotong sebelum `done`) tetap punya id untuk di-retry/di-edit **tanpa reload** — sebelumnya id hanya sampai via `done`.
+
+### 15.9 File Mapping
+
+- `apps/backend/src/shared/models/db.model.ts`: tabel `turnAlternatives`.
+- `apps/backend/drizzle/migrations/0023_shiny_eternity.sql`: tabel + FK + index + `DISABLE ROW LEVEL SECURITY`.
+- `apps/backend/src/modules/rag/rag.schema.ts`: `retry_turn_id`, `selected_variant_id`, `TurnAlternativeSchema`, `ConversationTurnSchema.alternatives`.
+- `apps/backend/src/modules/rag/rag.controller.ts`: meneruskan `retryTurnId`/`selectedVariantId`.
+- `apps/backend/src/modules/rag/rag.service.ts`: write-ahead retry, dual-write finalize (`abortAsStopped`/`blockAsInjection`/`finalizeTurn`), history override, `promoteAndCleanupVariants`, event `turn_started`/`done {variantId}`, `getConversation` alternatives.
+- `apps/backend/src/modules/rag/rag.service.test.ts`: retry validation (400/404), retry happy path (`variantId` di `turn_started` + `done`), edit clears variants, history override + promote, `getConversation` filter, cleanup tanpa seleksi.
+- `apps/frontend/src/routes/app/chat/[id]/+page.svelte`: lihat `docs/frontend/app-chat-detail-enhancements.md` (Iteration 4).
+- `api-collections/Search & RAG/02_RAG QA Chat.bru` & `06_Get Conversation.bru`: contoh body + dokumentasi event.
+
+### 15.10 Completion Timestamp
+
+**Retry variants + promote/cleanup:** 2026-08-09  
+**Event `turn_started` (retry tanpa reload):** 2026-08-09
