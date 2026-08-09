@@ -44,6 +44,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
 	import DeleteConversationDialog from '$lib/components/app/DeleteConversationDialog.svelte';
+	import ShareConversationDialog from '$lib/components/app/ShareConversationDialog.svelte';
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -58,7 +59,14 @@
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
 	import { deleteKey, getKeys, upsertKey } from '$lib/api/keys';
-	import { branchConversation, deleteConversation, deleteTurn, getConversation, updateConversation, updateTurnFeedback } from '$lib/api/rag';
+	import {
+		branchConversation,
+		deleteConversation,
+		deleteTurn,
+		getConversation,
+		updateConversation,
+		updateTurnFeedback
+	} from '$lib/api/rag';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { PUBLIC_API_URL } from '$env/static/public';
 	import { dokyudoFetch } from '$lib/apiClient';
@@ -119,38 +127,46 @@
 	function transformCitationTags(html: string, references?: DocReference[]): string {
 		if (!html) return '';
 
-		const isNegativeAnswer = /(Mohon maaf|tidak mengandung informasi|tidak ditemukan|tidak ada informasi|does not contain|cannot answer|no information available)/i.test(html);
+		const isNegativeAnswer =
+			/(Mohon maaf|tidak mengandung informasi|tidak ditemukan|tidak ada informasi|does not contain|cannot answer|no information available)/i.test(
+				html
+			);
 		if (isNegativeAnswer) {
 			return html.replace(/\s*\[Doc [^\]]+\]/gi, '');
 		}
 
 		let cleanHtml = html.replace(/\[Doc \d+:[^\]]*;[^\]]*\]/gi, '');
 
-		let result = cleanHtml.replace(/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi, (_match, docIdxStr, rawPageInfo) => {
-			const docIdx = Number(docIdxStr);
-			let docDisplayName = `Doc ${docIdx}`;
-			let docId = '';
-			let docFullName = '';
-			let snippet = '';
+		let result = cleanHtml.replace(
+			/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi,
+			(_match, docIdxStr, rawPageInfo) => {
+				const docIdx = Number(docIdxStr);
+				let docDisplayName = `Doc ${docIdx}`;
+				let docId = '';
+				let docFullName = '';
+				let snippet = '';
 
-			if (references && references.length > 0) {
-				const refDoc = references.find((r) => r.index === docIdx || r.id === docIdxStr) || references[docIdx - 1];
-				if (refDoc && refDoc.name) {
-					docId = refDoc.id;
-					docFullName = refDoc.name;
-					snippet = refDoc.snippet ?? '';
-					const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
-					docDisplayName = cleanName.length > 22 ? cleanName.slice(0, 22) + '...' : cleanName;
+				if (references && references.length > 0) {
+					const refDoc =
+						references.find((r) => r.index === docIdx || r.id === docIdxStr) ||
+						references[docIdx - 1];
+					if (refDoc && refDoc.name) {
+						docId = refDoc.id;
+						docFullName = refDoc.name;
+						snippet = refDoc.snippet ?? '';
+						const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
+						docDisplayName = cleanName.length > 22 ? cleanName.slice(0, 22) + '...' : cleanName;
+					}
 				}
+
+				const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
+				const label = pageFormatted
+					? `${escapeHtml(docDisplayName)} <span class="text-white/40 font-normal">• ${escapeHtml(pageFormatted)}</span>`
+					: escapeHtml(docDisplayName);
+
+				return `<span data-doc-id="${escapeHtml(docId)}" data-doc-title="${escapeHtml(docFullName)}" data-snippet="${escapeHtml(snippet)}" data-pages="${escapeHtml(pageFormatted)}" class="relative inline-flex cursor-pointer items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white mx-0.5 my-0.5 whitespace-nowrap">${label}</span>`;
 			}
-
-			const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
-			const label = pageFormatted
-				? `${escapeHtml(docDisplayName)} <span class="text-white/40 font-normal">• ${escapeHtml(pageFormatted)}</span>`
-				: escapeHtml(docDisplayName);
-
-			return `<span data-doc-id="${escapeHtml(docId)}" data-doc-title="${escapeHtml(docFullName)}" data-snippet="${escapeHtml(snippet)}" data-pages="${escapeHtml(pageFormatted)}" class="relative inline-flex cursor-pointer items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white mx-0.5 my-0.5 whitespace-nowrap">${label}</span>`;
-		});
+		);
 
 		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
 	}
@@ -321,6 +337,7 @@
 	let isTitleSaving = $state(false);
 	let isDeleteConversationDialogOpen = $state(false);
 	let isConversationDeleting = $state(false);
+	let isShareDialogOpen = $state(false);
 	let isDeleteResponseDialogOpen = $state(false);
 	let isResponseDeleting = $state(false);
 	let targetDeleteMessageIndex = $state<number | null>(null);
@@ -593,7 +610,9 @@
 
 		setTimeout(() => {
 			if (!chatContainer) return;
-			const blockElements = chatContainer.querySelectorAll<HTMLElement>('.code-block-embed:not([data-mounted])');
+			const blockElements = chatContainer.querySelectorAll<HTMLElement>(
+				'.code-block-embed:not([data-mounted])'
+			);
 			blockElements.forEach((el) => {
 				const rawCode = el.getAttribute('data-code');
 				const lang = el.getAttribute('data-lang') || '';
@@ -635,8 +654,15 @@
 	// Sync conversationTitle reactively if updated from sidebar via conversationsStore
 	$effect(() => {
 		const currentStoreItem = conversationsStore.list.find((c) => c.id === chatId);
-		if (currentStoreItem && currentStoreItem.title && currentStoreItem.title !== conversationTitle) {
-			console.log('[Chat Detail] Syncing header title from conversationsStore:', currentStoreItem.title);
+		if (
+			currentStoreItem &&
+			currentStoreItem.title &&
+			currentStoreItem.title !== conversationTitle
+		) {
+			console.log(
+				'[Chat Detail] Syncing header title from conversationsStore:',
+				currentStoreItem.title
+			);
 			conversationTitle = currentStoreItem.title;
 		}
 	});
@@ -651,9 +677,7 @@
 		[...messages].reverse().find((m) => m.role === 'assistant') ?? null
 	);
 	let lastDisplayedContent = $derived(lastAssistantMsg ? displayedContentOf(lastAssistantMsg) : '');
-	let conversationCheckpoints = $derived(
-		messages.filter((message) => message.role === 'user')
-	);
+	let conversationCheckpoints = $derived(messages.filter((message) => message.role === 'user'));
 	let conversationRequestId = 0;
 
 	// Track the last user message id for edit button visibility
@@ -769,7 +793,9 @@
 					messages = historyMsgs;
 				}
 			} else if (convRes.error?.code === 'NOT_FOUND') {
-				console.log(`[Chat Detail] Conversation ID ${id} not found in DB. Redirecting to /app/chat`);
+				console.log(
+					`[Chat Detail] Conversation ID ${id} not found in DB. Redirecting to /app/chat`
+				);
 				toast.error('Conversation not found');
 				await goto('/app/chat');
 				return;
@@ -935,12 +961,18 @@
 	}
 
 	async function shareConversation() {
-		try {
-			await navigator.clipboard.writeText(window.location.href);
-			toast.success('Conversation link copied');
-		} catch {
-			toast.error('Unable to copy conversation link');
-		}
+		// Disabled while a turn is still streaming — a share must never snapshot
+		// an in-flight ("processing") turn.
+		if (isGenerating) return;
+		isShareDialogOpen = true;
+	}
+
+	function handleShareDialogShared() {
+		conversationsStore.setHasActiveShare(chatId, true);
+	}
+
+	function handleShareDialogStopped() {
+		conversationsStore.setHasActiveShare(chatId, false);
 	}
 
 	function scrollToCheckpoint(messageId: string) {
@@ -1025,7 +1057,9 @@
 			await loadLlmOptions();
 			configureApiKey = '';
 			isConfigureDialogOpen = false;
-			toast.success(`${BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.label} key saved`);
+			toast.success(
+				`${BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.label} key saved`
+			);
 		} catch (err) {
 			console.error('[Chat Detail] Failed to save BYOK key:', err);
 			configureError = 'Failed to save API key.';
@@ -1047,7 +1081,9 @@
 			}
 
 			await loadLlmOptions();
-			toast.success(`${BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.label} key reset`);
+			toast.success(
+				`${BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.label} key reset`
+			);
 		} catch (err) {
 			console.error('[Chat Detail] Failed to reset BYOK key:', err);
 			configureError = 'Failed to reset API key.';
@@ -1255,9 +1291,7 @@
 			// The turn this follow-up builds on — pruned locally on success to
 			// mirror the server-side cleanup of unselected variants.
 			prevLatestAsstMsg =
-				messages[messages.length - 1]?.role === 'assistant'
-					? messages[messages.length - 1]
-					: null;
+				messages[messages.length - 1]?.role === 'assistant' ? messages[messages.length - 1] : null;
 
 			userMsg = {
 				id: `user-${Date.now()}`,
@@ -1310,7 +1344,7 @@
 		};
 		const readDisplayedRefs = (): DocReference[] => {
 			const v = activeRetryVariant();
-			return v ? v.references ?? [] : messages[asstIndex].references ?? [];
+			return v ? (v.references ?? []) : (messages[asstIndex].references ?? []);
 		};
 		const writeDisplayedRefs = (refs: DocReference[]) => {
 			const v = activeRetryVariant();
@@ -1423,9 +1457,7 @@
 						prevLatestAsstMsg.variants.length > 0
 					) {
 						if (opts.selectedVariantId) {
-							const kept = prevLatestAsstMsg.variants.find(
-								(v) => v.id === opts.selectedVariantId
-							);
+							const kept = prevLatestAsstMsg.variants.find((v) => v.id === opts.selectedVariantId);
 							if (kept) {
 								prevLatestAsstMsg.content = kept.answer;
 								prevLatestAsstMsg.references = kept.references ?? [];
@@ -1542,17 +1574,17 @@
 				let onAbort: (() => void) | null = null;
 				const abortPromise = new Promise<never>((_, reject) => {
 					if (abortController.signal.aborted) {
-						reject(new DOMException("Aborted", "AbortError"));
+						reject(new DOMException('Aborted', 'AbortError'));
 					} else {
-						onAbort = () => reject(new DOMException("Aborted", "AbortError"));
-						abortController.signal.addEventListener("abort", onAbort, { once: true });
+						onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+						abortController.signal.addEventListener('abort', onAbort, { once: true });
 					}
 				});
 				let value: Uint8Array | undefined;
 				let done = false;
 				try {
 					const result = await Promise.race([readPromise, abortPromise]);
-					if (onAbort) abortController.signal.removeEventListener("abort", onAbort);
+					if (onAbort) abortController.signal.removeEventListener('abort', onAbort);
 					value = result.value;
 					done = result.done;
 				} catch (_err) {
@@ -1597,7 +1629,7 @@
 						} catch (e) {
 							console.error('[Chat Detail] Failed to parse turn_started event:', e);
 						}
-					} else 					if (eventName === 'references' && dataStr) {
+					} else if (eventName === 'references' && dataStr) {
 						try {
 							const parsed = JSON.parse(dataStr);
 							if (parsed.references) {
@@ -1738,8 +1770,8 @@
 		const activeIdx = latestAsst?.variantIndex ?? 0;
 		const activeVariant =
 			activeIdx > 0 && latestAsst?.variants?.[activeIdx - 1]
-			? latestAsst.variants[activeIdx - 1]
-			: null;
+				? latestAsst.variants[activeIdx - 1]
+				: null;
 		streamChatTurn(inputValue.trim(), selectedModel, {
 			selectedVariantId: activeVariant ? activeVariant.id : undefined
 		});
@@ -1867,7 +1899,16 @@
 	/** Cheap heuristic: counts language markers to pick an id/en voice. */
 	function detectSpeechLang(text: string): string {
 		const lower = text.toLowerCase();
-		const idMarkers = [' yang ', ' dan ', ' dengan ', ' untuk ', ' pada ', ' adalah ', ' tidak ', ' mohon '];
+		const idMarkers = [
+			' yang ',
+			' dan ',
+			' dengan ',
+			' untuk ',
+			' pada ',
+			' adalah ',
+			' tidak ',
+			' mohon '
+		];
 		const enMarkers = [' the ', ' and ', ' with ', ' for ', ' is ', ' are ', ' not ', ' please '];
 		let idScore = 0;
 		let enScore = 0;
@@ -1897,7 +1938,13 @@
 			voices.find((v) => v.lang.toLowerCase().startsWith(normalized)) ??
 			voices.find((v) => v.lang.toLowerCase().startsWith('en')) ??
 			voices[0];
-		console.log('[ReadAloud] pickVoice: want =', normalized, '| chosen =', chosen?.lang, chosen?.name);
+		console.log(
+			'[ReadAloud] pickVoice: want =',
+			normalized,
+			'| chosen =',
+			chosen?.lang,
+			chosen?.name
+		);
 		return chosen;
 	}
 
@@ -2015,10 +2062,7 @@
 			speakingMessageId = msg.id;
 			try {
 				window.speechSynthesis.speak(utterance);
-				console.log(
-					'[ReadAloud] speak() returned, speaking =',
-					window.speechSynthesis.speaking
-				);
+				console.log('[ReadAloud] speak() returned, speaking =', window.speechSynthesis.speaking);
 			} catch (err) {
 				console.error('[ReadAloud] speak() threw:', err);
 				speakingMessageId = null;
@@ -2071,8 +2115,7 @@
 
 			messages = messages.filter(
 				(_item, index) =>
-					index !== msgIndex &&
-					!(index === msgIndex - 1 && messages[index].role === 'user')
+					index !== msgIndex && !(index === msgIndex - 1 && messages[index].role === 'user')
 			);
 
 			isDeleteResponseDialogOpen = false;
@@ -2115,9 +2158,9 @@
 				<Resizable.Pane defaultSize={40} minSize={25}>
 					<PdfPreviewPanel
 						src={citationPreview.src}
-					name={citationPreview.name}
-					initialPages={citationPreview.pages}
-					onclose={closeCitationPreview}
+						name={citationPreview.name}
+						initialPages={citationPreview.pages}
+						onclose={closeCitationPreview}
 					/>
 				</Resizable.Pane>
 			</Resizable.PaneGroup>
@@ -2156,7 +2199,9 @@
 									</button>
 								{/snippet}
 							</Tooltip.Trigger>
-							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+							<Tooltip.Content
+								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+							>
 								<p>Toggle Menu</p>
 							</Tooltip.Content>
 						</Tooltip.Root>
@@ -2177,7 +2222,9 @@
 									</button>
 								{/snippet}
 							</Tooltip.Trigger>
-							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+							<Tooltip.Content
+								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+							>
 								<p>New Chat</p>
 							</Tooltip.Content>
 						</Tooltip.Root>
@@ -2186,12 +2233,12 @@
 
 				<button
 					type="button"
-					class="flex min-w-0 max-w-[45%] cursor-pointer items-center justify-center gap-1.5 truncate px-2 text-xs font-medium text-white/75 transition-colors hover:text-white"
+					class="flex max-w-[45%] min-w-0 cursor-pointer items-center justify-center gap-1.5 truncate px-2 text-xs font-medium text-white/75 transition-colors hover:text-white"
 					onclick={toggleMobileTitleActions}
 					aria-label="Conversation actions"
 				>
 					{#if isPinned}
-						<Pin class="size-3.5 rotate-45 shrink-0 text-white/60" />
+						<Pin class="size-3.5 shrink-0 rotate-45 text-white/60" />
 					{/if}
 					<span class="truncate">
 						{isTitleLoading ? 'Generating title...' : conversationTitle || 'New Conversation'}
@@ -2206,15 +2253,18 @@
 									<button
 										{...props}
 										type="button"
-										class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+										class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
 										onclick={shareConversation}
+										disabled={isGenerating}
 										aria-label="Share conversation"
 									>
 										<Share2 class="size-4" />
 									</button>
 								{/snippet}
 							</Tooltip.Trigger>
-							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+							<Tooltip.Content
+								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+							>
 								<p>Share Conversation</p>
 							</Tooltip.Content>
 						</Tooltip.Root>
@@ -2233,14 +2283,18 @@
 									>
 										<FileText class="size-4" />
 										{#if conversationReferences.length > 0}
-											<span class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black">
+											<span
+												class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
+											>
 												{conversationReferences.length}
 											</span>
 										{/if}
 									</button>
 								{/snippet}
 							</Tooltip.Trigger>
-							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+							<Tooltip.Content
+								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+							>
 								<p>References ({conversationReferences.length})</p>
 							</Tooltip.Content>
 						</Tooltip.Root>
@@ -2266,7 +2320,9 @@
 					</button>
 					<button
 						type="button"
-						class="flex size-10 cursor-pointer items-center justify-center rounded-full border {isPinned ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-white/10 bg-white/5 text-white/65'} transition-colors hover:bg-white/10 hover:text-white"
+						class="flex size-10 cursor-pointer items-center justify-center rounded-full border {isPinned
+							? 'border-amber-400/40 bg-amber-400/10 text-amber-400'
+							: 'border-white/10 bg-white/5 text-white/65'} transition-colors hover:bg-white/10 hover:text-white"
 						onclick={() => {
 							isMobileTitleActionsOpen = false;
 							togglePinConversation();
@@ -2305,7 +2361,8 @@
 							<button
 								type="button"
 								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-								onclick={() => openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
+								onclick={() =>
+									openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
 							>
 								<FileText class="size-3.5 shrink-0 text-white/50" />
 								<span class="min-w-0 truncate">{reference.name}</span>
@@ -2337,7 +2394,9 @@
 									</button>
 								{/snippet}
 							</Tooltip.Trigger>
-							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+							<Tooltip.Content
+								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+							>
 								<p>Start New Chat</p>
 							</Tooltip.Content>
 						</Tooltip.Root>
@@ -2357,16 +2416,20 @@
 											onclick={openTitleMenu}
 										>
 											{#if isPinned}
-												<Pin class="size-3.5 rotate-45 shrink-0 text-white/60" />
+												<Pin class="size-3.5 shrink-0 rotate-45 text-white/60" />
 											{/if}
 											<span class="max-w-56 truncate">
-												{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
+												{isTitleLoading
+													? 'New Conversation'
+													: conversationTitle || 'New Conversation'}
 											</span>
 											<ChevronDown class="size-3.5 shrink-0 text-white/45" />
 										</button>
 									{/snippet}
 								</Tooltip.Trigger>
-								<Tooltip.Content class="max-w-xs rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+								<Tooltip.Content
+									class="max-w-xs rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+								>
 									<p>{conversationTitle}</p>
 								</Tooltip.Content>
 							</Tooltip.Root>
@@ -2378,7 +2441,7 @@
 							onclick={openTitleMenu}
 						>
 							{#if isPinned}
-								<Pin class="size-3.5 rotate-45 shrink-0 text-white/60" />
+								<Pin class="size-3.5 shrink-0 rotate-45 text-white/60" />
 							{/if}
 							<span class="max-w-56 truncate">
 								{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
@@ -2396,15 +2459,18 @@
 									<button
 										{...props}
 										type="button"
-										class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white"
+										class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
 										onclick={shareConversation}
+										disabled={isGenerating}
 										aria-label="Share conversation"
 									>
 										<Share2 class="size-4" />
 									</button>
 								{/snippet}
 							</Tooltip.Trigger>
-							<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+							<Tooltip.Content
+								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+							>
 								<p>Share Conversation</p>
 							</Tooltip.Content>
 						</Tooltip.Root>
@@ -2426,7 +2492,9 @@
 												>
 													<FileText class="size-4" />
 													{#if conversationReferences.length > 0}
-														<span class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black">
+														<span
+															class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
+														>
 															{conversationReferences.length}
 														</span>
 													{/if}
@@ -2435,21 +2503,31 @@
 										</DropdownMenu.Trigger>
 									{/snippet}
 								</Tooltip.Trigger>
-								<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+								<Tooltip.Content
+									class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+								>
 									<p>Conversation References</p>
 								</Tooltip.Content>
 							</Tooltip.Root>
 						</Tooltip.Provider>
 
-						<DropdownMenu.Content align="end" class="w-72 border-white/10 bg-[#232323] p-1 text-white">
-							<div class="px-2.5 py-2 text-xs font-medium text-white/45">Conversation references</div>
+						<DropdownMenu.Content
+							align="end"
+							class="w-72 border-white/10 bg-[#232323] p-1 text-white"
+						>
+							<div class="px-2.5 py-2 text-xs font-medium text-white/45">
+								Conversation references
+							</div>
 							{#if conversationReferences.length === 0}
-								<div class="px-2.5 py-3 text-xs text-white/35">No references in this conversation.</div>
+								<div class="px-2.5 py-3 text-xs text-white/35">
+									No references in this conversation.
+								</div>
 							{:else}
 								{#each conversationReferences as reference (reference.id)}
 									<DropdownMenu.Item
 										class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-xs text-white/75 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-										onclick={() => openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
+										onclick={() =>
+											openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
 									>
 										<FileText class="size-3.5 shrink-0 text-white/50" />
 										<span class="min-w-0 flex-1 truncate">{reference.name}</span>
@@ -2469,12 +2547,18 @@
 				aria-label="Conversation checkpoints"
 			>
 				<div
-					class="flex max-h-[65vh] flex-col items-center justify-center overflow-y-auto scrollbar-none py-2 {conversationCheckpoints.length > 24 ? 'gap-1' : conversationCheckpoints.length > 12 ? 'gap-1.5' : 'gap-2.5'}"
+					class="flex max-h-[65vh] scrollbar-none flex-col items-center justify-center overflow-y-auto py-2 {conversationCheckpoints.length >
+					24
+						? 'gap-1'
+						: conversationCheckpoints.length > 12
+							? 'gap-1.5'
+							: 'gap-2.5'}"
 				>
 					{#each conversationCheckpoints as checkpoint (checkpoint.id)}
 						<button
 							type="button"
-							class="h-0.5 shrink-0 cursor-pointer rounded-full transition-all duration-300 {checkpoint.id === currentCheckpointId
+							class="h-0.5 shrink-0 cursor-pointer rounded-full transition-all duration-300 {checkpoint.id ===
+							currentCheckpointId
 								? 'w-4.5 bg-[#DB8F5E]'
 								: 'w-3 bg-white/25 hover:w-4.5 hover:bg-white/50'}"
 							onclick={() => scrollToCheckpoint(checkpoint.id)}
@@ -2485,14 +2569,14 @@
 				</div>
 
 				<div
-					class="pointer-events-none absolute top-1/2 right-0 w-64 -translate-y-1/2 translate-x-2 rounded-2xl border border-white/10 bg-[#232323]/90 p-2 opacity-0 shadow-2xl backdrop-blur-[32px] transition-all duration-300 group-hover/checkpoints:pointer-events-auto group-hover/checkpoints:translate-x-0 group-hover/checkpoints:opacity-100"
+					class="pointer-events-none absolute top-1/2 right-0 w-64 translate-x-2 -translate-y-1/2 rounded-2xl border border-white/10 bg-[#232323]/90 p-2 opacity-0 shadow-2xl backdrop-blur-[32px] transition-all duration-300 group-hover/checkpoints:pointer-events-auto group-hover/checkpoints:translate-x-0 group-hover/checkpoints:opacity-100"
 				>
 					<div class="max-h-64 overflow-y-auto">
 						{#each conversationCheckpoints as checkpoint (checkpoint.id)}
 							<button
 								type="button"
 								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-white/10 {checkpoint.id ===
-									currentCheckpointId
+								currentCheckpointId
 									? 'text-[#E59C6D]'
 									: 'text-white/55'}"
 								onclick={() => scrollToCheckpoint(checkpoint.id)}
@@ -2522,13 +2606,14 @@
 						<!-- User Message (Clean Pill) -->
 						<div id={`chat-message-${msg.id}`} class="flex w-full justify-end">
 							<div
-								class="flex max-w-[85%] flex-col items-end gap-1.5 md:max-w-[70%] {editingMessageId === msg.id
+								class="flex max-w-[85%] flex-col items-end gap-1.5 md:max-w-[70%] {editingMessageId ===
+								msg.id
 									? 'w-full'
 									: ''}"
 							>
 								<div
-								class="rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md {editingMessageId ===
-										msg.id
+									class="rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md {editingMessageId ===
+									msg.id
 										? 'w-full'
 										: 'w-fit'} {pulseCheckpointId === msg.id ? 'checkpoint-pulse' : ''}"
 								>
@@ -2545,7 +2630,7 @@
 										<div class="mt-2 flex items-center justify-between gap-2">
 											<div
 												class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] {editingMessageValue.length >=
-													690
+												690
 													? 'text-red-400'
 													: 'text-white/40'}"
 											>
@@ -2587,33 +2672,7 @@
 
 								<!-- Action Toolbar for User Question (Copy & Edit) -->
 								{#if !(msg.id === lastUserMsgId && isGenerating)}
-								<div class="flex items-center gap-1">
-									<Tooltip.Provider delayDuration={100}>
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<Button
-														{...props}
-														variant="ghost"
-														size="icon"
-														class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-														onclick={() => copyToClipboard(msg.content, msg.id)}
-														aria-label="Copy question"
-													>
-														{#if copiedMessageId === msg.id}
-															<Check class="size-3 text-green-400" />
-														{:else}
-															<Copy class="size-3" />
-														{/if}
-													</Button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-												<p>{copiedMessageId === msg.id ? 'Copied!' : 'Copy question'}</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									</Tooltip.Provider>
-									{#if msg.id === lastUserMsgId}
+									<div class="flex items-center gap-1">
 										<Tooltip.Provider delayDuration={100}>
 											<Tooltip.Root>
 												<Tooltip.Trigger>
@@ -2623,20 +2682,50 @@
 															variant="ghost"
 															size="icon"
 															class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-															onclick={() => beginEditMessage(msg)}
-															aria-label="Edit question"
+															onclick={() => copyToClipboard(msg.content, msg.id)}
+															aria-label="Copy question"
 														>
-															<Pencil class="size-3" />
+															{#if copiedMessageId === msg.id}
+																<Check class="size-3 text-green-400" />
+															{:else}
+																<Copy class="size-3" />
+															{/if}
 														</Button>
 													{/snippet}
 												</Tooltip.Trigger>
-												<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-													<p>Edit question</p>
+												<Tooltip.Content
+													class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+												>
+													<p>{copiedMessageId === msg.id ? 'Copied!' : 'Copy question'}</p>
 												</Tooltip.Content>
 											</Tooltip.Root>
 										</Tooltip.Provider>
-									{/if}
-								</div>
+										{#if msg.id === lastUserMsgId}
+											<Tooltip.Provider delayDuration={100}>
+												<Tooltip.Root>
+													<Tooltip.Trigger>
+														{#snippet child({ props })}
+															<Button
+																{...props}
+																variant="ghost"
+																size="icon"
+																class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+																onclick={() => beginEditMessage(msg)}
+																aria-label="Edit question"
+															>
+																<Pencil class="size-3" />
+															</Button>
+														{/snippet}
+													</Tooltip.Trigger>
+													<Tooltip.Content
+														class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+													>
+														<p>Edit question</p>
+													</Tooltip.Content>
+												</Tooltip.Root>
+											</Tooltip.Provider>
+										{/if}
+									</div>
 								{/if}
 							</div>
 						</div>
@@ -2647,7 +2736,7 @@
 								<!-- Markdown Content View -->
 								<div
 									role="none"
-									class="prose prose-sm max-w-none text-white/90 prose-invert prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-li:my-1 prose-th:border-b prose-th:border-white/20 prose-td:border-b prose-td:border-white/10 prose-tr:border-b prose-tr:border-white/10 prose-hr:border-white/10 prose-hr:my-4"
+									class="prose prose-sm max-w-none text-white/90 prose-invert prose-headings:font-semibold prose-headings:text-white prose-p:leading-relaxed prose-a:text-white/90 prose-a:underline hover:prose-a:text-white prose-code:rounded prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-white/90 prose-code:before:content-none prose-code:after:content-none prose-pre:my-3 prose-pre:border prose-pre:border-white/10 prose-pre:bg-black/50 prose-li:my-1 prose-tr:border-b prose-tr:border-white/10 prose-th:border-b prose-th:border-white/20 prose-td:border-b prose-td:border-white/10 prose-hr:my-4 prose-hr:border-white/10"
 									onclick={(e) => {
 										const target = e.target as HTMLElement;
 										const chip = target.closest('[data-doc-id]');
@@ -2848,9 +2937,10 @@
 									</div>
 								{/if}
 
-
 								{#if speakingMessageId === msg.id}
-									<div class="mt-2 inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 py-1 pr-1.5 pl-3">
+									<div
+										class="mt-2 inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 py-1 pr-1.5 pl-3"
+									>
 										<Volume2 class="size-3.5 shrink-0 animate-pulse text-white/60" />
 										<span class="text-xs font-medium text-white/60">Reading aloud…</span>
 										<button
@@ -2907,186 +2997,206 @@
 
 								<!-- Action Toolbar (Copy, Retry, Thumbs Up/Down, Dropdown Menu) -->
 								{#if !msg.isStreaming}
-								<div class="flex items-center justify-between gap-2 pt-1 text-white/40">
-									<div class="flex items-center gap-1">
-									<Tooltip.Provider delayDuration={100}>
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<Button
-														{...props}
-														variant="ghost"
-														size="icon"
-														class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-														onclick={() => copyToClipboard(displayedContentOf(msg), msg.id)}
-							aria-label="Copy response"
-													>
-														{#if copiedMessageId === msg.id}
-															<Check class="size-3.5 text-green-400" />
-														{:else}
-															<Copy class="size-3.5" />
-														{/if}
-													</Button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-												<p>{copiedMessageId === msg.id ? 'Copied!' : 'Copy response'}</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									</Tooltip.Provider>
-
-									<Tooltip.Provider delayDuration={100}>
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<Button
-														{...props}
-														variant="ghost"
-														size="icon"
-														class="h-7 w-7 cursor-pointer {msg.feedback === 'good' ? 'bg-white/10 text-white hover:bg-white/20 hover:text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}"
-														onclick={() => toggleFeedback(msg, 'good')}
-														aria-label="Helpful"
-													>
-														<ThumbsUp class="size-3.5" />
-													</Button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-												<p>Good response</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									</Tooltip.Provider>
-
-									<Tooltip.Provider delayDuration={100}>
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<Button
-														{...props}
-														variant="ghost"
-														size="icon"
-														class="h-7 w-7 cursor-pointer {msg.feedback === 'bad' ? 'bg-white/10 text-white hover:bg-white/20 hover:text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}"
-														onclick={() => toggleFeedback(msg, 'bad')}
-														aria-label="Not helpful"
-													>
-														<ThumbsDown class="size-3.5" />
-													</Button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-												<p>Bad response</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									</Tooltip.Provider>
-
-									{#if !msg.isRejection && msg.status !== 'blocked' && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
-										<DropdownMenu.Root>
+									<div class="flex items-center justify-between gap-2 pt-1 text-white/40">
+										<div class="flex items-center gap-1">
 											<Tooltip.Provider delayDuration={100}>
 												<Tooltip.Root>
 													<Tooltip.Trigger>
-														{#snippet child({ props: tooltipProps })}
-															<DropdownMenu.Trigger>
-																{#snippet child({ props: dropdownProps })}
-																	<button
-																		{...tooltipProps}
-																		{...dropdownProps}
-																		type="button"
-																		class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
-																		aria-label="Retry response"
-																	>
-																		<RotateCw class="size-3.5" />
-																	</button>
-																{/snippet}
-															</DropdownMenu.Trigger>
+														{#snippet child({ props })}
+															<Button
+																{...props}
+																variant="ghost"
+																size="icon"
+																class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+																onclick={() => copyToClipboard(displayedContentOf(msg), msg.id)}
+																aria-label="Copy response"
+															>
+																{#if copiedMessageId === msg.id}
+																	<Check class="size-3.5 text-green-400" />
+																{:else}
+																	<Copy class="size-3.5" />
+																{/if}
+															</Button>
 														{/snippet}
 													</Tooltip.Trigger>
-													<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-														<p>Regenerate response</p>
+													<Tooltip.Content
+														class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+													>
+														<p>{copiedMessageId === msg.id ? 'Copied!' : 'Copy response'}</p>
 													</Tooltip.Content>
 												</Tooltip.Root>
 											</Tooltip.Provider>
-											<DropdownMenu.Content
-												align="start"
-												class="w-36 border-white/15 bg-[#232323] p-1 text-white"
-											>
-												<DropdownMenu.Item
-													class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-													onclick={() => retryMessage(msg, messages[msgIndex - 1])}
-												>
-													<RotateCw class="size-3.5 text-white/70" />
-													<span>Try Again</span>
-												</DropdownMenu.Item>
-											</DropdownMenu.Content>
-										</DropdownMenu.Root>
-									{/if}
-									<!-- Triple Dot Response Action Button -->
-									<Tooltip.Provider delayDuration={100}>
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<button
-														{...props}
-														type="button"
-														class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
-														onclick={(e) => openResponseMenu(e, msgIndex)}
-														aria-label="More options"
+
+											<Tooltip.Provider delayDuration={100}>
+												<Tooltip.Root>
+													<Tooltip.Trigger>
+														{#snippet child({ props })}
+															<Button
+																{...props}
+																variant="ghost"
+																size="icon"
+																class="h-7 w-7 cursor-pointer {msg.feedback === 'good'
+																	? 'bg-white/10 text-white hover:bg-white/20 hover:text-white'
+																	: 'text-white/40 hover:bg-white/10 hover:text-white'}"
+																onclick={() => toggleFeedback(msg, 'good')}
+																aria-label="Helpful"
+															>
+																<ThumbsUp class="size-3.5" />
+															</Button>
+														{/snippet}
+													</Tooltip.Trigger>
+													<Tooltip.Content
+														class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 													>
-														<Ellipsis class="size-3.5" />
-													</button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-												<p>More options</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-									</Tooltip.Provider>
-								</div>
-									{#if msg.variants && msg.variants.length > 0}
-										<div class="inline-flex items-center gap-0.5 rounded-full border border-white/10 bg-white/5 px-1 py-0.5 text-[11px] font-medium text-white/50">
-											<button
-												type="button"
-												class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-												onclick={() => browseVariant(msg, -1)}
-												disabled={isGenerating || (msg.variantIndex ?? 0) <= 0}
-												aria-label="Previous response"
+														<p>Good response</p>
+													</Tooltip.Content>
+												</Tooltip.Root>
+											</Tooltip.Provider>
+
+											<Tooltip.Provider delayDuration={100}>
+												<Tooltip.Root>
+													<Tooltip.Trigger>
+														{#snippet child({ props })}
+															<Button
+																{...props}
+																variant="ghost"
+																size="icon"
+																class="h-7 w-7 cursor-pointer {msg.feedback === 'bad'
+																	? 'bg-white/10 text-white hover:bg-white/20 hover:text-white'
+																	: 'text-white/40 hover:bg-white/10 hover:text-white'}"
+																onclick={() => toggleFeedback(msg, 'bad')}
+																aria-label="Not helpful"
+															>
+																<ThumbsDown class="size-3.5" />
+															</Button>
+														{/snippet}
+													</Tooltip.Trigger>
+													<Tooltip.Content
+														class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+													>
+														<p>Bad response</p>
+													</Tooltip.Content>
+												</Tooltip.Root>
+											</Tooltip.Provider>
+
+											{#if !msg.isRejection && msg.status !== 'blocked' && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
+												<DropdownMenu.Root>
+													<Tooltip.Provider delayDuration={100}>
+														<Tooltip.Root>
+															<Tooltip.Trigger>
+																{#snippet child({ props: tooltipProps })}
+																	<DropdownMenu.Trigger>
+																		{#snippet child({ props: dropdownProps })}
+																			<button
+																				{...tooltipProps}
+																				{...dropdownProps}
+																				type="button"
+																				class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
+																				aria-label="Retry response"
+																			>
+																				<RotateCw class="size-3.5" />
+																			</button>
+																		{/snippet}
+																	</DropdownMenu.Trigger>
+																{/snippet}
+															</Tooltip.Trigger>
+															<Tooltip.Content
+																class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+															>
+																<p>Regenerate response</p>
+															</Tooltip.Content>
+														</Tooltip.Root>
+													</Tooltip.Provider>
+													<DropdownMenu.Content
+														align="start"
+														class="w-36 border-white/15 bg-[#232323] p-1 text-white"
+													>
+														<DropdownMenu.Item
+															class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
+															onclick={() => retryMessage(msg, messages[msgIndex - 1])}
+														>
+															<RotateCw class="size-3.5 text-white/70" />
+															<span>Try Again</span>
+														</DropdownMenu.Item>
+													</DropdownMenu.Content>
+												</DropdownMenu.Root>
+											{/if}
+											<!-- Triple Dot Response Action Button -->
+											<Tooltip.Provider delayDuration={100}>
+												<Tooltip.Root>
+													<Tooltip.Trigger>
+														{#snippet child({ props })}
+															<button
+																{...props}
+																type="button"
+																class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+																onclick={(e) => openResponseMenu(e, msgIndex)}
+																aria-label="More options"
+															>
+																<Ellipsis class="size-3.5" />
+															</button>
+														{/snippet}
+													</Tooltip.Trigger>
+													<Tooltip.Content
+														class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+													>
+														<p>More options</p>
+													</Tooltip.Content>
+												</Tooltip.Root>
+											</Tooltip.Provider>
+										</div>
+										{#if msg.variants && msg.variants.length > 0}
+											<div
+												class="inline-flex items-center gap-0.5 rounded-full border border-white/10 bg-white/5 px-1 py-0.5 text-[11px] font-medium text-white/50"
+											>
+												<button
+													type="button"
+													class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+													onclick={() => browseVariant(msg, -1)}
+													disabled={isGenerating || (msg.variantIndex ?? 0) <= 0}
+													aria-label="Previous response"
 												>
 													<ChevronLeft class="size-3" />
 												</button>
-											<span class="px-1.5 text-xs tabular-nums">{(msg.variantIndex ?? 0) + 1} / {(msg.variants?.length ?? 0) + 1}</span>
-											<button
-												type="button"
-												class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-												onclick={() => browseVariant(msg, 1)}
-												disabled={isGenerating || (msg.variantIndex ?? 0) >= (msg.variants?.length ?? 0)}
-												aria-label="Next response"
+												<span class="px-1.5 text-xs tabular-nums"
+													>{(msg.variantIndex ?? 0) + 1} / {(msg.variants?.length ?? 0) + 1}</span
+												>
+												<button
+													type="button"
+													class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+													onclick={() => browseVariant(msg, 1)}
+													disabled={isGenerating ||
+														(msg.variantIndex ?? 0) >= (msg.variants?.length ?? 0)}
+													aria-label="Next response"
 												>
 													<ChevronRight class="size-3" />
 												</button>
-										</div>
-									{/if}
-</div>
+											</div>
+										{/if}
+									</div>
 								{/if}
 							</div>
 						</div>
 					{/if}
-				{#if msg.role === 'assistant' && msg.branchedFromTurnId}
-					<div class="flex items-center justify-center gap-2 py-2 text-[11px] text-white/40">
-						<div class="h-px flex-1 bg-white/10"></div>
-						<GitBranch class="size-3 shrink-0" />
-						<span class="flex items-center gap-1">
-							Branched from
-							{#if branchOfTitle}
-								<a
-									href={`/app/chat/${branchOfId ?? ''}`}
-									class="cursor-pointer underline decoration-white/30 underline-offset-2 hover:text-white hover:decoration-white/70"
-								>{branchOfTitle}</a>
-							{:else}
-								Deleted Conversation
-							{/if}
-						</span>
-						<div class="h-px flex-1 bg-white/10"></div>
-					</div>
-				{/if}
+					{#if msg.role === 'assistant' && msg.branchedFromTurnId}
+						<div class="flex items-center justify-center gap-2 py-2 text-[11px] text-white/40">
+							<div class="h-px flex-1 bg-white/10"></div>
+							<GitBranch class="size-3 shrink-0" />
+							<span class="flex items-center gap-1">
+								Branched from
+								{#if branchOfTitle}
+									<a
+										href={`/app/chat/${branchOfId ?? ''}`}
+										class="cursor-pointer underline decoration-white/30 underline-offset-2 hover:text-white hover:decoration-white/70"
+										>{branchOfTitle}</a
+									>
+								{:else}
+									Deleted Conversation
+								{/if}
+							</span>
+							<div class="h-px flex-1 bg-white/10"></div>
+						</div>
+					{/if}
 				{/each}
 			</div>
 		</div>
@@ -3199,45 +3309,49 @@
 									<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
 									<ChevronDown class="size-4" />
 								</DropdownMenu.Trigger>
-									<DropdownMenu.Content
-										class="w-80 border border-white/[0.16] bg-[#232323]/95 p-0 text-white backdrop-blur-[42px]"
-									>
-										<div class="max-h-72 overflow-y-auto px-1 py-1">
-											<Input
-												type="search"
-												bind:value={modelSearchQuery}
-												placeholder="Select a model..."
-												class="h-9 rounded-none border-0 border-b border-white/10 bg-transparent px-2.5 text-xs text-white shadow-none focus-visible:border-white/20 focus-visible:ring-0"
-												onkeydown={(event) => event.stopPropagation()}
-											/>
-											{#each modelGroups as group (group.provider)}
-												<div class="px-2.5 pt-3 pb-1 text-[11px] font-medium text-white/40">
-													{group.label}
-												</div>
-												{#each group.options as option (`${option.provider}:${option.model}`)}
-													<DropdownMenu.Item
-														class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/75 focus:bg-white/[0.16] focus:text-white data-highlighted:bg-white/[0.12]"
-														onclick={() => (selectedModel = option)}
-													>
-														<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert opacity-60" />
-														<span class="min-w-0 flex-1 truncate">{option.name}</span>
-														{#if selectedModel.provider === option.provider && selectedModel.model === option.model}
-															<Check class="size-3.5 text-[#DB8F5E]" />
-														{/if}
-													</DropdownMenu.Item>
-												{/each}
+								<DropdownMenu.Content
+									class="w-80 border border-white/[0.16] bg-[#232323]/95 p-0 text-white backdrop-blur-[42px]"
+								>
+									<div class="max-h-72 overflow-y-auto px-1 py-1">
+										<Input
+											type="search"
+											bind:value={modelSearchQuery}
+											placeholder="Select a model..."
+											class="h-9 rounded-none border-0 border-b border-white/10 bg-transparent px-2.5 text-xs text-white shadow-none focus-visible:border-white/20 focus-visible:ring-0"
+											onkeydown={(event) => event.stopPropagation()}
+										/>
+										{#each modelGroups as group (group.provider)}
+											<div class="px-2.5 pt-3 pb-1 text-[11px] font-medium text-white/40">
+												{group.label}
+											</div>
+											{#each group.options as option (`${option.provider}:${option.model}`)}
+												<DropdownMenu.Item
+													class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/75 focus:bg-white/[0.16] focus:text-white data-highlighted:bg-white/[0.12]"
+													onclick={() => (selectedModel = option)}
+												>
+													<img
+														src={option.icon}
+														alt={option.name}
+														class="size-4 opacity-60 brightness-0 invert"
+													/>
+													<span class="min-w-0 flex-1 truncate">{option.name}</span>
+													{#if selectedModel.provider === option.provider && selectedModel.model === option.model}
+														<Check class="size-3.5 text-[#DB8F5E]" />
+													{/if}
+												</DropdownMenu.Item>
 											{/each}
-										</div>
-										<div class="border-t border-white/10 p-1">
-											<DropdownMenu.Item
-												class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 focus:bg-white/[0.12] focus:text-white data-highlighted:bg-white/[0.12]"
-												onclick={() => openConfigureDialog()}
-													>
-														<Settings2 class="size-3.5" />
-														<span>Configure</span>
-													</DropdownMenu.Item>
-										</div>
-									</DropdownMenu.Content>
+										{/each}
+									</div>
+									<div class="border-t border-white/10 p-1">
+										<DropdownMenu.Item
+											class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 focus:bg-white/[0.12] focus:text-white data-highlighted:bg-white/[0.12]"
+											onclick={() => openConfigureDialog()}
+										>
+											<Settings2 class="size-3.5" />
+											<span>Configure</span>
+										</DropdownMenu.Item>
+									</div>
+								</DropdownMenu.Content>
 							</DropdownMenu.Root>
 						</div>
 
@@ -3304,12 +3418,16 @@
 				<button
 					type="button"
 					class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors {configureProvider ===
-						provider.id
+					provider.id
 						? 'border-[#DB8F5E]/60 bg-[#DB8F5E]/10 text-white'
 						: 'border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.08] hover:text-white/80'}"
 					onclick={() => selectConfigureProvider(provider.id)}
 				>
-					<img src={provider.icon} alt={provider.label} class="size-4 shrink-0 brightness-0 invert opacity-70" />
+					<img
+						src={provider.icon}
+						alt={provider.label}
+						class="size-4 shrink-0 opacity-70 brightness-0 invert"
+					/>
 					<span class="min-w-0 truncate text-xs font-medium">{provider.label}</span>
 				</button>
 			{/each}
@@ -3329,7 +3447,9 @@
 			</div>
 
 			{#if configuredKeyMasks[configureProvider]}
-				<div class="flex h-10 items-center justify-between rounded-lg border border-white/15 bg-black/20 px-3">
+				<div
+					class="flex h-10 items-center justify-between rounded-lg border border-white/15 bg-black/20 px-3"
+				>
 					<div class="flex items-center gap-2 text-sm text-white/75">
 						<Check class="size-4 text-white/60" />
 						<span>API Key Configured</span>
@@ -3348,7 +3468,8 @@
 				<Input
 					type="password"
 					bind:value={configureApiKey}
-					placeholder={BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)?.placeholder}
+					placeholder={BYOK_PROVIDER_OPTIONS.find((item) => item.id === configureProvider)
+						?.placeholder}
 					class="h-10 border-white/15 bg-black/20 text-sm text-white placeholder:text-white/25 focus-visible:border-[#DB8F5E]/60 focus-visible:ring-[#DB8F5E]/20"
 					autocomplete="new-password"
 				/>
@@ -3384,54 +3505,6 @@
 	</Dialog.Content>
 </Dialog.Root>
 
-<style>
-	@keyframes checkpoint-pulse {
-		0% {
-			box-shadow: 0 0 0 0 rgb(255 255 255 / 0%);
-			transform: scale(1);
-		}
-		35% {
-			box-shadow: 0 0 0 5px rgb(255 255 255 / 12%);
-			transform: scale(1.015);
-		}
-		100% {
-			box-shadow: 0 0 0 0 rgb(255 255 255 / 0%);
-			transform: scale(1);
-		}
-	}
-
-	.checkpoint-pulse {
-		animation: checkpoint-pulse 900ms cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-
-	:global(.prose table) {
-		border-collapse: collapse;
-		width: 100%;
-		margin-top: 1rem;
-		margin-bottom: 1rem;
-	}
-	:global(.prose th) {
-		border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
-		padding: 0.625rem 0.875rem;
-		font-weight: 600;
-		color: rgba(255, 255, 255, 0.95);
-	}
-	:global(.prose td) {
-		border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
-		padding: 0.625rem 0.875rem;
-		color: rgba(255, 255, 255, 0.85);
-	}
-	:global(.prose tr:hover) {
-		background-color: rgba(255, 255, 255, 0.03);
-	}
-	:global(.prose hr) {
-		border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
-		border-bottom: none !important;
-		margin-top: 1.25rem;
-		margin-bottom: 1.25rem;
-	}
-</style>
-
 <EditTitleDialog
 	bind:open={isTitleEditDialogOpen}
 	title={conversationTitle}
@@ -3445,6 +3518,14 @@
 	isDeleting={isConversationDeleting}
 	onConfirm={deleteCurrentConversation}
 	onClose={() => (isDeleteConversationDialogOpen = false)}
+/>
+
+<ShareConversationDialog
+	bind:open={isShareDialogOpen}
+	conversationId={chatId}
+	onShared={handleShareDialogShared}
+	onStopped={handleShareDialogStopped}
+	onClose={() => (isShareDialogOpen = false)}
 />
 
 <Dialog.Root bind:open={isDeleteResponseDialogOpen}>
@@ -3522,7 +3603,7 @@
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
 			onclick={() => {
 				isTitleMenuOpen = false;
 				isDeleteConversationDialogOpen = true;
@@ -3552,7 +3633,7 @@
 		<button
 			type="button"
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-				onclick={() => branchFromMessage(activeResponseMenuMsgIndex!)}
+			onclick={() => branchFromMessage(activeResponseMenuMsgIndex!)}
 		>
 			<GitBranch class="size-3.5 text-white/70" />
 			<span>Branch in new chat</span>
@@ -3560,19 +3641,23 @@
 		<button
 			type="button"
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-					onclick={() => {
-						const msgIndex = activeResponseMenuMsgIndex;
-						closeResponseMenu();
-						if (msgIndex !== null) toggleReadAloud(msgIndex);
-					}}
+			onclick={() => {
+				const msgIndex = activeResponseMenuMsgIndex;
+				closeResponseMenu();
+				if (msgIndex !== null) toggleReadAloud(msgIndex);
+			}}
 		>
 			<Volume2 class="size-3.5 text-white/70" />
-			<span>{speakingMessageId === messages[activeResponseMenuMsgIndex!]?.id ? 'Stop reading' : 'Read aloud'}</span>
+			<span
+				>{speakingMessageId === messages[activeResponseMenuMsgIndex!]?.id
+					? 'Stop reading'
+					: 'Read aloud'}</span
+			>
 		</button>
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:bg-red-500/15 focus:outline-none"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
 			disabled={messages[activeResponseMenuMsgIndex]?.isStreaming}
 			onclick={() => {
 				if (activeResponseMenuMsgIndex !== null) {
@@ -3586,3 +3671,51 @@
 		</button>
 	</div>
 {/if}
+
+<style>
+	@keyframes checkpoint-pulse {
+		0% {
+			box-shadow: 0 0 0 0 rgb(255 255 255 / 0%);
+			transform: scale(1);
+		}
+		35% {
+			box-shadow: 0 0 0 5px rgb(255 255 255 / 12%);
+			transform: scale(1.015);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgb(255 255 255 / 0%);
+			transform: scale(1);
+		}
+	}
+
+	.checkpoint-pulse {
+		animation: checkpoint-pulse 900ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+
+	:global(.prose table) {
+		border-collapse: collapse;
+		width: 100%;
+		margin-top: 1rem;
+		margin-bottom: 1rem;
+	}
+	:global(.prose th) {
+		border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+		padding: 0.625rem 0.875rem;
+		font-weight: 600;
+		color: rgba(255, 255, 255, 0.95);
+	}
+	:global(.prose td) {
+		border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+		padding: 0.625rem 0.875rem;
+		color: rgba(255, 255, 255, 0.85);
+	}
+	:global(.prose tr:hover) {
+		background-color: rgba(255, 255, 255, 0.03);
+	}
+	:global(.prose hr) {
+		border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+		border-bottom: none !important;
+		margin-top: 1.25rem;
+		margin-bottom: 1.25rem;
+	}
+</style>

@@ -2,6 +2,8 @@ export interface ConversationItem {
 	id: string;
 	title: string;
 	isPinned: boolean;
+	/** True when the conversation currently has at least one active public share. */
+	hasActiveShare: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -53,6 +55,8 @@ export interface DeleteTurnResponse {
 
 export interface ContextReference {
 	documentId: string;
+	/** Citation index used in [Doc N] tags — present in conversation references. */
+	index?: number;
 	title?: string;
 	pages: number[];
 }
@@ -111,3 +115,51 @@ export interface BranchConversationResponse {
 	title: string;
 }
 
+// =============================================================================
+// Public Share
+// =============================================================================
+
+export interface CreateShareParams {
+	/** Link lifetime in hours. Absent = never expires. Presets: 1 | 24 | 168 | 720. */
+	expiresInHours?: number;
+	/** Optional user-chosen short code (4-32 chars: letters, digits, '-', '_'). */
+	customCode?: string;
+}
+
+export interface CreateShareResponse {
+	code: string;
+}
+
+export interface PublicShareTurn {
+	question: string;
+	answer: string;
+	modelUsed: string | null;
+	status: 'complete' | 'stopped' | 'failed' | 'blocked';
+	contextReferences: ContextReference[] | null;
+	createdAt: string;
+}
+
+export interface PublicShare {
+	code: string;
+	title: string;
+	expiresAt: string | null;
+	createdAt: string;
+	/** Id of the original conversation — used by the "continue chat" flow. */
+	conversationId: string;
+	/** Last turn included in the snapshot — the continue-chat boundary. */
+	boundaryTurnId: string | null;
+	turns: PublicShareTurn[];
+}
+
+export interface ContinueShareResponse {
+	id: string;
+	title: string;
+}
+
+export interface ShareListItem {
+	code: string;
+	title: string;
+	isCustom: boolean;
+	expiresAt: string | null;
+	createdAt: string;
+}

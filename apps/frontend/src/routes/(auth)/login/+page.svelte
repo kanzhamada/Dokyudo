@@ -26,6 +26,23 @@
 	let isSubmitting = $state(false);
 	let lockoutEndTime = $state<number | null>(null);
 
+	// Safe post-login redirect target — internal paths only (open-redirect guard).
+	// Used by the public share page: /login?redirect=/s/{code}
+	function resolveRedirectParam(): string {
+		try {
+			const params = new URLSearchParams(window.location.search);
+			const redirect = params.get('redirect');
+			if (!redirect) return '/app/chat';
+			if (!redirect.startsWith('/')) return '/app/chat';
+			if (redirect.startsWith('//') || redirect.startsWith('/\\')) return '/app/chat';
+			if (redirect.includes('\\') || redirect.includes(':')) return '/app/chat';
+			return redirect;
+		} catch {
+			return '/app/chat';
+		}
+	}
+	let redirectPath = $state('/app/chat');
+
 	// Countdown logic moved to AuthErrorBox component
 
 	const form = superForm(data.form, {
@@ -59,7 +76,7 @@
 				if (result.ok) {
 					sessionStore.set(result.data);
 					localStorage.removeItem('dokyudo_login_lockout');
-					await goto('/app/chat');
+					await goto(redirectPath);
 				} else {
 					if (result.error.code === 'RATE_LIMIT_EXCEEDED' && result.error.retryAfter) {
 						const endTime = Date.now() + result.error.retryAfter * 1000;
@@ -82,6 +99,7 @@
 	const { form: formData, enhance } = form;
 
 	onMount(() => {
+		redirectPath = resolveRedirectParam();
 		loadRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY);
 
 		const storedLockout = localStorage.getItem('dokyudo_login_lockout');
@@ -171,7 +189,12 @@
 	</div>
 
 	<!-- Error box -->
-	<AuthErrorBox {apiError} bind:lockoutEndTime localStorageKey="dokyudo_login_lockout" lockoutMessage="Too many failed attempts. Try again in" />
+	<AuthErrorBox
+		{apiError}
+		bind:lockoutEndTime
+		localStorageKey="dokyudo_login_lockout"
+		lockoutMessage="Too many failed attempts. Try again in"
+	/>
 </form>
 
 <AuthOAuthGroup />
@@ -186,13 +209,15 @@
 					<a
 						{...props}
 						href="/register"
-						class="cursor-pointer font-semibold  text-white underline underline-offset-2 transition-colors hover:text-[#E8DEC8]"
+						class="cursor-pointer font-semibold text-white underline underline-offset-2 transition-colors hover:text-[#E8DEC8]"
 					>
 						Register
 					</a>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content class="bg-[#232323]" arrowClasses="bg-[#232323]">Create a new account</Tooltip.Content>
+			<Tooltip.Content class="bg-[#232323]" arrowClasses="bg-[#232323]"
+				>Create a new account</Tooltip.Content
+			>
 		</Tooltip.Root>
 	</Tooltip.Provider>
 </p>

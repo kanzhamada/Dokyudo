@@ -10,7 +10,12 @@ import type {
 	UpdateTurnFeedbackParams,
 	UpdateTurnFeedbackResponse,
 	DeleteTurnResponse,
-	BranchConversationResponse
+	BranchConversationResponse,
+	CreateShareParams,
+	CreateShareResponse,
+	PublicShare,
+	ContinueShareResponse,
+	ShareListItem
 } from '../types/rag.types';
 
 /**
@@ -101,3 +106,73 @@ export function branchConversation(
 	});
 }
 
+// =============================================================================
+// Public Share
+// =============================================================================
+
+/**
+ * Creates a public read-only share of the conversation (snapshot up to its
+ * last turn). Returns the short code — compose the URL as `${origin}/s/${code}`.
+ */
+export function createShare(
+	conversationId: string,
+	params: CreateShareParams = {}
+): Promise<ApiResult<CreateShareResponse>> {
+	return apiRequest<CreateShareResponse>(`/api/rag/conversations/${conversationId}/share`, {
+		method: 'POST',
+		body: {
+			...(params.expiresInHours !== undefined ? { expires_in_hours: params.expiresInHours } : {}),
+			...(params.customCode ? { custom_code: params.customCode } : {})
+		}
+	});
+}
+
+/**
+ * Public (unauthenticated) read of a share link. Safe to call without a
+ * session — the backend ignores the token when present.
+ */
+export function getPublicShare(code: string): Promise<ApiResult<PublicShare>> {
+	return apiRequest<PublicShare>(`/api/rag/shares/${code}`, { method: 'GET' });
+}
+
+/**
+ * Authenticated: rebuilds a new conversation from the share's snapshot.
+ */
+export function continueShare(code: string): Promise<ApiResult<ContinueShareResponse>> {
+	return apiRequest<ContinueShareResponse>(`/api/rag/shares/${code}/continue`, {
+		method: 'POST'
+	});
+}
+
+/**
+ * Revokes a single share link.
+ */
+export function deleteShare(code: string): Promise<ApiResult<DeleteConversationResponse>> {
+	return apiRequest<DeleteConversationResponse>(`/api/rag/shares/${code}`, {
+		method: 'DELETE'
+	});
+}
+
+/**
+ * Revokes every active share of a conversation ("stop sharing").
+ */
+export function deleteAllShares(
+	conversationId: string
+): Promise<ApiResult<{ success: boolean; deleted: number }>> {
+	return apiRequest<{ success: boolean; deleted: number }>(
+		`/api/rag/conversations/${conversationId}/shares`,
+		{ method: 'DELETE' }
+	);
+}
+
+/**
+ * Lists the active share links of a conversation.
+ */
+export function listShares(
+	conversationId: string
+): Promise<ApiResult<{ shares: ShareListItem[] }>> {
+	return apiRequest<{ shares: ShareListItem[] }>(
+		`/api/rag/conversations/${conversationId}/shares`,
+		{ method: 'GET' }
+	);
+}
