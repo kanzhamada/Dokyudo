@@ -21,6 +21,7 @@
 	import Edit from '@lucide/svelte/icons/pen';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Pin from '@lucide/svelte/icons/pin';
+	import PinOff from '@lucide/svelte/icons/pin-off';
 	import Settings from '@lucide/svelte/icons/settings';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import LogOut from '@lucide/svelte/icons/log-out';
@@ -146,6 +147,7 @@
 
 			if (result.ok) {
 				console.log('[Auth Conversations] Update success:', result.data);
+				toast.success('Conversation title updated');
 				editingConversation = null;
 			} else {
 				console.error('[Auth Conversations] Update failed, reverting:', result.error);
@@ -153,6 +155,7 @@
 					conversations.map((c) => (c.id === targetId ? { ...c, title: oldTitle } : c))
 				);
 				conversationsStore.addOrUpdate(targetId, oldTitle);
+				toast.error(result.error.message);
 			}
 		} catch (err) {
 			console.error('[Auth Conversations] Update Catch Error, reverting:', err);
@@ -160,6 +163,7 @@
 				conversations.map((c) => (c.id === targetId ? { ...c, title: oldTitle } : c))
 			);
 			conversationsStore.addOrUpdate(targetId, oldTitle);
+			toast.error('Failed to update conversation title');
 		} finally {
 			isUpdating = false;
 		}
@@ -188,12 +192,14 @@
 			const result = await updateConversation(item.id, { isPinned: newPinnedState });
 			if (result.ok) {
 				console.log('[Auth Conversations] Pin toggle backend response:', result.data);
+				toast.success(newPinnedState ? 'Conversation pinned' : 'Conversation unpinned');
 			} else {
 				console.error('[Auth Conversations] Pin toggle failed, reverting:', result.error);
 				conversations = sortConversations(
 					conversations.map((c) => (c.id === item.id ? { ...c, isPinned: item.isPinned } : c))
 				);
 				conversationsStore.togglePin(item.id, item.isPinned);
+				toast.error(result.error.message);
 			}
 		} catch (err) {
 			console.error('[Auth Conversations] Pin toggle catch error, reverting:', err);
@@ -201,6 +207,7 @@
 				conversations.map((c) => (c.id === item.id ? { ...c, isPinned: item.isPinned } : c))
 			);
 			conversationsStore.togglePin(item.id, item.isPinned);
+			toast.error('Failed to update pin status');
 		}
 	}
 
@@ -626,8 +633,13 @@
 					class="cursor-pointer text-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
 					onclick={() => handleTogglePin(item)}
 				>
-					<Pin class="mr-2 size-4" />
-					<span>{item.isPinned ? 'Unpin' : 'Pin'}</span>
+					{#if item.isPinned}
+						<PinOff class="mr-2 size-4" />
+						<span>Unpin</span>
+					{:else}
+						<Pin class="mr-2 size-4" />
+						<span>Pin</span>
+					{/if}
 				</DropdownMenu.Item>
 				<DropdownMenu.Separator class="bg-white/10" />
 				<DropdownMenu.Item
