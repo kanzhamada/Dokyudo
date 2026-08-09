@@ -1,0 +1,28 @@
+meta {
+  name: Continue Chat From Share
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/rag/shares/{{shareCode}}/continue
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Authenticated: creates a new conversation owned by the caller, rebuilt from
+  the share's SNAPSHOT (not from the original conversation — stays correct for
+  future subset shares).
+
+  Response: { "id": "...", "title": "<shared title>" }
+
+  - The new conversation uses the shared title as-is — no "Branched -" prefix
+    and no branchOf/branchedFromTurnId lineage, so it never shows a
+    "Branched from ..." marker.
+  - 401 without a valid token; 404 when the share is gone or expired.
+}

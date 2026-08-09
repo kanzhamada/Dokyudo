@@ -1,0 +1,29 @@
+meta {
+  name: Get Public Share
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/rag/shares/{{shareCode}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  PUBLIC read of a share link — no authentication required (the backend
+  ignores the Authorization header when present). Returns the immutable
+  snapshot of the conversation.
+
+  Response: { code, title, expiresAt, createdAt, conversationId,
+              boundaryTurnId, turns: [...] }
+
+  - 404 when the link does not exist or has expired (expired rows are
+    lazy-deleted on read).
+  - Public viewers only receive the snapshot columns — tenant_id / created_by
+    are never exposed (column-level grants + RLS).
+}

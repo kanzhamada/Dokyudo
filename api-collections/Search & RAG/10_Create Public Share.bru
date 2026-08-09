@@ -1,0 +1,38 @@
+meta {
+  name: Create Public Share
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/rag/conversations/{{conversationId}}/share
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "expires_in_hours": 24,
+    "custom_code": "my-custom-link"
+  }
+}
+
+docs {
+  Creates a public read-only share of the conversation, snapshotted up to its
+  last turn. Returns the short code; the frontend composes the URL.
+
+  Response: { "code": "..." }
+
+  - expires_in_hours: link lifetime in hours (1h - 1 year). OMIT the field for
+    a never-expiring link. Presets: 1 | 24 | 168 | 720.
+  - custom_code: optional user-chosen short code (4-32 chars: letters, digits,
+    '-' or '_'). Omit for an auto-generated base62 code.
+  - 409 CODE_TAKEN when the custom code is already in use.
+  - The snapshot is immutable: turns added or edited AFTER sharing never leak
+    into the public view.
+}

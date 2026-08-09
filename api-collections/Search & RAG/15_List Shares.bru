@@ -1,0 +1,22 @@
+meta {
+  name: List Shares
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/api/rag/conversations/{{conversationId}}/shares
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Lists the active share links of a conversation (newest first, max 50) —
+  powers the manage/revoke dialog.
+
+  Response: { "shares": [{ code, title, isCustom, expiresAt, createdAt }] }
+}

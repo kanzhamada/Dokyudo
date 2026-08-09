@@ -1,0 +1,22 @@
+meta {
+  name: Stop All Shares
+  type: http
+  seq: 14
+}
+
+delete {
+  url: {{baseUrl}}/api/rag/conversations/{{conversationId}}/shares
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Revokes EVERY public share of a conversation ("stop sharing" — used from the
+  sidebar context menu). Purges all related Redis caches.
+
+  Response: { "data": { "success": true, "deleted": <count> } }
+}

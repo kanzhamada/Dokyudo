@@ -1,0 +1,24 @@
+meta {
+  name: Delete Public Share
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/api/rag/shares/{{shareCode}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Revokes a single share link owned by the caller's tenant. Also purges the
+  Redis share cache, so the public URL stops resolving immediately.
+
+  Response: { "data": { "success": true } }
+
+  - 404 when the share does not exist or belongs to another tenant.
+}
