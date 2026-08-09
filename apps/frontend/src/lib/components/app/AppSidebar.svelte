@@ -212,27 +212,30 @@
 		if (!deletingConversation || isDeleting) return;
 		isDeleting = true;
 
-		console.log('[Auth Conversations] Deleting conversation:', deletingConversation.id);
+		const deletedId = deletingConversation.id;
+		console.log('[Auth Conversations] Deleting conversation:', deletedId);
+
+		// Realtime illusion: Optimistically remove from local state AND conversationsStore immediately
+		conversations = conversations.filter((c) => c.id !== deletedId);
+		conversationsStore.remove(deletedId);
+		isDeleteDialogOpen = false;
 
 		try {
-			const result = await deleteConversation(deletingConversation.id);
+			const result = await deleteConversation(deletedId);
 
 			if (result.ok) {
 				console.log('[Auth Conversations] Delete success:', result.data);
-				const deletedId = deletingConversation.id;
-				conversations = conversations.filter((c) => c.id !== deletedId);
-
-				isDeleteDialogOpen = false;
-
 				if ($page.url.pathname === `/app/chat/${deletedId}`) {
 					await goto('/app/chat');
 				}
 				deletingConversation = null;
 			} else {
-				console.error('[Auth Conversations] Delete failed:', result.error);
+				console.error('[Auth Conversations] Delete failed, reverting:', result.error);
+				await fetchConversations();
 			}
 		} catch (err) {
-			console.error('[Auth Conversations] Delete Catch Error:', err);
+			console.error('[Auth Conversations] Delete Catch Error, reverting:', err);
+			await fetchConversations();
 		} finally {
 			isDeleting = false;
 		}
