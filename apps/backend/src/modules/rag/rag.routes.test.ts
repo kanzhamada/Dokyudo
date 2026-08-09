@@ -128,6 +128,36 @@ describe("RAG Routes", () => {
             const healthRes = await makeRequest("/api/rag/conversations", "GET", undefined, headers);
             assertEquals(healthRes.status, 200);
         });
+
+        it("negative: invalid retry_turn_id returns 400", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest("/api/rag/chat", "POST", {
+                question: "test",
+                conversation_id: testConversationId,
+                retry_turn_id: "not-a-uuid",
+                useByok: false,
+            }, headers);
+
+            if (!validToken) return;
+            assertEquals(res.status, 400);
+            const json = await res.json();
+            assertEquals(json.error.code, "VALIDATION_ERROR");
+        });
+
+        it("negative: invalid selected_variant_id returns 400", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest("/api/rag/chat", "POST", {
+                question: "test",
+                conversation_id: testConversationId,
+                selected_variant_id: "not-a-uuid",
+                useByok: false,
+            }, headers);
+
+            if (!validToken) return;
+            assertEquals(res.status, 400);
+            const json = await res.json();
+            assertEquals(json.error.code, "VALIDATION_ERROR");
+        });
     });
 
     describe("PATCH /api/rag/conversations/:id", () => {

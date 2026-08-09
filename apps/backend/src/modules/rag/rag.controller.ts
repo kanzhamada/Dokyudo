@@ -18,6 +18,8 @@ export async function handleChat(c: Context) {
         model: body.model,
         useByok: body.useByok,
         editTurnId: body.edit_turn_id,
+        retryTurnId: body.retry_turn_id,
+        selectedVariantId: body.selected_variant_id,
         signal: c.req.raw.signal,
         logContext,
     };

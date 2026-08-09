@@ -295,6 +295,49 @@ export const conversationTurns = pgTable("conversation_turns", {
 });
 
 // ==============================================================================
+// 7.5. TURN ALTERNATIVES TABLE (Retry Variants)
+// ==============================================================================
+// One row per retried answer for a turn (1:N to conversation_turns). Only the
+// latest turn of a conversation can receive retries; unselected variants are
+// deleted when a follow-up turn completes successfully.
+export const turnAlternatives = pgTable("turn_alternatives", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+        .notNull()
+        .references(() => tenants.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+        .notNull()
+        .references(() => conversations.id, { onDelete: "cascade" }),
+    turnId: uuid("turn_id")
+        .notNull()
+        .references(() => conversationTurns.id, { onDelete: "cascade" }),
+    answer: text("answer").notNull(),
+    // Nullable: no model is recorded when the retry was cancelled before any
+    // model was selected (mirrors conversationTurns.modelUsed).
+    modelUsed: varchar("model_used", { length: 100 }),
+    latencyMs: integer("latency_ms"),
+    contextReferences: jsonb("context_references"),
+    status: turnStatusEnum("status").notNull().default("complete"),
+    updatedAt: timestamp("updated_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    })
+        .defaultNow()
+        .notNull()
+        .$onUpdateFn(() => new Date()),
+    createdAt: timestamp("created_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    })
+        .defaultNow()
+        .notNull(),
+}, (table) => ({
+    turnIdx: index("idx_turn_alternatives_turn").on(table.turnId),
+}));
+
+// ==============================================================================
 // 8. OUTBOX EVENTS TABLE (Transactional Outbox)
 // ==============================================================================
 export const outboxEvents = pgTable("outbox_events", {

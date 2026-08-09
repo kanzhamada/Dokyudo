@@ -10,6 +10,8 @@
 		MessageSquare,
 		Search,
 		ChevronDown,
+		ChevronLeft,
+		ChevronRight,
 		Keyboard,
 		X,
 		ArrowLeft,
@@ -65,9 +67,11 @@
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 	import { mergeConversationReferences, type DocReference } from '$lib/utils/doc-references';
+	import type { TurnAlternative } from '$lib/types/rag.types';
 	import { marked } from 'marked';
-	import { mount, untrack } from 'svelte';
+	import { mount, unmount, untrack } from 'svelte';
 	import CodeBlockPreview from '$lib/components/chat/CodeBlockPreview.svelte';
+	import CitationTooltip from '$lib/components/chat/CitationTooltip.svelte';
 
 	const customRenderer = new marked.Renderer();
 	customRenderer.code = ({ text, lang }: { text: string; lang?: string }) => {
@@ -104,6 +108,14 @@
 		return uniqueNums.join(', ');
 	}
 
+	function escapeHtml(value: string): string {
+		return value
+			.replace(/&/g, '&amp;')
+			.replace(/"/g, '&quot;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
+	}
+
 	function transformCitationTags(html: string, references?: DocReference[]): string {
 		if (!html) return '';
 
@@ -117,16 +129,16 @@
 		let result = cleanHtml.replace(/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi, (_match, docIdxStr, rawPageInfo) => {
 			const docIdx = Number(docIdxStr);
 			let docDisplayName = `Doc ${docIdx}`;
-			let tooltipTitle = `Doc ${docIdx}`;
 			let docId = '';
 			let docFullName = '';
+			let snippet = '';
 
 			if (references && references.length > 0) {
 				const refDoc = references.find((r) => r.index === docIdx || r.id === docIdxStr) || references[docIdx - 1];
 				if (refDoc && refDoc.name) {
 					docId = refDoc.id;
 					docFullName = refDoc.name;
-					tooltipTitle = refDoc.name;
+					snippet = refDoc.snippet ?? '';
 					const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
 					docDisplayName = cleanName.length > 22 ? cleanName.slice(0, 22) + '...' : cleanName;
 				}
@@ -134,10 +146,10 @@
 
 			const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
 			const label = pageFormatted
-				? `${docDisplayName} <span class="text-white/40 font-normal">• ${pageFormatted}</span>`
-				: docDisplayName;
+				? `${escapeHtml(docDisplayName)} <span class="text-white/40 font-normal">• ${escapeHtml(pageFormatted)}</span>`
+				: escapeHtml(docDisplayName);
 
-			return `<span data-doc-id="${docId}" data-doc-title="${docFullName}" data-pages="${pageFormatted}" class="inline-flex cursor-pointer items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white mx-0.5 my-0.5 whitespace-nowrap" title="${tooltipTitle}">${label}</span>`;
+			return `<span data-doc-id="${escapeHtml(docId)}" data-doc-title="${escapeHtml(docFullName)}" data-snippet="${escapeHtml(snippet)}" data-pages="${escapeHtml(pageFormatted)}" class="relative inline-flex cursor-pointer items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white mx-0.5 my-0.5 whitespace-nowrap">${label}</span>`;
 		});
 
 		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
@@ -161,6 +173,7 @@
 	import mistralIcon from '$lib/assets/llm/mistral.svg';
 	import openaiIcon from '$lib/assets/llm/openai.svg';
 	import openrouterIcon from '$lib/assets/llm/openrouter.svg';
+	import freeIcon from '$lib/assets/llm/free.svg';
 
 	interface LlmOption {
 		name: string;
@@ -198,6 +211,37 @@
 		feedback?: 'good' | 'bad' | null;
 		/** Set on the boundary turn of a branched conversation. */
 		branchedFromTurnId?: string | null;
+		/** Retry variants of this turn (the canonical answer is separate, see variantIndex). */
+		variants?: ChatVariant[];
+		/** 0 = canonical answer (content), k = variants[k-1]. Defaults to 0. */
+		variantIndex?: number;
+		/** True while a retry variant is streaming into this message. */
+		isRetrying?: boolean;
+	}
+
+	/** A retried answer of a turn — TurnAlternative plus frontend-only render state. */
+	interface ChatVariant extends TurnAlternative {
+		/** Mapped doc references for rendering (same shape as ChatMessage.references). */
+		references?: DocReference[];
+		/** True while this variant is being streamed in. */
+		isStreaming?: boolean;
+	}
+
+	/** The variant currently displayed on a message, or null when showing the canonical answer. */
+	function activeVariantOf(msg: ChatMessage): ChatVariant | null {
+		const idx = msg.variantIndex ?? 0;
+		if (idx > 0 && msg.variants && msg.variants[idx - 1]) return msg.variants[idx - 1];
+		return null;
+	}
+
+	function displayedContentOf(msg: ChatMessage): string {
+		return activeVariantOf(msg)?.answer ?? msg.content;
+	}
+
+	function displayedRefsOf(msg: ChatMessage): DocReference[] {
+		const variant = activeVariantOf(msg);
+		if (variant) return variant.references ?? [];
+		return msg.references ?? [];
 	}
 
 	const PROVIDER_ICONS: Record<string, string> = {
@@ -212,7 +256,7 @@
 	};
 
 	const INITIAL_LLM_OPTIONS: LlmOption[] = [
-		{ name: 'Free Auto', provider: 'auto', model: 'auto', icon: geminiIcon }
+		{ name: 'Free Auto', provider: 'auto', model: 'auto', icon: freeIcon }
 	];
 
 	const BYOK_PROVIDER_OPTIONS: ByokProviderOption[] = [
@@ -499,6 +543,9 @@
 		stopThinkingTimer();
 		if (pulseCheckpointTimeout) clearTimeout(pulseCheckpointTimeout);
 		if (checkpointVisibilityTimeout) clearTimeout(checkpointVisibilityTimeout);
+		// Unmount citation tooltips mounted inside the citation chips
+		citationTooltipInstances.forEach((instance) => instance.unmount());
+		citationTooltipInstances = [];
 	});
 
 	// Auto-reset textarea height when input is cleared
@@ -508,10 +555,27 @@
 		}
 	});
 
-	// Auto-mount interactive Code & Mermaid Preview components
+	// Instances of CitationTooltip mounted inside citation chips, keyed by their chip element.
+
+	// Instances of CitationTooltip mounted inside citation chips, keyed by their chip element.
+	let citationTooltipInstances: { chip: HTMLElement; unmount: () => void }[] = [];
+
+	// Auto-mount interactive Code & Mermaid Preview components and inline citation tooltips.
+	// Re-runs whenever messages change, so tooltips are attached as citation chips stream in.
 	$effect(() => {
-		const msgLength = messages.length;
-		if (!chatContainer || msgLength === 0) return;
+		const lastAssistantContent = lastDisplayedContent;
+		if (!chatContainer) return;
+
+		// Prune tooltip instances whose chip was replaced by a re-render of the markdown.
+		citationTooltipInstances = citationTooltipInstances.filter((instance) => {
+			if (!document.contains(instance.chip)) {
+				instance.unmount();
+				return false;
+			}
+			return true;
+		});
+
+		if (!lastAssistantContent) return;
 
 		setTimeout(() => {
 			if (!chatContainer) return;
@@ -527,6 +591,21 @@
 						props: { code, language: lang }
 					});
 				}
+			});
+
+			const citationChips = chatContainer.querySelectorAll<HTMLElement>(
+				'[data-doc-id]:not([data-tooltip-mounted])'
+			);
+			citationChips.forEach((chip) => {
+				chip.setAttribute('data-tooltip-mounted', 'true');
+				const instance = mount(CitationTooltip, {
+					// Mount inside the chip: the chip is `relative`, so the tooltip's
+					// invisible overlay trigger covers exactly the chip area. Mounting
+					// on document.body would make the overlay fill the whole viewport.
+					target: chip,
+					props: { trigger: chip }
+				});
+				citationTooltipInstances.push({ chip, unmount: () => unmount(instance) });
 			});
 		}, 30);
 	});
@@ -550,6 +629,14 @@
 
 	// Conversation Messages
 	let messages: ChatMessage[] = $state([]);
+
+	// The last assistant message and the answer it currently displays (canonical
+	// or browsed retry variant) — the tooltip/codeblock mount effect reacts to
+	// variant browsing so chips of a newly displayed variant get mounted too.
+	let lastAssistantMsg = $derived(
+		[...messages].reverse().find((m) => m.role === 'assistant') ?? null
+	);
+	let lastDisplayedContent = $derived(lastAssistantMsg ? displayedContentOf(lastAssistantMsg) : '');
 	let conversationCheckpoints = $derived(
 		messages.filter((message) => message.role === 'user')
 	);
@@ -647,8 +734,21 @@
 								id: r.documentId,
 								index: r.index || 1,
 								name: r.title || r.documentId,
-								pages: r.pages
+								pages: r.pages,
+								snippet: r.snippet ?? undefined
 							})),
+							variants: (turn.alternatives ?? []).map((alt) => ({
+								...alt,
+								references: alt.contextReferences?.map((r: any) => ({
+									id: r.documentId,
+									index: r.index || 1,
+									name: r.title || r.documentId,
+									pages: r.pages,
+									snippet: r.snippet ?? undefined
+								})),
+								isStreaming: false
+							})),
+							variantIndex: 0,
 							isStreaming: false
 						});
 					}
@@ -1084,9 +1184,14 @@
 		attachedFiles.splice(index, 1);
 	}
 
-	async function streamChatTurn(questionText: string, modelChoice: LlmOption, editTurnId?: string) {
+	async function streamChatTurn(
+		questionText: string,
+		modelChoice: LlmOption,
+		opts: { editTurnId?: string; retryTurnId?: string; selectedVariantId?: string } = {}
+	) {
 		if (!questionText || isGenerating) return;
 
+		const isRetryMode = !!opts.retryTurnId;
 		const useByok = modelChoice.provider !== 'auto';
 		const bodyPayload: Record<string, any> = {
 			question: questionText,
@@ -1094,7 +1199,13 @@
 			useByok
 		};
 		// Edit mode: overwrite the existing turn in place instead of creating a new one.
-		if (editTurnId) bodyPayload.edit_turn_id = editTurnId;
+		if (opts.editTurnId) bodyPayload.edit_turn_id = opts.editTurnId;
+		// Retry mode: stream a new variant of the latest turn instead of a new turn.
+		if (opts.retryTurnId) bodyPayload.retry_turn_id = opts.retryTurnId;
+		// Follow-up: the retry variant the user is currently viewing becomes the
+		// history context; the server promotes it on success and deletes the
+		// unselected variants.
+		if (opts.selectedVariantId) bodyPayload.selected_variant_id = opts.selectedVariantId;
 
 		if (useByok) {
 			bodyPayload.provider = modelChoice.provider;
@@ -1103,18 +1214,50 @@
 
 		console.log('[Chat Detail] Form Submitted (Outbound Payload):', bodyPayload);
 
-		const userMsg: ChatMessage = {
-			id: `user-${Date.now()}`,
-			role: 'user',
-			content: questionText,
-			timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-			turnId: editTurnId,
-			attachments: attachedFiles.map((f) => ({ name: f.name, size: f.size }))
-		};
+		// Retry mode targets the latest assistant message — no new messages are
+		// pushed; the streamed answer lands in a new variant of that message.
+		let retryVariant: ChatVariant | null = null;
+		let prevLatestAsstMsg: ChatMessage | null = null;
+		let userMsg: ChatMessage | null = null;
 
-		messages = [...messages, userMsg];
-		inputValue = '';
-		attachedFiles = [];
+		if (isRetryMode) {
+			const targetMsg = messages[messages.length - 1];
+			if (!targetMsg || targetMsg.role !== 'assistant' || !opts.retryTurnId) return;
+			retryVariant = {
+				id: `variant-${Date.now()}`,
+				answer: '',
+				status: 'processing',
+				modelUsed: null,
+				latencyMs: null,
+				contextReferences: null,
+				createdAt: new Date().toISOString(),
+				references: [],
+				isStreaming: true
+			};
+			targetMsg.variants = [...(targetMsg.variants ?? []), retryVariant];
+			targetMsg.variantIndex = targetMsg.variants.length;
+			targetMsg.isRetrying = true;
+		} else {
+			// The turn this follow-up builds on — pruned locally on success to
+			// mirror the server-side cleanup of unselected variants.
+			prevLatestAsstMsg =
+				messages[messages.length - 1]?.role === 'assistant'
+					? messages[messages.length - 1]
+					: null;
+
+			userMsg = {
+				id: `user-${Date.now()}`,
+				role: 'user',
+				content: questionText,
+				timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+				turnId: opts.editTurnId,
+				attachments: attachedFiles.map((f) => ({ name: f.name, size: f.size }))
+			};
+
+			messages = [...messages, userMsg];
+			inputValue = '';
+			attachedFiles = [];
+		}
 		isGenerating = true;
 		startThinkingTimer();
 
@@ -1128,13 +1271,44 @@
 			modelName: modelChoice.name,
 			timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 			content: '',
-			isStreaming: true,
+			isStreaming: !isRetryMode,
 			isCancelled: false,
 			references: []
 		};
 
-		messages = [...messages, assistantMsg];
+		if (!isRetryMode) messages = [...messages, assistantMsg];
 		const asstIndex = messages.length - 1;
+
+		// Stream write/read routing: retry mode writes into the active variant,
+		// normal mode writes into the assistant message as before. The variant is
+		// resolved through the reactive proxy on every access — mutating the raw
+		// object reference would bypass $state and the UI would never re-render.
+		const activeRetryVariant = (): ChatVariant | null =>
+			isRetryMode ? activeVariantOf(messages[asstIndex]) : null;
+		const readDisplayedContent = () => {
+			const v = activeRetryVariant();
+			return v ? v.answer : messages[asstIndex].content;
+		};
+		const writeDisplayedContent = (text: string) => {
+			const v = activeRetryVariant();
+			if (v) v.answer = text;
+			else messages[asstIndex].content = text;
+		};
+		const readDisplayedRefs = (): DocReference[] => {
+			const v = activeRetryVariant();
+			return v ? v.references ?? [] : messages[asstIndex].references ?? [];
+		};
+		const writeDisplayedRefs = (refs: DocReference[]) => {
+			const v = activeRetryVariant();
+			if (v) v.references = refs;
+			else messages[asstIndex].references = refs;
+		};
+		const setMsgStreaming = (value: boolean) => {
+			messages[asstIndex].isRetrying = false;
+			const v = activeRetryVariant();
+			if (v) v.isStreaming = value;
+			else messages[asstIndex].isStreaming = value;
+		};
 
 		let streamBuffer = '';
 		let isStreamDone = false;
@@ -1151,8 +1325,8 @@
 					// the "Stop" button live only while the stream is genuinely
 					// generating, so an abort always lands mid-SSE and the server
 					// persists a partial answer with status=stopped.
-					if (messages[asstIndex].content.length < streamBuffer.length) {
-						messages[asstIndex].content = streamBuffer;
+					if (readDisplayedContent().length < streamBuffer.length) {
+						writeDisplayedContent(streamBuffer);
 						if (chatContainer) {
 							chatContainer.scrollTop = chatContainer.scrollHeight;
 						}
@@ -1160,7 +1334,7 @@
 					clearInterval(typewriterTimer!);
 					typewriterTimer = null;
 
-					messages[asstIndex].isStreaming = false;
+					setMsgStreaming(false);
 					isGenerating = false;
 					if (activeAbortController === abortController) {
 						activeAbortController = null;
@@ -1171,12 +1345,12 @@
 					stopThinkingTimer();
 
 					if (streamHadError) {
-						messages[asstIndex].references = [];
+						if (!isRetryMode) messages[asstIndex].references = [];
 						return;
 					}
 
-					const textContent = messages[asstIndex].content;
-					const currentRefs = messages[asstIndex].references;
+					const textContent = readDisplayedContent();
+					const currentRefs = readDisplayedRefs();
 
 					if (currentRefs && currentRefs.length > 0) {
 						const isNegativeAnswer =
@@ -1188,7 +1362,7 @@
 						];
 
 						if (isNegativeAnswer || citationMatches.length === 0) {
-							messages[asstIndex].references = [];
+							writeDisplayedRefs([]);
 						} else {
 							const citedPagesMap = new Map<number, Set<number>>();
 							for (const match of citationMatches) {
@@ -1219,14 +1393,42 @@
 									});
 								}
 							}
-							messages[asstIndex].references = filteredRefs;
+							writeDisplayedRefs(filteredRefs);
 						}
 					}
-				} else if (messages[asstIndex].content.length < streamBuffer.length) {
-					const delta = Math.min(3, streamBuffer.length - messages[asstIndex].content.length);
-					messages[asstIndex].content += streamBuffer.substring(
-						messages[asstIndex].content.length,
-						messages[asstIndex].content.length + delta
+
+					// Follow-up succeeded (normal mode): prune the previous turn's
+					// variants locally, mirroring the server-side promote + delete.
+					// The selected variant (if any) becomes the message's canonical
+					// content; unselected variants disappear.
+					if (
+						!isRetryMode &&
+						!opts.editTurnId &&
+						prevLatestAsstMsg &&
+						prevLatestAsstMsg.variants &&
+						prevLatestAsstMsg.variants.length > 0
+					) {
+						if (opts.selectedVariantId) {
+							const kept = prevLatestAsstMsg.variants.find(
+								(v) => v.id === opts.selectedVariantId
+							);
+							if (kept) {
+								prevLatestAsstMsg.content = kept.answer;
+								prevLatestAsstMsg.references = kept.references ?? [];
+							}
+						}
+						prevLatestAsstMsg.variants = [];
+						prevLatestAsstMsg.variantIndex = 0;
+						prevLatestAsstMsg.isRetrying = false;
+					}
+				} else if (readDisplayedContent().length < streamBuffer.length) {
+					const delta = Math.min(3, streamBuffer.length - readDisplayedContent().length);
+					writeDisplayedContent(
+						readDisplayedContent() +
+							streamBuffer.substring(
+								readDisplayedContent().length,
+								readDisplayedContent().length + delta
+							)
 					);
 					if (chatContainer) {
 						chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -1252,10 +1454,18 @@
 			// Freeze at everything received so far — this is the partial the
 			// server persists as "stopped". If the stream already completed
 			// (isStreamDone), the answer is complete, not stopped.
-			messages[asstIndex].content = streamBuffer;
-			messages[asstIndex].isStreaming = false;
-			messages[asstIndex].isCancelled = true;
-			messages[asstIndex].status = isStreamDone ? 'complete' : 'stopped';
+			const activeVar = activeRetryVariant();
+			if (activeVar) {
+				activeVar.answer = streamBuffer;
+				activeVar.isStreaming = false;
+				activeVar.status = isStreamDone ? 'complete' : 'stopped';
+				messages[asstIndex].isRetrying = false;
+			} else {
+				messages[asstIndex].content = streamBuffer;
+				messages[asstIndex].isStreaming = false;
+				messages[asstIndex].isCancelled = true;
+				messages[asstIndex].status = isStreamDone ? 'complete' : 'stopped';
+			}
 			isGenerating = false;
 			isTitleLoading = false;
 			stopThinkingTimer();
@@ -1289,7 +1499,7 @@
 				const errorMessage: string =
 					errorData?.error?.message ?? errorData?.message ?? 'Error executing chat request';
 				showError(errorMessage);
-				messages[asstIndex].isStreaming = false;
+				setMsgStreaming(false);
 				isGenerating = false;
 				isTitleLoading = false;
 				stopThinkingTimer();
@@ -1299,7 +1509,7 @@
 
 			if (!res.body) {
 				showError('No response body returned from server');
-				messages[asstIndex].isStreaming = false;
+				setMsgStreaming(false);
 				isGenerating = false;
 				isTitleLoading = false;
 				stopThinkingTimer();
@@ -1365,12 +1575,14 @@
 								// Assign references immediately so inline citations render file names
 								// while the answer is still typing. The Source References block below
 								// the message is only shown once the stream is fully done.
-								messages[asstIndex].references = parsed.references.map((r: any, idx: number) => ({
+								const mappedRefs = parsed.references.map((r: any, idx: number) => ({
 									id: r.documentId,
 									index: r.index || idx + 1,
 									name: r.title || r.documentId,
-									pages: r.pages
+									pages: r.pages,
+									snippet: r.snippet ?? undefined
 								}));
+								writeDisplayedRefs(mappedRefs);
 							}
 						} catch (e) {
 							console.error('[Chat Detail] Failed to parse references event:', e);
@@ -1404,8 +1616,12 @@
 								// mirror both locally so the UI shows the blocked state
 								// immediately, without waiting for a reload.
 								streamBuffer = 'Nice try, Diddy.';
-								messages[asstIndex].isRejection = true;
-								messages[asstIndex].status = 'blocked';
+								const warnVar = activeRetryVariant();
+								if (warnVar) warnVar.status = 'blocked';
+								else {
+									messages[asstIndex].isRejection = true;
+									messages[asstIndex].status = 'blocked';
+								}
 								console.log('[Chat Detail] Prompt injection detected via SSE warning event.');
 							}
 						} catch (e) {
@@ -1419,7 +1635,10 @@
 						if (dataStr) {
 							try {
 								const parsed = JSON.parse(dataStr);
-								if (parsed.turnId) {
+								const doneVar = activeRetryVariant();
+								if (parsed.variantId && doneVar) {
+									doneVar.id = parsed.variantId;
+								} else if (parsed.turnId && userMsg) {
 									userMsg.turnId = parsed.turnId;
 									messages[asstIndex].turnId = parsed.turnId;
 								}
@@ -1436,7 +1655,9 @@
 							showError('Stream error');
 						}
 						streamHadError = true;
-						messages[asstIndex].status = 'failed';
+						const errVar = activeRetryVariant();
+						if (errVar) errVar.status = 'failed';
+						else messages[asstIndex].status = 'failed';
 						isStreamDone = true;
 					}
 				}
@@ -1452,7 +1673,7 @@
 				if (typewriterTimer) clearInterval(typewriterTimer);
 			} else if (abortController.signal.aborted) {
 				if (typewriterTimer) clearInterval(typewriterTimer);
-				messages[asstIndex].isStreaming = false;
+				setMsgStreaming(false);
 				isGenerating = false;
 				isTitleLoading = false;
 				stopThinkingTimer();
@@ -1464,7 +1685,7 @@
 				// If buffer was empty or loop not running, ensure clean reset
 				stopThinkingTimer();
 				if (typewriterTimer) clearInterval(typewriterTimer);
-				messages[asstIndex].isStreaming = false;
+				setMsgStreaming(false);
 				isGenerating = false;
 				isTitleLoading = false;
 				if (activeAbortController === abortController) {
@@ -1481,16 +1702,35 @@
 
 	function handleSendMessage() {
 		if (!inputValue.trim() || isGenerating) return;
-		streamChatTurn(inputValue.trim(), selectedModel);
+		// The retry variant currently displayed (if any) is the one the
+		// follow-up context is built on; nothing is sent when the canonical
+		// answer is shown (server then deletes all variants on success).
+		const latestAsst = [...messages].reverse().find((m) => m.role === 'assistant');
+		const activeIdx = latestAsst?.variantIndex ?? 0;
+		const activeVariant =
+			activeIdx > 0 && latestAsst?.variants?.[activeIdx - 1]
+			? latestAsst.variants[activeIdx - 1]
+			: null;
+		streamChatTurn(inputValue.trim(), selectedModel, {
+			selectedVariantId: activeVariant ? activeVariant.id : undefined
+		});
 	}
 
 	function stopCurrentStream() {
 		cancelActiveStream?.();
 	}
 
-	function retryMessage(userPrompt: string) {
-		if (isGenerating || !userPrompt.trim()) return;
-		streamChatTurn(userPrompt, selectedModel);
+	function retryMessage(msg: ChatMessage, userMsg: ChatMessage | undefined) {
+		if (isGenerating || !userMsg || !msg.turnId) return;
+		// Retry streams a NEW variant of this turn (the latest one) instead
+		// of creating a duplicate turn.
+		streamChatTurn(userMsg.content, selectedModel, { retryTurnId: msg.turnId });
+	}
+
+	function browseVariant(msg: ChatMessage, delta: number) {
+		if (isGenerating) return;
+		const max = msg.variants?.length ?? 0;
+		msg.variantIndex = Math.min(max, Math.max(0, (msg.variantIndex ?? 0) + delta));
 	}
 
 	function resizeEditingTextInput() {
@@ -1522,7 +1762,7 @@
 			messages = messages.slice(0, msgIndex);
 		}
 		cancelEditMessage();
-		streamChatTurn(editedPrompt, selectedModel, msg.turnId);
+		streamChatTurn(editedPrompt, selectedModel, { editTurnId: msg.turnId });
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -2392,9 +2632,9 @@
 									}}
 									onkeydown={() => {}}
 								>
-									{#if msg.content}
-										{@html renderMarkdown(msg.content, msg.references)}
-									{:else if msg.isStreaming}
+									{#if displayedContentOf(msg)}
+										{@html renderMarkdown(displayedContentOf(msg), displayedRefsOf(msg))}
+									{:else if msg.isStreaming || msg.isRetrying}
 										<div
 											class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
 										>
@@ -2579,6 +2819,31 @@
 									</div>
 								{/if}
 
+
+								<!-- Retry Variant Browser (prev/next + counter) -->
+								{#if msg.role === 'assistant' && msg.variants && msg.variants.length > 0}
+									<div class="mt-2 inline-flex items-center gap-1 self-start rounded-full border border-white/10 bg-white/5 px-1 py-0.5 text-[11px] font-medium text-white/50">
+										<button
+											type="button"
+											class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+											onclick={() => browseVariant(msg, -1)}
+											disabled={isGenerating || (msg.variantIndex ?? 0) <= 0}
+											aria-label="Previous response"
+											>
+												<ChevronLeft class="size-3" />
+											</button>
+										<span class="px-1.5 text-xs tabular-nums">{(msg.variantIndex ?? 0) + 1} / {(msg.variants?.length ?? 0) + 1}</span>
+										<button
+											type="button"
+											class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+											onclick={() => browseVariant(msg, 1)}
+											disabled={isGenerating || (msg.variantIndex ?? 0) >= (msg.variants?.length ?? 0)}
+											aria-label="Next response"
+											>
+												<ChevronRight class="size-3" />
+											</button>
+										</div>
+								{/if}
 								{#if speakingMessageId === msg.id}
 									<div class="mt-2 inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 py-1 pr-1.5 pl-3">
 										<Volume2 class="size-3.5 shrink-0 animate-pulse text-white/60" />
@@ -2596,14 +2861,14 @@
 								{/if}
 
 								<!-- Document Reference Chips -->
-								{#if !msg.isStreaming && !msg.isCancelled && msg.references && msg.references.length > 0}
+								{#if !msg.isStreaming && !msg.isRetrying && !msg.isCancelled && displayedRefsOf(msg).length > 0}
 									<div class="mt-2 border-t border-white/10 pt-3">
 										<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
 											<BookOpen class="size-3.5 text-white/60" />
-											<span>Source References ({msg.references.length})</span>
+											<span>Source References ({displayedRefsOf(msg).length})</span>
 										</div>
 										<div class="flex flex-wrap gap-2">
-											{#each msg.references as ref}
+											{#each displayedRefsOf(msg) as ref}
 												<Tooltip.Provider delayDuration={100}>
 													<Tooltip.Root>
 														<Tooltip.Trigger
@@ -2647,8 +2912,8 @@
 														variant="ghost"
 														size="icon"
 														class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
-														onclick={() => copyToClipboard(msg.content, msg.id)}
-														aria-label="Copy response"
+														onclick={() => copyToClipboard(displayedContentOf(msg), msg.id)}
+							aria-label="Copy response"
 													>
 														{#if copiedMessageId === msg.id}
 															<Check class="size-3.5 text-green-400" />
@@ -2740,7 +3005,7 @@
 											>
 												<DropdownMenu.Item
 													class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-													onclick={() => retryMessage(messages[msgIndex - 1]?.content ?? '')}
+													onclick={() => retryMessage(msg, messages[msgIndex - 1])}
 												>
 													<RotateCw class="size-3.5 text-white/70" />
 													<span>Try Again</span>

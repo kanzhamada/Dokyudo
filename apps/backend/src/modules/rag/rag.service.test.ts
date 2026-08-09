@@ -5,7 +5,7 @@ import { RagService } from "./rag.service.ts";
 import { SearchService } from "../search/search.service.ts";
 import { FallbackLlmService } from "./fallback_llm.service.ts";
 import { db } from "../../config/drizzle.ts";
-import { conversations, conversationTurns, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
+import { conversations, conversationTurns, tenants, tenantSubscriptions, turnAlternatives } from "../../shared/models/db.model.ts";
 import { eq, and, desc } from "drizzle-orm";
 import { gemini } from "../../config/gemini.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
@@ -986,6 +986,576 @@ describe("RagService Isolated Tests", () => {
             // ...but the stopped turn is excluded
             assertEquals(rewritePrompt.includes("Stopped Q"), false);
             assertEquals(rewritePrompt.includes("Partial text"), false);
+        });
+    });
+
+    describe("retry variants (turn_alternatives)", () => {
+        const RETRY_CONVERSATION_ID = crypto.randomUUID();
+        const RETRY_TURN_ID = crypto.randomUUID();
+        const RETRY_QUESTION = "Retry source question";
+
+        beforeAll(async () => {
+            await db.insert(conversations).values({
+                id: RETRY_CONVERSATION_ID,
+                tenantId: TEST_TENANT_ID,
+                title: "Retry Variant Test Conversation",
+            }).onConflictDoNothing();
+
+            // A complete latest turn to retry against.
+            await db.insert(conversationTurns).values({
+                id: RETRY_TURN_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: RETRY_CONVERSATION_ID,
+                question: RETRY_QUESTION,
+                answer: "Original answer",
+                modelUsed: "gemini-2.0-flash-lite",
+                status: "complete",
+            }).onConflictDoNothing();
+        });
+
+        afterAll(async () => {
+            await db.delete(conversations).where(eq(conversations.id, RETRY_CONVERSATION_ID));
+        });
+
+        async function waitForVariants(
+            turnId: string,
+            predicate: (variants: any[]) => boolean,
+            timeoutMs = 5000,
+        ): Promise<any[]> {
+            const deadline = Date.now() + timeoutMs;
+            let variants: any[] = [];
+            while (Date.now() < deadline) {
+                variants = await db
+                    .select()
+                    .from(turnAlternatives)
+                    .where(
+                        and(
+                            eq(turnAlternatives.turnId, turnId),
+                            eq(turnAlternatives.tenantId, TEST_TENANT_ID),
+                        ),
+                    )
+                    .orderBy(desc(turnAlternatives.createdAt));
+                if (predicate(variants)) return variants;
+                await new Promise((r) => setTimeout(r, 50));
+            }
+            return variants;
+        }
+
+        it("negative: retry without conversation_id returns 400", async () => {
+            await assertRejects(
+                () => RagService.streamChat({
+                    tenantId: TEST_TENANT_ID,
+                    userId: TEST_USER_ID,
+                    question: RETRY_QUESTION,
+                    retryTurnId: RETRY_TURN_ID,
+                    useByok: false,
+                    logContext: {},
+                }),
+                AppError,
+                "conversation_id is required when retrying a turn",
+            );
+        });
+
+        it("negative: retry on a non-latest turn is rejected", async () => {
+            const convId = crypto.randomUUID();
+            const oldTurnId = crypto.randomUUID();
+            const past = new Date(Date.now() - 60_000);
+            await db.insert(conversations).values({
+                id: convId,
+                tenantId: TEST_TENANT_ID,
+                title: "Non-latest retry test",
+            });
+            await db.insert(conversationTurns).values([
+                {
+                    id: oldTurnId,
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    question: "Old question",
+                    answer: "Old answer",
+                    status: "complete",
+                    createdAt: past,
+                },
+                {
+                    id: crypto.randomUUID(),
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    question: "New question",
+                    answer: "New answer",
+                    status: "complete",
+                },
+            ]);
+
+            await assertRejects(
+                () => RagService.streamChat({
+                    tenantId: TEST_TENANT_ID,
+                    userId: TEST_USER_ID,
+                    question: "Old question",
+                    conversationId: convId,
+                    retryTurnId: oldTurnId,
+                    useByok: false,
+                    logContext: {},
+                }),
+                AppError,
+                "Retry is only allowed on the latest turn",
+            );
+
+            await db.delete(conversations).where(eq(conversations.id, convId));
+        });
+
+        it("positive: retry persists a variant row and the done event carries its id", async () => {
+            const convId = crypto.randomUUID();
+            const turnId = crypto.randomUUID();
+            await db.insert(conversations).values({
+                id: convId,
+                tenantId: TEST_TENANT_ID,
+                title: "Retry happy path",
+            });
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                question: RETRY_QUESTION,
+                answer: "Original answer",
+                status: "complete",
+            });
+
+            using gatekeeperStub = stub(gemini, "generateText", (prompt: string) =>
+                Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten query",
+                }) as any);
+            using searchStub = stub(SearchService, "executeHybridSearch", () =>
+                Promise.resolve([]) as any);
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () => {
+                async function* simpleGen() {
+                    yield { text: "Retried answer" };
+                }
+                return Promise.resolve({
+                    stream: simpleGen(),
+                    provider: "gemini" as any,
+                    modelId: "gemini-2.0-flash-lite",
+                });
+            });
+
+            const stream = await RagService.streamChat({
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question: RETRY_QUESTION,
+                conversationId: convId,
+                retryTurnId: turnId,
+                useByok: false,
+                logContext: {},
+            });
+
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            let payload = "";
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (value) payload += decoder.decode(value, { stream: true });
+            }
+
+            const variants = await waitForVariants(
+                turnId,
+                (v) =>
+                    v.some(
+                        (row) =>
+                            row.status === "complete" &&
+                            row.answer === "Retried answer",
+                    ),
+            );
+            assertExists(variants[0]);
+            assertEquals(variants[0].answer, "Retried answer");
+            assertEquals(variants[0].modelUsed, "gemini-2.0-flash-lite");
+
+            // The done event reports the variant id, not the canonical turn id.
+            const doneMatch = payload.match(/event: done\ndata: (\{[^\n]+\})/);
+            assertExists(doneMatch);
+            const donePayload = JSON.parse(doneMatch[1]);
+            assertEquals(donePayload.variantId, variants[0].id);
+            assertEquals(donePayload.turnId, turnId);
+
+            // The canonical turn row must be untouched by the retry.
+            const [turn] = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.id, turnId));
+            assertEquals(turn.answer, "Original answer");
+
+            await db.delete(conversations).where(eq(conversations.id, convId));
+        });
+
+        it("positive: editing a turn clears its retry variants", async () => {
+            const convId = crypto.randomUUID();
+            const turnId = crypto.randomUUID();
+            await db.insert(conversations).values({
+                id: convId,
+                tenantId: TEST_TENANT_ID,
+                title: "Edit clears variants",
+            });
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                question: "Edit question",
+                answer: "Original answer",
+                status: "complete",
+            });
+            await db.insert(turnAlternatives).values({
+                id: crypto.randomUUID(),
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                turnId,
+                answer: "Variant answer",
+                status: "complete",
+            });
+
+            using gatekeeperStub = stub(gemini, "generateText", (prompt: string) =>
+                Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten query",
+                }) as any);
+            using searchStub = stub(SearchService, "executeHybridSearch", () =>
+                Promise.resolve([]) as any);
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () => {
+                async function* simpleGen() {
+                    yield { text: "Edited answer" };
+                }
+                return Promise.resolve({
+                    stream: simpleGen(),
+                    provider: "gemini" as any,
+                    modelId: "gemini-2.0-flash-lite",
+                });
+            });
+
+            const stream = await RagService.streamChat({
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question: "Edited question",
+                conversationId: convId,
+                editTurnId: turnId,
+                useByok: false,
+                logContext: {},
+            });
+            await drainStream(stream);
+
+            await waitForTurns(
+                convId,
+                (t) =>
+                    t.some(
+                        (row) =>
+                            row.id === turnId &&
+                            row.status === "complete" &&
+                            row.question === "Edited question",
+                    ),
+            );
+
+            const remaining = await db
+                .select()
+                .from(turnAlternatives)
+                .where(
+                    and(
+                        eq(turnAlternatives.turnId, turnId),
+                        eq(turnAlternatives.tenantId, TEST_TENANT_ID),
+                    ),
+                );
+            assertEquals(remaining.length, 0);
+
+            await db.delete(conversations).where(eq(conversations.id, convId));
+        });
+
+        it("positive: getConversation returns terminal non-empty alternatives", async () => {
+            const convId = crypto.randomUUID();
+            const turnId = crypto.randomUUID();
+            await db.insert(conversations).values({
+                id: convId,
+                tenantId: TEST_TENANT_ID,
+                title: "Alternatives listing",
+            });
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                question: "Listing question",
+                answer: "Canonical answer",
+                status: "complete",
+            });
+            await db.insert(turnAlternatives).values([
+                {
+                    id: crypto.randomUUID(),
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    turnId,
+                    answer: "Variant one",
+                    modelUsed: "m1",
+                    status: "complete",
+                    createdAt: new Date(Date.now() - 10_000),
+                },
+                {
+                    id: crypto.randomUUID(),
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    turnId,
+                    answer: "Variant two [Doc 1: Page 2]",
+                    modelUsed: "m2",
+                    latencyMs: 500,
+                    contextReferences: [
+                        { index: 1, documentId: "doc-1", title: "Doc One", pages: [1, 2] },
+                    ],
+                    status: "complete",
+                },
+                {
+                    id: crypto.randomUUID(),
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    turnId,
+                    answer: "in flight",
+                    status: "processing",
+                },
+                {
+                    id: crypto.randomUUID(),
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    turnId,
+                    answer: "",
+                    status: "failed",
+                },
+            ]);
+
+            const res = await RagService.getConversation({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+            });
+            const turn = res.turns.find((t: any) => t.id === turnId);
+            assertExists(turn);
+            // Only the two terminal, non-empty variants are returned, in order.
+            assertEquals(turn.alternatives.length, 2);
+            assertEquals(turn.alternatives[0].answer, "Variant one");
+            assertEquals(turn.alternatives[1].answer, "Variant two [Doc 1: Page 2]");
+            // References are filtered by the citations actually present.
+            assertEquals(turn.alternatives[1].contextReferences?.length, 1);
+
+            await db.delete(conversations).where(eq(conversations.id, convId));
+        });
+
+        it("positive: follow-up with selected_variant_id uses the variant answer as history context and promotes it on success", async () => {
+            const convId = crypto.randomUUID();
+            const turnId = crypto.randomUUID();
+            const v1 = crypto.randomUUID();
+            const past = new Date(Date.now() - 5 * 60_000);
+            await db.insert(conversations).values({
+                id: convId,
+                tenantId: TEST_TENANT_ID,
+                title: "Variant history override",
+            });
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                question: "Variant history Q",
+                answer: "Canonical answer",
+                status: "complete",
+                createdAt: past,
+            });
+            await db.insert(turnAlternatives).values({
+                id: v1,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                turnId,
+                answer: "Selected variant answer",
+                status: "complete",
+            });
+
+            const capturedPrompts: string[] = [];
+            using gatekeeperStub = stub(gemini, "generateText", (prompt: string) => {
+                capturedPrompts.push(prompt);
+                return Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten query",
+                }) as any;
+            });
+            using searchStub = stub(SearchService, "executeHybridSearch", () =>
+                Promise.resolve([]) as any);
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () => {
+                async function* simpleGen() {
+                    yield { text: "Follow-up answer" };
+                }
+                return Promise.resolve({
+                    stream: simpleGen(),
+                    provider: "gemini" as any,
+                    modelId: "gemini-2.0-flash-lite",
+                });
+            });
+
+            const stream = await RagService.streamChat({
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question: "Follow-up question",
+                conversationId: convId,
+                selectedVariantId: v1,
+                useByok: false,
+                logContext: {},
+            });
+            await drainStream(stream);
+
+            // Wait until the follow-up completed AND the selected variant was
+            // promoted into the canonical turn (promote+cleanup runs after the
+            // stream body closes).
+            await waitForTurns(
+                convId,
+                (t) =>
+                    t.some(
+                        (row) =>
+                            row.id === turnId &&
+                            row.answer === "Selected variant answer" &&
+                            row.status === "complete",
+                    ),
+            );
+
+            // The history context used the selected variant's answer, not the
+            // canonical one.
+            const rewritePrompt = capturedPrompts.find((p) =>
+                p.includes("Latest User Question"),
+            );
+            assertExists(rewritePrompt);
+            assertEquals(rewritePrompt.includes("Selected variant answer"), true);
+            assertEquals(rewritePrompt.includes("Canonical answer"), false);
+
+            // Promote + cleanup: the variant is now the canonical answer and
+            // every variant row is gone.
+            const remaining = await db
+                .select()
+                .from(turnAlternatives)
+                .where(eq(turnAlternatives.turnId, turnId));
+            assertEquals(remaining.length, 0);
+
+            await db.delete(conversations).where(eq(conversations.id, convId));
+        });
+
+        it("positive: promoteAndCleanupVariants promotes the selected variant and deletes the rest", async () => {
+            const convId = crypto.randomUUID();
+            const turnId = crypto.randomUUID();
+            const v1 = crypto.randomUUID();
+            const v2 = crypto.randomUUID();
+            await db.insert(conversations).values({
+                id: convId,
+                tenantId: TEST_TENANT_ID,
+                title: "Promote test",
+            });
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                question: "Promote question",
+                answer: "Original answer",
+                status: "complete",
+                feedback: "good",
+                feedbackAt: new Date(),
+            });
+            await db.insert(turnAlternatives).values([
+                {
+                    id: v1,
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    turnId,
+                    answer: "Variant one",
+                    modelUsed: "m1",
+                    status: "complete",
+                },
+                {
+                    id: v2,
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    turnId,
+                    answer: "Variant two",
+                    modelUsed: "m2",
+                    latencyMs: 123,
+                    status: "complete",
+                },
+            ]);
+
+            await RagService.promoteAndCleanupVariants({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                turnId,
+                selectedVariantId: v2,
+            });
+
+            const [turn] = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.id, turnId));
+            assertEquals(turn.answer, "Variant two");
+            assertEquals(turn.modelUsed, "m2");
+            assertEquals(turn.latencyMs, 123);
+            assertEquals(turn.status, "complete");
+            // Stale feedback refers to an answer that no longer exists.
+            assertEquals(turn.feedback, null);
+
+            const remaining = await db
+                .select()
+                .from(turnAlternatives)
+                .where(eq(turnAlternatives.turnId, turnId));
+            assertEquals(remaining.length, 0);
+
+            await db.delete(conversations).where(eq(conversations.id, convId));
+        });
+
+        it("positive: promoteAndCleanupVariants without a selection deletes all variants and keeps the turn", async () => {
+            const convId = crypto.randomUUID();
+            const turnId = crypto.randomUUID();
+            await db.insert(conversations).values({
+                id: convId,
+                tenantId: TEST_TENANT_ID,
+                title: "Cleanup without selection",
+            });
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                question: "Cleanup question",
+                answer: "Original answer",
+                status: "complete",
+            });
+            await db.insert(turnAlternatives).values([
+                {
+                    id: crypto.randomUUID(),
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    turnId,
+                    answer: "Variant one",
+                    status: "complete",
+                },
+                {
+                    id: crypto.randomUUID(),
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                    turnId,
+                    answer: "Variant two",
+                    status: "complete",
+                },
+            ]);
+
+            await RagService.promoteAndCleanupVariants({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                turnId,
+            });
+
+            const [turn] = await db
+                .select()
+                .from(conversationTurns)
+                .where(eq(conversationTurns.id, turnId));
+            assertEquals(turn.answer, "Original answer");
+
+            const remaining = await db
+                .select()
+                .from(turnAlternatives)
+                .where(eq(turnAlternatives.turnId, turnId));
+            assertEquals(remaining.length, 0);
+
+            await db.delete(conversations).where(eq(conversations.id, convId));
         });
     });
 });

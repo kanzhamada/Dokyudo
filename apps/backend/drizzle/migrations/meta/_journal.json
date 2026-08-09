@@ -162,6 +162,13 @@
       "when": 1786126999487,
       "tag": "0022_dizzy_the_santerians",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786255332077,
+      "tag": "0023_shiny_eternity",
+      "breakpoints": true
     }
   ]
 }

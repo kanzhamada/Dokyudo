@@ -8,6 +8,7 @@ import {
     tenantSubscriptions,
     conversationTurns,
     conversations,
+    turnAlternatives,
 } from "../../shared/models/db.model.ts";
 import { desc, eq, and, lt, ne, sql } from "drizzle-orm";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
@@ -56,11 +57,26 @@ export class RagService {
             model,
             useByok,
             editTurnId,
+            retryTurnId,
+            selectedVariantId,
             signal,
             logContext,
         } = params;
 
         if (signal?.aborted) return createClosedStream();
+
+        // Retry mode: the write target is a turn_alternatives row (a variant of
+        // the latest turn), never the canonical turn row. `turnId` below is the
+        // write-target id — the alternative row id in retry mode, the turn id
+        // in edit/normal mode.
+        const isRetry = !!retryTurnId;
+        const turnId = editTurnId ?? crypto.randomUUID();
+        // The retried turn's own question — read from the DB in the write-ahead
+        // so a stale client copy can never diverge from what the turn shows.
+        let retryQuestion: string | null = null;
+        // Captured when a NEW turn is inserted: the turn the follow-up builds
+        // on. Its unselected variants are deleted once the follow-up completes.
+        let prevLatestTurnId: string | null = null;
 
         // -1. Tier Quota Validation (Check Only)
         await withAuthDb(userId, async (tx) => {
@@ -72,7 +88,8 @@ export class RagService {
         //    reset to "processing") BEFORE any LLM work. This persists the user's
         //    question immediately for tracking, and gives the state machine a
         //    visible in-flight state: processing -> complete | stopped | failed.
-        const turnId = editTurnId ?? crypto.randomUUID();
+        //    In retry mode the write-ahead row lives in turn_alternatives
+        //    instead — the canonical turn row is never touched.
         let isNewConversation = false;
         let cid = conversationId;
 
@@ -105,7 +122,8 @@ export class RagService {
                 // Persist the edited question, drop the stale answer, and mark the
                 // turn as processing so it is excluded from LLM history until the
                 // regeneration completes. Feedback is reset too — the old rating
-                // refers to an answer that no longer exists.
+                // refers to an answer that no longer exists. Retry variants of the
+                // edited turn are stale as well (the question changed) — drop them.
                 await tx
                     .update(conversationTurns)
                     .set({
@@ -118,6 +136,82 @@ export class RagService {
                         updatedAt: new Date(),
                     })
                     .where(eq(conversationTurns.id, editTurnId));
+                await tx
+                    .delete(turnAlternatives)
+                    .where(
+                        and(
+                            eq(turnAlternatives.turnId, editTurnId),
+                            eq(turnAlternatives.tenantId, tenantId),
+                        ),
+                    );
+            } else if (retryTurnId) {
+                if (!conversationId) {
+                    throw new AppError({
+                        code: "VALIDATION_ERROR",
+                        message: "conversation_id is required when retrying a turn",
+                        status: 400,
+                    });
+                }
+                const [turn] = await tx
+                    .select({
+                        id: conversationTurns.id,
+                        question: conversationTurns.question,
+                        status: conversationTurns.status,
+                    })
+                    .from(conversationTurns)
+                    .where(
+                        and(
+                            eq(conversationTurns.id, retryTurnId),
+                            eq(conversationTurns.conversationId, conversationId!),
+                            eq(conversationTurns.tenantId, tenantId),
+                        ),
+                    );
+                if (!turn) {
+                    throw new AppError({
+                        code: "NOT_FOUND",
+                        message: "Turn not found",
+                        status: 404,
+                    });
+                }
+                if (turn.status === "processing") {
+                    throw new AppError({
+                        code: "VALIDATION_ERROR",
+                        message: "Cannot retry a turn that is still generating",
+                        status: 400,
+                    });
+                }
+                // Retries are only allowed on the LATEST turn of the conversation
+                // — the variant browser and the follow-up context depend on it.
+                const [latest] = await tx
+                    .select({ id: conversationTurns.id })
+                    .from(conversationTurns)
+                    .where(
+                        and(
+                            eq(conversationTurns.conversationId, conversationId!),
+                            eq(conversationTurns.tenantId, tenantId),
+                        ),
+                    )
+                    .orderBy(desc(conversationTurns.createdAt), desc(conversationTurns.id))
+                    .limit(1);
+                if (!latest || latest.id !== retryTurnId) {
+                    throw new AppError({
+                        code: "VALIDATION_ERROR",
+                        message: "Retry is only allowed on the latest turn of the conversation",
+                        status: 400,
+                    });
+                }
+                retryQuestion = turn.question;
+                // Eager insert of the variant row ("processing") so the retry is
+                // trackable and finalize keeps the single-writer status gate.
+                await tx.insert(turnAlternatives).values({
+                    id: turnId,
+                    tenantId,
+                    conversationId: conversationId!,
+                    turnId: retryTurnId,
+                    answer: "",
+                    modelUsed: null,
+                    status: "processing",
+                });
             } else {
                 // Resolve (or create) the parent conversation first — the turn row
                 // has a NOT NULL FK to it.
@@ -155,6 +249,21 @@ export class RagService {
                     isNewConversation = true;
                 }
 
+                // The turn this follow-up builds on — its unselected variants are
+                // deleted once the new turn completes (see promoteAndCleanupVariants).
+                const [latestBefore] = await tx
+                    .select({ id: conversationTurns.id })
+                    .from(conversationTurns)
+                    .where(
+                        and(
+                            eq(conversationTurns.conversationId, cid!),
+                            eq(conversationTurns.tenantId, tenantId),
+                        ),
+                    )
+                    .orderBy(desc(conversationTurns.createdAt), desc(conversationTurns.id))
+                    .limit(1);
+                prevLatestTurnId = latestBefore?.id ?? null;
+
                 // Eager insert: the question is persisted up front with a
                 // "processing" status so the request is trackable from the start.
                 // modelUsed starts null — it is filled once the actual model is
@@ -171,22 +280,40 @@ export class RagService {
             }
         });
 
-        // Helper: mark the eagerly-inserted turn as "stopped" when the client bails
-        // before the stream starts (cancellation during gatekeeper/search/retrieval).
-        // Only touches rows still in "processing" — the in-stream finalize path is
-        // the single writer for the terminal state once streaming has begun.
+        // The effective question for the whole pipeline: the turn's own question
+        // in retry mode (authoritative), the request body otherwise.
+        const effectiveQuestion = retryQuestion ?? question;
+
+        // Helper: mark the eagerly-inserted turn (or variant, in retry mode) as
+        // "stopped" when the client bails before the stream starts (cancellation
+        // during gatekeeper/search/retrieval). Only touches rows still in
+        // "processing" — the in-stream finalize path is the single writer for
+        // the terminal state once streaming has begun.
         const abortAsStopped = async (): Promise<ReadableStream> => {
             try {
                 await withAuthDb(userId, async (tx) => {
-                    await tx
-                        .update(conversationTurns)
-                        .set({ status: "stopped", updatedAt: new Date() })
-                        .where(
-                            and(
-                                eq(conversationTurns.id, turnId),
-                                eq(conversationTurns.status, "processing"),
-                            ),
-                        );
+                    if (isRetry) {
+                        await tx
+                            .update(turnAlternatives)
+                            .set({ status: "stopped", updatedAt: new Date() })
+                            .where(
+                                and(
+                                    eq(turnAlternatives.id, turnId),
+                                    eq(turnAlternatives.tenantId, tenantId),
+                                    eq(turnAlternatives.status, "processing"),
+                                ),
+                            );
+                    } else {
+                        await tx
+                            .update(conversationTurns)
+                            .set({ status: "stopped", updatedAt: new Date() })
+                            .where(
+                                and(
+                                    eq(conversationTurns.id, turnId),
+                                    eq(conversationTurns.status, "processing"),
+                                ),
+                            );
+                    }
                 });
             } catch (dbErr: any) {
                 if (logContext) logContext.ragAbortMarkError = dbErr.message;
@@ -201,7 +328,7 @@ export class RagService {
         //    questions BEFORE the guard model is called — repeated injection
         //    attempts never consume guard tokens. Only positive results are
         //    cached; a cache miss or error always falls through to the guard.
-        const injectionKey = await RedisKeys.promptInjection(question.trim());
+        const injectionKey = await RedisKeys.promptInjection(effectiveQuestion.trim());
 
         // Resolves the eagerly-inserted turn to "blocked" with the hardcoded
         // answer, then returns the graceful warning stream (HTTP 200). Shared by
@@ -210,20 +337,39 @@ export class RagService {
             if (logContext) logContext.ragEvent = "prompt_injection_blocked";
             try {
                 await withAuthDb(userId, async (tx) => {
-                    await tx
-                        .update(conversationTurns)
-                        .set({
-                            status: "blocked",
-                            modelUsed: null,
-                            answer: PROMPT_INJECTION_ANSWER,
-                            updatedAt: new Date(),
-                        })
-                        .where(
-                            and(
-                                eq(conversationTurns.id, turnId),
-                                eq(conversationTurns.status, "processing"),
-                            ),
-                        );
+                    if (isRetry) {
+                        await tx
+                            .update(turnAlternatives)
+                            .set({
+                                status: "blocked",
+                                modelUsed: null,
+                                answer: PROMPT_INJECTION_ANSWER,
+                                updatedAt: new Date(),
+                            })
+                            .where(
+                                and(
+                                    eq(turnAlternatives.id, turnId),
+                                    eq(turnAlternatives.conversationId, cid!),
+                                    eq(turnAlternatives.tenantId, tenantId),
+                                    eq(turnAlternatives.status, "processing"),
+                                ),
+                            );
+                    } else {
+                        await tx
+                            .update(conversationTurns)
+                            .set({
+                                status: "blocked",
+                                modelUsed: null,
+                                answer: PROMPT_INJECTION_ANSWER,
+                                updatedAt: new Date(),
+                            })
+                            .where(
+                                and(
+                                    eq(conversationTurns.id, turnId),
+                                    eq(conversationTurns.status, "processing"),
+                                ),
+                            );
+                    }
                 });
             } catch (_dbErr) {
                 // non-fatal — the warning stream is still delivered
@@ -276,7 +422,7 @@ Reply with EXACTLY one word — "INJECTION" or "SAFE" — and nothing else.
 </output>
 
 User Input:
-${question}`;
+${effectiveQuestion}`;
 
         try {
             const guardResponse = await gemini.generateText(
@@ -307,12 +453,19 @@ ${question}`;
         // 0.5. Retrieve Conversation History & Rewrite Query
         let historyText = "";
         let historyDepth = 0;
-        let searchQuery = question;
+        let searchQuery = effectiveQuestion;
+
+        // The selected retry variant of the latest turn (follow-up mode): its
+        // answer replaces the canonical answer in the history context — the
+        // variant is what the user is actually following up on. Selection is a
+        // frontend concern; the variant id is carried by the follow-up request.
+        let selectedVariantAnswer: string | null = null;
+        let selectedVariantTurnId: string | null = null;
 
         if (conversationId) {
             try {
                 const previousTurns = await withAuthDb(userId, async (tx) => {
-                    return await tx
+                    const rows = await tx
                         .select()
                         .from(conversationTurns)
                         .where(
@@ -331,6 +484,69 @@ ${question}`;
                         )
                         .orderBy(desc(conversationTurns.createdAt))
                         .limit(3);
+
+                    if (selectedVariantId && !isRetry && !editTurnId && rows.length > 0) {
+                        const [variant] = await tx
+                            .select({
+                                id: turnAlternatives.id,
+                                turnId: turnAlternatives.turnId,
+                                answer: turnAlternatives.answer,
+                            })
+                            .from(turnAlternatives)
+                            .where(
+                                and(
+                                    eq(turnAlternatives.id, selectedVariantId),
+                                    eq(
+                                        turnAlternatives.conversationId,
+                                        conversationId,
+                                    ),
+                                    eq(turnAlternatives.tenantId, tenantId),
+                                ),
+                            );
+                        if (!variant) {
+                            throw new AppError({
+                                code: "NOT_FOUND",
+                                message: "Selected variant not found",
+                                status: 404,
+                            });
+                        }
+                        // Retries are only allowed on the latest turn, so the
+                        // selected variant must belong to it. The write-ahead
+                        // has already inserted the in-flight follow-up turn, so
+                        // exclude it (by id) from the latest-turn check.
+                        const [latest] = await tx
+                            .select({ id: conversationTurns.id })
+                            .from(conversationTurns)
+                            .where(
+                                and(
+                                    eq(
+                                        conversationTurns.conversationId,
+                                        conversationId,
+                                    ),
+                                    eq(conversationTurns.tenantId, tenantId),
+                                    ne(conversationTurns.id, turnId),
+                                ),
+                            )
+                            .orderBy(
+                                desc(conversationTurns.createdAt),
+                                desc(conversationTurns.id),
+                            )
+                            .limit(1);
+                        if (!latest || latest.id !== variant.turnId) {
+                            throw new AppError({
+                                code: "VALIDATION_ERROR",
+                                message:
+                                    "Selected variant does not belong to the latest turn",
+                                status: 400,
+                            });
+                        }
+                        if (variant.answer && variant.answer.length > 0) {
+                            selectedVariantAnswer = variant.answer;
+                            selectedVariantTurnId = variant.turnId;
+                        }
+                    }
+
+                    return rows;
                 });
                 if (signal?.aborted) return await abortAsStopped();
                 historyDepth = previousTurns.length;
@@ -341,7 +557,14 @@ ${question}`;
 
                     historyText = "[PREVIOUS CONVERSATION HISTORY]\n";
                     for (const turn of previousTurns) {
-                        historyText += `User: ${turn.question}\nAssistant: ${turn.answer}\n\n`;
+                        // The selected variant's answer wins over the canonical
+                        // one when the user followed up on a retry.
+                        const answer =
+                            turn.id === selectedVariantTurnId &&
+                            selectedVariantAnswer
+                                ? selectedVariantAnswer
+                                : turn.answer;
+                        historyText += `User: ${turn.question}\nAssistant: ${answer}\n\n`;
                     }
 
                     // Query Rewriting (Contextualization)
@@ -359,7 +582,7 @@ Output ONLY the rewritten query. Do not answer the question, add explanations, o
 </output>
 
 ${historyText}
-Latest User Question: ${question}
+Latest User Question: ${effectiveQuestion}
 Rewritten Query:`;
 
                     const rewriteResponse = await gemini.generateText(
@@ -480,7 +703,7 @@ You are Dokyudo AI, a precise document-analysis assistant for annual reports, fi
 ${historyText}
 ${contextText}
 USER QUESTION:
-${question}
+${effectiveQuestion}
 
 Always include the document references ([Doc N: Page X]) in your answer.
         `.trim();
@@ -511,7 +734,8 @@ Always include the document references ([Doc N: Page X]) in your answer.
         const modelUsedFallback = useByok ? (model || "auto") : "auto";
         const startMs = Date.now();
 
-        // Resolve the eagerly-inserted (or edited) turn to a terminal status.
+        // Resolve the eagerly-inserted (or edited) turn — or the retried
+        // alternative row, in retry mode — to a terminal status.
         // Always an UPDATE — the row already exists. The `status = processing`
         // gate makes the state machine explicit and prevents a stale writer
         // from clobbering an already-terminal state.
@@ -519,28 +743,62 @@ Always include the document references ([Doc N: Page X]) in your answer.
             const latencyMs = Date.now() - startMs;
             try {
                 await withAuthDb(userId, async (tx) => {
-                    await tx
-                        .update(conversationTurns)
-                        .set({
-                            answer,
-                            modelUsed: successfulModel || modelUsedFallback,
-                            latencyMs,
-                            contextReferences:
-                                RagService.filterReferencesByCitations(
-                                    answer,
-                                    references,
+                    if (isRetry) {
+                        await tx
+                            .update(turnAlternatives)
+                            .set({
+                                answer,
+                                modelUsed: successfulModel || modelUsedFallback,
+                                latencyMs,
+                                contextReferences:
+                                    RagService.filterReferencesByCitations(
+                                        answer,
+                                        references,
+                                    ),
+                                status,
+                                updatedAt: new Date(),
+                            })
+                            .where(
+                                and(
+                                    eq(turnAlternatives.id, turnId),
+                                    eq(
+                                        turnAlternatives.conversationId,
+                                        cid!,
+                                    ),
+                                    eq(turnAlternatives.tenantId, tenantId),
+                                    eq(
+                                        turnAlternatives.status,
+                                        "processing",
+                                    ),
                                 ),
-                            status,
-                            updatedAt: new Date(),
-                        })
-                        .where(
-                            and(
-                                eq(conversationTurns.id, turnId),
-                                eq(conversationTurns.conversationId, cid!),
-                                eq(conversationTurns.tenantId, tenantId),
-                                eq(conversationTurns.status, "processing"),
-                            ),
-                        );
+                            );
+                    } else {
+                        await tx
+                            .update(conversationTurns)
+                            .set({
+                                answer,
+                                modelUsed: successfulModel || modelUsedFallback,
+                                latencyMs,
+                                contextReferences:
+                                    RagService.filterReferencesByCitations(
+                                        answer,
+                                        references,
+                                    ),
+                                status,
+                                updatedAt: new Date(),
+                            })
+                            .where(
+                                and(
+                                    eq(conversationTurns.id, turnId),
+                                    eq(
+                                        conversationTurns.conversationId,
+                                        cid!,
+                                    ),
+                                    eq(conversationTurns.tenantId, tenantId),
+                                    eq(conversationTurns.status, "processing"),
+                                ),
+                            );
+                    }
 
                     // Explicitly touch the updatedAt field on the parent conversation
                     await tx
@@ -899,8 +1157,16 @@ Always include the document references ([Doc N: Page X]) in your answer.
                     }
 
                     if (!cancelled) {
+                        // Retry mode reports the variant row id so the frontend
+                        // can swap its local placeholder; the canonical turn id
+                        // stays untouched.
+                        const donePayload = isRetry
+                            ? { turnId: retryTurnId, variantId: turnId }
+                            : { turnId };
                         controller.enqueue(
-                            encoder.encode(`event: done\ndata: ${JSON.stringify({ turnId })}\n\n`),
+                            encoder.encode(
+                                `event: done\ndata: ${JSON.stringify(donePayload)}\n\n`,
+                            ),
                         );
                     }
                 }
@@ -915,14 +1181,32 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 // trusting the stale `cancelled` flag. A request the user cancelled
                 // must never be recorded as "complete".
                 const abortedAtFinalize = cancelled || cancelSignal.aborted;
-                await finalizeTurn(
-                    abortedAtFinalize
-                        ? "stopped"
-                        : success
-                          ? "complete"
-                          : "failed",
-                    fullAnswer,
-                );
+                const finalStatus: TurnStatus = abortedAtFinalize
+                    ? "stopped"
+                    : success
+                      ? "complete"
+                      : "failed";
+                await finalizeTurn(finalStatus, fullAnswer);
+
+                // Follow-up succeeded: promote the selected variant into the
+                // canonical turn row (if one was selected) and delete every
+                // remaining retry variant of the turn the user followed up on.
+                // Only runs for brand-new turns — edits and retries keep their
+                // own write paths.
+                if (
+                    finalStatus === "complete" &&
+                    !isRetry &&
+                    !editTurnId &&
+                    prevLatestTurnId
+                ) {
+                    await RagService.promoteAndCleanupVariants({
+                        userId,
+                        tenantId,
+                        conversationId: cid!,
+                        turnId: prevLatestTurnId,
+                        selectedVariantId,
+                    });
+                }
             },
             cancel() {
                 streamAbort.abort();
@@ -930,6 +1214,71 @@ Always include the document references ([Doc N: Page X]) in your answer.
         });
 
         return stream;
+    }
+
+    /**
+     * Applies the follow-up outcome to a turn that had retry variants:
+     * - with a selected variant: its answer/model/references are promoted into
+     *   the canonical turn row (status forced to "complete", stale feedback
+     *   cleared — the old rating referred to an answer that no longer exists);
+     * - then ALL variants of that turn are deleted (the selected one now lives
+     *   in the turn row itself).
+     * No-ops when the turn has no variants.
+     */
+    static async promoteAndCleanupVariants(params: {
+        userId: string;
+        tenantId: string;
+        conversationId: string;
+        turnId: string;
+        selectedVariantId?: string;
+    }) {
+        const { userId, tenantId, conversationId, turnId, selectedVariantId } =
+            params;
+
+        await withAuthDb(userId, async (tx) => {
+            if (selectedVariantId) {
+                const [variant] = await tx
+                    .select()
+                    .from(turnAlternatives)
+                    .where(
+                        and(
+                            eq(turnAlternatives.id, selectedVariantId),
+                            eq(turnAlternatives.turnId, turnId),
+                            eq(turnAlternatives.conversationId, conversationId),
+                            eq(turnAlternatives.tenantId, tenantId),
+                        ),
+                    );
+                if (variant) {
+                    await tx
+                        .update(conversationTurns)
+                        .set({
+                            answer: variant.answer,
+                            modelUsed: variant.modelUsed,
+                            latencyMs: variant.latencyMs,
+                            contextReferences: variant.contextReferences,
+                            status: "complete",
+                            feedback: null,
+                            feedbackAt: null,
+                            updatedAt: new Date(),
+                        })
+                        .where(
+                            and(
+                                eq(conversationTurns.id, turnId),
+                                eq(conversationTurns.tenantId, tenantId),
+                            ),
+                        );
+                }
+            }
+
+            await tx
+                .delete(turnAlternatives)
+                .where(
+                    and(
+                        eq(turnAlternatives.turnId, turnId),
+                        eq(turnAlternatives.tenantId, tenantId),
+                    ),
+                );
+        });
     }
 
     static async listConversations(params: {
@@ -986,6 +1335,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
         let conversation: any = null;
         let branchParent: { id: string; title: string } | null = null;
         let turns: any[] = [];
+        let alternativesByTurn = new Map<string, any[]>();
 
         await withAuthDb(userId, async (tx) => {
             const results = await tx
@@ -1022,6 +1372,26 @@ Always include the document references ([Doc N: Page X]) in your answer.
                         ),
                     )
                     .orderBy(conversationTurns.createdAt);
+
+                // Retry variants (terminal, non-empty answers only — in-flight
+                // or junk rows are not rendered), grouped by turn id.
+                const altRows = await tx
+                    .select()
+                    .from(turnAlternatives)
+                    .where(
+                        and(
+                            eq(turnAlternatives.conversationId, conversationId),
+                            eq(turnAlternatives.tenantId, tenantId),
+                            ne(turnAlternatives.status, "processing"),
+                            ne(turnAlternatives.answer, ""),
+                        ),
+                    )
+                    .orderBy(turnAlternatives.createdAt);
+                for (const alt of altRows) {
+                    const list = alternativesByTurn.get(alt.turnId) ?? [];
+                    list.push(alt);
+                    alternativesByTurn.set(alt.turnId, list);
+                }
             }
         });
 
@@ -1051,6 +1421,21 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 contextReferences: RagService.filterReferencesByCitations(
                     t.answer,
                     t.contextReferences as any,
+                ),
+                alternatives: (alternativesByTurn.get(t.id) ?? []).map(
+                    (alt: any) => ({
+                        id: alt.id,
+                        answer: alt.answer,
+                        status: alt.status,
+                        modelUsed: alt.modelUsed ?? null,
+                        latencyMs: alt.latencyMs ?? null,
+                        contextReferences:
+                            RagService.filterReferencesByCitations(
+                                alt.answer,
+                                alt.contextReferences as any,
+                            ),
+                        createdAt: alt.createdAt.toISOString(),
+                    }),
                 ),
                 createdAt: t.createdAt.toISOString(),
                 updatedAt: t.updatedAt?.toISOString(),

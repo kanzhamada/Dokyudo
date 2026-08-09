@@ -11,6 +11,18 @@ export const ChatBodySchema = z.object({
      * instead of inserting a new turn. Requires `conversation_id`.
      */
     edit_turn_id: z.string().uuid("Invalid turn ID").optional(),
+    /**
+     * When set, the streamed answer is stored as a retry alternative (variant)
+     * of this turn instead of inserting/overwriting a turn. Only allowed on the
+     * latest turn of the conversation. Requires `conversation_id`.
+     */
+    retry_turn_id: z.string().uuid("Invalid turn ID").optional(),
+    /**
+     * When set on a normal (non-retry) follow-up, the answer of this variant is
+     * used as the conversation history context for the latest turn, promoted
+     * into the turn row on success, and unselected variants are deleted.
+     */
+    selected_variant_id: z.string().uuid("Invalid variant ID").optional(),
 });
 export type ChatBody = z.infer<typeof ChatBodySchema>;
 
@@ -25,6 +37,8 @@ export interface ChatServiceParams {
     model?: string;
     useByok: boolean;
     editTurnId?: string;
+    retryTurnId?: string;
+    selectedVariantId?: string;
     signal?: AbortSignal;
     logContext?: Record<string, any>;
 }
@@ -89,6 +103,17 @@ export const ContextReferenceSchema = z.object({
 });
 export type ContextReference = z.infer<typeof ContextReferenceSchema>;
 
+export const TurnAlternativeSchema = z.object({
+    id: z.string().uuid(),
+    answer: z.string(),
+    status: z.enum(["processing", "complete", "stopped", "failed", "blocked"]),
+    modelUsed: z.string().nullable().optional(),
+    latencyMs: z.number().nullable().optional(),
+    contextReferences: z.array(ContextReferenceSchema).nullable().optional(),
+    createdAt: z.string(),
+});
+export type TurnAlternative = z.infer<typeof TurnAlternativeSchema>;
+
 export const ConversationTurnSchema = z.object({
     id: z.string().uuid(),
     question: z.string(),
@@ -99,6 +124,8 @@ export const ConversationTurnSchema = z.object({
     /** Set only on the boundary turn of a branched conversation. */
     branchedFromTurnId: z.string().uuid().nullable().optional(),
     contextReferences: z.array(ContextReferenceSchema).nullable(),
+    /** Retry variants of this turn (terminal, non-empty answers only). */
+    alternatives: z.array(TurnAlternativeSchema).default([]),
     createdAt: z.string(),
     updatedAt: z.string().optional(),
 });

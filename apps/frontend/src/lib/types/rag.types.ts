@@ -59,6 +59,16 @@ export interface ContextReference {
 
 export type TurnStatus = 'processing' | 'complete' | 'stopped' | 'failed' | 'blocked';
 
+export interface TurnAlternative {
+	id: string;
+	answer: string;
+	status: TurnStatus;
+	modelUsed: string | null;
+	latencyMs: number | null;
+	contextReferences: ContextReference[] | null;
+	createdAt: string;
+}
+
 export interface ConversationTurn {
 	id: string;
 	question: string;
@@ -70,6 +80,8 @@ export interface ConversationTurn {
 	branchedFromTurnId?: string | null;
 	modelUsed: string | null;
 	contextReferences: ContextReference[] | null;
+	/** Retry variants of this turn (terminal, non-empty answers only). */
+	alternatives: TurnAlternative[];
 	createdAt: string;
 	updatedAt?: string;
 }
