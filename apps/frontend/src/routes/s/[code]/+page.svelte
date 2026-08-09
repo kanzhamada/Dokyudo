@@ -140,6 +140,16 @@
 	let copiedMessageId = $state<string | null>(null);
 	let codeBlockInstances: { el: HTMLElement; unmount: () => void }[] = [];
 
+	const isSignedIn = $derived(!!sessionStore.getAccessToken());
+	const turnLabel = $derived(
+		share ? `${share.turns.length} turn${share.turns.length === 1 ? '' : 's'}` : ''
+	);
+	const footerHint = $derived(
+		isSignedIn
+			? 'Continue in your private chat (a copy of this link).'
+			: 'Sign in to continue this chat in your account.'
+	);
+
 	onMount(() => {
 		loadShare();
 		return () => {
@@ -219,14 +229,22 @@
 	}
 
 	function formatExpiry(expiresAt: string | null): string {
-		if (!expiresAt) return 'Tidak ada batas waktu';
-		return `Kedaluwarsa ${new Date(expiresAt).toLocaleString('id-ID', {
+		if (!expiresAt) return 'No expiry';
+		return `Expires ${new Date(expiresAt).toLocaleString('en-US', {
 			day: 'numeric',
 			month: 'short',
 			year: 'numeric',
 			hour: '2-digit',
 			minute: '2-digit'
 		})}`;
+	}
+
+	function formatSharedDate(iso: string): string {
+		return new Date(iso).toLocaleDateString('en-US', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		});
 	}
 </script>
 
@@ -241,34 +259,85 @@
 		style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
 	></div>
 
-	<!-- Floating Conversation Capsule (same visual as the chat page header) -->
+	<!-- ================= Mobile Header (Floating Capsule — same as chat page) ================= -->
 	<div
-		class="pointer-events-auto absolute top-3 right-3 left-3 z-30 overflow-hidden rounded-[24px] border border-white/15 bg-[#232323]/90 shadow-2xl backdrop-blur-[42px]"
+		class="pointer-events-auto absolute top-3 right-3 left-3 z-30 overflow-hidden rounded-[24px] border border-white/15 bg-[#232323]/90 shadow-2xl backdrop-blur-[42px] md:hidden"
 	>
 		<div class="flex h-14 items-center justify-between px-3">
-			<!-- Brand -->
-			<a href="/" class="flex shrink-0 items-center gap-1.5" aria-label="Dokyudo beranda">
+			<a href="/" class="flex shrink-0 items-center gap-1.5" aria-label="Dokyudo home">
 				<img src={favicon} alt="Dokyudo" class="h-6 w-auto" />
-				<span class="hidden font-sans text-sm font-medium tracking-tight text-white/80 sm:block">
-					Dokyudo
-				</span>
 			</a>
 
-			<!-- Shared conversation title -->
 			<div class="flex min-w-0 flex-1 items-center justify-center px-2">
 				<span class="max-w-full truncate text-xs font-medium text-white/75" title={share?.title}>
 					{share?.title ?? 'Shared conversation'}
 				</span>
 			</div>
 
-			<!-- Share-specific actions -->
 			<div class="flex shrink-0 items-center gap-1.5">
 				<span
-					class="hidden items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/60 sm:flex"
+					class="flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-white/60"
 					title={share ? formatExpiry(share.expiresAt) : undefined}
 				>
 					<Clock class="size-3 text-white/50" />
-					{share?.expiresAt ? 'Ada batas waktu' : 'Tanpa batas waktu'}
+					{share?.expiresAt ? 'Expires' : 'No expiry'}
+				</span>
+			</div>
+		</div>
+	</div>
+
+	<!-- ================= Desktop Header (Gradient Bar — same as chat page) ================= -->
+	<div
+		class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-28 bg-gradient-to-b from-[#1F1E1D] via-[#1F1E1D]/95 via-65% to-transparent md:block"
+	>
+		<div class="pointer-events-auto grid h-16 w-full grid-cols-3 items-center px-4 md:px-8">
+			<div class="flex justify-start">
+				<a
+					href="/"
+					class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+				>
+					<img src={favicon} alt="Dokyudo" class="h-5 w-auto" />
+					<span class="font-sans font-medium tracking-tight">Dokyudo</span>
+				</a>
+			</div>
+
+			<div class="flex min-w-0 justify-center">
+				{#if (share?.title ?? '').length > 25}
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<span
+										{...props}
+										class="flex max-w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75"
+									>
+										<span class="max-w-56 truncate">{share?.title ?? 'Shared conversation'}</span>
+									</span>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content
+								class="max-w-xs rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+							>
+								<p>{share?.title}</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
+				{:else}
+					<span
+						class="flex max-w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75"
+					>
+						<span class="max-w-56 truncate">{share?.title ?? 'Shared conversation'}</span>
+					</span>
+				{/if}
+			</div>
+
+			<div class="flex justify-end gap-1">
+				<span
+					class="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/60"
+					title={share ? formatExpiry(share.expiresAt) : undefined}
+				>
+					<Lock class="size-3 text-white/50" />
+					<span>Read-only</span>
 				</span>
 				<Button
 					size="sm"
@@ -278,21 +347,21 @@
 				>
 					{#if isContinuing}
 						<Spinner class="mr-1.5 size-3" />
-						Menyiapkan...
+						Preparing...
 					{:else}
 						<GitBranch class="mr-1.5 size-3.5" />
-						Lanjutkan chat
+						Continue chat
 					{/if}
 				</Button>
 			</div>
 		</div>
 	</div>
 
-	<!-- Main Content -->
+	<!-- ================= Main Content ================= -->
 	<main
 		class="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
 	>
-		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
+		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-32">
 			{#if isLoading}
 				<div class="flex flex-1 items-center justify-center py-24">
 					<Spinner class="size-5 text-white/40" />
@@ -300,15 +369,15 @@
 			{:else if notFound}
 				<div class="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
 					<Share2 class="size-8 text-white/25" />
-					<h1 class="text-lg font-semibold text-white">Link tidak valid atau sudah kedaluwarsa</h1>
+					<h1 class="text-lg font-semibold text-white">Link is invalid or has expired</h1>
 					<p class="max-w-sm text-sm text-white/45">
-						Link publik ini sudah dihentikan oleh pemiliknya, atau masa berlakunya sudah habis.
+						This public link has been removed by its owner, or it has expired.
 					</p>
 					<Button
 						class="mt-2 cursor-pointer bg-amber-500 text-black hover:bg-amber-400"
 						onclick={() => goto('/')}
 					>
-						Ke beranda
+						Go to home
 					</Button>
 				</div>
 			{:else if share}
@@ -322,12 +391,7 @@
 							<span>Read-only share</span>
 						</span>
 						<span class="text-xs text-white/40">
-							Dibagikan {new Date(share.createdAt).toLocaleDateString('id-ID', {
-								day: 'numeric',
-								month: 'short',
-								year: 'numeric'
-							})}
-							· {share.turns.length} turn
+							Shared {formatSharedDate(share.createdAt)} · {turnLabel}
 						</span>
 					</div>
 				</div>
@@ -390,7 +454,7 @@
 									<div
 										class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
 									>
-										<span>Menunggu respons…</span>
+										<span>Awaiting response…</span>
 									</div>
 								{/if}
 							</div>
@@ -489,33 +553,41 @@
 						</div>
 					</div>
 				{/each}
-
-				<!-- Footer CTA -->
-				<div class="flex flex-col items-center gap-3 border-t border-white/10 pt-6 text-center">
-					<p class="text-xs text-white/35">
-						Dibagikan secara read-only via Dokyudo — {share.turns.length} turn, tidak termasuk percakapan
-						selanjutnya.
-					</p>
-					<Button
-						class="cursor-pointer bg-amber-500 text-black hover:bg-amber-400 disabled:opacity-60"
-						onclick={handleContinue}
-						disabled={isContinuing}
-					>
-						{#if isContinuing}
-							<Spinner class="mr-2 size-4" />
-							Menyiapkan chat...
-						{:else}
-							<GitBranch class="mr-2 size-4" />
-							Lanjutkan chat ini
-						{/if}
-					</Button>
-					<p class="text-xs text-white/40">
-						{sessionStore.getAccessToken()
-							? 'Lanjutkan di chat pribadi kamu (salinan dari link ini).'
-							: 'Masuk dulu untuk melanjutkan chat ini di akunmu.'}
-					</p>
-				</div>
 			{/if}
 		</div>
 	</main>
+
+	<!-- ================= Floating Bottom Bar (same capsule style as the chat composer) ================= -->
+	{#if share && !isLoading}
+		<div
+			class="pointer-events-none absolute right-0 bottom-0 left-0 z-30 flex flex-col items-center justify-end bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent pt-6 pb-4"
+			style="font-family: 'Inter', sans-serif;"
+		>
+			<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">
+				<div
+					class="flex w-full items-center justify-between gap-3 rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.85] px-4 py-2.5 shadow-2xl backdrop-blur-[42px] transition-all"
+				>
+					<div class="flex min-w-0 flex-col gap-0.5">
+						<p class="truncate text-xs text-white/60">
+							Shared read-only via Dokyudo — {turnLabel}, excluding any further conversation.
+						</p>
+						<p class="truncate text-[11px] text-white/40">{footerHint}</p>
+					</div>
+					<Button
+						class="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-amber-500 px-4 text-sm font-medium text-black hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
+						disabled={isContinuing}
+						onclick={handleContinue}
+					>
+						{#if isContinuing}
+							<Spinner class="size-3.5" />
+							Preparing...
+						{:else}
+							<GitBranch class="size-4" />
+							Continue chat
+						{/if}
+					</Button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
