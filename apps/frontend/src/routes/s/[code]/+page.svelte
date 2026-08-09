@@ -15,6 +15,9 @@
 	import { toast } from 'svelte-sonner';
 	import { mount, unmount, untrack } from 'svelte';
 	import type { PublicShare, PublicShareTurn } from '$lib/types/rag.types';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 	import favicon from '$lib/assets/favicon.svg';
 	import faviconRaw from '$lib/assets/favicon.svg?raw';
 
@@ -30,8 +33,8 @@
 	}
 
 	const code = $derived(page.params.code ?? '');
-	let share = $state<PublicShare | null>(null);
-	let isLoading = $state(true);
+	let share = $state<PublicShare | null>(untrack(() => data.share));
+	let isLoading = $state(!untrack(() => data.share));
 	let notFound = $state(false);
 	let isContinuing = $state(false);
 	let copiedMessageId = $state<string | null>(null);
@@ -44,9 +47,17 @@
 			: 'Sign in to continue this chat in your account.'
 	);
 	let copiedLink = $state(false);
+	const shareUrl = $derived(`${page.url.origin}/s/${code}`);
+	const ogImageUrl = $derived(`${shareUrl}/opengraph-image.svg`);
+	const metaTitle = $derived(share ? `${share.title} — Dokyudo` : 'Shared conversation — Dokyudo');
+	const metaDescription = $derived(
+		share
+			? `A shared conversation by ${share.authorName || 'a Dokyudo user'}.`
+			: 'A shared conversation on Dokyudo.'
+	);
 
 	onMount(() => {
-		loadShare();
+		if (!share) loadShare();
 		return () => {
 			codeBlockInstances.forEach((i) => i.unmount());
 			codeBlockInstances = [];
@@ -161,7 +172,20 @@
 </script>
 
 <svelte:head>
-	<title>{share ? `${share.title} — Dokyudo` : 'Dokyudo'}</title>
+	<title>{metaTitle}</title>
+	<meta name="description" content={metaDescription} />
+	<meta property="og:type" content="article" />
+	<meta property="og:site_name" content="Dokyudo" />
+	<meta property="og:title" content={metaTitle} />
+	<meta property="og:description" content={metaDescription} />
+	<meta property="og:url" content={shareUrl} />
+	<meta property="og:image" content={ogImageUrl} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content={metaTitle} />
+	<meta name="twitter:description" content={metaDescription} />
+	<meta name="twitter:image" content={ogImageUrl} />
 </svelte:head>
 
 <div class="relative flex h-svh w-full flex-col overflow-hidden bg-[#1F1E1D]">
@@ -326,7 +350,7 @@
 							<span>Read-only share</span>
 						</span>
 						<span class="text-xs text-white/40">
-							Shared {formatSharedDate(share.createdAt)}
+							By {share.authorName || 'Dokyudo user'} · Shared {formatSharedDate(share.createdAt)}
 						</span>
 					</div>
 				</div>

@@ -848,6 +848,7 @@
 	<ShareConversationDialog
 		bind:open={isShareDialogOpen}
 		conversationId={sharingConversation.id}
+		conversationTitle={sharingConversation.title}
 		onShared={() => updateLocalShareFlag(sharingConversation!.id, true)}
 		onClose={() => {
 			isShareDialogOpen = false;

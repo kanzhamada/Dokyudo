@@ -176,6 +176,7 @@ export type PublicShareTurn = z.infer<typeof PublicShareTurnSchema>;
 export const PublicShareResponseSchema = z.object({
     code: z.string(),
     title: z.string(),
+    authorName: z.string().nullable(),
     expiresAt: z.string().nullable(),
     createdAt: z.string(),
     /** Id of the original conversation — used by the "continue chat" flow. */

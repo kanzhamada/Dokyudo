@@ -5,6 +5,8 @@ import {
     chatShares,
     conversations,
     conversationTurns,
+    tenants,
+    users,
 } from "../../shared/models/db.model.ts";
 import { generateShareCode } from "../../shared/utils/base62.util.ts";
 import { redis } from "../../config/redis.ts";
@@ -40,6 +42,23 @@ function isUniqueViolation(err: any): boolean {
         err?.code === PG_UNIQUE_VIOLATION ||
         err?.cause?.code === PG_UNIQUE_VIOLATION
     );
+}
+
+async function lookupShareAuthorName(code: string): Promise<string | null> {
+    try {
+        const [author] = await db
+            .select({ authorName: tenants.name })
+            .from(chatShares)
+            .leftJoin(users, eq(users.id, chatShares.createdBy))
+            .leftJoin(tenants, eq(tenants.id, users.tenantId))
+            .where(eq(chatShares.code, code))
+            .limit(1);
+        return author?.authorName ?? null;
+    } catch (err: any) {
+        // Author metadata is useful for previews, but must not break a valid share.
+        console.error("[Share] Author metadata lookup failed:", err.message);
+        return null;
+    }
 }
 
 interface SnapshotTurn {
@@ -217,6 +236,7 @@ export class ShareService {
     static async getPublicShare(params: { code: string }): Promise<{
         code: string;
         title: string;
+        authorName: string | null;
         expiresAt: string | null;
         createdAt: string;
         conversationId: string;
@@ -238,7 +258,13 @@ export class ShareService {
                     cacheKey,
                     shareCacheTtlSeconds(expiresAt),
                 );
-                return payload;
+                if (!Object.hasOwn(payload, "authorName")) {
+                    payload.authorName = await lookupShareAuthorName(code);
+                    await redis.set(cacheKey, JSON.stringify(payload), {
+                        ex: shareCacheTtlSeconds(expiresAt),
+                    });
+                }
+                return { ...payload, authorName: payload.authorName ?? null };
             }
         } catch (err: any) {
             // Cache failures must never break the public read — fall through.
@@ -293,6 +319,7 @@ export class ShareService {
         const payload = {
             code: row.code,
             title: row.title,
+            authorName: await lookupShareAuthorName(code),
             expiresAt: row.expiresAt?.toISOString() ?? null,
             createdAt: row.createdAt.toISOString(),
             conversationId: row.conversationId,

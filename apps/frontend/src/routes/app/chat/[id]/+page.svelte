@@ -3370,6 +3370,7 @@
 <ShareConversationDialog
 	bind:open={isShareDialogOpen}
 	conversationId={chatId}
+	conversationTitle={conversationTitle}
 	onShared={handleShareDialogShared}
 	onClose={() => (isShareDialogOpen = false)}
 />

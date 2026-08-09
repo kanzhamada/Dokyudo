@@ -6,16 +6,25 @@
 	import { Check, Copy, Globe2, Link2, LockKeyhole, Mail, Share2, X } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import { createShare } from '$lib/api/rag';
+	import { getMe } from '$lib/api/me';
+	import favicon from '$lib/assets/favicon.svg';
 
 	interface Props {
 		open?: boolean;
 		conversationId: string;
+		conversationTitle?: string;
 		onClose?: () => void;
 		/** Fired after a share is created — lets the parent refresh share indicators. */
 		onShared?: () => void;
 	}
 
-	let { open = $bindable(false), conversationId, onClose, onShared }: Props = $props();
+	let {
+		open = $bindable(false),
+		conversationId,
+		conversationTitle = 'Untitled conversation',
+		onClose,
+		onShared
+	}: Props = $props();
 
 	const EXPIRY_OPTIONS: { label: string; hours: number | null }[] = [
 		{ label: '1 hour', hours: 1 },
@@ -34,6 +43,9 @@
 	let errorMessage = $state('');
 	let copiedCode = $state<string | null>(null);
 	let lastCreatedUrl = $state<string | null>(null);
+	let lastCreatedCode = $state<string | null>(null);
+	let publishedAt = $state(new Date().toISOString());
+	let authorName = $state('User');
 	let recipientInput = $state('');
 	let recipients = $state<string[]>([]);
 	let notifyRecipients = $state(true);
@@ -47,6 +59,10 @@
 	);
 	const previewUrl = $derived(customCode.trim() ? `${origin}/s/${customCode.trim()}` : null);
 	const hasValidRecipients = $derived(recipients.length > 0);
+	const ogImageUrl = $derived(
+		lastCreatedCode ? `${origin}/s/${lastCreatedCode}/opengraph-image.svg` : null
+	);
+	const previewTitle = $derived(conversationTitle?.trim() || 'Untitled conversation');
 
 	function shareUrlOf(code: string): string {
 		return `${origin}/s/${code}`;
@@ -56,11 +72,22 @@
 		customCode = '';
 		shareMode = 'public';
 		lastCreatedUrl = null;
+		lastCreatedCode = null;
+		publishedAt = new Date().toISOString();
 		errorMessage = '';
 		inviteMessage = '';
 		recipientInput = '';
 		recipients = [];
 		copiedCode = null;
+		authorName = 'User';
+	}
+
+	async function loadAuthorName() {
+		const result = await getMe();
+		if (result.ok) {
+			authorName =
+				result.data.tenant.name?.trim() || result.data.user.email.split('@')[0] || 'User';
+		}
 	}
 
 	function setShareMode(mode: ShareMode) {
@@ -93,6 +120,8 @@
 
 			if (result.ok) {
 				lastCreatedUrl = shareUrlOf(result.data.code);
+				lastCreatedCode = result.data.code;
+				publishedAt = new Date().toISOString();
 				customCode = '';
 				onShared?.();
 				const copied = await copyText(lastCreatedUrl, 'created');
@@ -183,8 +212,19 @@
 	}
 
 	$effect(() => {
-		if (open) resetDialogState();
+		if (open) {
+			resetDialogState();
+			void loadAuthorName();
+		}
 	});
+
+	function formatPublishedDate(iso: string): string {
+		return new Date(iso).toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
+	}
 </script>
 
 <Dialog.Root
@@ -282,6 +322,65 @@
 						Private
 					</button>
 				</div>
+			</section>
+
+			<section
+				aria-labelledby="preview-heading"
+				class="space-y-3 border-t border-white/[0.09] pt-5"
+			>
+				<div class="flex items-baseline justify-between gap-3">
+					<div>
+						<h2 id="preview-heading" class="text-sm font-medium text-white/90">Share preview</h2>
+						<p class="mt-1 text-xs leading-5 text-white/42">
+							This is how the link will appear when shared.
+						</p>
+					</div>
+					<span class="shrink-0 text-[10px] text-white/30">1200 × 630</span>
+				</div>
+
+				{#if ogImageUrl}
+					<img
+						src={ogImageUrl}
+						alt={`Open Graph preview for ${previewTitle}`}
+						class="aspect-[1200/630] w-full rounded-xl border border-white/[0.12] object-cover"
+					/>
+				{:else}
+					<div
+						class="relative aspect-[1200/630] overflow-hidden rounded-xl border border-white/[0.12] bg-[#1F1E1D]"
+					>
+						<div
+							class="pointer-events-none absolute -top-[42%] -left-[22%] h-[190%] w-[72%] rounded-full opacity-[0.07]"
+							style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(24px);"
+						></div>
+						<div
+							class="pointer-events-none absolute top-5 right-7 size-10 rotate-12 border border-[#DB8F5E]/35"
+						></div>
+						<div
+							class="pointer-events-none absolute right-10 bottom-8 size-2 rounded-full bg-[#DB8F5E]/70"
+						></div>
+						<div class="relative flex h-full flex-col justify-between p-5 sm:p-6">
+							<div class="flex items-center gap-2 text-white/80">
+								<img src={favicon} alt="" class="size-5 object-contain" />
+								<span class="text-[10px] font-medium tracking-[0.22em]">DOKYUDO</span>
+							</div>
+							<div class="max-w-[82%]">
+								<p class="mb-2 text-[9px] font-medium tracking-[0.2em] text-[#DB8F5E] uppercase">
+									Shared conversation
+								</p>
+								<h3
+									class="line-clamp-2 text-lg leading-tight font-medium tracking-[-0.03em] text-white sm:text-xl"
+								>
+									{previewTitle}
+								</h3>
+							</div>
+							<div class="flex items-center gap-2 text-[10px] text-white/45">
+								<span>By {authorName}</span>
+								<span class="size-0.5 rounded-full bg-white/30"></span>
+								<span>{formatPublishedDate(publishedAt)}</span>
+							</div>
+						</div>
+					</div>
+				{/if}
 			</section>
 
 			<section aria-labelledby="link-heading" class="space-y-3 border-t border-white/[0.09] pt-5">

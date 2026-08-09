@@ -142,6 +142,7 @@ export interface PublicShareTurn {
 export interface PublicShare {
 	code: string;
 	title: string;
+	authorName: string | null;
 	expiresAt: string | null;
 	createdAt: string;
 	/** Id of the original conversation — used by the "continue chat" flow. */

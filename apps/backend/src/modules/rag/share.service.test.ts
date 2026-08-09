@@ -140,6 +140,7 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
 
         const pub = await ShareService.getPublicShare({ code: shareCode });
         assertEquals(pub.title, "Share Test Conversation");
+        assertEquals(pub.authorName, "Share Service Test Tenant");
         assertEquals(pub.turns.length, 2);
         assertEquals(pub.turns[0].question, "Pertanyaan pertama");
         assertEquals(pub.turns[1].answer, "Jawaban kedua");
