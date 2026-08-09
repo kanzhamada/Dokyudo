@@ -578,14 +578,35 @@
 			{/snippet}
 		</Sidebar.MenuButton>
 
-		<!-- Conversation actions stay hidden until hover; sharing is managed from the profile menu. -->
-		<Sidebar.MenuAction
-			showOnHover={true}
-			class="cursor-pointer"
-			onclick={(e) => openConversationMenu(e, item)}
-		>
-			<MoreHorizontal class="size-4" />
-		</Sidebar.MenuAction>
+		<!-- Action Menu & Indicators (pin only — sharing is managed from the profile menu) -->
+		{#if item.isPinned}
+			<Sidebar.MenuAction
+				showOnHover={false}
+				class="cursor-pointer"
+				onclick={(e) => openConversationMenu(e, item)}
+			>
+				<div
+					class="flex size-full items-center justify-center gap-1 group-hover/menu-item:hidden"
+					class:hidden={activeConversationMenu?.item.id === item.id}
+				>
+					<Pin class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
+				</div>
+				<div
+					class="hidden size-full items-center justify-center group-hover/menu-item:flex"
+					class:flex={activeConversationMenu?.item.id === item.id}
+				>
+					<MoreHorizontal class="size-4" />
+				</div>
+			</Sidebar.MenuAction>
+		{:else}
+			<Sidebar.MenuAction
+				showOnHover={true}
+				class="cursor-pointer"
+				onclick={(e) => openConversationMenu(e, item)}
+			>
+				<MoreHorizontal class="size-4" />
+			</Sidebar.MenuAction>
+		{/if}
 	</Sidebar.MenuItem>
 {/snippet}
 

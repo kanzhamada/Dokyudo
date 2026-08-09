@@ -181,3 +181,10 @@ export function listShares(
 export function listAllShares(): Promise<ApiResult<{ shares: ShareListItem[] }>> {
 	return apiRequest<{ shares: ShareListItem[] }>('/api/rag/shares', { method: 'GET' });
 }
+
+/** Revokes every active share link owned by the current tenant. */
+export function deleteAllTenantShares(): Promise<ApiResult<{ success: boolean; deleted: number }>> {
+	return apiRequest<{ success: boolean; deleted: number }>('/api/rag/shares', {
+		method: 'DELETE'
+	});
+}

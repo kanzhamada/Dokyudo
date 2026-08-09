@@ -589,4 +589,34 @@ export class ShareService {
             createdAt: r.createdAt.toISOString(),
         }));
     }
+
+    /** Revokes every share owned by the tenant (account-level cleanup). */
+    static async deleteAllTenantShares(params: {
+        userId: string;
+        tenantId: string;
+    }): Promise<{ deleted: number }> {
+        const { userId, tenantId } = params;
+
+        let codes: string[] = [];
+        await withAuthDb(userId, async (tx) => {
+            const rows = await tx
+                .select({ code: chatShares.code })
+                .from(chatShares)
+                .where(eq(chatShares.tenantId, tenantId));
+            codes = rows.map((r) => r.code);
+            await tx
+                .delete(chatShares)
+                .where(eq(chatShares.tenantId, tenantId));
+        });
+
+        if (codes.length > 0) {
+            try {
+                await redis.del(...codes.map((code) => RedisKeys.shareCache(code)));
+            } catch {
+                // non-fatal
+            }
+        }
+
+        return { deleted: codes.length };
+    }
 }

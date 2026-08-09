@@ -243,3 +243,12 @@ export async function handleListAllShares(c: Context) {
     const result = await ShareService.listAllShares({ userId, tenantId });
     return c.json({ shares: result });
 }
+
+export async function handleDeleteTenantShares(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, userId } = extractor.extractAuthContext();
+
+    const result = await ShareService.deleteAllTenantShares({ userId, tenantId });
+
+    return c.json({ data: { success: true, deleted: result.deleted } });
+}

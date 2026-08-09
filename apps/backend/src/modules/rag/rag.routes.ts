@@ -529,6 +529,28 @@ ragRoutes.openapi(
 
 ragRoutes.openapi(
     createRoute({
+        method: "delete",
+        path: "/shares",
+        tags: ["RAG"],
+        summary: "Delete All Public Shares",
+        description: "Revokes every active share link owned by the caller's tenant.",
+        responses: {
+            200: {
+                description: "Success",
+            },
+            401: {
+                description: "Unauthorized",
+            },
+            500: {
+                description: "Internal server error",
+            },
+        },
+    }),
+    ragController.handleDeleteTenantShares as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
         method: "get",
         path: "/conversations/{id}/shares",
         tags: ["RAG"],
