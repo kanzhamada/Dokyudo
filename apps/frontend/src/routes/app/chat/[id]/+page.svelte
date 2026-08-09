@@ -39,6 +39,7 @@
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -729,20 +730,20 @@
 		isTitleEditDialogOpen = true;
 	}
 
-	async function saveConversationTitle() {
-		const nextTitle = titleDraft.trim();
-		if (!nextTitle || isTitleSaving) return;
+	async function saveConversationTitle(nextTitle: string) {
+		const trimmed = nextTitle.trim();
+		if (!trimmed || isTitleSaving) return;
 
 		isTitleSaving = true;
 		const oldTitle = conversationTitle;
 
 		// Realtime illusion: Optimistically update local title & store for instant response
-		conversationTitle = nextTitle;
-		conversationsStore.addOrUpdate(chatId, nextTitle);
+		conversationTitle = trimmed;
+		conversationsStore.addOrUpdate(chatId, trimmed);
 		isTitleEditDialogOpen = false;
 
 		try {
-			const result = await updateConversation(chatId, { title: nextTitle });
+			const result = await updateConversation(chatId, { title: trimmed });
 			if (result.ok) {
 				toast.success('Conversation title updated');
 			} else {
@@ -3129,46 +3130,13 @@
 	}
 </style>
 
-<Dialog.Root bind:open={isTitleEditDialogOpen}>
-	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title class="text-lg font-semibold text-white">Edit conversation title</Dialog.Title>
-			<Dialog.Description class="text-sm text-white/45">
-				Choose a title that makes this conversation easy to find later.
-			</Dialog.Description>
-		</Dialog.Header>
-		<Input
-			type="text"
-			bind:value={titleDraft}
-			placeholder="Conversation title"
-			maxlength={100}
-			disabled={isTitleSaving}
-			class="border-white/15 bg-black/20 text-white placeholder:text-white/25 focus-visible:border-[#DB8F5E]/60 focus-visible:ring-[#DB8F5E]/20"
-		/>
-		<Dialog.Footer class="mt-1 flex gap-2 sm:justify-end">
-			<Button
-				variant="ghost"
-				class="cursor-pointer text-white/60 hover:bg-white/10 hover:text-white"
-				disabled={isTitleSaving}
-				onclick={() => (isTitleEditDialogOpen = false)}
-			>
-				Cancel
-			</Button>
-			<Button
-				class="cursor-pointer bg-[#DB8F5E] text-black hover:bg-[#E59C6D] disabled:opacity-50"
-				disabled={!titleDraft.trim() || isTitleSaving}
-				onclick={saveConversationTitle}
-			>
-				{#if isTitleSaving}
-					<Spinner class="mr-2" />
-					Saving...
-				{:else}
-					Save title
-				{/if}
-			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+<EditTitleDialog
+	bind:open={isTitleEditDialogOpen}
+	title={conversationTitle}
+	isSaving={isTitleSaving}
+	onSave={saveConversationTitle}
+	onClose={() => (isTitleEditDialogOpen = false)}
+/>
 
 <Dialog.Root bind:open={isDeleteConversationDialogOpen}>
 	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">

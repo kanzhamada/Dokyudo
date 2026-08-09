@@ -35,6 +35,7 @@
 	import { goto } from '$app/navigation';
 
 	import { onMount } from 'svelte';
+	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
 	import { authLogout } from '$lib/api/auth';
 	import { getMe } from '$lib/api/me';
 	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
@@ -116,34 +117,34 @@
 		isEditDialogOpen = true;
 	}
 
-	async function handleUpdateConversation() {
-		if (!editingConversation || !editTitle.trim() || isUpdating) return;
+	async function handleUpdateConversation(newTitle: string) {
+		const targetTitle = newTitle.trim();
+		if (!editingConversation || !targetTitle || isUpdating) return;
 		isUpdating = true;
 
 		const targetId = editingConversation.id;
-		const updatedTitle = editTitle.trim();
 		const oldTitle = editingConversation.title;
 
 		console.log('[Auth Conversations] Updating conversation:', {
 			id: targetId,
-			title: updatedTitle
+			title: targetTitle
 		});
 
 		// Optimistically update local list & store for instant real-time feel
 		conversations = sortConversations(
-			conversations.map((c) => (c.id === targetId ? { ...c, title: updatedTitle } : c))
+			conversations.map((c) => (c.id === targetId ? { ...c, title: targetTitle } : c))
 		);
-		conversationsStore.addOrUpdate(targetId, updatedTitle);
+		conversationsStore.addOrUpdate(targetId, targetTitle);
 		isEditDialogOpen = false;
-		editingConversation = null;
 
 		try {
 			const result = await updateConversation(targetId, {
-				title: updatedTitle
+				title: targetTitle
 			});
 
 			if (result.ok) {
 				console.log('[Auth Conversations] Update success:', result.data);
+				editingConversation = null;
 			} else {
 				console.error('[Auth Conversations] Update failed, reverting:', result.error);
 				conversations = sortConversations(
@@ -669,57 +670,16 @@
 </Dialog.Root>
 
 <!-- Edit Conversation Modal -->
-<Dialog.Root bind:open={isEditDialogOpen}>
-	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-[425px]">
-		<Dialog.Header>
-			<Dialog.Title class="font-sans text-xl font-medium text-white">Edit Conversation</Dialog.Title>
-			<Dialog.Description class="text-sm text-white/70">
-				Enter a new title for this conversation.
-			</Dialog.Description>
-		</Dialog.Header>
-
-		<form
-			onsubmit={(e) => {
-				e.preventDefault();
-				handleUpdateConversation();
-			}}
-			class="mt-2 flex flex-col gap-4"
-		>
-			<Input
-				type="text"
-				placeholder="Conversation title"
-				disabled={isUpdating}
-				bind:value={editTitle}
-				variant="auth"
-				class="auth-input"
-			/>
-
-			<Dialog.Footer class="mt-2 flex gap-2 sm:justify-end">
-				<Button
-					type="button"
-					variant="outline"
-					disabled={isUpdating}
-					onclick={() => (isEditDialogOpen = false)}
-					class="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-				>
-					Cancel
-				</Button>
-				<Button
-					type="submit"
-					disabled={isUpdating || !editTitle.trim()}
-					class="bg-auth-primary text-white hover:bg-auth-primary/90"
-				>
-					{#if isUpdating}
-						<Spinner class="mr-2 size-4" />
-						Saving...
-					{:else}
-						Save Changes
-					{/if}
-				</Button>
-			</Dialog.Footer>
-		</form>
-	</Dialog.Content>
-</Dialog.Root>
+<EditTitleDialog
+	bind:open={isEditDialogOpen}
+	title={editTitle}
+	isSaving={isUpdating}
+	onSave={handleUpdateConversation}
+	onClose={() => {
+		isEditDialogOpen = false;
+		editingConversation = null;
+	}}
+/>
 
 <!-- Delete Conversation Confirmation Dialog -->
 <Dialog.Root bind:open={isDeleteDialogOpen}>

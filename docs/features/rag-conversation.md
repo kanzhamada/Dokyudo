@@ -143,6 +143,9 @@ Allows users to pin important conversations so they stay at the top of the sideb
   - Added Pin indicator icon to Desktop and Mobile header title buttons.
   - Added "Pin conversation" / "Unpin conversation" action item to Desktop title dropdown menu (`isTitleMenuOpen`) and Mobile title actions panel (`isMobileTitleActionsOpen`).
   - **Reactive 2-Way Title Sync**: Added `$effect` in `+page.svelte` listening to `conversationsStore.list`. When a conversation title is updated from the Sidebar, the Header Title on `/app/chat/[id]` instantly syncs in real-time. Both Sidebar (`AppSidebar.svelte`) and Header (`+page.svelte`) implement Optimistic UI updates with fallback revert on API error.
+- **Shared `EditTitleDialog.svelte` Component**:
+  - Extracted the Edit Conversation Title Dialog design from `/chat/[id]` into a reusable component at `apps/frontend/src/lib/components/app/EditTitleDialog.svelte`.
+  - Replaced inline dialogs in both `AppSidebar.svelte` and `+page.svelte`.
 
 ### 7. Completion Timestamps
 - **Branching:** 2026-08-08
