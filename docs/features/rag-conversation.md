@@ -147,6 +147,7 @@ Allows users to pin important conversations so they stay at the top of the sideb
   - Extracted Edit Title and Delete Conversation dialog designs from `/chat/[id]` into reusable components at `apps/frontend/src/lib/components/app/EditTitleDialog.svelte` and `apps/frontend/src/lib/components/app/DeleteConversationDialog.svelte`.
   - Replaced inline dialogs in both `AppSidebar.svelte` and `+page.svelte`.
   - **Optimistic Deletion Store Sync**: In `AppSidebar.svelte`, `handleDeleteConversation()` calls `conversationsStore.remove(deletedId)` and filters local state immediately so deleted items vanish instantly from the sidebar feed without lingering.
+  - **Sonner Toast Feedback**: Integrated `toast.success('Conversation title updated')` and `toast.success('Conversation deleted')` across both `AppSidebar.svelte` and `/chat/[id]/+page.svelte`.
 
 ### 7. Completion Timestamps
 - **Branching:** 2026-08-08

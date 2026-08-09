@@ -35,6 +35,7 @@
 	import { goto } from '$app/navigation';
 
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
 	import DeleteConversationDialog from '$lib/components/app/DeleteConversationDialog.svelte';
 	import { authLogout } from '$lib/api/auth';
@@ -225,16 +226,19 @@
 
 			if (result.ok) {
 				console.log('[Auth Conversations] Delete success:', result.data);
+				toast.success('Conversation deleted');
 				if ($page.url.pathname === `/app/chat/${deletedId}`) {
 					await goto('/app/chat');
 				}
 				deletingConversation = null;
 			} else {
 				console.error('[Auth Conversations] Delete failed, reverting:', result.error);
+				toast.error(result.error.message);
 				await fetchConversations();
 			}
 		} catch (err) {
 			console.error('[Auth Conversations] Delete Catch Error, reverting:', err);
+			toast.error('Failed to delete conversation');
 			await fetchConversations();
 		} finally {
 			isDeleting = false;

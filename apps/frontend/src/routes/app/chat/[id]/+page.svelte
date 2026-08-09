@@ -809,6 +809,7 @@
 
 			conversationsStore.remove(chatId);
 			isDeleteConversationDialogOpen = false;
+			toast.success('Conversation deleted');
 			await goto('/app/chat');
 		} catch (err) {
 			console.error('[Chat Detail] Failed to delete conversation:', err);
