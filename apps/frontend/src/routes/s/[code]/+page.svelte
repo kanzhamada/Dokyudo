@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { Copy, Check, Lock, GitBranch, Share2 } from 'lucide-svelte';
+	import { Copy, Check, Lock, Share2 } from 'lucide-svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Button } from '$lib/components/ui/button';
@@ -456,7 +456,7 @@
 						<p class="truncate text-[11px] text-white/40">{footerHint}</p>
 					</div>
 					<Button
-						class="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-amber-500 px-4 text-sm font-medium text-black hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
+						class="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-[#DB8F5E] px-4 text-sm font-medium text-black hover:bg-[#E39B6D] disabled:cursor-not-allowed disabled:opacity-40"
 						disabled={isContinuing}
 						onclick={handleContinue}
 					>
@@ -464,7 +464,6 @@
 							<Spinner class="size-3.5" />
 							Preparing...
 						{:else}
-							<GitBranch class="size-4" />
 							Continue chat
 						{/if}
 					</Button>
