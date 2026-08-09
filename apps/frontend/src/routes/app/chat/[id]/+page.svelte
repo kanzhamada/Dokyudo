@@ -24,6 +24,7 @@
 		GitBranch,
 		Volume2,
 		Pencil,
+		Pin,
 		RotateCw,
 		Square,
 		Trash2,
@@ -532,6 +533,7 @@
 	let conversationTitle = $state('New Conversation');
 	let branchOfTitle = $state<string | null>(null);
 	let branchOfId = $state<string | null>(null);
+	let isPinned = $state(false);
 	let isTitleLoading = $state(false);
 
 	// Conversation Messages
@@ -573,6 +575,7 @@
 		conversationTitle = 'New Conversation';
 		branchOfTitle = null;
 		branchOfId = null;
+		isPinned = false;
 		inputValue = '';
 		attachedFiles = [];
 
@@ -600,6 +603,7 @@
 				if (convRes.data.title) conversationTitle = convRes.data.title;
 				branchOfTitle = convRes.data.branchOf?.title ?? null;
 				branchOfId = convRes.data.branchOf?.id ?? null;
+				isPinned = convRes.data.isPinned ?? false;
 				if (convRes.data.turns && convRes.data.turns.length > 0) {
 					const historyMsgs: ChatMessage[] = [];
 					for (const turn of convRes.data.turns) {
@@ -737,6 +741,39 @@
 			toast.error('Failed to update conversation title');
 		} finally {
 			isTitleSaving = false;
+		}
+	}
+
+	async function togglePinConversation() {
+		const newPinnedState = !isPinned;
+		const targetChatId = chatId;
+		console.log('[Chat Detail] Toggling pin:', { id: targetChatId, isPinned: newPinnedState });
+
+		if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
+
+		// Optimistically update local state & store so sidebar and header update instantly
+		isPinned = newPinnedState;
+		conversationsStore.addOrUpdate(targetChatId, conversationTitle, newPinnedState);
+		isTitleMenuOpen = false;
+
+		try {
+			const result = await updateConversation(targetChatId, { isPinned: newPinnedState });
+			if (result.ok) {
+				console.log('[Chat Detail] Pin toggle success:', result.data);
+				toast.success(newPinnedState ? 'Conversation pinned' : 'Conversation unpinned');
+			} else {
+				console.error('[Chat Detail] Pin toggle failed, reverting:', result.error);
+				isPinned = !newPinnedState;
+				conversationsStore.addOrUpdate(targetChatId, conversationTitle, !newPinnedState);
+				toast.error('Failed to update pin status');
+			}
+		} catch (err) {
+			console.error('[Chat Detail] Pin toggle catch error, reverting:', err);
+			isPinned = !newPinnedState;
+			conversationsStore.addOrUpdate(targetChatId, conversationTitle, !newPinnedState);
+			toast.error('Failed to update pin status');
 		}
 	}
 
@@ -1859,11 +1896,16 @@
 
 				<button
 					type="button"
-					class="min-w-0 max-w-[45%] cursor-pointer truncate px-2 text-xs font-medium text-white/75 transition-colors hover:text-white"
+					class="flex min-w-0 max-w-[45%] cursor-pointer items-center justify-center gap-1.5 truncate px-2 text-xs font-medium text-white/75 transition-colors hover:text-white"
 					onclick={toggleMobileTitleActions}
 					aria-label="Conversation actions"
 				>
-					{isTitleLoading ? 'Generating title...' : conversationTitle || 'New Conversation'}
+					{#if isPinned}
+						<Pin class="size-3.5 rotate-45 shrink-0 text-white/60" />
+					{/if}
+					<span class="truncate">
+						{isTitleLoading ? 'Generating title...' : conversationTitle || 'New Conversation'}
+					</span>
 				</button>
 
 				<div class="flex items-center gap-1">
@@ -1931,6 +1973,17 @@
 						aria-label="Edit conversation title"
 					>
 						<Pencil class="size-4" />
+					</button>
+					<button
+						type="button"
+						class="flex size-10 cursor-pointer items-center justify-center rounded-full border {isPinned ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-white/10 bg-white/5 text-white/65'} transition-colors hover:bg-white/10 hover:text-white"
+						onclick={() => {
+							isMobileTitleActionsOpen = false;
+							togglePinConversation();
+						}}
+						aria-label={isPinned ? 'Unpin conversation' : 'Pin conversation'}
+					>
+						<Pin class="size-4 rotate-45" />
 					</button>
 					<button
 						type="button"
@@ -2009,6 +2062,9 @@
 											class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
 											onclick={openTitleMenu}
 										>
+											{#if isPinned}
+												<Pin class="size-3.5 rotate-45 shrink-0 text-white/60" />
+											{/if}
 											<span class="max-w-56 truncate">
 												{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
 											</span>
@@ -2027,6 +2083,9 @@
 							class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
 							onclick={openTitleMenu}
 						>
+							{#if isPinned}
+								<Pin class="size-3.5 rotate-45 shrink-0 text-white/60" />
+							{/if}
 							<span class="max-w-56 truncate">
 								{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
 							</span>
@@ -3185,6 +3244,14 @@
 		>
 			<Pencil class="size-3.5 text-white/60" />
 			<span>Edit title</span>
+		</button>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={togglePinConversation}
+		>
+			<Pin class="size-3.5 text-white/60" />
+			<span>{isPinned ? 'Unpin conversation' : 'Pin conversation'}</span>
 		</button>
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
