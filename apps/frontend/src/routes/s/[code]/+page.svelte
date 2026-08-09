@@ -140,9 +140,6 @@
 	let codeBlockInstances: { el: HTMLElement; unmount: () => void }[] = [];
 
 	const isSignedIn = $derived(!!sessionStore.getAccessToken());
-	const turnLabel = $derived(
-		share ? `${share.turns.length} turn${share.turns.length === 1 ? '' : 's'}` : ''
-	);
 	const footerHint = $derived(
 		isSignedIn
 			? 'Continue in your private chat (a copy of this link).'
@@ -428,7 +425,7 @@
 							<span>Read-only share</span>
 						</span>
 						<span class="text-xs text-white/40">
-							Shared {formatSharedDate(share.createdAt)} · {turnLabel}
+							Shared {formatSharedDate(share.createdAt)}
 						</span>
 					</div>
 				</div>
@@ -605,9 +602,7 @@
 					class="flex w-full items-center justify-between gap-3 rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.85] px-4 py-2.5 shadow-2xl backdrop-blur-[42px] transition-all"
 				>
 					<div class="flex min-w-0 flex-col gap-0.5">
-						<p class="truncate text-xs text-white/60">
-							Shared read-only via Dokyudo — {turnLabel}, excluding any further conversation.
-						</p>
+						<p class="truncate text-xs text-white/60">Shared read-only via Dokyudo.</p>
 						<p class="truncate text-[11px] text-white/40">{footerHint}</p>
 					</div>
 					<Button
