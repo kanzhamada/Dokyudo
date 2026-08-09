@@ -37,10 +37,20 @@
 	let errorMessage = $state('');
 	let copiedCode = $state<string | null>(null);
 
+	/**
+	 * Custom codes rejected with 409 during THIS page session — in-memory only,
+	 * lost on refresh. Pure UX hint while typing: the server (DB unique index)
+	 * remains the source of truth, so the submit stays enabled.
+	 */
+	let rejectedCodes = $state(new Set<string>());
+
 	let lastCreatedUrl = $state<string | null>(null);
 	const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
 	const customCodeValid = $derived(/^[a-zA-Z0-9_-]{4,32}$/.test(customCode.trim()));
+	const isRejectedInput = $derived(
+		customCode.trim().length > 0 && rejectedCodes.has(customCode.trim())
+	);
 	const previewUrl = $derived(customCode.trim() ? `${origin}/s/${customCode.trim()}` : null);
 
 	function handleClose() {
@@ -99,6 +109,9 @@
 				onShared?.();
 				await loadShares();
 			} else {
+				if (result.error.code === 'CODE_TAKEN' && code) {
+					rejectedCodes.add(code);
+				}
 				errorMessage =
 					result.error.code === 'CODE_TAKEN'
 						? 'Custom link tersebut sudah dipakai orang lain.'
@@ -214,7 +227,11 @@
 					placeholder="nama-kustom"
 					class="border-white/15 bg-white/5 text-white placeholder:text-white/30 focus:border-amber-400/50"
 				/>
-				{#if previewUrl}
+				{#if isRejectedInput}
+					<p class="mt-1 flex items-center gap-1 text-[11px] text-amber-300/80">
+						<span>Sudah pernah ditolak karena dipakai — pilih kode lain kalau masih tersedia.</span>
+					</p>
+				{:else if previewUrl}
 					<p class="mt-1 truncate font-mono text-[11px] text-white/40">{previewUrl}</p>
 				{/if}
 			</div>

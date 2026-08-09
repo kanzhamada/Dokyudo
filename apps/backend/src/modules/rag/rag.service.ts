@@ -1745,10 +1745,7 @@ data: ${JSON.stringify(startedPayload)}
 
         if (shareCodes.length > 0) {
             try {
-                await redis.del(...shareCodes.flatMap((code) => [
-                    RedisKeys.shareCache(code),
-                    RedisKeys.shareCodeTaken(code),
-                ]));
+                await redis.del(...shareCodes.map((code) => RedisKeys.shareCache(code)));
             } catch {
                 // non-fatal — stale cache entries expire on their own
             }

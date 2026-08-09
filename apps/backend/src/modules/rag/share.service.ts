@@ -87,7 +87,6 @@ export class ShareService {
         let snapshot: SnapshotTurn[] = [];
         let boundaryTurnId: string | null = null;
         let insertedCode: string | null = null;
-        let isCustomCode = false;
 
         await withAuthDb(userId, async (tx) => {
             const [conv] = await tx
@@ -167,7 +166,6 @@ export class ShareService {
                         expiresAt,
                     });
                     insertedCode = custom;
-                    isCustomCode = true;
                 } catch (err: any) {
                     if (isUniqueViolation(err)) {
                         throw new AppError({
@@ -208,20 +206,6 @@ export class ShareService {
                 }
             }
         });
-
-        // Mark the custom code as taken (outside the DB transaction). Fast
-        // pre-check only — the DB unique index remains the source of truth.
-        if (isCustomCode) {
-            try {
-                await redis.set(
-                    RedisKeys.shareCodeTaken(custom!),
-                    "1",
-                    { ex: MAX_SHARE_CACHE_TTL_SECONDS },
-                );
-            } catch {
-                // non-fatal
-            }
-        }
 
         return { code: insertedCode! };
     }
@@ -439,10 +423,7 @@ export class ShareService {
         });
 
         try {
-            await redis.del(
-                RedisKeys.shareCache(code),
-                RedisKeys.shareCodeTaken(code),
-            );
+            await redis.del(RedisKeys.shareCache(code));
         } catch {
             // non-fatal
         }
@@ -480,10 +461,7 @@ export class ShareService {
 
         if (codes.length > 0) {
             try {
-                await redis.del(...codes.flatMap((code) => [
-                    RedisKeys.shareCache(code),
-                    RedisKeys.shareCodeTaken(code),
-                ]));
+                await redis.del(...codes.map((code) => RedisKeys.shareCache(code)));
             } catch {
                 // non-fatal
             }
