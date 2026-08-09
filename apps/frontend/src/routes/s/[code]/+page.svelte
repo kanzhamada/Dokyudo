@@ -2,123 +2,20 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import {
-		Copy,
-		Check,
-		FileText,
-		BookOpen,
-		Square,
-		TriangleAlert,
-		ShieldAlert,
-		Lock,
-		GitBranch,
-		Share2
-	} from 'lucide-svelte';
+	import { Copy, Check, Lock, GitBranch, Share2 } from 'lucide-svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Button } from '$lib/components/ui/button';
 	import CodeBlockPreview from '$lib/components/chat/CodeBlockPreview.svelte';
+	import TurnStatusBadge from '$lib/components/chat/TurnStatusBadge.svelte';
+	import SourceReferences from '$lib/components/chat/SourceReferences.svelte';
+	import { renderMarkdown } from '$lib/utils/markdown';
 	import { continueShare, getPublicShare } from '$lib/api/rag';
 	import { sessionStore } from '$lib/state/session.store.svelte';
-	import { marked } from 'marked';
 	import { mount, unmount, untrack } from 'svelte';
 	import type { PublicShare, PublicShareTurn } from '$lib/types/rag.types';
 	import favicon from '$lib/assets/favicon.svg';
-
-	const customRenderer = new marked.Renderer();
-	customRenderer.code = ({ text, lang }: { text: string; lang?: string }) => {
-		const cleanLang = (lang || '').trim().toLowerCase();
-		const encodedCode = encodeURIComponent(text);
-		return `<div class="code-block-embed my-3" data-code="${encodedCode}" data-lang="${cleanLang}"></div>`;
-	};
-
-	marked.setOptions({
-		gfm: true,
-		breaks: true,
-		renderer: customRenderer
-	});
-
-	function formatPageNumbers(raw: string): string {
-		if (!raw) return '';
-		const expanded = raw.replace(/(\d+)\s*-\s*(\d+)/g, (_m, startStr, endStr) => {
-			const start = Number(startStr);
-			const end = Number(endStr);
-			if (end > start && end - start < 30) {
-				const arr: number[] = [];
-				for (let i = start; i <= end; i++) arr.push(i);
-				return arr.join(', ');
-			}
-			return `${startStr}, ${endStr}`;
-		});
-		const matches = expanded.match(/\d+/g);
-		if (!matches || matches.length === 0) return raw.trim();
-		return Array.from(new Set(matches.map(Number)))
-			.sort((a, b) => a - b)
-			.join(', ');
-	}
-
-	function escapeHtml(value: string): string {
-		return value
-			.replace(/&/g, '&amp;')
-			.replace(/"/g, '&quot;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;');
-	}
-
-	/**
-	 * Inline citation chips — identical look to the chat page, but static:
-	 * no document preview (public viewers have no document access) and no
-	 * tooltip interaction. Title + pages come from the share snapshot.
-	 */
-	function transformCitationTags(
-		html: string,
-		references?: PublicShareTurn['contextReferences']
-	): string {
-		const isNegativeAnswer =
-			/(Mohon maaf|tidak mengandung informasi|tidak ditemukan|tidak ada informasi|does not contain|cannot answer|no information available)/i.test(
-				html
-			);
-		if (isNegativeAnswer) {
-			return html.replace(/\s*\[Doc [^\]]+\]/gi, '');
-		}
-
-		let cleanHtml = html.replace(/\[Doc \d+:[^\]]*;[^\]]*\]/gi, '');
-
-		let result = cleanHtml.replace(
-			/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi,
-			(_match, docIdxStr, rawPageInfo) => {
-				const docIdx = Number(docIdxStr);
-				let docDisplayName = `Doc ${docIdx}`;
-
-				if (references && references.length > 0) {
-					const refDoc = references.find((r) => r.index === docIdx) ?? references[docIdx - 1];
-					if (refDoc && refDoc.title) {
-						const cleanName = refDoc.title.replace(/\.[^/.]+$/, '');
-						docDisplayName = cleanName.length > 22 ? cleanName.slice(0, 22) + '...' : cleanName;
-					}
-				}
-
-				const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
-				const label = pageFormatted
-					? `${escapeHtml(docDisplayName)} <span class="text-white/40 font-normal">• ${escapeHtml(pageFormatted)}</span>`
-					: escapeHtml(docDisplayName);
-
-				return `<span class="relative inline-flex items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 mx-0.5 my-0.5 whitespace-nowrap">${label}</span>`;
-			}
-		);
-
-		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
-	}
-
-	function renderMarkdown(text: string, references?: PublicShareTurn['contextReferences']): string {
-		if (!text) return '';
-		try {
-			const rawHtml = marked.parse(text) as string;
-			return transformCitationTags(rawHtml, references);
-		} catch {
-			return text;
-		}
-	}
+	import faviconRaw from '$lib/assets/favicon.svg?raw';
 
 	// Map snapshot references to the chat page's reference shape (id/name/pages/snippet).
 	function refsOf(turn: PublicShareTurn) {
@@ -269,49 +166,47 @@
 		style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
 	></div>
 
-	<!-- ================= Mobile Header (Floating Capsule — same as chat page) ================= -->
+	<!-- ================= Mobile Header (documents-style capsule, logo left) ================= -->
 	<div
-		class="pointer-events-auto absolute top-3 right-3 left-3 z-30 overflow-hidden rounded-[24px] border border-white/15 bg-[#232323]/90 shadow-2xl backdrop-blur-[42px] md:hidden"
+		class="pointer-events-auto fixed inset-x-4 top-4 z-50 flex h-14 items-center justify-between overflow-hidden rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.40] px-4 shadow-lg backdrop-blur-[42px] transition-all duration-500 md:hidden"
 	>
-		<div class="flex h-14 items-center justify-between px-3">
-			<a href="/" class="flex shrink-0 items-center gap-1.5" aria-label="Dokyudo home">
-				<img src={favicon} alt="Dokyudo" class="h-6 w-auto" />
-			</a>
-
-			<div class="flex min-w-0 flex-1 items-center justify-center px-2">
-				<span class="max-w-full truncate text-xs font-medium text-white/75" title={share?.title}>
-					{share?.title ?? 'Shared conversation'}
-				</span>
+		<a href="/" class="flex shrink-0 items-center gap-0.5" aria-label="Dokyudo home">
+			<div class="flex items-center [&_path]:fill-white [&>svg]:size-6">
+				{@html faviconRaw}
 			</div>
+			<span class="font-geist text-lg font-bold tracking-tight text-white">okyudo</span>
+		</a>
 
-			<div class="flex shrink-0 items-center gap-1.5">
-				<Tooltip.Provider delayDuration={100}>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<button
-									{...props}
-									type="button"
-									class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-									onclick={copyShareLink}
-									aria-label="Copy share link"
-								>
-									{#if copiedLink}
-										<Check class="size-4 text-green-400" />
-									{:else}
-										<Share2 class="size-4" />
-									{/if}
-								</button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content
-							class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
-						>
-							<p>{copiedLink ? 'Copied!' : 'Copy link'}</p>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
-			</div>
+		<div class="flex min-w-0 flex-1 items-center justify-end gap-1.5 pl-3">
+			<span class="max-w-[40%] truncate text-xs font-medium text-white/75" title={share?.title}>
+				{share?.title ?? 'Shared conversation'}
+			</span>
+			<Tooltip.Provider delayDuration={100}>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<button
+								{...props}
+								type="button"
+								class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+								onclick={copyShareLink}
+								aria-label="Copy share link"
+							>
+								{#if copiedLink}
+									<Check class="size-4 text-green-400" />
+								{:else}
+									<Share2 class="size-4" />
+								{/if}
+							</button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content
+						class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+					>
+						<p>{copiedLink ? 'Copied!' : 'Copy link'}</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			</Tooltip.Provider>
 		</div>
 	</div>
 
@@ -483,7 +378,7 @@
 							>
 								{#if turn.answer}
 									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-									{@html renderMarkdown(turn.answer, turn.contextReferences)}
+									{@html renderMarkdown(turn.answer, turn.contextReferences, false)}
 								{:else}
 									<div
 										class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
@@ -494,62 +389,11 @@
 							</div>
 
 							<!-- Terminal Status Marker (stopped / failed / blocked) -->
-							{#if turn.status === 'stopped'}
-								<div
-									class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
-								>
-									<Square class="size-3" />
-									<span>Response Stopped</span>
-								</div>
-							{:else if turn.status === 'failed'}
-								<div
-									class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
-								>
-									<TriangleAlert class="size-3" />
-									<span>Response failed</span>
-								</div>
-							{:else if turn.status === 'blocked'}
-								<div
-									class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
-								>
-									<ShieldAlert class="size-3" />
-									<span>Response blocked by security filter</span>
-								</div>
-							{/if}
+							<TurnStatusBadge status={turn.status} />
 
 							<!-- Document Reference Chips (static — no document preview) -->
 							{#if refsOf(turn).length > 0}
-								<div class="mt-2 border-t border-white/10 pt-3">
-									<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
-										<BookOpen class="size-3.5 text-white/60" />
-										<span>Source References ({refsOf(turn).length})</span>
-									</div>
-									<div class="flex flex-wrap gap-2">
-										{#each refsOf(turn) as ref (ref.id)}
-											<Tooltip.Provider delayDuration={100}>
-												<Tooltip.Root>
-													<Tooltip.Trigger
-														class="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#2B2A29] px-3 py-1 text-xs text-white/80"
-													>
-														<FileText class="size-3 text-white/60" />
-														<span class="font-medium">{ref.name}</span>
-														{#if ref.pages && ref.pages.length > 0}
-															<span class="text-white/40">• {ref.pages.join(', ')}</span>
-														{/if}
-													</Tooltip.Trigger>
-													<Tooltip.Content
-														class="max-w-xs rounded-md border-0 bg-white px-3 py-1.5 text-xs text-black shadow-md"
-													>
-														<p class="font-semibold text-black">{ref.name}</p>
-														{#if ref.snippet}
-															<p class="mt-1 text-black/70 italic">"{ref.snippet}"</p>
-														{/if}
-													</Tooltip.Content>
-												</Tooltip.Root>
-											</Tooltip.Provider>
-										{/each}
-									</div>
-								</div>
+								<SourceReferences references={refsOf(turn)} />
 							{/if}
 
 							<!-- Action Toolbar (Copy only — no retry/feedback/dropdown on a shared chat) -->

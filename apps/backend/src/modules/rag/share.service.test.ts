@@ -193,13 +193,21 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
         );
     });
 
-    it("continueShare: builds a new conversation from the snapshot", async () => {
+    it("continueShare: builds a new conversation from the snapshot (no branch marker)", async () => {
         const result = await ShareService.continueShare({
             userId: TEST_USER_ID,
             tenantId: TEST_TENANT_ID,
             code: shareCode,
         });
-        assertEquals(result.title, "Branched - Share Test Conversation");
+        // Plain copy of the shared title — no "Branched -" prefix.
+        assertEquals(result.title, "Share Test Conversation");
+
+        const [conv] = await db
+            .select({ branchOfId: conversations.branchOfId })
+            .from(conversations)
+            .where(eq(conversations.id, result.id));
+        // No lineage marker: the continued chat never shows "Branched from".
+        assertEquals(conv?.branchOfId, null);
 
         const turns = await db
             .select({
@@ -214,8 +222,8 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
         assertEquals(turns.length, 2);
         assertEquals(turns[0].question, "Pertanyaan pertama");
         assertEquals(turns[1].answer, "Jawaban kedua");
-        // boundary marker on the last copied turn
-        assertEquals(turns[1].branchedFromTurnId !== null, true);
+        // No boundary marker on the last copied turn either.
+        assertEquals(turns[1].branchedFromTurnId, null);
 
         await db.delete(conversations).where(eq(conversations.id, result.id));
     });

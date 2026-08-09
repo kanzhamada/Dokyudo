@@ -363,10 +363,10 @@ export class ShareService {
                 .insert(conversations)
                 .values({
                     tenantId,
-                    title: `Branched - ${share.title}`,
-                    // Lineage to the shared conversation (set null on parent
-                    // delete — the share itself is cascade-deleted too).
-                    branchOfId: share.conversationId,
+                    // Plain copy of the shared title — no "Branched -" prefix
+                    // and no branchOf lineage: a continued chat stands on its
+                    // own and never shows a "Branched from" marker.
+                    title: share.title,
                 })
                 .returning({ id: conversations.id, title: conversations.title });
             newConversationId = newConv.id;
@@ -374,7 +374,7 @@ export class ShareService {
 
             if (snapshot.length > 0) {
                 await tx.insert(conversationTurns).values(
-                    snapshot.map((t, i) => ({
+                    snapshot.map((t) => ({
                         id: crypto.randomUUID(),
                         tenantId,
                         conversationId: newConversationId,
@@ -383,8 +383,7 @@ export class ShareService {
                         modelUsed: t.modelUsed,
                         contextReferences: t.contextReferences as any,
                         status: t.status as any,
-                        branchedFromTurnId:
-                            i === snapshot.length - 1 ? share.boundaryTurnId : null,
+                        branchedFromTurnId: null,
                         createdAt: new Date(t.createdAt),
                     })),
                 );

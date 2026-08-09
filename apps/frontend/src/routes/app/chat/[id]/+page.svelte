@@ -21,7 +21,6 @@
 		Check,
 		ThumbsUp,
 		ThumbsDown,
-		BookOpen,
 		Ellipsis,
 		GitBranch,
 		Volume2,
@@ -35,8 +34,6 @@
 		KeyRound,
 		Plus,
 		Share2,
-		ShieldAlert,
-		TriangleAlert,
 		Menu
 	} from 'lucide-svelte';
 
@@ -76,110 +73,12 @@
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 	import { mergeConversationReferences, type DocReference } from '$lib/utils/doc-references';
 	import type { TurnAlternative } from '$lib/types/rag.types';
-	import { marked } from 'marked';
-	import { mount, unmount, untrack } from 'svelte';
 	import CodeBlockPreview from '$lib/components/chat/CodeBlockPreview.svelte';
 	import CitationTooltip from '$lib/components/chat/CitationTooltip.svelte';
-
-	const customRenderer = new marked.Renderer();
-	customRenderer.code = ({ text, lang }: { text: string; lang?: string }) => {
-		const cleanLang = (lang || '').trim().toLowerCase();
-		const encodedCode = encodeURIComponent(text);
-		return `<div class="code-block-embed my-3" data-code="${encodedCode}" data-lang="${cleanLang}"></div>`;
-	};
-
-	marked.setOptions({
-		gfm: true,
-		breaks: true,
-		renderer: customRenderer
-	});
-
-	function formatPageNumbers(raw: string): string {
-		if (!raw) return '';
-		const expanded = raw.replace(/(\d+)\s*-\s*(\d+)/g, (_m, startStr, endStr) => {
-			const start = Number(startStr);
-			const end = Number(endStr);
-			if (end > start && end - start < 30) {
-				const arr: number[] = [];
-				for (let i = start; i <= end; i++) {
-					arr.push(i);
-				}
-				return arr.join(', ');
-			}
-			return `${startStr}, ${endStr}`;
-		});
-
-		const matches = expanded.match(/\d+/g);
-		if (!matches || matches.length === 0) return raw.trim();
-
-		const uniqueNums = Array.from(new Set(matches.map(Number))).sort((a, b) => a - b);
-		return uniqueNums.join(', ');
-	}
-
-	function escapeHtml(value: string): string {
-		return value
-			.replace(/&/g, '&amp;')
-			.replace(/"/g, '&quot;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;');
-	}
-
-	function transformCitationTags(html: string, references?: DocReference[]): string {
-		if (!html) return '';
-
-		const isNegativeAnswer =
-			/(Mohon maaf|tidak mengandung informasi|tidak ditemukan|tidak ada informasi|does not contain|cannot answer|no information available)/i.test(
-				html
-			);
-		if (isNegativeAnswer) {
-			return html.replace(/\s*\[Doc [^\]]+\]/gi, '');
-		}
-
-		let cleanHtml = html.replace(/\[Doc \d+:[^\]]*;[^\]]*\]/gi, '');
-
-		let result = cleanHtml.replace(
-			/\[Doc (\d+)(?::\s*(?:Hlm\.|Pages?|Page)?\s*([^\]]+))?\]/gi,
-			(_match, docIdxStr, rawPageInfo) => {
-				const docIdx = Number(docIdxStr);
-				let docDisplayName = `Doc ${docIdx}`;
-				let docId = '';
-				let docFullName = '';
-				let snippet = '';
-
-				if (references && references.length > 0) {
-					const refDoc =
-						references.find((r) => r.index === docIdx || r.id === docIdxStr) ||
-						references[docIdx - 1];
-					if (refDoc && refDoc.name) {
-						docId = refDoc.id;
-						docFullName = refDoc.name;
-						snippet = refDoc.snippet ?? '';
-						const cleanName = refDoc.name.replace(/\.[^/.]+$/, '');
-						docDisplayName = cleanName.length > 22 ? cleanName.slice(0, 22) + '...' : cleanName;
-					}
-				}
-
-				const pageFormatted = rawPageInfo ? formatPageNumbers(rawPageInfo) : '';
-				const label = pageFormatted
-					? `${escapeHtml(docDisplayName)} <span class="text-white/40 font-normal">• ${escapeHtml(pageFormatted)}</span>`
-					: escapeHtml(docDisplayName);
-
-				return `<span data-doc-id="${escapeHtml(docId)}" data-doc-title="${escapeHtml(docFullName)}" data-snippet="${escapeHtml(snippet)}" data-pages="${escapeHtml(pageFormatted)}" class="relative inline-flex cursor-pointer items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white mx-0.5 my-0.5 whitespace-nowrap">${label}</span>`;
-			}
-		);
-
-		return result.replace(/\s*\[Doc [^\]]+\]/gi, '');
-	}
-
-	function renderMarkdown(text: string, references?: DocReference[]): string {
-		if (!text) return '';
-		try {
-			const rawHtml = marked.parse(text) as string;
-			return transformCitationTags(rawHtml, references);
-		} catch (e) {
-			return text;
-		}
-	}
+	import { mount, unmount, untrack } from 'svelte';
+	import TurnStatusBadge from '$lib/components/chat/TurnStatusBadge.svelte';
+	import SourceReferences from '$lib/components/chat/SourceReferences.svelte';
+	import { renderMarkdown } from '$lib/utils/markdown';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
 	import cohereIcon from '$lib/assets/llm/cohere.svg';
@@ -2913,29 +2812,11 @@
 									{/if}
 								</div>
 
-								<!-- Terminal Status Marker (stopped / failed) -->
-								{#if !msg.isStreaming && displayedStatusOf(msg) === 'stopped'}
-									<div
-										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
-									>
-										<Square class="size-3" />
-										<span>Response Stopped</span>
-									</div>
-								{:else if !msg.isStreaming && displayedStatusOf(msg) === 'failed'}
-									<div
-										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
-									>
-										<TriangleAlert class="size-3" />
-										<span>Response failed — regenerate or edit the question above</span>
-									</div>
-								{:else if !msg.isStreaming && displayedStatusOf(msg) === 'blocked'}
-									<div
-										class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
-									>
-										<ShieldAlert class="size-3" />
-										<span>Response blocked by security filter</span>
-									</div>
-								{/if}
+								<!-- Terminal Status Marker (stopped / failed / blocked) -->
+								<TurnStatusBadge
+									status={!msg.isStreaming ? displayedStatusOf(msg) : null}
+									detailed
+								/>
 
 								{#if speakingMessageId === msg.id}
 									<div
@@ -2957,42 +2838,12 @@
 
 								<!-- Document Reference Chips -->
 								{#if !msg.isStreaming && !msg.isRetrying && !displayedCancelledOf(msg) && displayedRefsOf(msg).length > 0}
-									<div class="mt-2 border-t border-white/10 pt-3">
-										<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
-											<BookOpen class="size-3.5 text-white/60" />
-											<span>Source References ({displayedRefsOf(msg).length})</span>
-										</div>
-										<div class="flex flex-wrap gap-2">
-											{#each displayedRefsOf(msg) as ref}
-												<Tooltip.Provider delayDuration={100}>
-													<Tooltip.Root>
-														<Tooltip.Trigger
-															class="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#2B2A29] px-3 py-1 text-xs text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white"
-															onclick={() => openCitationPreview(ref.id, ref.name, ref.pages ?? [])}
-														>
-															<FileText class="size-3 text-white/60" />
-															<span class="font-medium">{ref.name}</span>
-															{#if ref.pages && ref.pages.length > 0}
-																<span class="text-white/40">• {ref.pages.join(', ')}</span>
-															{:else if ref.page}
-																<span class="text-white/40"
-																	>• {formatPageNumbers(String(ref.page))}</span
-																>
-															{/if}
-														</Tooltip.Trigger>
-														<Tooltip.Content
-															class="max-w-xs rounded-md border-0 bg-white px-3 py-1.5 text-xs text-black shadow-md"
-														>
-															<p class="font-semibold text-black">{ref.name}</p>
-															{#if ref.snippet}
-																<p class="mt-1 text-black/70 italic">"{ref.snippet}"</p>
-															{/if}
-														</Tooltip.Content>
-													</Tooltip.Root>
-												</Tooltip.Provider>
-											{/each}
-										</div>
-									</div>
+									<SourceReferences
+										references={displayedRefsOf(msg)}
+										interactive
+										onPreview={(ref) =>
+											openCitationPreview(ref.id ?? '', ref.name, ref.pages ?? [])}
+									/>
 								{/if}
 
 								<!-- Action Toolbar (Copy, Retry, Thumbs Up/Down, Dropdown Menu) -->
