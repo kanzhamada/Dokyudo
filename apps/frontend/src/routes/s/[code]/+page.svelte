@@ -396,7 +396,7 @@
 
 	<!-- ================= Main Content ================= -->
 	<main
-		class="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
+		class="relative z-10 flex min-h-0 flex-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
 	>
 		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-32">
 			{#if isLoading}
