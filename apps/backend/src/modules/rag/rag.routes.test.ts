@@ -141,6 +141,16 @@ describe("RAG Routes", () => {
             assertEquals(json.data.success, true);
         });
 
+        it("positive: updates isPinned successfully", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(`/api/rag/conversations/${testConversationId}`, "PATCH", { isPinned: true }, headers);
+            
+            if (!validToken) return;
+            assertEquals(res.status, 200);
+            const json = await res.json();
+            assertEquals(json.data.success, true);
+        });
+
         it("negative: empty title returns 400 validation error", async () => {
             const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
             const res = await makeRequest(`/api/rag/conversations/${testConversationId}`, "PATCH", { title: "" }, headers);

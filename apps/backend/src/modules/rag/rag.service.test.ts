@@ -260,9 +260,9 @@ describe("RagService Isolated Tests", () => {
         });
     });
 
-    describe("updateConversationTitle", () => {
+    describe("updateConversation", () => {
         it("positive: updates conversation title successfully", async () => {
-            await RagService.updateConversationTitle({
+            await RagService.updateConversation({
                 userId: TEST_USER_ID,
                 tenantId: TEST_TENANT_ID,
                 conversationId: TEST_CONVERSATION_ID,
@@ -274,9 +274,22 @@ describe("RagService Isolated Tests", () => {
             assertEquals(result[0].title, "Updated Title");
         });
 
+        it("positive: updates conversation isPinned successfully", async () => {
+            await RagService.updateConversation({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                isPinned: true,
+            });
+
+            // Verify in DB
+            const result = await db.select().from(conversations).where(eq(conversations.id, TEST_CONVERSATION_ID));
+            assertEquals(result[0].isPinned, true);
+        });
+
         it("negative: throws 404 if conversation does not exist or wrong tenant", async () => {
             await assertRejects(
-                () => RagService.updateConversationTitle({
+                () => RagService.updateConversation({
                     userId: TEST_USER_ID,
                     tenantId: crypto.randomUUID(), // wrong tenant
                     conversationId: TEST_CONVERSATION_ID,

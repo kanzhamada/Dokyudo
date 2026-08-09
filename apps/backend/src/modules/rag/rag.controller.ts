@@ -33,18 +33,19 @@ export async function handleChat(c: Context) {
     });
 }
 
-export async function handleUpdateConversationTitle(c: Context) {
+export async function handleUpdateConversation(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, userId } = extractor.extractAuthContext();
 
     const { id: conversationId } = c.req.valid("param" as never) as { id: string };
     const body = extractor.extractValidJson<RagSchema.UpdateConversationBody>();
 
-    await RagService.updateConversationTitle({
+    await RagService.updateConversation({
         userId,
         tenantId,
         conversationId,
         title: body.title,
+        isPinned: body.isPinned,
     });
 
     return c.json({ data: { success: true } });

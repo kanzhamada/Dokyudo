@@ -120,37 +120,47 @@ Branch = conversation baru yang dimulai dari **salinan history** sampai turn bat
 - Divider `Branched from {title}` dirender **hanya di bawah response AI** (bukan question user): icon `GitBranch` + title sebagai `<a href>` (underline, hyperlink ke parent conversation; SvelteKit tetap client-side nav). Parent dihapus → **"Branched from Deleted Conversation"** tanpa link.
 - Setelah branch berhasil: `conversationsStore.addOrUpdate(id, "Branched - XXXX")` → conversation branch langsung muncul di **paling atas** sidebar, lalu navigate ke halaman branch.
 
-### 6. Completion Timestamp
-**Branching:** 2026-08-08
+### 6. Pin Conversation Feature
+
+#### 6.1 Core Logic
+Allows users to pin important conversations so they stay at the top of the sidebar list regardless of update timestamps. Pinned conversations are sorted first in descending order (`desc(isPinned)`), followed by non-pinned conversations ordered by `desc(updatedAt)`.
+
+#### 6.2 Database Schema (Migration `0023_add_is_pinned_to_conversations.sql`)
+- Added column `conversations.is_pinned` (boolean, default `false`, NOT NULL).
+
+#### 6.3 REST Endpoint & Partial Update (`PATCH /api/rag/conversations/{id}`)
+- Updated `UpdateConversationBodySchema` to accept optional `title` and/or `isPinned` properties.
+- Service `RagService.updateConversation` dynamically sets `title` and/or `isPinned` and updates `updatedAt`.
+- `listConversations` & `getConversation` return `isPinned: boolean`.
+
+### 7. Completion Timestamps
+- **Branching:** 2026-08-08
+- **Pin Conversation Backend:** 2026-08-09 11:04 (UTC+7)
 
 ## Completion Timestamp
-**Date:** 2026-08-08
-**Time:** 00:35 (UTC+7)
+**Date:** 2026-08-09
+**Time:** 11:04 (UTC+7)
 
 ## File Mapping
-- `apps/backend/src/modules/rag/rag.schema.ts`: Added schema definitions and types for conversation management and turn interactions.
-- `apps/backend/src/modules/rag/rag.service.ts`: Implemented `deleteTurn`, `deleteConversation`, prompt guardrails, `filterReferencesByCitations` server-side DB & history filtering, `isNewConversation` detection, smart title generation, and `event: title` SSE emission.
-- `apps/backend/src/modules/rag/rag.controller.ts`: Implemented `handleDeleteTurn`, `handleDeleteConversation`, `handleUpdateTurnFeedback`, and chat stream controller handlers.
-- `apps/backend/src/modules/rag/rag.routes.ts`: Registered OpenAPI specifications for `DELETE /api/rag/conversations/{id}/turns/{turnId}`, title update, feedback, and conversation deletion.
-- `apps/backend/src/modules/rag/rag.service.test.ts`: Added unit tests covering positive and negative execution paths for `deleteTurn`, `updateTurnFeedback`, and `filterReferencesByCitations`.
-- `apps/backend/src/modules/rag/rag.routes.test.ts`: Added route execution tests for `DELETE /api/rag/conversations/:id/turns/:turnId`.
-- `api-collections/Search & RAG/07_Delete Turn.bru`: Created Bruno API collection request for turn deletion endpoint.
-- `apps/frontend/src/lib/types/rag.types.ts`: Exported `DeleteTurnResponse` interface.
-- `apps/frontend/src/lib/api/rag.ts`: Exported `deleteTurn` API client helper.
-- `apps/frontend/src/routes/app/+layout.svelte`: Locked viewport bounds on `<main>` (`h-svh max-h-svh flex-1 min-h-0 flex-col overflow-hidden`).
-- `apps/frontend/src/routes/app/chat/[id]/+page.svelte`: Built headerless layout, active feedback button hover styling, toast notifications, delete response confirmation modal, `untrack()` Svelte 5 effect optimization, 404 route redirect, matching markdown hr styling, responsive floating input bar with linear gradient, action bars, auto-resetting textarea height `$effect`, and client-side citation tag transformer and filtering.
-- `apps/frontend/src/routes/app/chat/+page.svelte`: Applied auto-resetting textarea height `$effect` to main chat page input.
-- `apps/frontend/src/lib/state/conversations.store.svelte.ts`: Created reactive Svelte 5 conversation store for real-time sidebar synchronization.
-- `apps/frontend/src/lib/components/app/AppSidebar.svelte`: Connected recent chats list to `conversationsStore` for instant live updates.
+- `apps/backend/drizzle/migrations/0023_add_is_pinned_to_conversations.sql`: Drizzle migration adding `is_pinned` column to `conversations`.
+- `apps/backend/src/shared/models/db.model.ts`: Added `isPinned` column to `conversations` pgTable model.
+- `apps/backend/src/modules/rag/rag.schema.ts`: Updated `UpdateConversationBodySchema` (optional `title` and `isPinned`) and `ConversationItemSchema` (`isPinned: z.boolean()`).
+- `apps/backend/src/modules/rag/rag.service.ts`: Implemented `RagService.updateConversation`, updated `listConversations` ordering (`desc(isPinned), desc(updatedAt)`), and included `isPinned` in return payloads.
+- `apps/backend/src/modules/rag/rag.controller.ts`: Refactored `handleUpdateConversationTitle` into `handleUpdateConversation`.
+- `apps/backend/src/modules/rag/rag.routes.ts`: Updated OpenAPI spec for `PATCH /api/rag/conversations/{id}` to support partial updates (`title`, `isPinned`).
+- `apps/backend/src/modules/rag/rag.service.test.ts`: Added unit test suite for `updateConversation` (`isPinned` update & title update).
+- `apps/backend/src/modules/rag/rag.routes.test.ts`: Added route test for `PATCH /api/rag/conversations/:id` with `isPinned: true`.
+- `api-collections/Search & RAG/03_Update Conversation Title.bru`: Updated Bruno API request collection payload for conversation update.
 
 ## Connections
-- **Client (Frontend):** Calls `deleteTurn(conversationId, turnId)` helper, renders modal confirmation dialogs, handles Sonner toasts, safely redirects invalid chat URLs to `/app/chat`, handles SSE streams, renders markdown with inline citation badges, and dynamically resets input heights.
-- **Deno API (Backend):** Manages sliding window memory, performs single turn deletion, executes hybrid search, streams SSE tokens, and filters references by citations before DB save.
-- **PostgreSQL (Database):** Holds `conversations` and `conversation_turns`, isolated strictly via `tenant_id`.
-- **LLM Provider (Gemini / Groq / OpenAI):** `gemini-3.1-flash-lite` used for security gatekeeping, query contextualization, and title generation, while selected main model streams the answer.
+- **Client (Frontend):** Calls `updateConversation(id, { isPinned })` helper, updates reactive store.
+- **Deno API (Backend):** Validates payload with Zod OpenAPI schema, enforces multi-tenancy `tenant_id` filter, executes DB update, and orders `listConversations` with `isPinned` priority.
+- **PostgreSQL (Database):** Persists `conversations.is_pinned` column.
 
 ## Architectural Decisions
-1. **Single-Turn Hard Delete:** Chosen `DELETE FROM conversation_turns WHERE id = turnId AND tenant_id = tenantId` over truncating entire subsequent thread or soft-deleting answer fields. Surviving turns in the table automatically re-form the chronological sliding window during subsequent completions.
+1. **Single-Turn Hard Delete:** Chosen `DELETE FROM conversation_turns WHERE id = turnId AND tenant_id = tenantId` over truncating entire subsequent thread or soft-deleting answer fields.
+2. **Partial Resource Update via Single PATCH Endpoint:** Reused `PATCH /api/rag/conversations/{id}` for both renaming title and toggling `isPinned` status instead of polluting the routing table with extra endpoints (`/pin`, `/unpin`).
+3. **Primary Sorting Priority (`desc(isPinned), desc(updatedAt)`):** Pinned conversations always surface at the top of the sidebar feed, keeping pinned chats easily accessible. Surviving turns in the table automatically re-form the chronological sliding window during subsequent completions.
 2. **Svelte 5 `untrack()` Effect Guarding:** Wrapped history initialization in `untrack()` inside `$effect` to untrack transient `page.state` mutations during streaming, preventing infinite re-submission loops.
 3. **Invalid Conversation URL Protection:** Directly checking `convRes.error?.code === 'NOT_FOUND'` inside `loadConversation` when `initialQuestion` is absent. Automatically notifies user and redirects invalid UUID URLs back to `/app/chat`.
 4. **Strict Multi-Tenancy Isolation:** Every Drizzle ORM query (`deleteTurn`, `deleteConversation`, `updateTurnFeedback`) explicitly mandates `eq(conversationTurns.tenantId, tenantId)` to guarantee data isolation.

@@ -43,7 +43,10 @@ export const TurnFeedbackBodySchema = z.object({
 export type TurnFeedbackBody = z.infer<typeof TurnFeedbackBodySchema>;
 
 export const UpdateConversationBodySchema = z.object({
-    title: z.string().min(1, "Title cannot be empty").max(100, "Title is too long"),
+    title: z.string().min(1, "Title cannot be empty").max(100, "Title is too long").optional(),
+    isPinned: z.boolean().optional(),
+}).refine((data) => data.title !== undefined || data.isPinned !== undefined, {
+    message: "At least one of 'title' or 'isPinned' must be provided",
 });
 export type UpdateConversationBody = z.infer<typeof UpdateConversationBodySchema>;
 
@@ -62,6 +65,7 @@ export type BranchOf = z.infer<typeof BranchOfSchema>;
 export const ConversationItemSchema = z.object({
     id: z.string().uuid(),
     title: z.string(),
+    isPinned: z.boolean(),
     createdAt: z.string(),
     updatedAt: z.string(),
 });

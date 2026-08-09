@@ -104,8 +104,8 @@ ragRoutes.openapi(
         method: "patch",
         path: "/conversations/{id}",
         tags: ["RAG"],
-        summary: "Update Conversation Title",
-        description: "Updates the title of a conversation.",
+        summary: "Update Conversation",
+        description: "Updates the title and/or pinned status of a conversation.",
         request: {
             params: RagSchema.ConversationParamSchema,
             body: {
@@ -135,7 +135,7 @@ ragRoutes.openapi(
             },
         },
     }),
-    ragController.handleUpdateConversationTitle as any,
+    ragController.handleUpdateConversation as any,
 );
 
 ragRoutes.openapi(

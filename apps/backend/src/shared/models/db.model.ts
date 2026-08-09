@@ -219,6 +219,7 @@ export const conversations = pgTable("conversations", {
         .notNull()
         .references(() => tenants.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    isPinned: boolean("is_pinned").default(false).notNull(),
     // Non-null when this conversation was branched from another (the parent).
     // ON DELETE SET NULL: the branch keeps existing if the parent is deleted,
     // it just loses the lineage link.

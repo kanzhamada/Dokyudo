@@ -954,7 +954,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
                           )
                         : eq(conversations.tenantId, tenantId),
                 )
-                .orderBy(desc(conversations.updatedAt))
+                .orderBy(desc(conversations.isPinned), desc(conversations.updatedAt))
                 .limit(limit);
 
             results = await query;
@@ -969,6 +969,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
             conversations: results.map((c) => ({
                 id: c.id,
                 title: c.title,
+                isPinned: c.isPinned,
                 createdAt: c.createdAt.toISOString(),
                 updatedAt: c.updatedAt.toISOString(),
             })),
@@ -1035,6 +1036,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
         return {
             id: conversation.id,
             title: conversation.title,
+            isPinned: conversation.isPinned,
             branchOf: branchParent,
             createdAt: conversation.createdAt.toISOString(),
             updatedAt: conversation.updatedAt.toISOString(),
@@ -1149,18 +1151,31 @@ Always include the document references ([Doc N: Page X]) in your answer.
         return { id: newConversationId, title: newConversationTitle };
     }
 
-    static async updateConversationTitle(params: {
+    static async updateConversation(params: {
         userId: string;
         tenantId: string;
         conversationId: string;
-        title: string;
+        title?: string;
+        isPinned?: boolean;
     }) {
-        const { userId, tenantId, conversationId, title } = params;
+        const { userId, tenantId, conversationId, title, isPinned } = params;
+
+        if (title === undefined && isPinned === undefined) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: "Nothing to update",
+                status: 400,
+            });
+        }
+
+        const updates: Record<string, any> = { updatedAt: new Date() };
+        if (title !== undefined) updates.title = title;
+        if (isPinned !== undefined) updates.isPinned = isPinned;
 
         await withAuthDb(userId, async (tx) => {
             const result = await tx
                 .update(conversations)
-                .set({ title, updatedAt: new Date() })
+                .set(updates)
                 .where(
                     and(
                         eq(conversations.id, conversationId),
