@@ -75,3 +75,18 @@ sequenceDiagram
 - **Why Wide Events over scattered logs?** In modern cloud architectures, searching for a single log containing 30 properties is much faster, cheaper, and less prone to race conditions than searching for 5 different log lines tied together by a transaction ID.
 - **Why not save logs to PostgreSQL?** To protect the database connection pool. Logging to a relational database under heavy load (like a brute-force attack) can cause the entire system to crash. Standard Output (`console.log`) allows the host server (or Docker/Kubernetes agent) to stream logs asynchronously to an observability platform like Axiom or Datadog.
 - **Why conditional pretty-printing?** To balance developer experience (DX) and machine parsing. Humans struggle to read dense inline JSON in a local terminal, while machine log-ingestion agents struggle to parse multi-line pretty-printed logs efficiently. Checking `NODE_ENV` provides the best of both worlds.
+
+## RAG Chat Log Fields (Privacy Rules)
+
+RAG pipeline menambahkan field berikut ke `logContext` (`http_request`):
+
+| Field | Isi | Keterangan |
+| --- | --- | --- |
+| `fallbackTier` / `fallbackChain` | tier & model LLM yang dipakai | metadata, aman |
+| `estimatedTokens` / `estimatedQuestionTokens` / `estimatedHistoryTokens` / `estimatedContextTokens` | hitungan token | angka, aman |
+| `historyDepth` | jumlah turn history yang dipakai | angka, aman |
+| `ragModelUsed` | model aktual setelah seleksi fallback | metadata, aman |
+| `ragScopedDocumentIds` | UUID dokumen yang di-scope retrieval (file upload + `@`-mention) | UUID, bukan konten — bukti scoping mention bekerja |
+| `ragEvent` / `ragError` / `turnStatus` / `latencyMs` | event & status pipeline | metadata, aman |
+
+**Aturan privasi (diberlakukan 2026-08-10):** teks pertanyaan user **tidak pernah** dicatat di log — `ragRewrittenQuery` (yang memuat hasil rewrite = teks user) telah dihapus. `ragScopedDocumentIds` adalah satu-satunya jejak mention di log; rewrite prompt, history, dan augmented prompt tidak di-log. Hal yang sama berlaku di frontend: payload chat tidak lagi di-`console.log`.

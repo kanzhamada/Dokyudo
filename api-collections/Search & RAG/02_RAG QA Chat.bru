@@ -18,13 +18,16 @@ headers {
 
 body:json {
   {
-    "question": "Siapa Komisaris Independen PT Harum Energy Tbk pada 2020?"
+    "question": "Siapa Komisaris Independen PT Harum Energy Tbk pada 2020? @[Annual Report 2020.pdf]({{documentId}})"
   //   "conversation_id": "{{conversationId}}",
   
   //   BYOK
   //   "provider": "gemini",
   //   "model": "gemini-3.5-flash",
   //   "useByok": true,
+    
+  //   Attachment (file upload — dokumen sudah di-upload & dikonfirmasi via /api/documents)
+  //   "attachment_document_ids": ["{{documentId}}"],
     
   //   Edit Prompt
   //   "edit_turn_id": "{{turnId}}",
@@ -39,11 +42,19 @@ docs {
   Streams answer tokens back using Server-Sent Events (SSE). Retrieves top 5 chunks, builds context prompt, and calls AI Gateway.
   
   ## Body Fields
-  - `question` — user prompt (wajib)
+  - `question` — user prompt (wajib). Limit 690 karakter dihitung **tanpa** token mention (5 token pertama di-strip). Pertanyaan yang hanya berisi mention ditolak.
   - `conversation_id` — untuk turn lanjutan / follow-up
+  - `attachment_document_ids` — **file upload saja** (max 10, dokumen milik tenant). Dokumen sudah `processed` → jawaban interaktif langsung (main context); masih diingest → `awaiting_indexing` + polling.
   - `edit_turn_id` — edit mode: jawaban stream menimpa turn ini (in-place regenerate)
   - `retry_turn_id` — retry mode: jawaban stream disimpan sebagai **varian baru** (`turn_alternatives`) dari turn terakhir ini; wajib disertai `conversation_id`; hanya boleh untuk turn terakhir (400 kalau bukan)
   - `selected_variant_id` — follow-up: jawaban varian ini dipakai sebagai konteks history, dipromosikan menjadi jawaban kanonik turn saat sukses, dan varian yang tidak dipilih dihapus
+  
+  ## Document Mention (`@[title](id)`)
+  Mention ditulis **inline di `question`** — `@[Judul.pdf](uuid-dokumen)`, maks 5 per pesan; token ke-6+ diperlakukan sebagai teks biasa. Backend mem-parse token sendiri:
+  - Retrieval di-scope ke dokumen yang disebut (main context) — id tidak perlu dikirim di `attachment_document_ids`.
+  - Token di-strip dari semua prompt LLM (rewrite, history, augmented prompt, title) — tidak pernah dilihat model.
+  - Question asli (dengan token) tersimpan verbatim di `conversation_turns.question` (frontend render tag dari situ).
+  - Validasi: kepemilikan tenant (404) & status terminal `failed` (400). Dokumen belum `processed` → jalur `awaiting_indexing`.
   
   ## SSE Event Types
   - `event: turn_started` — id write-target di awal stream (`data: { "turnId": "...", "variantId": "..." }`; `variantId` hanya untuk retry). Membuat turn yang di-stop tetap bisa di-retry/edit tanpa reload.

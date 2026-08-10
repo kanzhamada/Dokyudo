@@ -1570,8 +1570,9 @@ Rewritten Query:`;
                     const rewritten = rewriteResponse.text?.trim();
                     if (rewritten && rewritten.length > 0) {
                         searchQuery = rewritten;
-                        if (logContext)
-                            logContext.ragRewrittenQuery = searchQuery;
+                        // NOTE: the rewritten query is deliberately NOT logged —
+                        // it is the user's question text (privacy). The scoping
+                        // evidence is `ragScopedDocumentIds`.
                     }
                 }
             } catch (e: any) {

@@ -12,6 +12,9 @@ get {
 
 params:query {
   limit: 20
+  //   Cursor pagination: `nextCursor` dari respons sebelumnya — JSON komposit
+  //   { p: isPinned, u: updatedAt, i: id } (opaque, dilempar apa adanya).
+  //   cursor: {{nextCursor}}
 }
 
 auth:bearer {

@@ -107,6 +107,7 @@ const needsAwaiting =
 - **Ada yang belum `processed`** (`pending`/`confirmed`) → turn `awaiting_indexing` + reservasi QA saat submit + stream pendek + diselesaikan `sweepAwaitingTurns` — flow upload file baru, tidak berubah.
 - **Scope gabungan di-persist** ke kolom `attachmentDocumentIds` turn — sweep/retry ikut me-rescope mention.
 - **Strip dari prompt LLM:** token mention adalah chrome editor, bukan prosa user — `stripMentionTokens` diterapkan di `buildContextAndPrompt` untuk `searchQuery` awal, rewrite prompt, history (question turn sebelumnya juga di-strip), dan augmented prompt (slot `USER QUESTION`); title generation juga memakai question tanpa token. **Guard prompt-injection tetap menerima question mentah** — input user tidak pernah di-strip sebelum security check (title token adalah teks user-controlled; striping sebelum prompt sudah menetralkannya). Question asli (dengan token) yang tersimpan di DB.
+- **Observability & privasi:** log `http_request` mencatat `ragScopedDocumentIds` (UUID dokumen yang di-scope — bukti mention bekerja). Teks pertanyaan user **tidak pernah di-log**: `ragRewrittenQuery` dihapus, dan frontend tidak lagi men-`console.log` payload chat. Detail: `docs/backend/observability-wide-events.md`.
 - Detail state machine: `docs/backend/rag-turn-status-and-edit-mode.md`.
 
 ## 7. Cache Dokumen (documentsStore)

@@ -18,7 +18,7 @@
 		Volume2,
 		RotateCw,
 		Square,
-		Plus,
+		Plus
 	} from 'lucide-svelte';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -1069,7 +1069,8 @@
 			bodyPayload.model = modelChoice.model;
 		}
 
-		console.log('[Chat Detail] Form Submitted (Outbound Payload):', bodyPayload);
+		// NOTE: the outbound payload is deliberately NOT logged — it contains
+		// the user's question text (privacy).
 
 		// Retry mode targets the latest assistant message — no new messages are
 		// pushed; the streamed answer lands in a new variant of that message.
@@ -2576,7 +2577,7 @@
 								</div>
 
 								<!-- Action Toolbar for User Question (Copy & Edit) -->
-								{#if !(msg.id === lastUserMsgId && isGenerating)}
+								{#if !(msg.id === lastUserMsgId && isGenerating) && messages[msgIndex + 1]?.status !== 'awaiting_indexing'}
 									<div class="flex items-center gap-1">
 										<Tooltip.Provider delayDuration={100}>
 											<Tooltip.Root>
@@ -2661,6 +2662,164 @@
 										<div
 											class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
 										>
+											<svg class="size-6 shrink-0 text-white/70" viewBox="0 0 50 50">
+												<g transform="rotate(0 25 25)">
+													<line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0s"
+															repeatCount="indefinite"
+														/></line
+													>
+													<circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0s"
+															repeatCount="indefinite"
+														/></circle
+													>
+												</g>
+												<g transform="rotate(60 25 25)">
+													<line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0.2s"
+															repeatCount="indefinite"
+														/></line
+													>
+													<circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0.2s"
+															repeatCount="indefinite"
+														/></circle
+													>
+												</g>
+												<g transform="rotate(120 25 25)">
+													<line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0.4s"
+															repeatCount="indefinite"
+														/></line
+													>
+													<circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0.4s"
+															repeatCount="indefinite"
+														/></circle
+													>
+												</g>
+												<g transform="rotate(180 25 25)">
+													<line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0.6s"
+															repeatCount="indefinite"
+														/></line
+													>
+													<circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0.6s"
+															repeatCount="indefinite"
+														/></circle
+													>
+												</g>
+												<g transform="rotate(240 25 25)">
+													<line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="0.8s"
+															repeatCount="indefinite"
+														/></line
+													>
+													<circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="0.8s"
+															repeatCount="indefinite"
+														/></circle
+													>
+												</g>
+												<g transform="rotate(300 25 25)">
+													<line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-width="1"
+														><animate
+															attributeName="strokeWidth"
+															values="0.5;2;0.5"
+															dur="1s"
+															begin="1s"
+															repeatCount="indefinite"
+														/></line
+													>
+													<circle cx="25" cy="15" r="2" fill="currentColor"
+														><animate
+															attributeName="cy"
+															values="15;35;15"
+															dur="1s"
+															begin="1s"
+															repeatCount="indefinite"
+														/></circle
+													>
+												</g>
+											</svg>
 											<span>{currentThinkingStatus}</span>
 										</div>
 									{:else if msg.isStreaming || msg.isRetrying}
@@ -2859,7 +3018,7 @@
 								{/if}
 
 								<!-- Action Toolbar (Copy, Retry, Thumbs Up/Down, Dropdown Menu) -->
-								{#if !msg.isStreaming}
+								{#if !msg.isStreaming && msg.status !== 'awaiting_indexing'}
 									<div class="flex items-center justify-between gap-2 pt-1 text-white/40">
 										<div class="flex items-center gap-1">
 											<Tooltip.Provider delayDuration={100}>
@@ -2942,7 +3101,7 @@
 												</Tooltip.Root>
 											</Tooltip.Provider>
 
-											{#if !msg.isRejection && msg.status !== 'blocked' && msg.status !== 'awaiting_indexing' && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
+											{#if !msg.isRejection && msg.status !== 'blocked' && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
 												<DropdownMenu.Root>
 													<Tooltip.Provider delayDuration={100}>
 														<Tooltip.Root>

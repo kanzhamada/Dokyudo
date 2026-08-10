@@ -182,12 +182,7 @@
 			}
 
 			const newId = crypto.randomUUID();
-			console.log('[Chat Page] Initial Chat Submit:', {
-				newId,
-				question: inputValue.trim(),
-				selectedModel,
-				attachmentDocuments
-			});
+			// NOTE: the initial question is deliberately NOT logged (privacy).
 			goto(`/app/chat/${newId}`, {
 				state: {
 					initialQuestion: inputValue.trim(),
@@ -398,10 +393,10 @@
 												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-[#232323]/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-[#B8B5B5]/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
 										>
 											{#if activeMode === 'search'}
-											<MxIcon name="receipt-search-bold" class="size-4" />
-										{:else}
-											<MxIcon name="receipt-search-outline" class="size-4" />
-										{/if}
+												<MxIcon name="receipt-search-bold" class="size-4" />
+											{:else}
+												<MxIcon name="receipt-search-outline" class="size-4" />
+											{/if}
 											<span class="text-sm">Search</span>
 										</Tabs.Trigger>
 									{/snippet}
@@ -429,9 +424,9 @@
 						: 'text-white/[0.40]'}"
 				>
 					<MxIcon
-							name={inputValue.length >= 690 ? 'devices-keyboard-bold' : 'devices-keyboard-outline'}
-							class="size-3.5"
-						/>
+						name={inputValue.length >= 690 ? 'devices-keyboard-bold' : 'devices-keyboard-outline'}
+						class="size-3.5"
+					/>
 					<span class="font-medium">{mentionStrippedLength(inputValue)}/690</span>
 				</div>
 
