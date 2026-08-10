@@ -551,6 +551,35 @@
 
 	let expandedDocs = $state<string[]>([]);
 
+	function escapeHtml(str: string): string {
+		return str
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+	}
+
+	/* Wrap words from the search query in <mark class="match-highlight"> so
+	   the matched excerpt reads like a stabilo-annotated snippet. Case-
+	   insensitive substring matching, so "pajak" also flags "perPajakan". */
+	function highlightMatch(text: string, query: string): string {
+		const escaped = escapeHtml(text);
+		const terms = query
+			.toLowerCase()
+			.split(/\s+/)
+			.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+			.filter((t) => t.length >= 3);
+		if (terms.length === 0) return escaped;
+
+		const regex = new RegExp(`(${terms.join('|')})`, 'gi');
+		return escaped.replace(regex, '<mark class="match-highlight">$1</mark>');
+	}
+
+	let activeSearchQuery = $derived(
+		searchMode === 'semantic' ? semanticSearchQuery : globalFilter
+	);
+
 	$effect(() => {
 		if (searchMode === 'keyword') {
 			// Restore list from latest payload or re-fetch
@@ -1061,7 +1090,46 @@
 
 			<!-- Row 5: Card List -->
 			<div class="flex flex-col gap-3">
-				{#each table.getRowModel().rows as row (row.id)}
+				{#if isSemanticSearching}
+					<!-- Hybrid search skeleton: mirrors the document card -->
+					{#each [0, 1, 2] as _skeleton ( _skeleton)}
+						<div
+							class="flex animate-pulse flex-col gap-3 rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4 md:p-5"
+							aria-hidden="true"
+						>
+							<!-- Header -->
+							<div class="flex items-start justify-between gap-3">
+								<div class="flex items-center gap-3">
+									<div class="size-4.5 rounded-md bg-[#302F2F]"></div>
+									<div class="h-3.5 w-44 rounded-full bg-[#302F2F]"></div>
+								</div>
+								<div class="flex items-center gap-3">
+									<div class="h-5 w-20 rounded-full bg-[#DB8F5E]/15"></div>
+									<div class="size-7 rounded-full bg-[#302F2F]"></div>
+								</div>
+							</div>
+							<!-- Description -->
+							<div class="flex flex-col gap-2">
+								<div class="h-3 w-full rounded-full bg-[#302F2F]"></div>
+								<div class="h-3 w-2/3 rounded-full bg-[#302F2F]"></div>
+							</div>
+							<!-- "Why this matched" box -->
+							<div class="rounded-lg border border-[#DB8F5E]/20 bg-[#1A1512] p-3.5">
+								<div class="flex items-center gap-1.5">
+									<div class="size-3.5 rounded-full bg-[#DB8F5E]/30"></div>
+									<div class="h-3 w-24 rounded-full bg-[#DB8F5E]/20"></div>
+								</div>
+								<div class="mt-2.5 flex flex-col gap-1.5">
+									<div class="h-3 w-full rounded-full bg-white/10"></div>
+									<div class="h-3 w-3/4 rounded-full bg-white/10"></div>
+								</div>
+							</div>
+							<!-- Meta -->
+							<div class="h-3 w-48 rounded-full bg-[#302F2F]"></div>
+						</div>
+					{/each}
+				{:else}
+					{#each table.getRowModel().rows as row (row.id)}
 					{@const doc = row.original as Document}
 					{@const isSelected = selectedDocIds.includes(doc.id)}
 					<div
@@ -1081,7 +1149,9 @@
 						<div class="flex items-start justify-between gap-3">
 							<div class="flex items-center gap-3">
 								<MxIcon name="document-outline" class="size-4.5 shrink-0 text-[#C5937B]" />
-								<span class="text-sm font-medium text-white md:text-base">{doc.name}</span>
+								<span class="text-sm font-medium text-white md:text-base"
+									>{@html highlightMatch(doc.name, activeSearchQuery)}</span
+								>
 							</div>
 							<div class="flex items-center gap-3" onclick={(e) => e.stopPropagation()} role="none">
 								{#if doc.score !== undefined}
@@ -1093,7 +1163,7 @@
 													{...props}
 													class="rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2 py-0.5 text-xs font-medium text-[#DB8F5E]"
 												>
-													{Math.round(score * 100)}% match
+													{(score * 100).toFixed(2)}% match
 												</div>
 											{/snippet}
 										</Tooltip.Trigger>
@@ -1130,7 +1200,7 @@
 							</div>
 						{:else}
 							<p class="mt-2 line-clamp-2 text-sm font-normal text-white/80">
-								{doc.description}
+								{@html highlightMatch(doc.description, activeSearchQuery)}
 							</p>
 						{/if}
 
@@ -1173,7 +1243,7 @@
 										? ''
 										: 'line-clamp-2'}"
 								>
-									{doc.semanticContent}
+									{@html highlightMatch(doc.semanticContent, activeSearchQuery)}
 								</div>
 							</div>
 						{/if}
@@ -1262,7 +1332,8 @@
 					>
 						<p class="text-sm text-[#959595]">No documents found.</p>
 					</div>
-				{/each}
+					{/each}
+				{/if}
 			</div>
 
 			<!-- Bottom: Pagination -->
@@ -1443,6 +1514,15 @@
 </Dialog.Root>
 
 <style>
+	.match-highlight {
+		background: rgb(217 142 104 / 0.28);
+		border-radius: 3px;
+		padding: 0 2px;
+		color: #f4e6d4;
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
+	}
+
 	.selected-card-glass {
 		animation: document-card-select 700ms cubic-bezier(0.32, 0.72, 0, 1) both;
 	}

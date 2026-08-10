@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import AlertTriangleIcon from '@lucide/svelte/icons/triangle-alert';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import XIcon from '@lucide/svelte/icons/x';
 
 	interface Props {
@@ -106,32 +108,63 @@
 	Usage (chat citation):
 	  <PdfPreviewPanel src={citationUrl} name={refName} initialPages={[citedPage]} onclose={closeSidePanel} />
 -->
-<div class="flex h-full w-full flex-col bg-[#191919] p-6">
+<div
+	class="pdf-panel relative flex h-full w-full flex-col overflow-hidden bg-dk-bg p-3 sm:p-4 md:p-5"
+>
+	<div class="sheet-handle md:hidden" aria-hidden="true"></div>
+
 	<!-- Header: document name + close button -->
-	<div class="mt-16 mb-4 flex items-start justify-between gap-4 md:mt-0">
-		<div class="flex flex-col gap-1">
-			<h3 class="line-clamp-1 text-lg font-medium text-white" title={name}>
+	<div class="panel-header relative mt-10 mb-3 flex items-start justify-between gap-3 md:mt-0">
+		<div class="min-w-0 flex-1">
+			<div
+				class="mb-2 flex items-center gap-2 text-[10px] font-medium tracking-[0.16em] text-dk-muted-gray uppercase"
+			>
+				<span class="title-mark" aria-hidden="true">
+					<FileTextIcon class="size-3.5" strokeWidth={1.7} />
+				</span>
+				<span>Document preview</span>
+				<span class="status-chip">Read only</span>
+			</div>
+			<h3
+				class="line-clamp-2 font-geist text-base leading-snug font-medium text-dk-light sm:text-lg"
+				title={name}
+			>
 				{name}
 			</h3>
-			<p class="text-xs text-[#DB8F5E]/90">
-				* Note: Edits made here won't be saved to the database. Please export the document to keep
-				your changes.
-			</p>
+			<div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+				<p
+					class="warning-note flex min-w-0 items-start gap-1.5 text-[11px] leading-relaxed text-dk-copper sm:text-xs"
+				>
+					<AlertTriangleIcon
+						class="mt-0.5 size-3.5 shrink-0"
+						strokeWidth={1.8}
+						aria-hidden="true"
+					/>
+					<span>Preview edits aren't saved. Export the document to keep changes.</span>
+				</p>
+				{#if initialPages[0]}
+					<span class="page-chip">Page {initialPages[0]}</span>
+				{/if}
+			</div>
 		</div>
 		{#if onclose}
 			<Button
 				variant="ghost"
-				size="icon"
-				class="cursor-pointer text-white/60 hover:bg-white/5 hover:text-white"
+				size="icon-sm"
+				class="close-button cursor-pointer rounded-full text-dk-muted-gray hover:-translate-y-px hover:bg-white/10 hover:text-dk-light active:translate-y-0"
 				onclick={onclose}
+				aria-label="Close document preview"
+				title="Close preview"
 			>
-				<XIcon class="size-5" />
+				<XIcon class="size-4" strokeWidth={1.8} />
 			</Button>
 		{/if}
 	</div>
 
 	<!-- PDF Viewer body -->
-	<div class="flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+	<div
+		class="viewer-frame flex min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5"
+	>
 		{#key src}
 			<PDFViewer
 				class="h-full w-full"
@@ -144,3 +177,138 @@
 		{/key}
 	</div>
 </div>
+
+<style>
+	.pdf-panel {
+		isolation: isolate;
+		background:
+			radial-gradient(circle at 100% 0%, rgba(217, 142, 104, 0.1), transparent 32%),
+			linear-gradient(145deg, #251e1b 0%, #1c1b1b 42%, #191919 100%);
+	}
+
+	.pdf-panel::before {
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		background: linear-gradient(90deg, transparent, rgba(244, 230, 212, 0.035) 50%, transparent);
+		content: '';
+		pointer-events: none;
+	}
+
+	.pdf-panel::after {
+		position: absolute;
+		top: 0;
+		right: 1.25rem;
+		left: 1.25rem;
+		height: 1px;
+		background: linear-gradient(90deg, transparent, rgba(217, 142, 104, 0.7), transparent);
+		content: '';
+		pointer-events: none;
+	}
+
+	.panel-header {
+		animation: panel-enter 560ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	}
+
+	.viewer-frame {
+		position: relative;
+		z-index: 1;
+		box-shadow: inset 0 1px 0 rgba(244, 230, 212, 0.06);
+		animation: viewer-enter 680ms cubic-bezier(0.32, 0.72, 0, 1) 80ms both;
+	}
+
+	.title-mark {
+		display: inline-flex;
+		height: 1.25rem;
+		width: 1.25rem;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid rgba(217, 142, 104, 0.28);
+		border-radius: 0.375rem;
+		background: rgba(217, 142, 104, 0.12);
+		color: #d98e68;
+	}
+
+	.status-chip,
+	.page-chip {
+		border: 1px solid rgba(244, 230, 212, 0.1);
+		border-radius: 999px;
+		background: rgba(244, 230, 212, 0.045);
+		padding: 0.2rem 0.45rem;
+		font-size: 0.625rem;
+		line-height: 1;
+		letter-spacing: 0.08em;
+		white-space: nowrap;
+	}
+
+	.status-chip {
+		color: rgba(244, 230, 212, 0.52);
+	}
+
+	.page-chip {
+		color: rgba(244, 230, 212, 0.7);
+		letter-spacing: 0.02em;
+	}
+
+	.warning-note {
+		transition: color 500ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.panel-header:hover .warning-note {
+		color: #eab08c;
+	}
+
+	:global(.close-button) {
+		border: 1px solid rgba(244, 230, 212, 0.08);
+		background: rgba(244, 230, 212, 0.04);
+		transition:
+			background-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			transform 500ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.sheet-handle {
+		position: absolute;
+		top: 0.5rem;
+		left: 50%;
+		height: 0.25rem;
+		width: 2.5rem;
+		transform: translateX(-50%);
+		border-radius: 999px;
+		background: rgba(244, 230, 212, 0.22);
+	}
+
+	@keyframes panel-enter {
+		from {
+			transform: translateY(0.5rem);
+			opacity: 0;
+		}
+		to {
+			transform: translateY(0);
+			opacity: 1;
+		}
+	}
+
+	@keyframes viewer-enter {
+		from {
+			transform: translateY(0.75rem);
+			opacity: 0;
+		}
+		to {
+			transform: translateY(0);
+			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.panel-header,
+		.viewer-frame {
+			animation: none;
+		}
+
+		.warning-note,
+		:global(.close-button) {
+			transition: none;
+		}
+	}
+</style>
