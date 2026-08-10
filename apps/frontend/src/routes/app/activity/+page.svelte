@@ -3,7 +3,8 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
-	import { Search, Calendar, RotateCcw } from 'lucide-svelte';
+	import { Calendar, RotateCcw } from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -141,7 +142,7 @@
 		<div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
 			<!-- Search Bar -->
 			<div class="relative flex-1 max-w-xs sm:max-w-sm">
-				<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+				<MxIcon name="receipt-search-outline" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
 				<Input
 					type="text"
 					placeholder="Search action, IP, metadata..."

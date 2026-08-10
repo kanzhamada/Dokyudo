@@ -12,20 +12,12 @@
 
 	// Icons
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-	import FileText from '@lucide/svelte/icons/file-text';
-	import MessageSquare from '@lucide/svelte/icons/message-square';
-	import Clock from '@lucide/svelte/icons/clock';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
+	import { mxBoldName } from '$lib/components/icons/mx-icons-data';
+	import type { MxIconName } from '$lib/components/icons/mx-icons-data';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import Share from '@lucide/svelte/icons/share';
 	import Link2 from '@lucide/svelte/icons/link-2';
-	import { Pencil } from 'lucide-svelte';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import Pin from '@lucide/svelte/icons/pin';
-	import PinOff from '@lucide/svelte/icons/pin-off';
-	import Settings from '@lucide/svelte/icons/settings';
-	import CreditCard from '@lucide/svelte/icons/credit-card';
-	import LogOut from '@lucide/svelte/icons/log-out';
 
 	// Brand Logo
 	import favicon from '$lib/assets/favicon.svg?raw';
@@ -342,7 +334,12 @@
 		}
 	}
 
-	const navItems = $derived([
+	const navItems: {
+		label: string;
+		icon: MxIconName | typeof LayoutGrid;
+		active: boolean;
+		href: string;
+	}[] = $derived([
 		{
 			label: 'Dashboard',
 			icon: LayoutGrid,
@@ -351,19 +348,19 @@
 		},
 		{
 			label: 'Document Library',
-			icon: FileText,
+			icon: 'document-outline',
 			active: $page.url.pathname.startsWith('/app/documents'),
 			href: '/app/documents'
 		},
 		{
 			label: 'Chat Assistant',
-			icon: MessageSquare,
+			icon: 'chat-round-line-linear',
 			active: $page.url.pathname === '/app/chat' || $page.url.pathname === '/app/chat/',
 			href: '/app/chat'
 		},
 		{
 			label: 'Activity Feed',
-			icon: Clock,
+			icon: 'clock-outline',
 			active: $page.url.pathname.startsWith('/app/activity'),
 			href: '/app/activity'
 		}
@@ -383,6 +380,9 @@
 	];
 
 	const sidebar = useSidebar();
+
+	/** Hovered nav href — drives the outline -> bold icon swap on hover. */
+	let hoveredNavHref = $state<string | null>(null);
 </script>
 
 <Sidebar.Root collapsible="icon" class="border-none">
@@ -545,8 +545,21 @@
 			class="h-10 px-3 font-geist text-[15px]"
 		>
 			{#snippet child({ props })}
-				<a href={item.href} {...props}>
-					<item.icon class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
+				<a
+					href={item.href}
+					{...props}
+					onmouseenter={() => (hoveredNavHref = item.href)}
+					onmouseleave={() => (hoveredNavHref = null)}
+				>
+					{#if typeof item.icon === 'string'}
+						{#if mxBoldName(item.icon) && (item.active || hoveredNavHref === item.href)}
+							<MxIcon name={mxBoldName(item.icon)!} class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
+						{:else}
+							<MxIcon name={item.icon} class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
+						{/if}
+					{:else}
+						<item.icon class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
+					{/if}
 					<span class="group-data-[collapsible=icon]:hidden">{item.label}</span>
 				</a>
 			{/snippet}
@@ -596,13 +609,13 @@
 					class="flex size-full items-center justify-center gap-1 group-hover/menu-item:hidden"
 					class:hidden={activeConversationMenu?.item.id === item.id}
 				>
-					<Pin class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
+					<MxIcon name="pin-bold" class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
 				</div>
 				<div
 					class="hidden size-full items-center justify-center group-hover/menu-item:flex"
 					class:flex={activeConversationMenu?.item.id === item.id}
 				>
-					<MoreHorizontal class="size-4" />
+					<MxIcon name="menu-dots-outline" class="size-4" />
 				</div>
 			</Sidebar.MenuAction>
 		{:else}
@@ -611,7 +624,7 @@
 				class="cursor-pointer"
 				onclick={(e) => openConversationMenu(e, item)}
 			>
-				<MoreHorizontal class="size-4" />
+				<MxIcon name="menu-dots-outline" class="size-4" />
 			</Sidebar.MenuAction>
 		{/if}
 	</Sidebar.MenuItem>
@@ -639,7 +652,7 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 			onclick={() => (isUserMenuOpen = false)}
 		>
-			<Settings class="size-3.5 text-white/60" />
+			<MxIcon name="settings-settings-outline" class="size-3.5 text-white/60" />
 			<span>Settings</span>
 		</button>
 		<button
@@ -647,7 +660,7 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 			onclick={() => (isUserMenuOpen = false)}
 		>
-			<CreditCard class="size-3.5 text-white/60" />
+			<MxIcon name="card-linear" class="size-3.5 text-white/60" />
 			<span>Billing</span>
 		</button>
 		<button
@@ -670,7 +683,7 @@
 				isLogoutDialogOpen = true;
 			}}
 		>
-			<LogOut class="size-3.5 shrink-0 text-red-400" />
+			<MxIcon name="logout3-bold" class="size-3.5 shrink-0 text-red-400" />
 			<span>Log out</span>
 		</button>
 	</div>
@@ -713,7 +726,7 @@
 				if (item) openEditModal(item);
 			}}
 		>
-			<Pencil class="size-3.5 text-white/60" />
+			<MxIcon name="edit2-outline" class="size-3.5 text-white/60" />
 			<span>Edit</span>
 		</button>
 		<button
@@ -726,10 +739,10 @@
 			}}
 		>
 			{#if activeConversationMenu.item.isPinned}
-				<PinOff class="size-3.5 text-white/60" />
+				<MxIcon name="pin-bold" class="size-3.5 text-white/60" />
 				<span>Unpin</span>
 			{:else}
-				<Pin class="size-3.5 text-white/60" />
+				<MxIcon name="pin-outline" class="size-3.5 text-white/60" />
 				<span>Pin</span>
 			{/if}
 		</button>
@@ -743,7 +756,7 @@
 				if (item) openDeleteModal(item);
 			}}
 		>
-			<Trash2 class="size-3.5 shrink-0 text-red-400" />
+			<MxIcon name="trash-bin-minimalistic-outline" class="size-3.5 shrink-0 text-red-400" />
 			<span>Delete</span>
 		</button>
 	</div>
@@ -751,7 +764,7 @@
 
 <!-- Confirmation Dialog for Logout -->
 <Dialog.Root bind:open={isLogoutDialogOpen}>
-	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-[425px]">
+	<Dialog.Content class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-[425px]">
 		<Dialog.Header>
 			<Dialog.Title class="font-sans text-xl font-medium text-white">Log out</Dialog.Title>
 			<Dialog.Description class="text-sm text-white/70">

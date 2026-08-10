@@ -25,10 +25,6 @@
 
 	/* ── Icons ── */
 	import PlusIcon from '@lucide/svelte/icons/plus';
-	import SearchIcon from '@lucide/svelte/icons/search';
-	import FilterIcon from '@lucide/svelte/icons/filter';
-	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -36,10 +32,8 @@
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import CheckSquareIcon from '@lucide/svelte/icons/check-square';
 	import CheckIcon from '@lucide/svelte/icons/check';
-	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
-	import DownloadIcon from '@lucide/svelte/icons/download';
-	import ClockIcon from '@lucide/svelte/icons/clock';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { createZipArchive } from '$lib/utils/zip';
 
 	/* ── shadcn-svelte Components (ToggleGroup) ── */
@@ -623,7 +617,7 @@
 									<Tooltip.Trigger>
 										{#snippet child({ props })}
 											<div {...props} class="flex h-full w-full items-center justify-center">
-												<SearchIcon class="size-3.5" />
+												<MxIcon name="receipt-search-outline" class="size-3.5" />
 											</div>
 										{/snippet}
 									</Tooltip.Trigger>
@@ -709,7 +703,7 @@
 											disabled={searchMode === 'semantic'}
 											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50"
 										>
-											<FilterIcon class="size-4" />
+											<MxIcon name="filter-outline" class="size-4" />
 										</Button>
 									{/snippet}
 								</DropdownMenu.Trigger>
@@ -763,7 +757,7 @@
 											disabled={searchMode === 'semantic'}
 											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50"
 										>
-											<ArrowUpDownIcon class="size-4" />
+											<MxIcon name="sort-outline" class="size-4" />
 										</Button>
 									{/snippet}
 								</DropdownMenu.Trigger>
@@ -890,7 +884,7 @@
 									{#if isBatchDownloading}
 										<Loader2Icon class="size-4 animate-spin" />
 									{:else}
-										<DownloadIcon class="size-4" />
+										<MxIcon name="arrows-action-import-outline" class="size-4" />
 									{/if}
 									<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
 								</Button>
@@ -912,7 +906,7 @@
 									onclick={() => (showBatchDeleteModal = true)}
 									class="h-10 cursor-pointer rounded-full border border-red-500/40 bg-red-950/40 px-3 text-sm font-medium text-red-400 hover:bg-red-900/60 hover:text-red-300 transition-colors flex items-center justify-center"
 								>
-									<Trash2Icon class="size-4" />
+									<MxIcon name="trash-bin-minimalistic-outline" class="size-4" />
 									<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
 								</Button>
 							{/snippet}
@@ -941,7 +935,7 @@
 						<!-- Card Row 1: Header -->
 						<div class="flex items-start justify-between gap-3">
 							<div class="flex items-center gap-3">
-								<FileTextIcon class="size-5 shrink-0 text-[#C5937B]" />
+								<MxIcon name="document-outline" class="size-5 shrink-0 text-[#C5937B]" />
 								<span class="text-sm font-normal text-white md:text-base">{doc.name}</span>
 							</div>
 							<div class="flex items-center gap-3" onclick={(e) => e.stopPropagation()} role="none">
@@ -974,7 +968,7 @@
 							<div
 								class="mt-2.5 flex items-center gap-2 text-sm font-normal text-amber-400/70 italic"
 							>
-								<ClockIcon class="size-3.5 shrink-0 text-amber-400" />
+								<MxIcon name="clock-outline" class="size-3.5 shrink-0 text-amber-400" />
 								<span>Summary generation paused due to daily quota. Resuming tomorrow.</span>
 							</div>
 						{:else}
@@ -1043,7 +1037,7 @@
 												{...props}
 												class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300 shadow-sm backdrop-blur-md cursor-help"
 											>
-												<ClockIcon class="size-3.5 text-amber-400" />
+												<MxIcon name="clock-outline" class="size-3.5 text-amber-400" />
 												<span class="tracking-wide font-medium">Resuming Tomorrow</span>
 											</div>
 										{/snippet}
@@ -1174,7 +1168,7 @@
 <!-- Delete Confirmation Dialog -->
 <Dialog.Root bind:open={deleteDialogOpen}>
 	<Dialog.Content
-		class="w-full max-w-md rounded-2xl border border-white/10 bg-[#2A2A2A] p-6 text-white shadow-2xl"
+		class="w-full max-w-md rounded-2xl border border-white/10 bg-[#2A2A2A]/[0.85] p-6 text-white shadow-2xl backdrop-blur-[42px]"
 	>
 		<Dialog.Header>
 			<Dialog.Title class="text-xl font-semibold text-white">Delete Document</Dialog.Title>
@@ -1210,7 +1204,7 @@
 
 <!-- Batch Delete Confirmation Modal -->
 <Dialog.Root bind:open={showBatchDeleteModal}>
-	<Dialog.Content class="border-[#302F2F] bg-[#191919] text-white sm:max-w-md sm:rounded-[22px]">
+	<Dialog.Content class="border-[#302F2F] bg-[#191919]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md sm:rounded-[22px]">
 		<Dialog.Header class="gap-2">
 			<Dialog.Title class="text-xl font-semibold text-white">
 				Delete {selectedCount} {selectedCount === 1 ? 'Document' : 'Documents'}?

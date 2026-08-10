@@ -6,13 +6,11 @@
 		Check,
 		Copy,
 		ExternalLink,
-		FileText,
 		Link2,
 		LockKeyhole,
 		RefreshCw,
-		Search,
-		Trash2
 	} from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { toast } from 'svelte-sonner';
 	import { deleteAllShares, deleteAllTenantShares, deleteShare, listAllShares } from '$lib/api/rag';
 	import type { ShareListItem } from '$lib/types/rag.types';
@@ -191,7 +189,7 @@
 >
 	<Dialog.Content
 		showCloseButton={true}
-		class="max-h-[min(680px,calc(100vh-2rem))] gap-0 overflow-y-auto rounded-[18px] border border-white/[0.1] bg-[#242322] p-0 text-white shadow-2xl shadow-black/40 sm:max-w-[560px]"
+		class="max-h-[min(680px,calc(100vh-2rem))] gap-0 overflow-y-auto rounded-[18px] border border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-[560px]"
 	>
 		<Dialog.Header class="border-b border-white/[0.09] px-5 py-4 pr-14">
 			<Dialog.Title
@@ -230,7 +228,7 @@
 							{#if isDeletingAll}
 								<RefreshCw class="size-3 animate-spin" strokeWidth={1.8} />
 							{:else}
-								<Trash2 class="size-3" strokeWidth={1.8} />
+								<MxIcon name="trash-bin-minimalistic-outline" class="size-3" />
 							{/if}
 							Delete all
 						</button>
@@ -240,9 +238,9 @@
 
 			{#if shares.length > 0}
 				<div class="relative mb-3">
-					<Search
+					<MxIcon
+						name="receipt-search-outline"
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/35"
-						strokeWidth={1.8}
 					/>
 					<input
 						type="text"
@@ -280,7 +278,7 @@
 				</div>
 			{:else if filteredShares.length === 0}
 				<div class="flex flex-col items-center gap-2 py-16 text-center">
-					<Search class="size-6 text-white/20" strokeWidth={1.5} />
+					<MxIcon name="receipt-search-outline" class="size-6 text-white/20" />
 					<p class="text-sm text-white/60">No shared links match your search</p>
 					<p class="max-w-xs text-xs leading-5 text-white/35">
 						Try a different title or link code.
@@ -296,7 +294,7 @@
 								<div
 									class="flex size-7 shrink-0 items-center justify-center rounded-md bg-white/[0.07]"
 								>
-									<FileText class="size-3.5 text-white/45" strokeWidth={1.8} />
+									<MxIcon name="document-outline" class="size-3.5 text-white/45" />
 								</div>
 								<p class="min-w-0 flex-1 truncate text-xs font-medium text-white/75">
 									{group.title}
@@ -315,7 +313,7 @@
 									{#if deletingConversationId === group.conversationId}
 										<RefreshCw class="size-3 animate-spin" strokeWidth={1.8} />
 									{:else}
-										<Trash2 class="size-3" strokeWidth={1.8} />
+										<MxIcon name="trash-bin-minimalistic-outline" class="size-3" />
 									{/if}
 									Delete
 								</button>
@@ -374,7 +372,7 @@
 												aria-label={`Revoke ${share.title}`}
 												onclick={() => revokeLink(share.code)}
 											>
-												<Trash2 class="size-3.5" strokeWidth={1.8} />
+												<MxIcon name="trash-bin-minimalistic-outline" class="size-3.5" />
 											</button>
 										</div>
 									</div>

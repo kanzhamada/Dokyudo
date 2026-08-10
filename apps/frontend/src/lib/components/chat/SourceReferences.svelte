@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { FileText, BookOpen } from 'lucide-svelte';
+	import { BookOpen } from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
+
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	export interface SourceRef {
@@ -41,7 +43,7 @@
 								: ''}"
 							onclick={interactive ? () => onPreview?.(ref) : undefined}
 						>
-							<FileText class="size-3 text-white/60" />
+							<MxIcon name="document-outline" class="size-3 text-white/60" />
 							<span class="font-medium">{ref.name}</span>
 							{#if ref.pages && ref.pages.length > 0}
 								<span class="text-white/40">• {ref.pages.join(', ')}</span>

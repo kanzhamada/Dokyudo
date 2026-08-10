@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import Menu from '@lucide/svelte/icons/menu';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import favicon from '$lib/assets/favicon.svg?raw';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
@@ -26,7 +25,7 @@
 				class="-ml-2 cursor-pointer text-white hover:bg-white/10 hover:text-white"
 				onclick={() => sidebar.toggle()}
 			>
-				<Menu class="size-6" />
+				<MxIcon name="hamburger-menu-outline" class="size-6" />
 				<span class="sr-only">Toggle Sidebar</span>
 			</Button>
 
@@ -39,7 +38,7 @@
 		</div>
 	{:else if mobileHeaderState.type === 'error'}
 		<div class="flex w-full items-start gap-3">
-			<TriangleAlert class="mt-0.5 size-5 shrink-0 text-red-400" />
+			<MxIcon name="danger-triangle-outline" class="mt-0.5 size-5 shrink-0 text-red-400" />
 			<div class="flex flex-col">
 				<span class="text-sm font-semibold text-white">{mobileHeaderState.title || 'Error'}</span>
 				<span class="text-sm leading-snug text-red-200">{mobileHeaderState.message}</span>

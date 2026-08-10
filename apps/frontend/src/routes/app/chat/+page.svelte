@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Bot, MessageSquare, Search, Activity, Keyboard, FileUp, Database } from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
+	import type { MxIconName } from '$lib/components/icons/mx-icons-data';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -12,6 +13,7 @@
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
 	import { documentsStore } from '$lib/state/documents.store.svelte';
+	import { mentionStrippedLength } from '$lib/utils/doc-mentions';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
@@ -157,7 +159,7 @@
 	}
 
 	async function handleSubmit() {
-		if (!inputValue.trim() || isUploading) return;
+		if (mentionStrippedLength(inputValue.trim()) === 0 || isUploading) return;
 
 		if (activeMode === 'chat') {
 			// Upload attached files BEFORE navigating — the conversation does not
@@ -200,13 +202,12 @@
 <div class="relative flex h-full w-full items-center justify-center overflow-hidden p-4">
 	<!-- Reusable Svelte 5 Snippets for Usage Metrics -->
 	{#snippet desktopUsageMetric(
-		icon: any,
+		icon: MxIconName,
 		valueText: string,
 		tooltipText: string,
 		basePercent: number,
 		totalPercent: number
 	)}
-		{@const Icon = icon}
 		<Tooltip.Provider delayDuration={100}>
 			<Tooltip.Root>
 				<Tooltip.Trigger
@@ -242,7 +243,11 @@
 						</svg>
 					</div>
 					<span>{valueText}</span>
-					<Icon class="size-3.5" />
+					{#if typeof icon === 'string'}
+						<MxIcon name={icon} class="size-3.5" />
+					{:else}
+						<MxIcon name="database-outline" class="size-3.5" />
+					{/if}
 				</Tooltip.Trigger>
 				<Tooltip.Content
 					class="border-white/[0.16] bg-[#232323] text-white"
@@ -255,17 +260,20 @@
 	{/snippet}
 
 	{#snippet mobileUsageMetric(
-		icon: any,
+		icon: MxIconName,
 		label: string,
 		valueText: string,
 		basePercent: number,
 		totalPercent: number
 	)}
-		{@const Icon = icon}
 		<div class="flex flex-col gap-1.5">
 			<div class="flex justify-between text-xs text-white/[0.69]">
 				<div class="flex items-center gap-1.5">
-					<Icon class="size-3.5" />
+					{#if typeof icon === 'string'}
+						<MxIcon name={icon} class="size-3.5" />
+					{:else}
+						<MxIcon name="database-outline" class="size-3.5" />
+					{/if}
 					<span>{label}</span>
 				</div>
 				<span>{valueText}</span>
@@ -360,7 +368,11 @@
 												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-[#B8B5B5]/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
 												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-[#232323]/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-[#B8B5B5]/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
 										>
-											<MessageSquare class="size-4" />
+											{#if activeMode === 'chat'}
+												<MxIcon name="chat-round-line-bold" class="size-4" />
+											{:else}
+												<MxIcon name="chat-round-line-linear" class="size-4" />
+											{/if}
 											<span class="text-sm">Chat</span>
 										</Tabs.Trigger>
 									{/snippet}
@@ -385,7 +397,11 @@
 												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-[#B8B5B5]/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
 												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-[#232323]/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-[#B8B5B5]/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
 										>
-											<Search class="size-4" />
+											{#if activeMode === 'search'}
+											<MxIcon name="receipt-search-bold" class="size-4" />
+										{:else}
+											<MxIcon name="receipt-search-outline" class="size-4" />
+										{/if}
 											<span class="text-sm">Search</span>
 										</Tabs.Trigger>
 									{/snippet}
@@ -406,13 +422,17 @@
 			<div class="flex items-center gap-2 @3xl:gap-3">
 				<!-- Character Count Indicator Capsule -->
 				<div
-					class="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {inputValue.length >=
-					690
+					class="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {mentionStrippedLength(
+						inputValue
+					) >= 690
 						? 'text-red-400'
 						: 'text-white/[0.40]'}"
 				>
-					<Keyboard class="size-3.5" />
-					<span class="font-medium">{inputValue.length}/690</span>
+					<MxIcon
+							name={inputValue.length >= 690 ? 'devices-keyboard-bold' : 'devices-keyboard-outline'}
+							class="size-3.5"
+						/>
+					<span class="font-medium">{mentionStrippedLength(inputValue)}/690</span>
 				</div>
 
 				<!-- Usage Info Capsule (Desktop) -->
@@ -420,28 +440,28 @@
 					class="hidden shrink-0 items-center gap-4 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-4 py-1.5 text-xs text-white/[0.40] backdrop-blur-[42px] transition-colors @3xl:flex"
 				>
 					{@render desktopUsageMetric(
-						FileUp,
+						'document-upload-outline',
 						`${currentUploadCount}/${maxUploads}`,
 						`Document Uploads (${currentUploadCount} of ${maxUploads} used)`,
 						baseUploads / maxUploads,
 						currentUploadCount / maxUploads
 					)}
 					{@render desktopUsageMetric(
-						Database,
+						'database-outline',
 						storageDisplay,
 						`Document Storage (${storageDisplay} used)`,
 						baseStorage / maxStorage,
 						currentStorageBytes / maxStorage
 					)}
 					{@render desktopUsageMetric(
-						Search,
+						'receipt-search-outline',
 						`${searchesCount}/${maxSearches}`,
 						`Semantic Searches (${searchesCount} of ${maxSearches} used)`,
 						searchesCount / maxSearches,
 						searchesCount / maxSearches
 					)}
 					{@render desktopUsageMetric(
-						MessageSquare,
+						'chat-round-line-linear',
 						`${qaCount}/${maxQa}`,
 						`Chat Messages (${qaCount} of ${maxQa} used)`,
 						qaCount / maxQa,
@@ -455,7 +475,7 @@
 						<DropdownMenu.Trigger
 							class="flex size-8 cursor-pointer items-center justify-center rounded-full border border-white/[0.16] bg-[#232323]/[0.40] text-white/[0.40] backdrop-blur-[42px] transition-colors hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] focus:outline-none"
 						>
-							<Activity class="size-4" />
+							<MxIcon name="diagram-up-bold" class="size-4" />
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Content
 							class="w-56 border border-white/[0.16] bg-[#232323]/40 p-3 text-white backdrop-blur-[42px]"
@@ -464,28 +484,28 @@
 							<div class="mb-3 text-xs font-medium text-white/[0.69]">Usage Information</div>
 							<div class="flex flex-col gap-3">
 								{@render mobileUsageMetric(
-									FileUp,
+									'document-upload-outline',
 									'Document Uploads',
 									`${currentUploadCount}/${maxUploads}`,
 									baseUploads / maxUploads,
 									currentUploadCount / maxUploads
 								)}
 								{@render mobileUsageMetric(
-									Database,
+									'database-outline',
 									'Document Storage',
 									storageDisplay,
 									baseStorage / maxStorage,
 									currentStorageBytes / maxStorage
 								)}
 								{@render mobileUsageMetric(
-									Search,
+									'receipt-search-outline',
 									'Semantic Searches',
 									`${searchesCount}/${maxSearches}`,
 									searchesCount / maxSearches,
 									searchesCount / maxSearches
 								)}
 								{@render mobileUsageMetric(
-									MessageSquare,
+									'chat-round-line-linear',
 									'Chat Messages',
 									`${qaCount}/${maxQa}`,
 									qaCount / maxQa,

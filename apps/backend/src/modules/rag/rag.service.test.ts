@@ -6,9 +6,11 @@ import { SearchService } from "../search/search.service.ts";
 import { FallbackLlmService } from "./fallback_llm.service.ts";
 import { db } from "../../config/drizzle.ts";
 import { conversations, conversationTurns, tenants, tenantSubscriptions, turnAlternatives, documents } from "../../shared/models/db.model.ts";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { gemini } from "../../config/gemini.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
+import { ChatBodySchema } from "./rag.schema.ts";
+import { mentionTokenIds, stripMentionTokens } from "./mention-tokens.util.ts";
 
 async function drainStream(stream: ReadableStream): Promise<void> {
     const reader = stream.getReader();
@@ -406,6 +408,116 @@ describe("RagService Isolated Tests", () => {
                 assertEquals(searchParams.documentIds, [attachedDocId]);
             } finally {
                 await db.delete(documents).where(eq(documents.id, attachedDocId));
+            }
+        });
+
+        it("positive: `@[title](id)` mentions in the question are scoped, stripped from prompts, and stored verbatim", async () => {
+            // Mention flow: NO attachment_document_ids in the payload — the
+            // backend parses the tokens from the question itself.
+            const docIds = Array.from({ length: 5 }, () => crypto.randomUUID());
+            await db.insert(documents).values(
+                docIds.map((id, i) => ({
+                    id,
+                    tenantId: TEST_TENANT_ID,
+                    title: `Doc${i + 1}.pdf`,
+                    storagePath: `doc${i + 1}.pdf`,
+                    sizeBytes: 100,
+                    status: "processed" as const,
+                })),
+            ).onConflictDoNothing();
+
+            // The 6th token carries a fake id — it is BEYOND the first-5
+            // window, so it is plain text: not validated, not scoped, not
+            // stripped, and it stays in the prompts.
+            const fakeId = "99999999-9999-4999-8999-999999999999";
+            let searchParams: any = null;
+            let augmentedPrompt: string | null = null;
+            using geminiStub = stub(gemini, "generateText", (prompt: string) =>
+                Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten",
+                }) as any,
+            );
+            using searchStub = stub(SearchService, "executeHybridSearch", (params: any) => {
+                searchParams = params;
+                return Promise.resolve([{
+                    id: crypto.randomUUID(),
+                    documentId: docIds[0],
+                    documentTitle: "Doc1.pdf",
+                    metadata: { pages: [1] },
+                    content: "Konten dokumen 1",
+                    score: 0.9,
+                }]);
+            });
+            const fakeStream: AsyncIterable<{ text: string }> = (async function* () {
+                yield { text: "Jawaban dari dokumen [Doc 1: Page 1]." };
+            })();
+            using fallbackStub = stub(FallbackLlmService, "generateStream", (params: any) => {
+                augmentedPrompt = params?.messages?.[0]?.content ?? null;
+                return Promise.resolve({ modelId: "test-model", stream: fakeStream }) as any;
+            });
+
+            try {
+                const tokens = docIds.map((id, i) => `@[Doc${i + 1}.pdf](${id})`).join(" ");
+                const question =
+                    `Tolong analisis ${tokens} lalu @[Fake.pdf](${fakeId})`;
+                const stream = await RagService.streamChat({
+                    tenantId: TEST_TENANT_ID,
+                    userId: TEST_USER_ID,
+                    question,
+                    conversationId: TEST_CONVERSATION_ID,
+                    useByok: false,
+                    logContext: {},
+                });
+                const reader = stream.getReader();
+                const decoder = new TextDecoder();
+                let payload = "";
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) payload += decoder.decode(value, { stream: true });
+                }
+
+                // Interactive path (all mentioned docs are processed).
+                assertEquals(payload.includes("event: awaiting_indexing"), false);
+                assertEquals(payload.includes("event: token"), true);
+
+                // Retrieval scoped to the 5 mentioned documents only (the fake
+                // 6th token is beyond the limit — not scoped, not validated).
+                // Order-insensitive: the merged scope is validated via a DB
+                // query whose row order is arbitrary.
+                assertExists(searchParams);
+                assertEquals(
+                    [...searchParams.documentIds].sort(),
+                    [...docIds].sort(),
+                );
+
+                // The augmented prompt is stripped of the first-5 mention
+                // tokens; the beyond-limit token stays as plain text.
+                assertExists(augmentedPrompt);
+                assertEquals(augmentedPrompt.includes(fakeId), true);
+                for (const id of docIds) {
+                    assertEquals(augmentedPrompt.includes(id), false);
+                }
+
+                // The stored question keeps the tokens verbatim (frontend
+                // rendering + history round-trip depend on it).
+                const turns = await waitForTurns(
+                    TEST_CONVERSATION_ID,
+                    (rows) =>
+                        rows.some(
+                            (t) => t.question === question && t.status === "complete",
+                        ),
+                );
+                const completedTurn = turns.find((t) => t.question === question);
+                assertExists(completedTurn);
+                assertEquals(completedTurn.status, "complete");
+                // Merged scope persisted so the sweep re-scopes mentions too.
+                assertEquals(
+                    [...(completedTurn.attachmentDocumentIds ?? [])].sort(),
+                    [...docIds].sort(),
+                );
+            } finally {
+                await db.delete(documents).where(inArray(documents.id, docIds));
             }
         });
 
@@ -2348,5 +2460,70 @@ describe("RagService Isolated Tests", () => {
 
             await db.delete(conversations).where(eq(conversations.id, convId));
         });
+    });
+});
+
+describe("mention tokens util", () => {
+    const IDS = [
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+        "33333333-3333-4333-8333-333333333333",
+        "44444444-4444-4444-8444-444444444444",
+        "55555555-5555-4555-8555-555555555555",
+        "66666666-6666-4666-8666-666666666666",
+    ];
+
+    it("parses ids of the first 5 tokens only, deduped", () => {
+        const text = `a @[One.pdf](${IDS[0]}) b @[Two.pdf](${IDS[1]}) c @[One.pdf](${IDS[0]}) d @[Three.pdf](${IDS[2]}) e @[Four.pdf](${IDS[3]}) f @[Five.pdf](${IDS[4]}) g @[Sixth.pdf](${IDS[5]})`;
+        assertEquals(mentionTokenIds(text), [IDS[0], IDS[1], IDS[2], IDS[3], IDS[4]]);
+    });
+
+    it("strips only the first 5 tokens; the 6th stays as plain text", () => {
+        const text = `x @[One.pdf](${IDS[0]}) y @[Two.pdf](${IDS[1]}) z @[Three.pdf](${IDS[2]}) w @[Four.pdf](${IDS[3]}) v @[Five.pdf](${IDS[4]}) u @[Sixth.pdf](${IDS[5]}) q`;
+        const stripped = stripMentionTokens(text);
+        assertEquals(stripped.includes(IDS[0]), false);
+        assertEquals(stripped.includes(IDS[1]), false);
+        assertEquals(stripped.includes(IDS[2]), false);
+        assertEquals(stripped.includes(IDS[3]), false);
+        assertEquals(stripped.includes(IDS[4]), false);
+        assertEquals(stripped.includes(IDS[5]), true);
+        assertEquals(stripped.includes("Sixth.pdf"), true);
+        assertEquals(
+            stripped,
+            "x  y  z  w  v  u @[Sixth.pdf](66666666-6666-4666-8666-666666666666) q",
+        );
+    });
+});
+
+describe("ChatBodySchema mention-aware length validation", () => {
+    it("counts characters without the first 5 mention tokens", () => {
+        const id = "11111111-1111-4111-8111-111111111111";
+        // 680 real chars + 2 mention tokens: stripped 681 <= 690, raw ~770.
+        const question = `@[A.pdf](${id}) ${"x".repeat(680)} @[B.pdf](${id})`;
+        assertEquals(ChatBodySchema.safeParse({ question, useByok: false }).success, true);
+    });
+
+    it("rejects when the mention-stripped text exceeds 690", () => {
+        const id = "11111111-1111-4111-8111-111111111111";
+        const question = `@[A.pdf](${id}) ${"x".repeat(700)}`;
+        const result = ChatBodySchema.safeParse({ question, useByok: false });
+        assertEquals(result.success, false);
+    });
+
+    it("rejects a question consisting only of mention tokens", () => {
+        const id = "11111111-1111-4111-8111-111111111111";
+        const question = `@[A.pdf](${id}) @[B.pdf](${id})`;
+        const result = ChatBodySchema.safeParse({ question, useByok: false });
+        assertEquals(result.success, false);
+    });
+
+    it("treats the 6th token as plain text for the limit (it counts)", () => {
+        const id = "11111111-1111-4111-8111-111111111111";
+        // 5 mention tokens (stripped) + 620 chars = 621 stripped — valid,
+        // even though the raw length exceeds 690.
+        const tokens = Array.from({ length: 5 }, (_, i) => `@[Doc${i}.pdf](${id})`).join(" ");
+        const question = `${tokens} ${"x".repeat(620)}`;
+        assertEquals(question.length > 690, true);
+        assertEquals(ChatBodySchema.safeParse({ question, useByok: false }).success, true);
     });
 });

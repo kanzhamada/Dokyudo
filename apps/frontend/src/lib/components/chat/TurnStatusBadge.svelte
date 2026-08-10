@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Square, TriangleAlert, ShieldAlert } from 'lucide-svelte';
+	import { Square, ShieldAlert } from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import type { TurnStatus } from '$lib/types/rag.types';
 
 	interface Props {
@@ -34,7 +35,7 @@
 		{#if status === 'stopped'}
 			<Square class="size-3" />
 		{:else if status === 'failed'}
-			<TriangleAlert class="size-3" />
+			<MxIcon name="danger-triangle-outline" class="size-3" />
 		{:else}
 			<ShieldAlert class="size-3" />
 		{/if}

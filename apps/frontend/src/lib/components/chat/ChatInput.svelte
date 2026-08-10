@@ -1,16 +1,6 @@
 <script lang="ts">
-	import {
-		Paperclip,
-		SendHorizontal,
-		ChevronDown,
-		X,
-		Square,
-		Settings2,
-		Check,
-		FileText,
-		Loader2,
-		AlertCircle
-	} from 'lucide-svelte';
+	import { ChevronDown, X, Square, Check, Loader2 } from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Input } from '$lib/components/ui/input';
@@ -22,7 +12,8 @@
 		mentionToken,
 		parseMentionIds,
 		splitMentionSegments,
-		formatMentionsForPayload
+		formatMentionsForPayload,
+		mentionStrippedLength
 	} from '$lib/utils/doc-mentions';
 
 	const MAX_DOCUMENT_MENTIONS = 5;
@@ -443,7 +434,7 @@
 			<div class="max-h-64 overflow-y-auto p-1.5">
 				{#if isMentionLimitReached}
 					<div class="flex items-center gap-2 px-3 py-2.5 text-sm text-white/60">
-						<AlertCircle class="size-4 shrink-0 text-white/40" />
+						<MxIcon name="danger-triangle-outline" class="size-4 shrink-0 text-white/40" />
 						<span>Maximum limit of 5 document mentions reached.</span>
 					</div>
 				{:else if documentsStore.loading}
@@ -471,7 +462,7 @@
 							onmouseenter={() => (mentionHighlight = index)}
 							onclick={() => selectMention(doc)}
 						>
-							<FileText class="size-4 shrink-0 text-white/60" />
+							<MxIcon name="document-outline" class="size-4 shrink-0 text-white/60" />
 							<span class="min-w-0 flex-1 truncate">{doc.title}</span>
 						</button>
 					{/each}
@@ -517,7 +508,7 @@
 							aria-label="Attach Document"
 							onclick={triggerFileInput}
 						>
-							<Paperclip class="size-5" />
+							<MxIcon name="attach-circle-outline" class="size-5" />
 						</Tooltip.Trigger>
 						<Tooltip.Content
 							class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
@@ -551,7 +542,7 @@
 					aria-multiline="true"
 					aria-placeholder={placeholder}
 					data-placeholder={placeholder}
-					class="mention-editor max-h-32 min-h-[36px] w-full overflow-y-auto bg-transparent py-1.5 text-base md:text-sm text-white caret-white outline-none selection:bg-white/15 break-words whitespace-pre-wrap"
+					class="mention-editor max-h-32 min-h-[36px] w-full overflow-y-auto bg-transparent py-1.5 text-base break-words whitespace-pre-wrap text-white caret-white outline-none selection:bg-white/15 md:text-sm"
 					oninput={() => {
 						syncValue();
 						updateMentionState();
@@ -624,7 +615,7 @@
 										class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 focus:bg-white/[0.12] focus:text-white data-highlighted:bg-white/[0.12]"
 										onclick={onconfigure}
 									>
-										<Settings2 class="size-3.5" />
+										<MxIcon name="settings-settings-outline" class="size-3.5" />
 										<span>Configure</span>
 									</DropdownMenu.Item>
 								</div>
@@ -652,8 +643,11 @@
 
 			<!-- Send Button -->
 			<button
-				class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
-				disabled={isUploading || (!isGenerating && !value.trim() && attachedFiles.length === 0)}
+				class="group/send flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
+				disabled={isUploading ||
+					(!isGenerating &&
+						mentionStrippedLength(value.trim()) === 0 &&
+						attachedFiles.length === 0)}
 				onclick={handleSendClick}
 				aria-label={isUploading
 					? 'Uploading attachments'
@@ -666,7 +660,8 @@
 				{:else if isGenerating}
 					<Square class="size-4" />
 				{:else}
-					<SendHorizontal class="size-5 -rotate-90" />
+					<span class="group-hover/send:hidden"><MxIcon name="send1-outline" class="size-5 -rotate-45" /></span>
+						<span class="hidden group-hover/send:block"><MxIcon name="send1-bold" class="size-5 -rotate-45" /></span>
 				{/if}
 			</button>
 		</div>

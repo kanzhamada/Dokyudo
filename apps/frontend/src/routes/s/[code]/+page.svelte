@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { Copy, Check, Lock, Share2 } from 'lucide-svelte';
+	import { Copy, Check, Lock } from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Button } from '$lib/components/ui/button';
@@ -240,7 +241,7 @@
 							{#if copiedLink}
 								<Check class="size-4 text-green-400" />
 							{:else}
-								<Share2 class="size-4" />
+								<MxIcon name="share-outline" class="size-4" />
 							{/if}
 						</button>
 					{/snippet}
@@ -314,7 +315,7 @@
 									{#if copiedLink}
 										<Check class="size-4 text-green-400" />
 									{:else}
-										<Share2 class="size-4" />
+										<MxIcon name="share-outline" class="size-4" />
 									{/if}
 								</button>
 							{/snippet}
@@ -355,7 +356,7 @@
 				</div>
 			{:else if notFound}
 				<div class="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
-					<Share2 class="size-8 text-white/25" />
+					<MxIcon name="share-outline" class="size-8 text-white/25" />
 					<h1 class="text-lg font-semibold text-white">Link is invalid or has expired</h1>
 					<p class="max-w-sm text-sm text-white/45">
 						This public link has been removed by its owner, or it has expired.

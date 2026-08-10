@@ -2,13 +2,11 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import XIcon from '@lucide/svelte/icons/x';
-	import FileIcon from '@lucide/svelte/icons/file';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
-	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import CheckCircle2Icon from '@lucide/svelte/icons/check-circle-2';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
 	import { apiRequest } from '$lib/api/client.js';
 	import { toast } from 'svelte-sonner';
@@ -342,7 +340,7 @@
 />
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="border-[#302F2F] bg-[#191919] p-0 text-white sm:rounded-[22px]">
+	<Dialog.Content class="border-[#302F2F] bg-[#191919]/[0.85] p-0 text-white backdrop-blur-[42px] sm:rounded-[22px]">
 		<div class="flex flex-col gap-5 p-8 pb-0 md:p-10 md:pb-0">
 			<!-- Header Section -->
 			<div class="flex flex-col gap-2 text-center">
@@ -498,7 +496,7 @@
 										<div
 											class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/70"
 										>
-											<FileTextIcon class="size-5" />
+											<MxIcon name="document-outline" class="size-5" />
 										</div>
 										<div class="flex flex-col">
 											<span class="text-sm font-bold text-white">{item.name}</span>
@@ -528,7 +526,7 @@
 										<div
 											class="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3b82f6]/10 text-[#3b82f6]"
 										>
-											<FileTextIcon class="size-5" />
+											<MxIcon name="document-outline" class="size-5" />
 										</div>
 										<div class="flex flex-col">
 											<span class="text-sm font-bold text-white">{item.name}</span>
@@ -547,7 +545,7 @@
 											class="cursor-pointer text-[#767676] transition-colors hover:text-[#ef4444]"
 											title="Delete File"
 										>
-											<Trash2Icon class="size-5" />
+											<MxIcon name="trash-bin-minimalistic-outline" class="size-5" />
 										</button>
 									</div>
 								</div>
@@ -560,7 +558,7 @@
 										<div
 											class="flex h-10 w-10 items-center justify-center rounded-lg bg-[#ef4444]/10 text-[#ef4444]"
 										>
-											<FileIcon class="size-5" />
+											<MxIcon name="document-outline" class="size-5" />
 										</div>
 										<div class="flex flex-col">
 											<span class="text-sm font-bold text-white">{item.name}</span>
@@ -601,7 +599,7 @@
 										<div
 											class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/70"
 										>
-											<FileTextIcon class="size-5" />
+											<MxIcon name="document-outline" class="size-5" />
 										</div>
 										<div class="flex flex-col">
 											<span class="text-sm font-bold text-white">{item.name}</span>

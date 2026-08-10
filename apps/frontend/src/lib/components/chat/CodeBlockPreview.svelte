@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { Copy, Check, Workflow, Code2, Eye, FileCode } from 'lucide-svelte';
+	import { Copy, Check, Workflow, Code2, FileCode } from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
+
 	import { toast } from 'svelte-sonner';
 	import mermaid from 'mermaid';
 
@@ -100,7 +102,7 @@
 						: 'text-white/60 hover:text-white'}"
 					onclick={() => (activeTab = 'diagram')}
 				>
-					<Eye class="size-3" />
+					<MxIcon name="security-eye-outline" class="size-3" />
 					<span>Diagram</span>
 				</button>
 				<button

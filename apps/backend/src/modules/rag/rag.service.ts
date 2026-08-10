@@ -13,6 +13,7 @@ import {
     documents,
 } from "../../shared/models/db.model.ts";
 import { desc, eq, and, lt, ne, sql, or, inArray } from "drizzle-orm";
+import { mentionTokenIds, stripMentionTokens } from "./mention-tokens.util.ts";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 import { LlmRouterService } from "./llm_router.service.ts";
 import { FallbackLlmService, type FallbackStreamResponse } from "./fallback_llm.service.ts";
@@ -192,8 +193,16 @@ export class RagService {
         //    (tenant-scoped) and documents already in a terminal failure state
         //    are rejected up front — the turn cannot be answered from them.
         //    Documents still ingesting are waited on later (see step 0.3).
+        //
+        //    `@[title](id)` mention tokens embedded in the question are scoped
+        //    documents too — the frontend sends only FILE ids in
+        //    attachment_document_ids and lets the backend parse the mentions.
+        //    The list is deduped: a document can be both uploaded and mentioned
+        //    in the same turn.
         const attachmentDocuments: { id: string; status: string }[] = [];
-        if (attachmentDocumentIds && attachmentDocumentIds.length > 0) {
+        const mentionIds = mentionTokenIds(question);
+        const scopedDocIds = [...new Set([...(attachmentDocumentIds ?? []), ...mentionIds])];
+        if (scopedDocIds.length > 0) {
             const ownedDocs = await withAuthDb(userId, async (tx) => {
                 return await tx
                     .select({ id: documents.id, status: documents.status })
@@ -201,11 +210,11 @@ export class RagService {
                     .where(
                         and(
                             eq(documents.tenantId, tenantId),
-                            inArray(documents.id, attachmentDocumentIds),
+                            inArray(documents.id, scopedDocIds),
                         ),
                     );
             });
-            if (ownedDocs.length !== attachmentDocumentIds.length) {
+            if (ownedDocs.length !== scopedDocIds.length) {
                 throw new AppError({
                     code: "NOT_FOUND",
                     message: "One or more attached documents were not found",
@@ -443,8 +452,10 @@ export class RagService {
                     answer: "",
                     modelUsed: null,
                     status: needsAwaiting ? "awaiting_indexing" : "processing",
+                    // Persist the merged scope (files + `@`-mention ids) so the
+                    // background sweep re-scopes retrieval to the mentions too.
                     attachmentDocumentIds: hasAttachments
-                        ? attachmentDocumentIds
+                        ? attachmentDocuments.map((d) => d.id)
                         : null,
                     modelRequest: hasAttachments && useByok
                         ? { provider, model }
@@ -669,7 +680,10 @@ ${effectiveQuestion}`;
                 conversationId,
                 turnId,
                 effectiveQuestion,
-                attachmentDocumentIds,
+                // The validated, merged scope — payload files + `@`-mention ids
+                // parsed from the question. The raw param alone would silently
+                // drop mention scoping from the search.
+                attachmentDocumentIds: attachmentDocuments.map((d) => d.id),
                 selectedVariantId,
                 allowVariantSelection: !isRetry && !editTurnId,
                 signal,
@@ -1205,9 +1219,12 @@ data: ${JSON.stringify(startedPayload)}
                     }
                 } else if (success) {
                     if (isNewConversation) {
-                        let smartTitle = question.substring(0, 50);
+                        // Title comes from the mention-free question — token
+                        // chrome must not leak into the conversation title.
+                        const titleQuestion = stripMentionTokens(question);
+                        let smartTitle = titleQuestion.substring(0, 50);
                         try {
-                            const titlePrompt = `Summarize the following user question and AI answer into a single, concise conversation title (maximum 7 words, clear and direct, no quotes, no period):\nUser Question: ${question}\nAI Answer: ${fullAnswer.substring(0, 300)}`;
+                            const titlePrompt = `Summarize the following user question and AI answer into a single, concise conversation title (maximum 7 words, clear and direct, no quotes, no period):\nUser Question: ${titleQuestion}\nAI Answer: ${fullAnswer.substring(0, 300)}`;
                             const titleRes = await gemini.generateText(
                                 titlePrompt,
                                 GEMINI_MODELS.llmDefault,
@@ -1399,7 +1416,11 @@ data: ${JSON.stringify(startedPayload)}
 
         let historyText = "";
         let historyDepth = 0;
-        let searchQuery = effectiveQuestion;
+        // Mention tokens (`@[title](id)`) are editor chrome, not user prose —
+        // they never reach the LLM. The stripped question drives the search
+        // query and every prompt slot; the raw question is persisted as-is.
+        const promptQuestion = stripMentionTokens(effectiveQuestion);
+        let searchQuery = promptQuestion;
 
         // The selected retry variant of the latest turn (follow-up mode): its
         // answer replaces the canonical answer in the history context — the
@@ -1510,7 +1531,9 @@ data: ${JSON.stringify(startedPayload)}
                             selectedVariantAnswer
                                 ? selectedVariantAnswer
                                 : turn.answer;
-                        historyText += `User: ${turn.question}\nAssistant: ${answer}\n\n`;
+                        // Stored questions keep their mention tokens; strip them
+                        // before the tokens leak into the LLM history.
+                        historyText += `User: ${stripMentionTokens(turn.question)}\nAssistant: ${answer}\n\n`;
                     }
 
                     // Query Rewriting (Contextualization)
@@ -1528,7 +1551,7 @@ Output ONLY the rewritten query. Do not answer the question, add explanations, o
 </output>
 
 ${historyText}
-Latest User Question: ${effectiveQuestion}
+Latest User Question: ${promptQuestion}
 Rewritten Query:`;
 
                     const rewriteResponse = await gemini.generateText(
@@ -1654,7 +1677,7 @@ You are Dokyudo AI, a precise document-analysis assistant for annual reports, fi
 ${historyText}
 ${contextText}
 USER QUESTION:
-${effectiveQuestion}
+${promptQuestion}
 
 Always include the document references ([Doc N: Page X]) in your answer.
         `.trim();

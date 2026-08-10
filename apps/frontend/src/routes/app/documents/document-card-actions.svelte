@@ -1,8 +1,5 @@
 <script lang="ts">
-	import EllipsisVerticalIcon from '@lucide/svelte/icons/ellipsis-vertical';
-	import EyeIcon from '@lucide/svelte/icons/eye';
-	import DownloadIcon from '@lucide/svelte/icons/download';
-	import Trash2Icon from '@lucide/svelte/icons/trash-2';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
@@ -29,7 +26,7 @@
 				class="relative size-8 cursor-pointer rounded-full text-white/60 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white data-[state=open]:bg-white/10"
 			>
 				<span class="sr-only">Open menu</span>
-				<EllipsisVerticalIcon />
+				<MxIcon name="menu-dots-outline" class="rotate-90" />
 			</Button>
 		{/snippet}
 	</DropdownMenu.Trigger>
@@ -42,14 +39,14 @@
 				class="cursor-pointer gap-2 text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
 				onclick={onPreview}
 			>
-				<EyeIcon data-icon="inline-start" />
+				<MxIcon name="security-eye-outline" data-icon="inline-start" />
 				Preview
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				class="cursor-pointer gap-2 text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
 				onclick={onDownload}
 			>
-				<DownloadIcon data-icon="inline-start" />
+				<MxIcon name="arrows-action-import-outline" data-icon="inline-start" />
 				Download
 			</DropdownMenu.Item>
 			<DropdownMenu.Separator class="bg-white/10" />
@@ -57,7 +54,7 @@
 				class="cursor-pointer gap-2 text-red-400 hover:text-white focus:bg-red-400 focus:text-white"
 				onclick={onDelete}
 			>
-				<Trash2Icon data-icon="inline-start" />
+				<MxIcon name="trash-bin-minimalistic-outline" data-icon="inline-start" />
 				Delete
 			</DropdownMenu.Item>
 		</DropdownMenu.Group>

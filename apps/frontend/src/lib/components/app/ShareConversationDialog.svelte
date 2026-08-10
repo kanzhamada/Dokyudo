@@ -10,10 +10,10 @@
 		Link2,
 		LockKeyhole,
 		Mail,
-		Share2,
 		UserRound,
 		X
 	} from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { toast } from 'svelte-sonner';
 	import { addShareInvitees, createShare } from '$lib/api/rag';
 	import { getMe } from '$lib/api/me';
@@ -293,13 +293,13 @@
 >
 	<Dialog.Content
 		showCloseButton={true}
-		class="max-h-[min(720px,calc(100vh-2rem))] gap-0 overflow-y-auto rounded-[18px] border border-white/[0.1] bg-[#242322] p-0 text-white shadow-2xl shadow-black/40 sm:max-w-[520px]"
+		class="max-h-[min(720px,calc(100vh-2rem))] gap-0 overflow-y-auto rounded-[18px] border border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-[520px]"
 	>
 		<Dialog.Header class="border-b border-white/[0.09] px-5 py-4 pr-14">
 			<Dialog.Title
 				class="flex items-center gap-2 text-[17px] font-medium tracking-[-0.02em] text-white"
 			>
-				<Share2 class="size-[15px] text-white/55" strokeWidth={1.8} />
+				<MxIcon name="share-outline" class="size-[15px] text-white/55" />
 				Share conversation
 			</Dialog.Title>
 			<Dialog.Description class="mt-1 text-xs leading-5 text-white/45">

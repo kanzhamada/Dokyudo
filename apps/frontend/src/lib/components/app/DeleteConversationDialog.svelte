@@ -24,7 +24,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">
+	<Dialog.Content class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title class="text-lg font-semibold text-white">Delete conversation?</Dialog.Title>
 			<Dialog.Description class="text-sm text-white/45">

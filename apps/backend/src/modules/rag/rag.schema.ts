@@ -1,7 +1,26 @@
 import { z } from "zod";
+import { stripMentionTokens } from "./mention-tokens.util.ts";
 
 export const ChatBodySchema = z.object({
-    question: z.string().min(1, "Question cannot be empty").max(690, "Question is too long (maximum 690 characters)"),
+    // Mention tokens (`@[title](id)`) are not user text — the 690-character
+    // limit applies to the question with the first 5 mention tokens stripped.
+    // A question consisting only of mentions is empty.
+    question: z
+        .string()
+        .superRefine((question, ctx) => {
+            const stripped = stripMentionTokens(question).trim();
+            if (stripped.length === 0) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Question cannot be empty",
+                });
+            } else if (stripped.length > 690) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Question is too long (maximum 690 characters)",
+                });
+            }
+        }),
     conversation_id: z.string().uuid().optional(),
     provider: z.enum(["gemini", "mistral", "openrouter"]).optional(),
     model: z.string().optional(),

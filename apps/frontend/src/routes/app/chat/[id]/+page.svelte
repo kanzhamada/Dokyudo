@@ -5,34 +5,20 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
-		Paperclip,
-		SendHorizontal,
-		MessageSquare,
-		Search,
 		ChevronDown,
 		ChevronLeft,
 		ChevronRight,
-		Keyboard,
 		X,
-		ArrowLeft,
 		Sparkles,
-		FileText,
 		Copy,
 		Check,
 		ThumbsUp,
 		ThumbsDown,
-		Ellipsis,
 		GitBranch,
 		Volume2,
-		Pencil,
-		Pin,
-		PinOff,
 		RotateCw,
 		Square,
-		Trash2,
 		Plus,
-		Share2,
-		Menu
 	} from 'lucide-svelte';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -55,7 +41,7 @@
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
 	import { documentsStore } from '$lib/state/documents.store.svelte';
-	import { parseMentionIds, splitMentionSegments } from '$lib/utils/doc-mentions';
+	import { mentionStrippedLength, splitMentionSegments } from '$lib/utils/doc-mentions';
 	import {
 		branchConversation,
 		deleteConversation,
@@ -79,6 +65,7 @@
 	import TurnStatusBadge from '$lib/components/chat/TurnStatusBadge.svelte';
 	import SourceReferences from '$lib/components/chat/SourceReferences.svelte';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import ConfigureByokDialog from '$lib/components/chat/ConfigureByokDialog.svelte';
 	import { renderMarkdown } from '$lib/utils/markdown';
 
@@ -1055,12 +1042,9 @@
 			// mention cache so the next popover shows them.
 			documentsStore.invalidate();
 		}
-		// `@[title](id)` mention tokens embedded in the question scope retrieval
-		// to already-owned documents (main context). They ride in the payload as
-		// attachment_document_ids, but stay OUT of the message's attachment
-		// chips — the question bubble renders them inline as clickable tags.
-		const mentionIds = parseMentionIds(questionText);
-
+		// `@[title](id)` mention tokens live in the question text itself — the
+		// backend parses them for retrieval scoping and strips them from the
+		// LLM prompts. The payload only carries FILE attachments here.
 		const bodyPayload: Record<string, any> = {
 			question: questionText,
 			conversation_id: chatId,
@@ -1068,9 +1052,8 @@
 		};
 		// Attachment mode: the server scopes retrieval to these documents (the
 		// backend answers immediately when they are all already indexed).
-		const scopedDocIds = [...attachmentDocs.map((a) => a.documentId), ...mentionIds];
-		if (scopedDocIds.length > 0) {
-			bodyPayload.attachment_document_ids = scopedDocIds;
+		if (attachmentDocs.length > 0) {
+			bodyPayload.attachment_document_ids = attachmentDocs.map((a) => a.documentId);
 		}
 		// Edit mode: overwrite the existing turn in place instead of creating a new one.
 		if (opts.editTurnId) bodyPayload.edit_turn_id = opts.editTurnId;
@@ -1620,7 +1603,9 @@
 	}
 
 	function handleSendMessage() {
-		if (!inputValue.trim() || isGenerating || isUploadingAttachments) return;
+		// Mention tokens don't count as characters — the real text decides.
+		if (mentionStrippedLength(inputValue.trim()) === 0 || isGenerating || isUploadingAttachments)
+			return;
 		// The retry variant currently displayed (if any) is the one the
 		// follow-up context is built on; nothing is sent when the canonical
 		// answer is shown (server then deletes all variants on success).
@@ -1713,7 +1698,7 @@
 
 	function saveEditMessage(msg: ChatMessage) {
 		const editedPrompt = editingMessageValue.trim();
-		if (!editedPrompt || isGenerating) return;
+		if (mentionStrippedLength(editedPrompt) === 0 || isGenerating) return;
 		const msgIndex = messages.indexOf(msg);
 		if (msgIndex !== -1) {
 			// Remove the edited question and everything after it — the turn is
@@ -2093,7 +2078,7 @@
 										onclick={() => sidebar.toggle()}
 										aria-label="Open navigation"
 									>
-										<Menu class="size-5" />
+										<MxIcon name="hamburger-menu-outline" class="size-5" />
 									</button>
 								{/snippet}
 							</Tooltip.Trigger>
@@ -2136,7 +2121,7 @@
 					aria-label="Conversation actions"
 				>
 					{#if isPinned}
-						<Pin class="size-3.5 shrink-0 rotate-45 text-white/60" />
+						<MxIcon name="pin-bold" class="size-3.5 shrink-0 rotate-45 text-white/60" />
 					{/if}
 					<span class="truncate">
 						{isTitleLoading ? 'Generating title...' : conversationTitle || 'New Conversation'}
@@ -2156,7 +2141,7 @@
 										disabled={isGenerating}
 										aria-label="Share conversation"
 									>
-										<Share2 class="size-4" />
+										<MxIcon name="share-outline" class="size-4" />
 									</button>
 								{/snippet}
 							</Tooltip.Trigger>
@@ -2179,7 +2164,7 @@
 										onclick={toggleMobileReferences}
 										aria-label="Conversation references"
 									>
-										<FileText class="size-4" />
+										<MxIcon name="document-outline" class="size-4" />
 										{#if conversationReferences.length > 0}
 											<span
 												class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
@@ -2214,7 +2199,7 @@
 						}}
 						aria-label="Edit conversation title"
 					>
-						<Pencil class="size-4" />
+						<MxIcon name="edit2-outline" class="size-4" />
 					</button>
 					<button
 						type="button"
@@ -2228,9 +2213,9 @@
 						aria-label={isPinned ? 'Unpin conversation' : 'Pin conversation'}
 					>
 						{#if isPinned}
-							<PinOff class="size-4" />
+							<MxIcon name="pin-bold" class="size-4" />
 						{:else}
-							<Pin class="size-4 rotate-45" />
+							<MxIcon name="pin-outline" class="size-4 rotate-45" />
 						{/if}
 					</button>
 					<button
@@ -2242,7 +2227,7 @@
 						}}
 						aria-label="Delete conversation"
 					>
-						<Trash2 class="size-4" />
+						<MxIcon name="trash-bin-minimalistic-outline" class="size-4" />
 					</button>
 				</div>
 			{/if}
@@ -2262,7 +2247,7 @@
 								onclick={() =>
 									openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
 							>
-								<FileText class="size-3.5 shrink-0 text-white/50" />
+								<MxIcon name="document-outline" class="size-3.5 shrink-0 text-white/50" />
 								<span class="min-w-0 truncate">{reference.name}</span>
 							</button>
 						{/each}
@@ -2314,7 +2299,7 @@
 											onclick={openTitleMenu}
 										>
 											{#if isPinned}
-												<Pin class="size-3.5 shrink-0 rotate-45 text-white/60" />
+												<MxIcon name="pin-bold" class="size-3.5 shrink-0 rotate-45 text-white/60" />
 											{/if}
 											<span class="max-w-56 truncate">
 												{isTitleLoading
@@ -2339,7 +2324,7 @@
 							onclick={openTitleMenu}
 						>
 							{#if isPinned}
-								<Pin class="size-3.5 shrink-0 rotate-45 text-white/60" />
+								<MxIcon name="pin-bold" class="size-3.5 shrink-0 rotate-45 text-white/60" />
 							{/if}
 							<span class="max-w-56 truncate">
 								{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
@@ -2362,7 +2347,7 @@
 										disabled={isGenerating}
 										aria-label="Share conversation"
 									>
-										<Share2 class="size-4" />
+										<MxIcon name="share-outline" class="size-4" />
 									</button>
 								{/snippet}
 							</Tooltip.Trigger>
@@ -2388,7 +2373,7 @@
 													class="relative flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
 													aria-label="Conversation references"
 												>
-													<FileText class="size-4" />
+													<MxIcon name="document-outline" class="size-4" />
 													{#if conversationReferences.length > 0}
 														<span
 															class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
@@ -2427,7 +2412,7 @@
 										onclick={() =>
 											openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
 									>
-										<FileText class="size-3.5 shrink-0 text-white/50" />
+										<MxIcon name="document-outline" class="size-3.5 shrink-0 text-white/50" />
 										<span class="min-w-0 flex-1 truncate">{reference.name}</span>
 									</DropdownMenu.Item>
 								{/each}
@@ -2519,7 +2504,6 @@
 										<textarea
 											bind:this={editingTextInput}
 											bind:value={editingMessageValue}
-											maxlength={690}
 											rows={1}
 											class="min-h-20 w-full resize-none overflow-hidden rounded-md border border-white/20 bg-black/20 p-2 text-sm text-white outline-none"
 											aria-label="Edit question"
@@ -2527,13 +2511,19 @@
 										></textarea>
 										<div class="mt-2 flex items-center justify-between gap-2">
 											<div
-												class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] {editingMessageValue.length >=
-												690
+												class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] {mentionStrippedLength(
+													editingMessageValue
+												) >= 690
 													? 'text-red-400'
 													: 'text-white/40'}"
 											>
-												<Keyboard class="size-3" />
-												<span>{editingMessageValue.length}/690</span>
+												<MxIcon
+													name={mentionStrippedLength(editingMessageValue) >= 690
+														? 'devices-keyboard-bold'
+														: 'devices-keyboard-outline'}
+													class="size-3"
+												/>
+												<span>{mentionStrippedLength(editingMessageValue)}/690</span>
 											</div>
 											<div class="flex justify-end gap-2">
 												<Button
@@ -2545,7 +2535,7 @@
 												<Button
 													size="sm"
 													class="cursor-pointer border border-white/20 bg-white/15 text-xs font-medium text-white hover:bg-white/25 hover:text-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-													disabled={!editingMessageValue.trim()}
+													disabled={mentionStrippedLength(editingMessageValue.trim()) === 0}
 													onclick={() => saveEditMessage(msg)}>Save &amp; resubmit</Button
 												>
 											</div>
@@ -2557,7 +2547,7 @@
 													<span
 														class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80"
 													>
-														<FileText class="size-3 text-white/60" />
+														<MxIcon name="document-outline" class="size-3 text-white/60" />
 														{att.name}
 													</span>
 												{/each}
@@ -2574,7 +2564,7 @@
 														onclick={() =>
 															openCitationPreview(seg.id!, seg.title ?? 'Document', [])}
 													>
-														<FileText class="size-3 text-white/60" />
+														<MxIcon name="document-outline" class="size-3 text-white/60" />
 														{seg.title}
 													</button>
 												{:else}
@@ -2628,7 +2618,7 @@
 																onclick={() => beginEditMessage(msg)}
 																aria-label="Edit question"
 															>
-																<Pencil class="size-3" />
+																<MxIcon name="edit2-outline" class="size-3" />
 															</Button>
 														{/snippet}
 													</Tooltip.Trigger>
@@ -3006,7 +2996,7 @@
 																onclick={(e) => openResponseMenu(e, msgIndex)}
 																aria-label="More options"
 															>
-																<Ellipsis class="size-3.5" />
+																<MxIcon name="menu-dots-outline" class="size-3.5" />
 															</button>
 														{/snippet}
 													</Tooltip.Trigger>
@@ -3110,13 +3100,19 @@
 
 					<!-- Keyboard length counter -->
 					<div
-						class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] {inputValue.length >=
-						690
+						class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] {mentionStrippedLength(
+							inputValue
+						) >= 690
 							? 'text-red-400'
 							: 'text-white/40'}"
 					>
-						<Keyboard class="size-3" />
-						<span>{inputValue.length}/690</span>
+						<MxIcon
+							name={mentionStrippedLength(inputValue) >= 690
+								? 'devices-keyboard-bold'
+								: 'devices-keyboard-outline'}
+							class="size-3"
+						/>
+						<span>{mentionStrippedLength(inputValue)}/690</span>
 					</div>
 				</div>
 			</div>
@@ -3149,7 +3145,9 @@
 />
 
 <Dialog.Root bind:open={isDeleteResponseDialogOpen}>
-	<Dialog.Content class="border-white/10 bg-[#232323] text-white sm:max-w-md">
+	<Dialog.Content
+		class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md"
+	>
 		<Dialog.Header>
 			<Dialog.Title class="text-lg font-semibold text-white">Delete response?</Dialog.Title>
 			<Dialog.Description class="text-sm text-white/45">
@@ -3204,7 +3202,7 @@
 				openTitleEditDialog();
 			}}
 		>
-			<Pencil class="size-3.5 text-white/60" />
+			<MxIcon name="edit2-outline" class="size-3.5 text-white/60" />
 			<span>Edit title</span>
 		</button>
 		<button
@@ -3213,10 +3211,10 @@
 			onclick={togglePinConversation}
 		>
 			{#if isPinned}
-				<PinOff class="size-3.5 text-white/60" />
+				<MxIcon name="pin-bold" class="size-3.5 text-white/60" />
 				<span>Unpin conversation</span>
 			{:else}
-				<Pin class="size-3.5 text-white/60" />
+				<MxIcon name="pin-outline" class="size-3.5 text-white/60" />
 				<span>Pin conversation</span>
 			{/if}
 		</button>
@@ -3229,7 +3227,7 @@
 				isDeleteConversationDialogOpen = true;
 			}}
 		>
-			<Trash2 class="size-3.5 shrink-0 text-red-400" />
+			<MxIcon name="trash-bin-minimalistic-outline" class="size-3.5 shrink-0 text-red-400" />
 			<span>Delete conversation</span>
 		</button>
 	</div>
@@ -3286,7 +3284,7 @@
 				closeResponseMenu();
 			}}
 		>
-			<Trash2 class="size-3.5 shrink-0 text-red-400" />
+			<MxIcon name="trash-bin-minimalistic-outline" class="size-3.5 shrink-0 text-red-400" />
 			<span>Delete response</span>
 		</button>
 	</div>
