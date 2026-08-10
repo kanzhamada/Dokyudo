@@ -285,6 +285,9 @@
 	let selectedDocIds = $state<string[]>([]);
 	let selectedCount = $derived(selectedDocIds.length);
 
+	/* Cards that are being deselected — play the reverse glass animation once */
+	let deselectedCardIds = $state<string[]>([]);
+
 	let showBatchDeleteModal = $state(false);
 	let isBatchDeleting = $state(false);
 	let isBatchDownloading = $state(false);
@@ -372,6 +375,10 @@
 	function toggleSelectDoc(id: string) {
 		if (selectedDocIds.includes(id)) {
 			selectedDocIds = selectedDocIds.filter((item) => item !== id);
+			deselectedCardIds = [...deselectedCardIds.filter((item) => item !== id), id];
+			setTimeout(() => {
+				deselectedCardIds = deselectedCardIds.filter((item) => item !== id);
+			}, 700);
 		} else {
 			selectedDocIds = [...selectedDocIds, id];
 		}
@@ -1053,7 +1060,7 @@
 			</div>
 
 			<!-- Row 5: Card List -->
-			<div class="flex flex-col gap-4">
+			<div class="flex flex-col gap-3">
 				{#each table.getRowModel().rows as row (row.id)}
 					{@const doc = row.original as Document}
 					{@const isSelected = selectedDocIds.includes(doc.id)}
@@ -1062,15 +1069,19 @@
 						tabindex="0"
 						onclick={() => toggleSelectDoc(doc.id)}
 						onkeydown={(e) => e.key === 'Enter' && toggleSelectDoc(doc.id)}
-						class="group relative cursor-pointer overflow-hidden rounded-[22px] border p-5 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px md:p-6 {isSelected
+						class="group relative cursor-pointer overflow-hidden rounded-2xl border p-4 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px md:p-5 {isSelected
 							? 'selected-card-glass border-white/45 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] ring-1 ring-white/10'
-							: 'border-[#302F2F] bg-[#191919]/[0.53] hover:border-[#949494] hover:bg-[#525252]/[0.53]'}"
+							: 'border-[#302F2F] bg-[#191919]/[0.53] hover:border-[#949494] hover:bg-[#525252]/[0.53]'} {deselectedCardIds.includes(
+							doc.id
+						)
+							? 'deselected-card-glass'
+							: ''}"
 					>
 						<!-- Card Row 1: Header -->
 						<div class="flex items-start justify-between gap-3">
 							<div class="flex items-center gap-3">
-								<MxIcon name="document-outline" class="size-5 shrink-0 text-[#C5937B]" />
-								<span class="text-sm font-normal text-white md:text-base">{doc.name}</span>
+								<MxIcon name="document-outline" class="size-4.5 shrink-0 text-[#C5937B]" />
+								<span class="text-sm font-medium text-white md:text-base">{doc.name}</span>
 							</div>
 							<div class="flex items-center gap-3" onclick={(e) => e.stopPropagation()} role="none">
 								{#if doc.score !== undefined}
@@ -1080,16 +1091,16 @@
 											{#snippet child({ props })}
 												<div
 													{...props}
-													class="rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2 py-0.5 text-xs font-semibold text-[#DB8F5E]"
+													class="rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2 py-0.5 text-xs font-medium text-[#DB8F5E]"
 												>
-													{(score * 100).toFixed(2)}% Match
+													{Math.round(score * 100)}% match
 												</div>
 											{/snippet}
 										</Tooltip.Trigger>
 										<Tooltip.Content
 											class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 										>
-											<p>AI Relevance Score</p>
+											<p>How well this document matches your question</p>
 										</Tooltip.Content>
 									</Tooltip.Root>
 								{/if}
@@ -1105,29 +1116,29 @@
 						<!-- Card Row 2: Description -->
 						{#if (doc.status === 'pending' || doc.status === 'confirmed') && (!doc.description || doc.description === 'No description provided.')}
 							<div
-								class="mt-2.5 flex animate-pulse items-center gap-2 text-sm font-normal text-white/50 italic"
+								class="mt-2 flex animate-pulse items-center gap-2 text-sm font-normal text-white/50 italic"
 							>
 								<SparklesIcon class="size-3.5 shrink-0 text-white/70" />
 								<span>Generating summary with AI...</span>
 							</div>
 						{:else if doc.status === 'quota_exhausted' && (!doc.description || doc.description === 'No description provided.')}
 							<div
-								class="mt-2.5 flex items-center gap-2 text-sm font-normal text-amber-400/70 italic"
+								class="mt-2 flex items-center gap-2 text-sm font-normal text-amber-400/70 italic"
 							>
 								<MxIcon name="clock-outline" class="size-3.5 shrink-0 text-amber-400" />
 								<span>Summary generation paused due to daily quota. Resuming tomorrow.</span>
 							</div>
 						{:else}
-							<p class="mt-2.5 line-clamp-2 text-sm font-normal text-white/80">
+							<p class="mt-2 line-clamp-2 text-sm font-normal text-white/80">
 								{doc.description}
 							</p>
 						{/if}
 
 						{#if doc.semanticContent}
 							<div
-								class="relative mt-4 overflow-hidden rounded-xl border border-[#DB8F5E]/20 bg-[#1A1512] p-4"
+								class="relative mt-3 overflow-hidden rounded-lg border border-[#DB8F5E]/20 bg-[#1A1512] p-3.5"
 							>
-								<div class="absolute top-0 left-0 h-full w-1 bg-[#DB8F5E]/50"></div>
+								<div class="absolute top-0 left-0 h-full w-0.5 bg-[#DB8F5E]/50"></div>
 								<div
 									class="flex cursor-pointer items-center justify-between"
 									onclick={(e) => {
@@ -1142,9 +1153,9 @@
 									tabindex="0"
 									onkeydown={(e) => e.key === 'Enter' && e.stopPropagation()}
 								>
-									<div class="flex items-center gap-2 text-[#DB8F5E]">
-										<BookOpenIcon class="size-4" />
-										<span class="text-sm font-medium">Relevant Chunk</span>
+									<div class="flex items-center gap-1.5 text-[#DB8F5E]">
+										<SparklesIcon class="size-3.5" />
+										<span class="text-xs font-medium">Why this matched</span>
 									</div>
 									<Button
 										variant="ghost"
@@ -1156,11 +1167,11 @@
 								</div>
 
 								<div
-									class="mt-3 text-sm font-normal text-white/80 transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] {expandedDocs.includes(
+									class="mt-2 text-[13px] leading-relaxed font-normal text-white/80 transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] {expandedDocs.includes(
 										doc.id
 									)
 										? ''
-										: 'line-clamp-3'}"
+										: 'line-clamp-2'}"
 								>
 									{doc.semanticContent}
 								</div>
@@ -1168,10 +1179,10 @@
 						{/if}
 
 						<!-- Card Row 3: Metadata & Real-time Status Badge -->
-						<div class="mt-3 flex items-center justify-between gap-2">
-							<div class="flex items-center gap-3">
-								<p class="text-xs font-normal text-[#959595] md:text-sm">
-									Uploaded: {doc.uploadedAt}&nbsp;&nbsp;•&nbsp;&nbsp;Size: {doc.size}
+						<div class="mt-2.5 flex items-center justify-between gap-2">
+							<div class="flex items-center gap-2.5">
+								<p class="text-xs font-normal text-[#959595]">
+									Uploaded {doc.uploadedAt} · {doc.size}
 								</p>
 
 								{#if doc.pages && doc.pages.length > 0}
@@ -1183,11 +1194,11 @@
 													{...props}
 													class="inline-flex items-center gap-1.5 rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2.5 py-0.5 text-xs font-medium text-[#DB8F5E]"
 												>
-													<BookOpenIcon class="size-3.5" />
+													<BookOpenIcon class="size-3" />
 													<span
-														>Pages: {pages.slice(0, 3).join(', ')}{pages.length > 3
-															? '...'
-															: ''}</span
+														>Page{pages.length > 1 ? 's' : ''}: {pages
+															.slice(0, 3)
+															.join(', ')}{pages.length > 3 ? '…' : ''}</span
 													>
 												</div>
 											{/snippet}
@@ -1195,7 +1206,7 @@
 										<Tooltip.Content
 											class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 										>
-											<p>Found on pages: {pages.join(', ')}</p>
+											<p>Found on page{pages.length > 1 ? 's' : ''}: {pages.join(', ')}</p>
 										</Tooltip.Content>
 									</Tooltip.Root>
 								{/if}
@@ -1207,7 +1218,7 @@
 									class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:-translate-y-px group-hover:border-white/30 group-hover:bg-white/20"
 								>
 									<SparklesIcon class="size-3.5 animate-pulse text-white" />
-									<span class="tracking-wide">Vectorizing...</span>
+									<span class="tracking-wide">Preparing…</span>
 								</div>
 							{:else if doc.status === 'quota_exhausted'}
 								<Tooltip.Root>
@@ -1247,7 +1258,7 @@
 					</div>
 				{:else}
 					<div
-						class="flex h-32 items-center justify-center rounded-[22px] border border-[#302F2F] bg-[#191919]/[0.53]"
+						class="flex h-32 items-center justify-center rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53]"
 					>
 						<p class="text-sm text-[#959595]">No documents found.</p>
 					</div>
@@ -1453,6 +1464,27 @@
 		animation: document-card-sheen 900ms cubic-bezier(0.32, 0.72, 0, 1) both;
 	}
 
+	.deselected-card-glass {
+		animation: document-card-deselect 700ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	}
+
+	.deselected-card-glass::after {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		content: '';
+		border-radius: inherit;
+		background: linear-gradient(
+			105deg,
+			transparent 24%,
+			rgb(255 255 255 / 0.16) 48%,
+			transparent 70%
+		);
+		transform: translateX(120%);
+		opacity: 0;
+		animation: document-card-sheen-reverse 900ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	}
+
 	@keyframes document-card-select {
 		from {
 			transform: scale(0.985);
@@ -1461,6 +1493,17 @@
 		to {
 			transform: scale(1);
 			opacity: 1;
+		}
+	}
+
+	@keyframes document-card-deselect {
+		from {
+			transform: scale(1);
+			opacity: 1;
+		}
+		to {
+			transform: scale(0.985);
+			opacity: 0.82;
 		}
 	}
 
@@ -1474,6 +1517,20 @@
 		}
 		100% {
 			transform: translateX(120%);
+			opacity: 0;
+		}
+	}
+
+	@keyframes document-card-sheen-reverse {
+		0% {
+			transform: translateX(120%);
+			opacity: 0;
+		}
+		20% {
+			opacity: 1;
+		}
+		100% {
+			transform: translateX(-120%);
 			opacity: 0;
 		}
 	}
