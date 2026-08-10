@@ -23,6 +23,13 @@ export const ChatBodySchema = z.object({
      * into the turn row on success, and unselected variants are deleted.
      */
     selected_variant_id: z.string().uuid("Invalid variant ID").optional(),
+    /**
+     * Documents attached to this turn. Their chunks become the primary search
+     * scope — RAG retrieval runs only over these documents, never the whole
+     * tenant knowledge base. Max 10 per submit. When present, the turn waits
+     * for all of them to finish ingesting before answering.
+     */
+    attachment_document_ids: z.array(z.string().uuid("Invalid attachment ID")).max(10, "Maximum of 10 attachments per message").optional(),
 });
 export type ChatBody = z.infer<typeof ChatBodySchema>;
 
@@ -39,6 +46,8 @@ export interface ChatServiceParams {
     editTurnId?: string;
     retryTurnId?: string;
     selectedVariantId?: string;
+    /** Documents attached to this turn — the primary (and only) search scope. */
+    attachmentDocumentIds?: string[];
     signal?: AbortSignal;
     logContext?: Record<string, any>;
 }

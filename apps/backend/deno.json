@@ -2,7 +2,7 @@
     "nodeModulesDir": "auto",
     "tasks": {
         "dev": "dotenvx run -- deno run --watch --allow-net --allow-env --allow-read --allow-sys src/main.ts",
-        "test": "dotenvx run -- deno test --allow-net --allow-env --allow-read --allow-sys src/",
+        "test": "ATTACHMENT_WAIT_TIMEOUT_MS=10000 ATTACHMENT_POLL_INTERVAL_MS=100 dotenvx run -- deno test --allow-net --allow-env --allow-read --allow-sys src/",
         "benchmark": "dotenvx run -- deno run --allow-net --allow-env --allow-read --allow-sys --allow-write=benchmark benchmark/run_benchmark.ts",
         "benchmark:list": "dotenvx run -- deno run --allow-net --allow-env --allow-read --allow-sys benchmark/list_documents.ts",
         "benchmark:bge3": "dotenvx run -- deno run --allow-net --allow-env --allow-read --allow-sys --allow-write=benchmark benchmark/bge_m3_test.ts",

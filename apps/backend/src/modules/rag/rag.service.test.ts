@@ -5,7 +5,7 @@ import { RagService } from "./rag.service.ts";
 import { SearchService } from "../search/search.service.ts";
 import { FallbackLlmService } from "./fallback_llm.service.ts";
 import { db } from "../../config/drizzle.ts";
-import { conversations, conversationTurns, tenants, tenantSubscriptions, turnAlternatives } from "../../shared/models/db.model.ts";
+import { conversations, conversationTurns, tenants, tenantSubscriptions, turnAlternatives, documents } from "../../shared/models/db.model.ts";
 import { eq, and, desc } from "drizzle-orm";
 import { gemini } from "../../config/gemini.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
@@ -182,6 +182,199 @@ describe("RagService Isolated Tests", () => {
             assertEquals(payload.includes("PROMPT_INJECTION"), true);
             // The guard ran exactly once (first request) — the cache short-circuited the second.
             assertEquals(guardCalls, 1);
+        });
+
+        // =============================================================
+        // Chat attachments (attachment_document_ids)
+        // =============================================================
+
+        it("negative: rejects attachments not owned by the tenant before creating a turn", async () => {
+            // A document id that does not exist (and cannot belong to the tenant).
+            const foreignDocId = crypto.randomUUID();
+            const question = `foreign attachment ${crypto.randomUUID()}`;
+
+            await assertRejects(
+                () => RagService.streamChat({
+                    tenantId: TEST_TENANT_ID,
+                    userId: TEST_USER_ID,
+                    question,
+                    conversationId: TEST_CONVERSATION_ID,
+                    useByok: false,
+                    attachmentDocumentIds: [foreignDocId],
+                    logContext: {},
+                }),
+                AppError,
+                "One or more attached documents were not found",
+            );
+
+            // The pre-flight rejection must happen BEFORE the write-ahead — no
+            // turn row may be left behind.
+            const turns = await db
+                .select()
+                .from(conversationTurns)
+                .where(
+                    and(
+                        eq(conversationTurns.conversationId, TEST_CONVERSATION_ID),
+                        eq(conversationTurns.question, question),
+                    ),
+                );
+            assertEquals(turns.length, 0);
+        });
+
+        it("negative: rejects attachments in a terminal failed state", async () => {
+            const failedDocId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: failedDocId,
+                tenantId: TEST_TENANT_ID,
+                title: "Failed Doc",
+                storagePath: "failed.pdf",
+                sizeBytes: 100,
+                status: "failed",
+            }).onConflictDoNothing();
+
+            try {
+                await assertRejects(
+                    () => RagService.streamChat({
+                        tenantId: TEST_TENANT_ID,
+                        userId: TEST_USER_ID,
+                        question: `failed attachment ${crypto.randomUUID()}`,
+                        conversationId: TEST_CONVERSATION_ID,
+                        useByok: false,
+                        attachmentDocumentIds: [failedDocId],
+                        logContext: {},
+                    }),
+                    AppError,
+                    "failed to process",
+                );
+            } finally {
+                await db.delete(documents).where(eq(documents.id, failedDocId));
+            }
+        });
+
+        it("positive: waits for processed attachments, scopes retrieval to them, and persists their references", async () => {
+            const attachedDocId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: attachedDocId,
+                tenantId: TEST_TENANT_ID,
+                title: "Attached Doc",
+                storagePath: "attached.pdf",
+                sizeBytes: 100,
+                status: "processed",
+            }).onConflictDoNothing();
+
+            let searchParams: any = null;
+            using geminiStub = stub(gemini, "generateText", (prompt: string) =>
+                Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten",
+                }) as any,
+            );
+            using searchStub = stub(SearchService, "executeHybridSearch", (params: any) => {
+                searchParams = params;
+                return Promise.resolve([{
+                    id: crypto.randomUUID(),
+                    documentId: attachedDocId,
+                    documentTitle: "Attached Doc",
+                    metadata: { pages: [1] },
+                    content: "Konten dokumen terlampir tentang kebijakan pengembalian",
+                    score: 0.9,
+                }]);
+            });
+            const fakeStream: AsyncIterable<{ text: string }> = (async function* () {
+                yield { text: "Jawaban berdasarkan dokumen terlampir [Doc 1: Page 1]." };
+            })();
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () =>
+                Promise.resolve({ modelId: "test-model", stream: fakeStream }) as any,
+            );
+
+            const question = `attachment flow ${crypto.randomUUID()}`;
+            const stream = await RagService.streamChat({
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question,
+                conversationId: TEST_CONVERSATION_ID,
+                useByok: false,
+                attachmentDocumentIds: [attachedDocId],
+                logContext: {},
+            });
+            await drainStream(stream);
+
+            // Retrieval must have been scoped to the attached document.
+            assertExists(searchParams);
+            assertEquals(searchParams.documentIds, [attachedDocId]);
+
+            // The turn completes and its references point only at the attachment.
+            const turns = await waitForTurns(
+                TEST_CONVERSATION_ID,
+                (t) =>
+                    t.some(
+                        (row) =>
+                            row.question === question &&
+                            row.status === "complete",
+                    ),
+            );
+            const turn = turns.find((t) => t.question === question);
+            assertExists(turn);
+            assertEquals(turn.answer, "Jawaban berdasarkan dokumen terlampir [Doc 1: Page 1].");
+            assertEquals(turn.contextReferences, [
+                { index: 1, documentId: attachedDocId, title: "Attached Doc", pages: [1] },
+            ]);
+
+            await db.delete(documents).where(eq(documents.id, attachedDocId));
+        });
+
+        it("negative: times out waiting for a still-ingesting attachment and fails the turn gracefully", async () => {
+            const pendingDocId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: pendingDocId,
+                tenantId: TEST_TENANT_ID,
+                title: "Pending Doc",
+                storagePath: "pending.pdf",
+                sizeBytes: 100,
+                status: "confirmed",
+            }).onConflictDoNothing();
+
+            try {
+                const question = `attachment timeout ${crypto.randomUUID()}`;
+                // Runs with ATTACHMENT_WAIT_TIMEOUT_MS/ATTACHMENT_POLL_INTERVAL_MS
+                // overridden by the `deno test` task so this does not wait minutes.
+                const stream = await RagService.streamChat({
+                    tenantId: TEST_TENANT_ID,
+                    userId: TEST_USER_ID,
+                    question,
+                    conversationId: TEST_CONVERSATION_ID,
+                    useByok: false,
+                    attachmentDocumentIds: [pendingDocId],
+                    logContext: {},
+                });
+
+                const reader = stream.getReader();
+                const decoder = new TextDecoder();
+                let payload = "";
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) payload += decoder.decode(value, { stream: true });
+                }
+
+                // Graceful error stream — the client gets a clear message...
+                assertEquals(payload.includes("event: error"), true);
+                assertEquals(payload.includes("ATTACHMENT_NOT_READY"), true);
+                assertEquals(payload.includes("event: done"), true);
+
+                // ...and the turn resolves to "failed", never stuck in "processing".
+                const turns = await waitForTurns(
+                    TEST_CONVERSATION_ID,
+                    (t) =>
+                        t.some(
+                            (row) =>
+                                row.question === question &&
+                                row.status === "failed",
+                        ),
+                );
+                assertExists(turns.find((t) => t.question === question));
+            } finally {
+                await db.delete(documents).where(eq(documents.id, pendingDocId));
+            }
         });
 
         // testing successful streaming is complex due to SSE ReadableStream mock, so we focus on unit test DB operations next.

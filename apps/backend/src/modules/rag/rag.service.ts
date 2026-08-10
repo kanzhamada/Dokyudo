@@ -10,8 +10,9 @@ import {
     conversations,
     turnAlternatives,
     chatShares,
+    documents,
 } from "../../shared/models/db.model.ts";
-import { desc, eq, and, lt, ne, sql, or } from "drizzle-orm";
+import { desc, eq, and, lt, ne, sql, or, inArray } from "drizzle-orm";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 import { LlmRouterService } from "./llm_router.service.ts";
 import { FallbackLlmService, type FallbackStreamResponse } from "./fallback_llm.service.ts";
@@ -29,6 +30,20 @@ const PROMPT_INJECTION_ANSWER = "Nice try, Diddy.";
 // How long a detected-injection question stays in the blocklist cache before the
 // guard model must re-evaluate it. Exact-match cache: mostly catches re-sends.
 const PROMPT_INJECTION_CACHE_TTL_SECONDS = 60 * 60 * 24; // 24h
+
+// Chat attachments: how long a turn waits for its attached documents to finish
+// ingesting in the STB worker (serial queue — one document at a time) before
+// giving up with a clear error, and how often it re-checks document status.
+// Env-overridable so tests can run the wait without real delays.
+const ATTACHMENT_WAIT_TIMEOUT_MS = Number(
+    Deno.env.get("ATTACHMENT_WAIT_TIMEOUT_MS") ?? 5 * 60 * 1000,
+);
+const ATTACHMENT_POLL_INTERVAL_MS = Number(
+    Deno.env.get("ATTACHMENT_POLL_INTERVAL_MS") ?? 2000,
+);
+
+const sleep = (ms: number): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
 function createClosedStream(): ReadableStream<Uint8Array> {
     return new ReadableStream({
@@ -88,6 +103,7 @@ export class RagService {
             editTurnId,
             retryTurnId,
             selectedVariantId,
+            attachmentDocumentIds,
             signal,
             logContext,
         } = params;
@@ -112,6 +128,46 @@ export class RagService {
             await TierQuotaUtil.checkQaQuota(tx, tenantId);
         });
         if (signal?.aborted) return createClosedStream();
+
+        // 0. Pre-flight: validate chat attachments BEFORE the write-ahead insert
+        //    so a bad request never creates a turn row. Ownership is checked
+        //    (tenant-scoped) and documents already in a terminal failure state
+        //    are rejected up front — the turn cannot be answered from them.
+        //    Documents still ingesting are waited on later (see step 0.3).
+        const attachmentDocuments: { id: string; status: string }[] = [];
+        if (attachmentDocumentIds && attachmentDocumentIds.length > 0) {
+            const ownedDocs = await withAuthDb(userId, async (tx) => {
+                return await tx
+                    .select({ id: documents.id, status: documents.status })
+                    .from(documents)
+                    .where(
+                        and(
+                            eq(documents.tenantId, tenantId),
+                            inArray(documents.id, attachmentDocumentIds),
+                        ),
+                    );
+            });
+            if (ownedDocs.length !== attachmentDocumentIds.length) {
+                throw new AppError({
+                    code: "NOT_FOUND",
+                    message: "One or more attached documents were not found",
+                    status: 404,
+                });
+            }
+            const terminalFailed = ownedDocs.filter((doc) =>
+                doc.status === "failed" ||
+                doc.status === "failed_vectorizing" ||
+                doc.status === "quota_exhausted",
+            );
+            if (terminalFailed.length > 0) {
+                throw new AppError({
+                    code: "VALIDATION_ERROR",
+                    message: "One or more attached documents failed to process and cannot be used for chat",
+                    status: 400,
+                });
+            }
+            attachmentDocuments.push(...ownedDocs);
+        }
 
         // 0. Write-ahead turn record: the turn row is created (or, for edits,
         //    reset to "processing") BEFORE any LLM work. This persists the user's
@@ -351,6 +407,89 @@ export class RagService {
         };
 
         if (signal?.aborted) return await abortAsStopped();
+
+        // 0.2 Attachments not ready: persist "failed" on the eagerly-inserted
+        // turn and return a graceful error stream (HTTP 200 + error event) so
+        // the frontend behaves identically to the other failure paths.
+        const failAsAttachmentsNotReady = async (
+            code: string,
+            message: string,
+        ): Promise<ReadableStream> => {
+            try {
+                await withAuthDb(userId, async (tx) => {
+                    if (isRetry) {
+                        await tx
+                            .update(turnAlternatives)
+                            .set({ status: "failed", updatedAt: new Date() })
+                            .where(
+                                and(
+                                    eq(turnAlternatives.id, turnId),
+                                    eq(turnAlternatives.tenantId, tenantId),
+                                    eq(turnAlternatives.status, "processing"),
+                                ),
+                            );
+                    } else {
+                        await tx
+                            .update(conversationTurns)
+                            .set({ status: "failed", updatedAt: new Date() })
+                            .where(
+                                and(
+                                    eq(conversationTurns.id, turnId),
+                                    eq(conversationTurns.status, "processing"),
+                                ),
+                            );
+                    }
+                });
+            } catch (dbErr: any) {
+                if (logContext) logContext.ragWaitMarkError = dbErr.message;
+            }
+            return new ReadableStream({
+                start(controller) {
+                    const encode = (data: string) =>
+                        new TextEncoder().encode(data);
+                    const startedPayload = isRetry
+                        ? { turnId: retryTurnId, variantId: turnId }
+                        : { turnId };
+                    controller.enqueue(
+                        encode(
+                            `event: turn_started
+data: ${JSON.stringify(startedPayload)}
+
+`,
+                        ),
+                    );
+                    controller.enqueue(
+                        encode(
+                            `event: error\ndata: ${JSON.stringify({ code, message })}\n\n`,
+                        ),
+                    );
+                    controller.enqueue(encode(`event: done\ndata: {}\n\n`));
+                    controller.close();
+                },
+            });
+        };
+
+        // 0.3 Wait for the attached documents to finish ingesting in the STB
+        // worker before retrieval. The turn row is already "processing" — the
+        // client sees the turn in flight while this polls document status.
+        if (attachmentDocuments.length > 0) {
+            if (logContext) logContext.ragAttachmentCount = attachmentDocuments.length;
+            const waitResult = await RagService.waitForAttachmentsReady({
+                userId,
+                tenantId,
+                documents: attachmentDocuments,
+                signal,
+                logContext,
+            });
+            if (signal?.aborted) return await abortAsStopped();
+            if (waitResult.ok === false) {
+                if (logContext) logContext.ragAttachmentWaitFailed = waitResult.code;
+                return await failAsAttachmentsNotReady(
+                    waitResult.code,
+                    waitResult.message,
+                );
+            }
+        }
 
         // 0. LLM Gatekeeper for Prompt Injection
         //    A blocklist cache (question hash → "1") short-circuits known-bad
@@ -645,12 +784,17 @@ Rewritten Query:`;
             }
         }
 
-        // 1. Retrieve Context via Hybrid Search
+        // 1. Retrieve Context via Hybrid Search.
+        //    Attachment mode: candidates are restricted to the attached
+        //    documents (the primary context) and the result window widens —
+        //    up to 10 docs deserve more than the tenant-wide 5.
+        const isAttachmentMode = (attachmentDocumentIds?.length ?? 0) > 0;
         const searchResults = await SearchService.executeHybridSearch({
             tenantId,
             query: searchQuery,
-            limit: 5,
+            limit: isAttachmentMode ? 10 : 5,
             logContext,
+            documentIds: attachmentDocumentIds,
         });
         if (signal?.aborted) return await abortAsStopped();
 
@@ -691,7 +835,9 @@ Rewritten Query:`;
 
         const len = searchResults.length;
         if (len > 0) {
-            contextText = "CONTEXT DOCUMENTS:\n---\n";
+            contextText = isAttachmentMode
+                ? "CONTEXT DOCUMENTS (the user's attached files — answer primarily from these):\n---\n"
+                : "CONTEXT DOCUMENTS:\n---\n";
             for (let i = 0; i < len; i++) {
                 const doc = searchResults[i];
                 chunkIds.push(doc.id);
@@ -703,8 +849,9 @@ Rewritten Query:`;
                 contextText += `[Doc ${docInfo.index}: ${docInfo.title} | Pages: ${pagesStr}]\n${doc.content}\n---\n`;
             }
         } else {
-            contextText =
-                "No relevant documents found in the knowledge base.\n";
+            contextText = isAttachmentMode
+                ? "No relevant content found in the attached documents.\n"
+                : "No relevant documents found in the knowledge base.\n";
         }
 
         // 3. Construct Augmented Prompt with Structural Guardrails & Citation Rules
@@ -1283,6 +1430,71 @@ data: ${JSON.stringify(startedPayload)}
         });
 
         return stream;
+    }
+
+    /**
+     * Polls the documents table until every attachment reaches "processed"
+     * (i.e. the STB worker finished chunking + embedding it). Fails fast when
+     * any attachment lands in a terminal failure state. Bound by
+     * ATTACHMENT_WAIT_TIMEOUT_MS so a stuck document never hangs a turn
+     * indefinitely.
+     */
+    private static async waitForAttachmentsReady(params: {
+        userId: string;
+        tenantId: string;
+        documents: { id: string; status: string }[];
+        signal?: AbortSignal;
+        logContext?: Record<string, any>;
+    }): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+        const { userId, tenantId, documents: initialDocs, signal, logContext } = params;
+        const statusById = new Map(initialDocs.map((doc) => [doc.id, doc.status]));
+        const deadline = Date.now() + ATTACHMENT_WAIT_TIMEOUT_MS;
+
+        while (true) {
+            const failed = [...statusById.entries()].filter(([, status]) =>
+                status === "failed" ||
+                status === "failed_vectorizing" ||
+                status === "quota_exhausted",
+            );
+            if (failed.length > 0) {
+                return {
+                    ok: false,
+                    code: "ATTACHMENT_PROCESSING_FAILED",
+                    message: "One or more attached documents failed to process. Please check their status and try again.",
+                };
+            }
+
+            const pending = [...statusById.entries()].filter(([, status]) => status !== "processed");
+            if (pending.length === 0) return { ok: true };
+
+            if (signal?.aborted) {
+                return { ok: false, code: "ABORTED", message: "aborted" };
+            }
+            if (Date.now() >= deadline) {
+                return {
+                    ok: false,
+                    code: "ATTACHMENT_NOT_READY",
+                    message: "Attached documents are still processing. Please wait a moment and try again.",
+                };
+            }
+
+            // Re-query only the docs that are not processed yet.
+            const pendingIds = pending.map(([id]) => id);
+            const rows = await withAuthDb(userId, async (tx) => {
+                return await tx
+                    .select({ id: documents.id, status: documents.status })
+                    .from(documents)
+                    .where(
+                        and(
+                            eq(documents.tenantId, tenantId),
+                            inArray(documents.id, pendingIds),
+                        ),
+                    );
+            });
+            for (const row of rows) statusById.set(row.id, row.status);
+
+            await sleep(ATTACHMENT_POLL_INTERVAL_MS);
+        }
     }
 
     /**

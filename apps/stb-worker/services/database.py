@@ -33,6 +33,24 @@ def check_document_idempotency(document_id: str) -> bool:
             return True
     return False
 
+def fetch_documents_needing_ingestion(limit: int = 100) -> list[dict]:
+    """
+    Fetch documents that were queued for ingestion but never finished, used to
+    re-hydrate the in-process queue after a worker restart. Only 'confirmed'
+    documents are picked: 'pending' files may not have been uploaded yet, and
+    terminal states (processed / failed / failed_vectorizing) are handled
+    elsewhere. The processor's idempotency check makes duplicate enqueues
+    harmless, so this is safe to run on every startup.
+    """
+    url = (
+        f"{settings.SUPABASE_URL}/rest/v1/documents"
+        f"?status=eq.confirmed&select=id,tenant_id&limit={limit}"
+    )
+    with httpx.Client() as client:
+        res = client.get(url, headers=get_supabase_headers())
+        res.raise_for_status()
+        return res.json()
+
 def get_last_processed_chunk_index(document_id: str) -> int:
     """
     Query Supabase to find the highest chunk_index already inserted for this document.

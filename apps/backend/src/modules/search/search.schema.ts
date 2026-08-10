@@ -16,6 +16,11 @@ export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 export const SearchParamsSchema = SearchQuerySchema.extend({
     tenantId: z.string().uuid(),
     logContext: z.any().optional(),
+    /**
+     * Restrict the candidate pool to these documents only (chat-attachment
+     * mode). Absent = tenant-wide search. Max 10 — the chat attachment cap.
+     */
+    documentIds: z.array(z.string().uuid()).max(10).optional(),
     // Fusion tuning (benchmark/experiments only; the HTTP endpoint never sets
     // these, so production falls back to the defaults in rrf.ts).
     rrfK: z.number().min(1).max(1000).optional(),

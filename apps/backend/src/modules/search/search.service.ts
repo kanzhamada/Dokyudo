@@ -106,7 +106,8 @@ export class SearchService {
         params: SearchParams,
         configs: FusionConfig[],
     ): Promise<SearchResult[][]> {
-        const { tenantId, query, limit = 10, logContext, skipQuota } = params;
+        const { tenantId, query, limit = 10, logContext, skipQuota, documentIds } = params;
+        const scopedToDocuments = documentIds && documentIds.length > 0;
 
         // -1. Tier Quota Validation & Enforcement (Atomic)
         // Skipped when the benchmark runs with `skipQuota` — benchmarking should
@@ -119,6 +120,13 @@ export class SearchService {
 
         const rankCalc = sql<number>`ts_rank(${documentChunks.fts}, (websearch_to_tsquery('indonesian', ${query}) || websearch_to_tsquery('english', ${query})))`;
 
+        const ftsConditions = [
+            eq(documentChunks.tenantId, tenantId),
+            sql`${documentChunks.fts} @@ (websearch_to_tsquery('indonesian', ${query}) || websearch_to_tsquery('english', ${query}))`,
+        ];
+        // Chat-attachment mode: only chunks of the attached documents compete.
+        if (scopedToDocuments) ftsConditions.push(inArray(documentChunks.documentId, documentIds!));
+
         const ftsPromise = (async () => {
             try {
                 return await withAuthDb(tenantId, async (tx) => {
@@ -128,12 +136,7 @@ export class SearchService {
                             rank: rankCalc,
                         })
                         .from(documentChunks)
-                        .where(
-                            and(
-                                eq(documentChunks.tenantId, tenantId),
-                                sql`${documentChunks.fts} @@ (websearch_to_tsquery('indonesian', ${query}) || websearch_to_tsquery('english', ${query}))`,
-                            ),
-                        )
+                        .where(and(...ftsConditions))
                         .orderBy(desc(rankCalc))
                         .limit(limit * 2);
                 });
@@ -152,12 +155,20 @@ export class SearchService {
                     SearchService.getEmbedding(params),
                 );
 
+                // Chat-attachment mode: Upstash metadata filter scoped to the
+                // attached documents (UUIDs only — safe to inline).
+                let filter = `tenantId = '${tenantId}'`;
+                if (scopedToDocuments) {
+                    const ids = documentIds!.map((id) => `'${id}'`).join(", ");
+                    filter += ` AND documentId in (${ids})`;
+                }
+
                 const vec = await vectorIndex.query({
                     vector: embedding,
                     topK: limit * 2,
                     includeMetadata: false,
                     includeVectors: false,
-                    filter: `tenantId = '${tenantId}'`,
+                    filter,
                 });
                 const vecLen = vec.length;
                 const vecMapped = new Array(vecLen);
@@ -209,6 +220,13 @@ export class SearchService {
         const topIds = Array.from(idSet);
 
         const chunks = await withAuthDb(tenantId, async (tx) => {
+            const chunkConditions = [
+                inArray(documentChunks.id, topIds),
+                eq(documentChunks.tenantId, tenantId),
+            ];
+            // Defensive: fused ids already came from scoped queries, but keep
+            // the final fetch scoped too so a chunk can never leak in.
+            if (scopedToDocuments) chunkConditions.push(inArray(documentChunks.documentId, documentIds!));
             return await tx
                 .select({
                     id: documentChunks.id,
@@ -219,12 +237,7 @@ export class SearchService {
                 })
                 .from(documentChunks)
                 .innerJoin(documents, eq(documentChunks.documentId, documents.id))
-                .where(
-                    and(
-                        inArray(documentChunks.id, topIds),
-                        eq(documentChunks.tenantId, tenantId),
-                    ),
-                );
+                .where(and(...chunkConditions));
         });
 
         const chunkMap = new Map();

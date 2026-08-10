@@ -21,6 +21,7 @@ export async function handleChat(c: Context) {
         editTurnId: body.edit_turn_id,
         retryTurnId: body.retry_turn_id,
         selectedVariantId: body.selected_variant_id,
+        attachmentDocumentIds: body.attachment_document_ids,
         signal: c.req.raw.signal,
         logContext,
     };

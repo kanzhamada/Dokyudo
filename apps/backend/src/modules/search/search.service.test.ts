@@ -12,6 +12,7 @@ import { AppError } from "../../shared/utils/errors.util.ts";
 describe("SearchService Isolated Tests", () => {
     const TEST_TENANT_ID = crypto.randomUUID();
     const TEST_DOC_ID = crypto.randomUUID();
+    const TEST_DOC_ID_2 = crypto.randomUUID();
 
     beforeAll(async () => {
         // Create dummy tenant and chunk for DB tests
@@ -36,6 +37,26 @@ describe("SearchService Isolated Tests", () => {
             documentId: TEST_DOC_ID,
             chunkIndex: 0,
             content: "Ini adalah dokumen dummy tentang kebijakan pengembalian barang",
+        }).onConflictDoNothing();
+
+        // Second document, same tenant — used to prove documentIds scoping
+        // keeps the two search spaces apart.
+        await db.insert(documents).values({
+            id: TEST_DOC_ID_2,
+            tenantId: TEST_TENANT_ID,
+            title: "Second Test Document",
+            storagePath: "test2.pdf",
+            sizeBytes: 100,
+            status: "confirmed",
+            description: "",
+        }).onConflictDoNothing();
+
+        await db.insert(documentChunks).values({
+            id: crypto.randomUUID(),
+            tenantId: TEST_TENANT_ID,
+            documentId: TEST_DOC_ID_2,
+            chunkIndex: 0,
+            content: "Kebijakan pengembalian barang elektronik, edisi kedua",
         }).onConflictDoNothing();
 
         await db.insert(tenantSubscriptions).values({
@@ -75,6 +96,33 @@ describe("SearchService Isolated Tests", () => {
             assertExists(results);
             assertEquals(Array.isArray(results), true);
             // It should at least search the DB (FTS) and Vector (mocked)
+        });
+
+        it("positive: documentIds restricts results to the attached documents only", async () => {
+            // Mock LLM Embedding to return a dummy vector
+            using geminiStub = stub(gemini, "generateEmbedding", () => Promise.resolve([0.1, 0.2, 0.3]));
+            // Mock Upstash Vector Index to return nothing — forces the FTS path
+            // (the only path that can prove scoping against real rows).
+            using vectorStub = stub(vectorIndex, "query", () => Promise.resolve([]));
+
+            // Query that matches BOTH tenant documents, scoped to doc #2 only.
+            const params = {
+                tenantId: TEST_TENANT_ID,
+                query: "kebijakan pengembalian",
+                limit: 5,
+                logContext: {},
+                documentIds: [TEST_DOC_ID_2],
+            };
+
+            const results = await SearchService.executeHybridSearch(params);
+
+            // Every result must belong to the scoped document — doc #1's chunk
+            // (also an FTS match) must never leak in.
+            assertExists(results);
+            assertEquals(results.length > 0, true);
+            for (const result of results) {
+                assertEquals(result.documentId, TEST_DOC_ID_2);
+            }
         });
 
         it("negative: throws error if LLM embedding fails completely", async () => {
