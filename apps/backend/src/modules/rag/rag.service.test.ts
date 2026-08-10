@@ -432,6 +432,7 @@ describe("RagService Isolated Tests", () => {
             const fakeId = "99999999-9999-4999-8999-999999999999";
             let searchParams: any = null;
             let augmentedPrompt: string | null = null;
+            const logContext: Record<string, any> = {};
             using geminiStub = stub(gemini, "generateText", (prompt: string) =>
                 Promise.resolve({
                     text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten",
@@ -466,7 +467,7 @@ describe("RagService Isolated Tests", () => {
                     question,
                     conversationId: TEST_CONVERSATION_ID,
                     useByok: false,
-                    logContext: {},
+                    logContext,
                 });
                 const reader = stream.getReader();
                 const decoder = new TextDecoder();
@@ -498,6 +499,14 @@ describe("RagService Isolated Tests", () => {
                 for (const id of docIds) {
                     assertEquals(augmentedPrompt.includes(id), false);
                 }
+
+                // The http_request log records the scope — the only place the
+                // mention's effect is observable (rewritten queries never
+                // contain tokens).
+                assertEquals(
+                    [...(logContext.ragScopedDocumentIds ?? [])].sort(),
+                    [...docIds].sort(),
+                );
 
                 // The stored question keeps the tokens verbatim (frontend
                 // rendering + history round-trip depend on it).

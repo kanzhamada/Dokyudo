@@ -235,6 +235,13 @@ export class RagService {
             }
             attachmentDocuments.push(...ownedDocs);
         }
+        // Observability: the mention/attachment scope is invisible in the
+        // http_request log otherwise — the rewritten query never contains
+        // mention tokens (they are stripped from every LLM prompt), so this
+        // field is the proof that retrieval was scoped to these documents.
+        if (logContext && attachmentDocuments.length > 0) {
+            logContext.ragScopedDocumentIds = attachmentDocuments.map((d) => d.id);
+        }
 
         // Already-indexed ("processed") attachments are used as the turn's
         // main context right away: the interactive SSE path streams the answer
