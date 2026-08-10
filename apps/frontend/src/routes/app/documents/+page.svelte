@@ -31,6 +31,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CheckSquareIcon from '@lucide/svelte/icons/check-square';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
@@ -576,9 +577,7 @@
 		return escaped.replace(regex, '<mark class="match-highlight">$1</mark>');
 	}
 
-	let activeSearchQuery = $derived(
-		searchMode === 'semantic' ? semanticSearchQuery : globalFilter
-	);
+	let activeSearchQuery = $derived(searchMode === 'semantic' ? semanticSearchQuery : globalFilter);
 
 	$effect(() => {
 		if (searchMode === 'keyword') {
@@ -833,7 +832,7 @@
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white disabled:opacity-50"
+								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white"
 								onclick={toggleFilterMenu}
 								aria-haspopup="menu"
 								aria-expanded={filterMenuOpen}
@@ -905,7 +904,7 @@
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white disabled:opacity-50"
+								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white"
 								onclick={toggleSortMenu}
 								aria-haspopup="menu"
 								aria-expanded={sortMenuOpen}
@@ -1092,7 +1091,7 @@
 			<div class="flex flex-col gap-3">
 				{#if isSemanticSearching}
 					<!-- Hybrid search skeleton: mirrors the document card -->
-					{#each [0, 1, 2] as _skeleton ( _skeleton)}
+					{#each [0, 1, 2] as _skeleton (_skeleton)}
 						<div
 							class="flex animate-pulse flex-col gap-3 rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4 md:p-5"
 							aria-hidden="true"
@@ -1130,212 +1129,229 @@
 					{/each}
 				{:else}
 					{#each table.getRowModel().rows as row (row.id)}
-					{@const doc = row.original as Document}
-					{@const isSelected = selectedDocIds.includes(doc.id)}
-					<div
-						role="button"
-						tabindex="0"
-						onclick={() => toggleSelectDoc(doc.id)}
-						onkeydown={(e) => e.key === 'Enter' && toggleSelectDoc(doc.id)}
-						class="group relative cursor-pointer overflow-hidden rounded-2xl border p-4 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px md:p-5 {isSelected
-							? 'selected-card-glass border-white/45 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] ring-1 ring-white/10'
-							: 'border-[#302F2F] bg-[#191919]/[0.53] hover:border-[#949494] hover:bg-[#525252]/[0.53]'} {deselectedCardIds.includes(
-							doc.id
-						)
-							? 'deselected-card-glass'
-							: ''}"
-					>
-						<!-- Card Row 1: Header -->
-						<div class="flex items-start justify-between gap-3">
-							<div class="flex items-center gap-3">
-								<MxIcon name="document-outline" class="size-4.5 shrink-0 text-[#C5937B]" />
-								<span class="text-sm font-medium text-white md:text-base"
-									>{@html highlightMatch(doc.name, activeSearchQuery)}</span
-								>
-							</div>
-							<div class="flex items-center gap-3" onclick={(e) => e.stopPropagation()} role="none">
-								{#if doc.score !== undefined}
-									{@const score = doc.score}
-									<Tooltip.Root>
-										<Tooltip.Trigger>
-											{#snippet child({ props })}
-												<div
-													{...props}
-													class="rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2 py-0.5 text-xs font-medium text-[#DB8F5E]"
-												>
-													{(score * 100).toFixed(2)}% match
-												</div>
-											{/snippet}
-										</Tooltip.Trigger>
-										<Tooltip.Content
-											class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
-										>
-											<p>How well this document matches your question</p>
-										</Tooltip.Content>
-									</Tooltip.Root>
-								{/if}
-								<DocumentCardActions
-									id={doc.id}
-									onPreview={() => handlePreview(doc)}
-									onDownload={() => handleDownload(doc)}
-									onDelete={() => promptDelete(doc)}
-								/>
-							</div>
-						</div>
-
-						<!-- Card Row 2: Description -->
-						{#if (doc.status === 'pending' || doc.status === 'confirmed') && (!doc.description || doc.description === 'No description provided.')}
-							<div
-								class="mt-2 flex animate-pulse items-center gap-2 text-sm font-normal text-white/50 italic"
-							>
-								<SparklesIcon class="size-3.5 shrink-0 text-white/70" />
-								<span>Generating summary with AI...</span>
-							</div>
-						{:else if doc.status === 'quota_exhausted' && (!doc.description || doc.description === 'No description provided.')}
-							<div
-								class="mt-2 flex items-center gap-2 text-sm font-normal text-amber-400/70 italic"
-							>
-								<MxIcon name="clock-outline" class="size-3.5 shrink-0 text-amber-400" />
-								<span>Summary generation paused due to daily quota. Resuming tomorrow.</span>
-							</div>
-						{:else}
-							<p
-								class="mt-2 text-sm font-normal text-white/80 {activeSearchQuery.trim()
-									? ''
-									: 'line-clamp-2'}"
-							>
-								{@html highlightMatch(doc.description, activeSearchQuery)}
-							</p>
-						{/if}
-
-						{#if doc.semanticContent}
-							<div
-								class="relative mt-3 overflow-hidden rounded-lg border border-[#DB8F5E]/20 bg-[#1A1512] p-3.5"
-							>
-								<div class="absolute top-0 left-0 h-full w-0.5 bg-[#DB8F5E]/50"></div>
-								<div
-									class="flex cursor-pointer items-center justify-between"
-									onclick={(e) => {
-										e.stopPropagation();
-										if (expandedDocs.includes(doc.id)) {
-											expandedDocs = expandedDocs.filter((id) => id !== doc.id);
-										} else {
-											expandedDocs = [...expandedDocs, doc.id];
-										}
-									}}
-									role="button"
-									tabindex="0"
-									onkeydown={(e) => e.key === 'Enter' && e.stopPropagation()}
-								>
-									<div class="flex items-center gap-1.5 text-[#DB8F5E]">
-										<SparklesIcon class="size-3.5" />
-										<span class="text-xs font-medium">Why this matched</span>
-									</div>
-									<Button
-										variant="ghost"
-										size="sm"
-										class="h-6 px-2 text-xs text-[#DB8F5E] hover:bg-[#DB8F5E]/20 hover:text-[#DB8F5E]"
+						{@const doc = row.original as Document}
+						{@const isSelected = selectedDocIds.includes(doc.id)}
+						<div
+							role="button"
+							tabindex="0"
+							onclick={() => toggleSelectDoc(doc.id)}
+							onkeydown={(e) => e.key === 'Enter' && toggleSelectDoc(doc.id)}
+							class="group relative cursor-pointer overflow-hidden rounded-2xl border p-4 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px md:p-5 {isSelected
+								? 'selected-card-glass border-white/45 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] ring-1 ring-white/10'
+								: 'border-[#302F2F] bg-[#191919]/[0.53] hover:border-[#949494] hover:bg-[#525252]/[0.53]'} {deselectedCardIds.includes(
+								doc.id
+							)
+								? 'deselected-card-glass'
+								: ''}"
+						>
+							<!-- Card Row 1: Header -->
+							<div class="flex items-start justify-between gap-3">
+								<div class="flex items-center gap-3">
+									<MxIcon name="document-outline" class="size-4.5 shrink-0 text-[#C5937B]" />
+									<span class="text-sm font-medium text-white md:text-base"
+										>{@html highlightMatch(doc.name, activeSearchQuery)}</span
 									>
-										{expandedDocs.includes(doc.id) ? 'Collapse' : 'Expand'}
-									</Button>
 								</div>
-
 								<div
-									class="mt-2 text-[13px] leading-relaxed font-normal text-white/80 transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] {expandedDocs.includes(
-										doc.id
-									)
+									class="flex items-center gap-3"
+									onclick={(e) => e.stopPropagation()}
+									role="none"
+								>
+									{#if doc.score !== undefined}
+										{@const score = doc.score}
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<div
+														{...props}
+														class="match-score"
+														aria-label={`${(score * 100).toFixed(2)} percent match`}
+													>
+														<span class="match-score-dot" aria-hidden="true"></span>
+														<span class="font-mono tabular-nums">{(score * 100).toFixed(2)}%</span>
+														<span class="match-score-label">match</span>
+													</div>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content
+												class="rounded-lg border border-white/10 bg-[#202020] px-2.5 py-1.5 text-xs font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
+											>
+												<p>How well this document matches your question</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									{/if}
+									<DocumentCardActions
+										id={doc.id}
+										onPreview={() => handlePreview(doc)}
+										onDownload={() => handleDownload(doc)}
+										onDelete={() => promptDelete(doc)}
+									/>
+								</div>
+							</div>
+
+							<!-- Card Row 2: Description -->
+							{#if (doc.status === 'pending' || doc.status === 'confirmed') && (!doc.description || doc.description === 'No description provided.')}
+								<div
+									class="mt-2 flex animate-pulse items-center gap-2 text-sm font-normal text-white/50 italic"
+								>
+									<SparklesIcon class="size-3.5 shrink-0 text-white/70" />
+									<span>Generating summary with AI...</span>
+								</div>
+							{:else if doc.status === 'quota_exhausted' && (!doc.description || doc.description === 'No description provided.')}
+								<div
+									class="mt-2 flex items-center gap-2 text-sm font-normal text-amber-400/70 italic"
+								>
+									<MxIcon name="clock-outline" class="size-3.5 shrink-0 text-amber-400" />
+									<span>Summary generation paused due to daily quota. Resuming tomorrow.</span>
+								</div>
+							{:else}
+								<p
+									class="mt-2 text-sm font-normal text-white/80 {activeSearchQuery.trim()
 										? ''
 										: 'line-clamp-2'}"
 								>
-									{@html highlightMatch(doc.semanticContent, activeSearchQuery)}
-								</div>
-							</div>
-						{/if}
-
-						<!-- Card Row 3: Metadata & Real-time Status Badge -->
-						<div class="mt-2.5 flex items-center justify-between gap-2">
-							<div class="flex items-center gap-2.5">
-								<p class="text-xs font-normal text-[#959595]">
-									Uploaded {doc.uploadedAt} · {doc.size}
+									{@html highlightMatch(doc.description, activeSearchQuery)}
 								</p>
+							{/if}
 
-								{#if doc.pages && doc.pages.length > 0}
-									{@const pages = doc.pages}
+							{#if doc.semanticContent}
+								<div class="semantic-match-panel">
+									<div class="semantic-match-rail" aria-hidden="true"></div>
+									<button
+										type="button"
+										class="semantic-match-trigger"
+										onclick={(e) => {
+											e.stopPropagation();
+											if (expandedDocs.includes(doc.id)) {
+												expandedDocs = expandedDocs.filter((id) => id !== doc.id);
+											} else {
+												expandedDocs = [...expandedDocs, doc.id];
+											}
+										}}
+										aria-expanded={expandedDocs.includes(doc.id)}
+										aria-controls={`semantic-match-${doc.id}`}
+									>
+										<span class="flex min-w-0 items-center gap-2.5">
+											<span class="semantic-match-icon" aria-hidden="true">
+												<SparklesIcon class="size-3.5" strokeWidth={1.7} />
+											</span>
+											<span class="min-w-0 text-left">
+												<span
+													class="block text-[13px] font-medium tracking-[-0.01em] text-white/90"
+												>
+													Why this matched
+												</span>
+												<span
+													class="mt-0.5 block text-[10px] tracking-[0.12em] text-white/35 uppercase"
+												>
+													Semantic context
+												</span>
+											</span>
+										</span>
+										<span class="semantic-match-action">
+											<span>{expandedDocs.includes(doc.id) ? 'Show less' : 'Read more'}</span>
+											<ChevronDownIcon
+												class="size-3.5 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] {expandedDocs.includes(
+													doc.id
+												)
+													? 'rotate-180'
+													: ''}"
+												strokeWidth={1.8}
+											/>
+										</span>
+									</button>
+
+									<div
+										id={`semantic-match-${doc.id}`}
+										class="semantic-match-copy {expandedDocs.includes(doc.id)
+											? 'semantic-match-copy-expanded'
+											: 'line-clamp-3'}"
+									>
+										{@html highlightMatch(doc.semanticContent, activeSearchQuery)}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Card Row 3: Metadata & Real-time Status Badge -->
+							<div class="mt-2.5 flex items-center justify-between gap-2">
+								<div class="flex items-center gap-2.5">
+									<p class="text-xs font-normal text-[#959595]">
+										Uploaded {doc.uploadedAt} · {doc.size}
+									</p>
+
+									{#if doc.pages && doc.pages.length > 0}
+										{@const pages = doc.pages}
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<div {...props} class="page-reference">
+														<BookOpenIcon class="size-3.5 text-[#DB8F5E]" strokeWidth={1.7} />
+														<span
+															>Page{pages.length > 1 ? 's' : ''}
+															{pages.slice(0, 3).join(', ')}{pages.length > 3 ? '…' : ''}</span
+														>
+													</div>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content
+												class="rounded-lg border border-white/10 bg-[#202020] px-2.5 py-1.5 text-xs font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
+											>
+												<p>Found on page{pages.length > 1 ? 's' : ''}: {pages.join(', ')}</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									{/if}
+								</div>
+
+								<!-- Vectorizing / Quota / Failed Status Badge -->
+								{#if doc.status === 'pending' || doc.status === 'confirmed'}
+									<div
+										class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:-translate-y-px group-hover:border-white/30 group-hover:bg-white/20"
+									>
+										<SparklesIcon class="size-3.5 animate-pulse text-white" />
+										<span class="tracking-wide">Preparing…</span>
+									</div>
+								{:else if doc.status === 'quota_exhausted'}
 									<Tooltip.Root>
 										<Tooltip.Trigger>
 											{#snippet child({ props })}
 												<div
 													{...props}
-													class="inline-flex items-center gap-1.5 rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2.5 py-0.5 text-xs font-medium text-[#DB8F5E]"
+													class="inline-flex cursor-help items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300"
 												>
-													<BookOpenIcon class="size-3" />
-													<span
-														>Page{pages.length > 1 ? 's' : ''}: {pages
-															.slice(0, 3)
-															.join(', ')}{pages.length > 3 ? '…' : ''}</span
-													>
+													<MxIcon name="clock-outline" class="size-3.5 text-amber-400" />
+													<span class="font-medium tracking-wide">Resuming Tomorrow</span>
 												</div>
 											{/snippet}
 										</Tooltip.Trigger>
 										<Tooltip.Content
-											class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+											class="max-w-xs rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 										>
-											<p>Found on page{pages.length > 1 ? 's' : ''}: {pages.join(', ')}</p>
+											<p>Daily AI quota reached. Vectorizing will resume tomorrow at 00:00 UTC.</p>
 										</Tooltip.Content>
 									</Tooltip.Root>
+								{:else if doc.status === 'failed_vectorizing'}
+									<div
+										class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
+									>
+										<XIcon class="size-3.5 text-red-400" />
+										<span class="font-medium tracking-wide">Failed Vectorizing</span>
+									</div>
+								{:else if doc.status === 'failed'}
+									<div
+										class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
+									>
+										<XIcon class="size-3.5 text-red-400" />
+										<span class="font-medium tracking-wide">Processing Failed</span>
+									</div>
 								{/if}
 							</div>
-
-							<!-- Vectorizing / Quota / Failed Status Badge -->
-							{#if doc.status === 'pending' || doc.status === 'confirmed'}
-								<div
-									class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:-translate-y-px group-hover:border-white/30 group-hover:bg-white/20"
-								>
-									<SparklesIcon class="size-3.5 animate-pulse text-white" />
-									<span class="tracking-wide">Preparing…</span>
-								</div>
-							{:else if doc.status === 'quota_exhausted'}
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										{#snippet child({ props })}
-											<div
-												{...props}
-												class="inline-flex cursor-help items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300"
-											>
-												<MxIcon name="clock-outline" class="size-3.5 text-amber-400" />
-												<span class="font-medium tracking-wide">Resuming Tomorrow</span>
-											</div>
-										{/snippet}
-									</Tooltip.Trigger>
-									<Tooltip.Content
-										class="max-w-xs rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
-									>
-										<p>Daily AI quota reached. Vectorizing will resume tomorrow at 00:00 UTC.</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
-							{:else if doc.status === 'failed_vectorizing'}
-								<div
-									class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
-								>
-									<XIcon class="size-3.5 text-red-400" />
-									<span class="font-medium tracking-wide">Failed Vectorizing</span>
-								</div>
-							{:else if doc.status === 'failed'}
-								<div
-									class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
-								>
-									<XIcon class="size-3.5 text-red-400" />
-									<span class="font-medium tracking-wide">Processing Failed</span>
-								</div>
-							{/if}
 						</div>
-					</div>
-				{:else}
-					<div
-						class="flex h-32 items-center justify-center rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53]"
-					>
-						<p class="text-sm text-[#959595]">No documents found.</p>
-					</div>
+					{:else}
+						<div
+							class="flex h-32 items-center justify-center rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53]"
+						>
+							<p class="text-sm text-[#959595]">No documents found.</p>
+						</div>
 					{/each}
 				{/if}
 			</div>
@@ -1525,6 +1541,206 @@
 		color: #f4e6d4;
 		box-decoration-break: clone;
 		-webkit-box-decoration-break: clone;
+	}
+
+	.semantic-match-panel {
+		position: relative;
+		margin-top: 0.875rem;
+		overflow: hidden;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 0.75rem;
+		background: linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.075) 0%,
+			rgba(30, 30, 30, 0.84) 54%,
+			rgba(219, 143, 94, 0.07) 100%
+		);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+		transition:
+			border-color 600ms cubic-bezier(0.32, 0.72, 0, 1),
+			transform 600ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.semantic-match-panel:hover {
+		border-color: rgba(219, 143, 94, 0.34);
+		transform: translateY(-1px);
+	}
+
+	.semantic-match-rail {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		width: 2px;
+		background: linear-gradient(180deg, #db8f5e 0%, rgba(219, 143, 94, 0.18) 100%);
+	}
+
+	.semantic-match-trigger {
+		position: relative;
+		display: flex;
+		width: 100%;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.8rem 0.9rem 0.75rem 1rem;
+		text-align: left;
+		transition: background-color 500ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.semantic-match-trigger:hover {
+		background: rgba(255, 255, 255, 0.045);
+	}
+
+	.semantic-match-trigger:focus-visible {
+		outline: none;
+		box-shadow: inset 0 0 0 1px rgba(219, 143, 94, 0.72);
+	}
+
+	.semantic-match-icon {
+		display: inline-flex;
+		height: 1.75rem;
+		width: 1.75rem;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid rgba(219, 143, 94, 0.28);
+		border-radius: 0.5rem;
+		background: rgba(219, 143, 94, 0.1);
+		color: #db8f5e;
+		transition:
+			background-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			transform 500ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.semantic-match-trigger:hover .semantic-match-icon {
+		background: rgba(219, 143, 94, 0.18);
+		transform: translateY(-1px) rotate(-3deg);
+	}
+
+	.semantic-match-action {
+		display: inline-flex;
+		flex-shrink: 0;
+		align-items: center;
+		gap: 0.3rem;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.045);
+		padding: 0.35rem 0.55rem 0.35rem 0.7rem;
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: rgba(255, 255, 255, 0.62);
+		white-space: nowrap;
+		transition:
+			background-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			border-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			transform 500ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.semantic-match-trigger:hover .semantic-match-action {
+		border-color: rgba(219, 143, 94, 0.42);
+		background: rgba(219, 143, 94, 0.12);
+		color: #db8f5e;
+		transform: translateX(1px);
+	}
+
+	.semantic-match-copy {
+		border-top: 1px solid rgba(255, 255, 255, 0.08);
+		padding: 0.8rem 1rem 1rem 3.75rem;
+		font-size: 0.8125rem;
+		font-weight: 400;
+		line-height: 1.65;
+		color: rgba(255, 255, 255, 0.72);
+		transition:
+			opacity 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			transform 500ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.semantic-match-copy-expanded {
+		color: rgba(255, 255, 255, 0.8);
+	}
+
+	.match-score {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		border: 1px solid rgba(219, 143, 94, 0.34);
+		border-radius: 999px;
+		background: rgba(219, 143, 94, 0.1);
+		padding: 0.3rem 0.55rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: #db8f5e;
+		white-space: nowrap;
+		transition:
+			background-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			border-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			transform 500ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.match-score:hover {
+		border-color: rgba(219, 143, 94, 0.62);
+		background: rgba(219, 143, 94, 0.16);
+		transform: translateY(-1px);
+	}
+
+	.match-score-dot {
+		height: 0.35rem;
+		width: 0.35rem;
+		border-radius: 999px;
+		background: #db8f5e;
+	}
+
+	.match-score-label {
+		font-size: 0.625rem;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: rgba(244, 230, 212, 0.62);
+	}
+
+	.page-reference {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.045);
+		padding: 0.3rem 0.65rem;
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: rgba(255, 255, 255, 0.62);
+		white-space: nowrap;
+		transition:
+			background-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			border-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			color 500ms cubic-bezier(0.32, 0.72, 0, 1),
+			transform 500ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.page-reference:hover {
+		border-color: rgba(219, 143, 94, 0.42);
+		background: rgba(219, 143, 94, 0.09);
+		color: rgba(255, 255, 255, 0.86);
+		transform: translateY(-1px);
+	}
+
+	@media (max-width: 767px) {
+		.semantic-match-copy {
+			padding-left: 1rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.semantic-match-panel,
+		.semantic-match-trigger,
+		.semantic-match-icon,
+		.semantic-match-action,
+		.semantic-match-copy,
+		.match-score,
+		.page-reference {
+			transition: none;
+		}
 	}
 
 	.selected-card-glass {
