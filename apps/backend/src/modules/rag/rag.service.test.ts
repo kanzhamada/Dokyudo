@@ -322,6 +322,93 @@ describe("RagService Isolated Tests", () => {
             }
         });
 
+        it("positive: already-processed attachments answer interactively as main context (no awaiting)", async () => {
+            // The `@`-mention flow: an owned document that is fully indexed
+            // ("processed") becomes the turn's main context — retrieval is
+            // scoped to it and the answer streams in-line, with no
+            // awaiting_indexing handoff to the background sweep.
+            const attachedDocId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: attachedDocId,
+                tenantId: TEST_TENANT_ID,
+                title: "Owned Doc",
+                storagePath: "owned.pdf",
+                sizeBytes: 100,
+                status: "processed",
+            }).onConflictDoNothing();
+
+            let searchParams: any = null;
+            using geminiStub = stub(gemini, "generateText", (prompt: string) =>
+                Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten",
+                }) as any,
+            );
+            using searchStub = stub(SearchService, "executeHybridSearch", (params: any) => {
+                searchParams = params;
+                return Promise.resolve([{
+                    id: crypto.randomUUID(),
+                    documentId: attachedDocId,
+                    documentTitle: "Owned Doc",
+                    metadata: { pages: [1] },
+                    content: "Konten dokumen tentang kebijakan pengembalian",
+                    score: 0.9,
+                }]);
+            });
+            const fakeStream: AsyncIterable<{ text: string }> = (async function* () {
+                yield { text: "Jawaban berdasarkan dokumen [Doc 1: Page 1]." };
+            })();
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () =>
+                Promise.resolve({ modelId: "test-model", stream: fakeStream }) as any,
+            );
+
+            try {
+                const question = `attachment main context ${crypto.randomUUID()}`;
+                const stream = await RagService.streamChat({
+                    tenantId: TEST_TENANT_ID,
+                    userId: TEST_USER_ID,
+                    question,
+                    conversationId: TEST_CONVERSATION_ID,
+                    useByok: false,
+                    attachmentDocumentIds: [attachedDocId],
+                    logContext: {},
+                });
+
+                const reader = stream.getReader();
+                const decoder = new TextDecoder();
+                let payload = "";
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) payload += decoder.decode(value, { stream: true });
+                }
+
+                // Interactive path: tokens stream, no awaiting handoff.
+                assertEquals(payload.includes("event: awaiting_indexing"), false);
+                assertEquals(payload.includes("event: token"), true);
+
+                // The turn completed in-line, scoped to the owned document.
+                // (Poll the DB — the finalize write may land after the stream
+                // closes, same as the sweep tests.)
+                const turns = await waitForTurns(
+                    TEST_CONVERSATION_ID,
+                    (rows) =>
+                        rows.some(
+                            (t) => t.question === question && t.status === "complete",
+                        ),
+                );
+                const completedTurn = turns.find((t) => t.question === question);
+                assertExists(completedTurn);
+                assertEquals(completedTurn.status, "complete");
+                assertEquals(completedTurn.attachmentDocumentIds, [attachedDocId]);
+
+                // Retrieval was scoped to the mentioned document only.
+                assertExists(searchParams);
+                assertEquals(searchParams.documentIds, [attachedDocId]);
+            } finally {
+                await db.delete(documents).where(eq(documents.id, attachedDocId));
+            }
+        });
+
         it("positive: sweep completes an awaiting turn once every document is processed", async () => {
             const attachedDocId = crypto.randomUUID();
             await db.insert(documents).values({
@@ -536,6 +623,206 @@ describe("RagService Isolated Tests", () => {
         });
 
         // testing successful streaming is complex due to SSE ReadableStream mock, so we focus on unit test DB operations next.
+    });
+
+    describe("background continuation (leave page while generating)", () => {
+        it("positive: leaving the page mid-generation hands the turn to the sweep (not stopped)", async () => {
+            const question = `disconnect flip ${crypto.randomUUID()}`;
+            using geminiStub = stub(gemini, "generateText", (prompt: string) =>
+                Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten",
+                }) as any,
+            );
+            using searchStub = stub(SearchService, "executeHybridSearch", (params: any) => {
+                return Promise.resolve([{
+                    id: crypto.randomUUID(),
+                    documentId: crypto.randomUUID(),
+                    documentTitle: "Some Doc",
+                    metadata: { pages: [1] },
+                    content: "Konten tentang kebijakan pengembalian",
+                    score: 0.9,
+                }]);
+            });
+            // Generation that takes a while — the client leaves mid-stream.
+            const fakeStream: AsyncIterable<{ text: string }> = (async function* () {
+                await new Promise((r) => setTimeout(r, 1500));
+                yield { text: "Jawaban [Doc 1: Page 1]." };
+            })();
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () =>
+                Promise.resolve({ modelId: "test-model", stream: fakeStream }) as any,
+            );
+
+            const stream = await RagService.streamChat({
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question,
+                conversationId: TEST_CONVERSATION_ID,
+                useByok: false,
+                logContext: {},
+            });
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            let payload = "";
+            let turnId: string | null = null;
+            while (!payload.includes("turn_started")) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (value) payload += decoder.decode(value, { stream: true });
+            }
+            const startedMatch = /data: (\{.*\})\n\n/.exec(payload);
+            if (startedMatch) turnId = JSON.parse(startedMatch[1]).turnId;
+            assertExists(turnId);
+
+            // Cancel like a page leave (reader.cancel / connection drop).
+            await reader.cancel();
+
+            try {
+                // The turn must be handed to the sweep — NOT stopped.
+                const turns = await waitForTurns(
+                    TEST_CONVERSATION_ID,
+                    (t) =>
+                        t.some(
+                            (row) =>
+                                row.question === question &&
+                                row.status === "awaiting_indexing",
+                        ),
+                    8000,
+                );
+                const turn = turns.find((t) => t.question === question);
+                assertExists(turn);
+                assertEquals(turn.status, "awaiting_indexing");
+            } finally {
+                await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId!));
+            }
+        });
+
+        it("positive: explicit stop aborts the generation and marks the turn stopped", async () => {
+            const question = `stop turn ${crypto.randomUUID()}`;
+            using geminiStub = stub(gemini, "generateText", (prompt: string) =>
+                Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten",
+                }) as any,
+            );
+            using searchStub = stub(SearchService, "executeHybridSearch", (params: any) => {
+                return Promise.resolve([{
+                    id: crypto.randomUUID(),
+                    documentId: crypto.randomUUID(),
+                    documentTitle: "Some Doc",
+                    metadata: { pages: [1] },
+                    content: "Konten tentang kebijakan pengembalian",
+                    score: 0.9,
+                }]);
+            });
+            const fakeStream: AsyncIterable<{ text: string }> = (async function* () {
+                await new Promise((r) => setTimeout(r, 3000));
+                yield { text: "Jawaban [Doc 1: Page 1]." };
+            })();
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () =>
+                Promise.resolve({ modelId: "test-model", stream: fakeStream }) as any,
+            );
+
+            const stream = await RagService.streamChat({
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question,
+                conversationId: TEST_CONVERSATION_ID,
+                useByok: false,
+                logContext: {},
+            });
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            let payload = "";
+            let turnId: string | null = null;
+            while (!payload.includes("turn_started")) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (value) payload += decoder.decode(value, { stream: true });
+            }
+            const startedMatch = /data: (\{.*\})\n\n/.exec(payload);
+            if (startedMatch) turnId = JSON.parse(startedMatch[1]).turnId;
+            assertExists(turnId);
+
+            // The user pressed "Stop" — explicit server-side stop.
+            const stopResult = await RagService.stopTurnGeneration({
+                tenantId: TEST_TENANT_ID,
+                targetId: turnId!,
+            });
+            assertEquals(stopResult.ok, true);
+
+            try {
+                const turns = await waitForTurns(
+                    TEST_CONVERSATION_ID,
+                    (t) =>
+                        t.some(
+                            (row) =>
+                                row.question === question &&
+                                row.status === "stopped",
+                        ),
+                    8000,
+                );
+                assertExists(turns.find((t) => t.question === question));
+            } finally {
+                await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId!));
+            }
+        });
+
+        it("positive: sweep completes a background turn without attachments (tenant-wide retrieval)", async () => {
+            const question = `background sweep ${crypto.randomUUID()}`;
+            const turnId = crypto.randomUUID();
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                question,
+                answer: "",
+                modelUsed: null,
+                status: "awaiting_indexing",
+                attachmentDocumentIds: null,
+            });
+
+            let searchParams: any = null;
+            using geminiStub = stub(gemini, "generateText", (prompt: string) =>
+                Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten",
+                }) as any,
+            );
+            using searchStub = stub(SearchService, "executeHybridSearch", (params: any) => {
+                searchParams = params;
+                return Promise.resolve([{
+                    id: crypto.randomUUID(),
+                    documentId: crypto.randomUUID(),
+                    documentTitle: "Some Doc",
+                    metadata: { pages: [1] },
+                    content: "Konten tentang kebijakan pengembalian",
+                    score: 0.9,
+                }]);
+            });
+            const fakeStream: AsyncIterable<{ text: string }> = (async function* () {
+                yield { text: "Jawaban biasa [Doc 1: Page 1]." };
+            })();
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () =>
+                Promise.resolve({ modelId: "test-model", stream: fakeStream }) as any,
+            );
+
+            try {
+                const result = await RagService.sweepAwaitingTurns();
+                assertEquals(result.completed >= 1, true);
+
+                const [turn] = await db
+                    .select()
+                    .from(conversationTurns)
+                    .where(eq(conversationTurns.id, turnId));
+                assertExists(turn);
+                assertEquals(turn.status, "complete");
+                assertEquals(turn.answer, "Jawaban biasa [Doc 1: Page 1].");
+
+                // No attachment scope — normal tenant-wide retrieval (empty list).
+                assertExists(searchParams);
+                assertEquals(searchParams.documentIds, []);
+            } finally {
+                await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId));
+            }
+        });
     });
 
     describe("listConversations", () => {
@@ -1191,8 +1478,23 @@ describe("RagService Isolated Tests", () => {
             const stream = await RagService.streamChat(params);
             const reader = stream.getReader();
 
-            // Read the first chunk (first token), then abort mid-stream
-            await reader.read();
+            // Read until the write-target id arrives, then stop explicitly —
+            // the stop endpoint path — before aborting the request.
+            const decoder = new TextDecoder();
+            let firstPayload = "";
+            while (!firstPayload.includes("turn_started")) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (value) firstPayload += decoder.decode(value, { stream: true });
+            }
+            const startedMatch = /data: (\{.*\})\n\n/.exec(firstPayload);
+            assertExists(startedMatch);
+            const activeTurnId = JSON.parse(startedMatch[1]).turnId as string;
+            assertExists(activeTurnId);
+            await RagService.stopTurnGeneration({
+                tenantId: TEST_TENANT_ID,
+                targetId: activeTurnId,
+            });
             abortController.abort();
 
             // Drain the remainder (the controller is closed on abort)

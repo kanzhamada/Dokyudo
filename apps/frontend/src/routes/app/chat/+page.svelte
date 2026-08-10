@@ -11,6 +11,7 @@
 	import { getMeUsage } from '$lib/api/me';
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
+	import { documentsStore } from '$lib/state/documents.store.svelte';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
@@ -88,6 +89,10 @@
 	});
 
 	onMount(async () => {
+		// Warm the document mention cache — idempotent, and the `@` popover also
+		// ensures it lazily, so this only makes the first mention instant.
+		documentsStore.ensureLoaded();
+
 		try {
 			const res = await getMeUsage();
 			if (res.ok) {
@@ -169,6 +174,9 @@
 					return;
 				}
 				attachmentDocuments = uploadRes.attachments;
+				// Newly uploaded documents are now referenceable via `@` — drop
+				// the mention cache so the next popover shows them.
+				documentsStore.invalidate();
 			}
 
 			const newId = crypto.randomUUID();
@@ -305,7 +313,6 @@
 		></div>
 	</div>
 
-
 	<!-- Chat Interface Container -->
 	<div
 		class="absolute bottom-4 left-1/2 flex w-full max-w-4xl -translate-x-1/2 flex-col items-center gap-3 px-4"
@@ -333,8 +340,11 @@
 			onconfigure={openConfigureDialog}
 		/>
 
-		<!-- 2. Lower Row: Mode Toggles & Usage Info -->
-		<div class="@container flex w-full flex-row items-center justify-between px-2">
+		<!-- 2. Lower Row: Mode Toggles & Usage Info
+		     Fixed h-8: keeps this row's height identical to the disclaimer row
+		     on /app/chat/[id], so the ChatInput capsule sits at the exact same
+		     bottom offset on both pages (no visual jump on page transition). -->
+		<div class="@container flex h-8 w-full flex-row items-center justify-between px-2">
 			<!-- Mode Toggle Tabs -->
 			<div class="flex shrink-0 flex-row items-center gap-3">
 				<Tabs.Root bind:value={activeMode}>

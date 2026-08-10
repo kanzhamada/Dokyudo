@@ -7,6 +7,7 @@
 		Square,
 		Settings2,
 		Check,
+		FileText,
 		Loader2
 	} from 'lucide-svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -15,6 +16,9 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { toast } from 'svelte-sonner';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
+	import { documentsStore } from '$lib/state/documents.store.svelte';
+	import type { DocumentItem } from '$lib/api/documents';
+	import { mentionToken, parseMentionIds, splitMentionSegments } from '$lib/utils/doc-mentions';
 
 	interface LlmOption {
 		name: string;
@@ -56,6 +60,52 @@
 	let textInput: HTMLTextAreaElement | null = $state(null);
 	let fileInput: HTMLInputElement | null = $state(null);
 	let modelSearchQuery = $state('');
+
+	// ---- Document mention (`@`) popover state ----
+	let mentionOpen = $state(false);
+	let mentionQuery = $state('');
+	let mentionHighlight = $state(0);
+	/** Element refs of the popover items — drives scroll-into-view on keyboard nav. */
+	let mentionItemEls: (HTMLButtonElement | undefined)[] = [];
+	/** Overlay that renders mention tokens as badges behind the transparent textarea. */
+	let mentionOverlay: HTMLDivElement | null = $state(null);
+
+	// Keep the highlighted item visible while navigating with ↑/↓.
+	$effect(() => {
+		if (!mentionOpen) return;
+		mentionItemEls[mentionHighlight]?.scrollIntoView({ block: 'nearest' });
+	});
+
+	// Mirror the textarea scroll position onto the badge overlay (both wrap and
+	// scroll together).
+	$effect(() => {
+		value;
+		if (mentionOverlay && textInput) {
+			mentionOverlay.scrollTop = textInput.scrollTop;
+		}
+	});
+
+	function syncMentionOverlayScroll() {
+		if (mentionOverlay && textInput) {
+			mentionOverlay.scrollTop = textInput.scrollTop;
+		}
+	}
+
+	let mentionCandidates = $derived.by(() => {
+		if (!mentionOpen) return [];
+		const q = mentionQuery.trim().toLowerCase();
+		// Exclude documents already referenced by an inline token in the text.
+		const mentionedIds = new Set(parseMentionIds(value));
+		// Only indexed ("processed") documents are usable as main context — the
+		// backend streams an answer from them immediately. Anything still
+		// ingesting (pending/confirmed) belongs to the file-upload flow, not
+		// the `@` mention.
+		return documentsStore.list
+			.filter((d) => d.status === 'processed' && !mentionedIds.has(d.id))
+			.filter((d) => !q || d.title.toLowerCase().includes(q))
+			.sort((a, b) => a.title.localeCompare(b.title))
+			.slice(0, 30);
+	});
 
 	let currentUploadCount = $derived(baseUploads + attachedFiles.length);
 	let currentStorageBytes = $derived(
@@ -126,9 +176,7 @@
 				const allowedExtensions = ['.pdf', '.txt'];
 				const lowerName = file.name.toLowerCase();
 				if (!allowedExtensions.some((ext) => lowerName.endsWith(ext))) {
-					showError(
-						`File "${file.name}" has an invalid extension. Only PDF and TXT are allowed.`
-					);
+					showError(`File "${file.name}" has an invalid extension. Only PDF and TXT are allowed.`);
 					continue;
 				}
 
@@ -168,12 +216,84 @@
 		attachedFiles.splice(index, 1);
 	}
 
+	/** Detects an in-progress `@query` token right before the caret. */
+	function updateMentionState() {
+		const el = textInput;
+		if (!el) return;
+		const pos = el.selectionStart ?? el.value.length;
+		const before = el.value.slice(0, pos);
+		const match = before.match(/(?:^|\s)@([^\s@]*)$/);
+		if (match) {
+			// A caret right after an existing `@[title](id)` token is not a new
+			// mention — the query would start with `[`.
+			if (match[1].startsWith('[')) {
+				closeMention();
+				return;
+			}
+			mentionQuery = match[1];
+			if (!mentionOpen) {
+				mentionOpen = true;
+				mentionHighlight = 0;
+				// Warm the cache the first time the popover opens — idempotent,
+				// no-op when the store was already loaded by the page on mount.
+				documentsStore.ensureLoaded();
+			}
+		} else {
+			closeMention();
+		}
+	}
+
+	function closeMention() {
+		mentionOpen = false;
+		mentionQuery = '';
+	}
+
+	function selectMention(doc: DocumentItem) {
+		const el = textInput;
+		if (!el) return;
+		// Replace the `@query` prefix with the inline `@[title](id)` token —
+		// the token lives in the question text itself (stored with the turn)
+		// and is rendered back as a clickable tag in the message bubble. A
+		// trailing space keeps the next word from merging into the token.
+		const pos = el.selectionStart ?? el.value.length;
+		const before = el.value.slice(0, pos);
+		const prefix = before.replace(/@[^\s@]*$/, '');
+		value = prefix + mentionToken(doc.title, doc.id) + ' ' + el.value.slice(pos);
+		closeMention();
+		el.focus();
+	}
+
 	function handleSendClick() {
 		if (isGenerating) onstop();
 		else onsend();
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
+		if (mentionOpen) {
+			const count = Math.max(1, mentionCandidates.length);
+			if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				mentionHighlight = (mentionHighlight + 1) % count;
+				return;
+			}
+			if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				mentionHighlight = (mentionHighlight - 1 + count) % count;
+				return;
+			}
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				const doc = mentionCandidates[mentionHighlight];
+				if (doc) selectMention(doc);
+				else closeMention();
+				return;
+			}
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				closeMention();
+				return;
+			}
+		}
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
 			onsend();
@@ -187,10 +307,54 @@
      area as one flat unit (a separate capture would carve a rectangular hole
      in `app-main` and leave sharp corner artifacts during the transition). -->
 <div
-	class="group flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] px-4 py-2 backdrop-blur-[42px] transition-all {transparent
+	class="group relative flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] px-4 py-2 backdrop-blur-[42px] transition-all {transparent
 		? 'bg-[#232323]/[0.40]'
 		: 'bg-[#232323]/[0.85] shadow-2xl'}"
 >
+	<!-- Document mention popover (@ trigger) — floats above the capsule -->
+	{#if mentionOpen}
+		<div
+			class="absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden rounded-2xl border border-white/[0.16] bg-[#232323]/[0.95] text-white shadow-2xl backdrop-blur-[42px]"
+			role="listbox"
+			aria-label="Documents"
+			tabindex="-1"
+			onmousedown={(e) => e.preventDefault()}
+		>
+			<div class="max-h-64 overflow-y-auto p-1.5">
+				{#if documentsStore.loading}
+					<div class="flex items-center gap-2 px-3 py-2.5 text-sm text-white/50">
+						<Loader2 class="size-4 animate-spin" />
+						<span>Loading documents...</span>
+					</div>
+				{:else if mentionCandidates.length === 0}
+					<div class="px-3 py-2.5 text-sm text-white/50">
+						{documentsStore.hasError
+							? 'Failed to load documents. Try again.'
+							: 'No matching documents.'}
+					</div>
+				{:else}
+					{#each mentionCandidates as doc, index (doc.id)}
+						<button
+							type="button"
+							role="option"
+							bind:this={mentionItemEls[index]}
+							aria-selected={index === mentionHighlight}
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white {index ===
+							mentionHighlight
+								? 'bg-white/[0.12] text-white'
+								: ''}"
+							onmouseenter={() => (mentionHighlight = index)}
+							onclick={() => selectMention(doc)}
+						>
+							<FileText class="size-4 shrink-0 text-white/60" />
+							<span class="min-w-0 flex-1 truncate">{doc.title}</span>
+						</button>
+					{/each}
+				{/if}
+			</div>
+		</div>
+	{/if}
+
 	<!-- Row 1: Attached Files -->
 	{#if attachedFiles.length > 0}
 		<div class="flex flex-wrap gap-2 pt-1 pb-1">
@@ -246,27 +410,57 @@
 			onchange={handleFileChange}
 		/>
 
-		<!-- Input Text Field -->
-		<Textarea
-			bind:ref={textInput}
-			bind:value
-			maxlength={690}
-			rows={1}
-			{placeholder}
-			class="max-h-32 min-h-[36px] flex-1 resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 shadow-none ring-0 transition-colors outline-none placeholder:text-white/[0.40] hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0 {transparent
-				? 'text-white/[0.40] focus-within:text-white/[0.69] focus-within:placeholder-white/[0.69]'
-				: 'text-white focus-within:text-white'}"
-			onkeydown={handleKeyDown}
-			oninput={(e) => {
-				const target = e.currentTarget as HTMLTextAreaElement;
-				if (target) {
-					target.style.height = 'auto';
-					if (target.value) {
-						target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+		<!-- Input Text Field.
+		     A textarea with transparent text + a badge overlay behind it: mention
+		     tokens render as monochrome pills while the textarea keeps native
+		     caret/selection/editing. The overlay mirrors the textarea's padding,
+		     wrapping and scroll position so badges sit exactly on their text. -->
+		<div class="relative min-w-0 flex-1">
+			<div
+				aria-hidden="true"
+				bind:this={mentionOverlay}
+				class="pointer-events-none absolute inset-0 max-h-32 scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent overflow-y-auto px-3 py-1.5 text-sm break-words whitespace-pre-wrap {transparent
+					? 'text-white/[0.40] group-focus-within:text-white/[0.69]'
+					: 'text-white'}"
+			>
+				{#each splitMentionSegments(value) as seg, i}
+					{#if seg.type === 'mention' && seg.id}
+						<span
+							class="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] leading-none font-medium text-white/80"
+						>
+							<FileText class="size-3 text-white/60" />
+							{seg.title}
+						</span>
+					{:else}
+						<span>{seg.text}</span>
+					{/if}
+				{/each}
+			</div>
+			<Textarea
+				bind:ref={textInput}
+				bind:value
+				maxlength={690}
+				rows={1}
+				{placeholder}
+				class="max-h-32 min-h-[36px] w-full resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 text-transparent caret-white shadow-none ring-0 transition-colors outline-none selection:bg-white/15 placeholder:text-white/[0.40] hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0 {transparent
+					? 'focus-within:placeholder-white/[0.69]'
+					: ''}"
+				onkeydown={handleKeyDown}
+				onscroll={syncMentionOverlayScroll}
+				oninput={(e) => {
+					const target = e.currentTarget as HTMLTextAreaElement;
+					if (target) {
+						target.style.height = 'auto';
+						if (target.value) {
+							target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+						}
 					}
-				}
-			}}
-		/>
+					updateMentionState();
+				}}
+				onfocus={updateMentionState}
+				onblur={closeMention}
+			/>
+		</div>
 
 		<!-- Model Switcher Dropdown -->
 		{#if showModelSelector}
@@ -362,7 +556,11 @@
 			class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
 			disabled={isUploading || (!isGenerating && !value.trim() && attachedFiles.length === 0)}
 			onclick={handleSendClick}
-			aria-label={isUploading ? 'Uploading attachments' : isGenerating ? 'Stop generating' : 'Send Message'}
+			aria-label={isUploading
+				? 'Uploading attachments'
+				: isGenerating
+					? 'Stop generating'
+					: 'Send Message'}
 		>
 			{#if isUploading}
 				<Loader2 class="size-5 animate-spin" />

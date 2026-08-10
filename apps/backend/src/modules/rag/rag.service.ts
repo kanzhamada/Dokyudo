@@ -39,6 +39,18 @@ const PROMPT_INJECTION_CACHE_TTL_SECONDS = 60 * 60 * 24; // 24h
 class TurnAbortedError extends Error {}
 
 /**
+ * In-flight generation registry, keyed by the write-target id (canonical turn
+ * id, or the variant id in retry mode). Lets the stop endpoint abort an
+ * active generation, and lets the disconnect path tell "user pressed stop"
+ * from "user left the page". Per-isolate: when a stop request lands on a
+ * different isolate, the endpoint falls back to a direct DB update.
+ */
+const activeGenerations = new Map<
+    string,
+    { abort: AbortController; stopRequested: boolean; tenantId: string }
+>();
+
+/**
  * SSE stream for a turn that was submitted with attachments: created as
  * awaiting_indexing, completed later by the background sweep. The client
  * switches to conversation polling on the awaiting_indexing event.
@@ -214,6 +226,17 @@ export class RagService {
             }
             attachmentDocuments.push(...ownedDocs);
         }
+
+        // Already-indexed ("processed") attachments are used as the turn's
+        // main context right away: the interactive SSE path streams the answer
+        // with retrieval scoped to them. Only turns whose documents are still
+        // ingesting (pending/confirmed) go through the awaiting_indexing
+        // background-sweep path — that is the file-upload flow, not the
+        // "@"-mention flow.
+        const hasAttachments = attachmentDocuments.length > 0;
+        const needsAwaiting =
+            hasAttachments &&
+            attachmentDocuments.some((doc) => doc.status !== "processed");
 
         // 0. Write-ahead turn record: the turn row is created (or, for edits,
         //    reset to "processing") BEFORE any LLM work. This persists the user's
@@ -412,7 +435,6 @@ export class RagService {
                 // completes them; everything else streams interactively.
                 // modelUsed starts null — it is filled once the actual model is
                 // selected (or stays null when the request is blocked/cancelled).
-                const hasAttachments = attachmentDocuments.length > 0;
                 await tx.insert(conversationTurns).values({
                     id: turnId,
                     tenantId,
@@ -420,7 +442,7 @@ export class RagService {
                     question,
                     answer: "",
                     modelUsed: null,
-                    status: hasAttachments ? "awaiting_indexing" : "processing",
+                    status: needsAwaiting ? "awaiting_indexing" : "processing",
                     attachmentDocumentIds: hasAttachments
                         ? attachmentDocumentIds
                         : null,
@@ -428,7 +450,7 @@ export class RagService {
                         ? { provider, model }
                         : null,
                 });
-                if (hasAttachments) {
+                if (needsAwaiting) {
                     // Reserve the QA quota at submit time — the pipeline runs
                     // later, in the background sweep, when quota may differ.
                     // (Search quota is consumed at completion, inside search.)
@@ -688,6 +710,8 @@ ${effectiveQuestion}`;
         // from clobbering an already-terminal state.
         const finalizeTurn = async (status: TurnStatus, answer: string) => {
             const latencyMs = Date.now() - startMs;
+            // The generation is over — free the stop-registry slot.
+            activeGenerations.delete(turnId);
             try {
                 await withAuthDb(userId, async (tx) => {
                     if (isRetry) {
@@ -773,6 +797,37 @@ ${effectiveQuestion}`;
             }
         };
 
+        // Client-teardown finalize: "stopped" only when the user explicitly
+        // pressed stop (the stop endpoint set the flag), or the write target is
+        // a retry variant (the sweep does not own variants). Otherwise the
+        // client left the page mid-generation — hand the canonical turn to the
+        // background sweep (awaiting_indexing) so the answer is still produced
+        // and survives reloads.
+        const finalizeOnDetach = async (answer: string) => {
+            const entry = activeGenerations.get(turnId);
+            const stopRequested = entry?.stopRequested === true;
+            activeGenerations.delete(turnId);
+            if (stopRequested || isRetry) {
+                await finalizeTurn("stopped", answer);
+                return;
+            }
+            try {
+                await withAuthDb(userId, async (tx) => {
+                    await tx
+                        .update(conversationTurns)
+                        .set({ status: "awaiting_indexing", updatedAt: new Date() })
+                        .where(
+                            and(
+                                eq(conversationTurns.id, turnId),
+                                eq(conversationTurns.status, "processing"),
+                            ),
+                        );
+                });
+            } catch (dbErr: any) {
+                if (logContext) logContext.ragDetachMarkError = dbErr.message;
+            }
+        };
+
         // 5.2 Pre-stream model selection (system mode). Resolving the fallback
         // model BEFORE the stream is returned lets the selection — tier,
         // fallbackChain, selected model — land in the http_request log, which is
@@ -842,6 +897,16 @@ data: ${JSON.stringify(startedPayload)}
                 const encoder = new TextEncoder();
                 let cancelled = cancelSignal.aborted;
                 let stalledPulls = 0;
+
+                // Register the in-flight generation so the stop endpoint can
+                // abort it explicitly — and so the disconnect path can tell
+                // "user pressed stop" from "user left the page". finalizeTurn
+                // removes the entry on every terminal path.
+                activeGenerations.set(turnId, {
+                    abort: streamAbort,
+                    stopRequested: false,
+                    tenantId,
+                });
 
                 // Live check: true when the client is gone (abort signal fired)
                 // OR the HTTP layer stopped pulling (backpressure / disconnect).
@@ -924,7 +989,7 @@ data: ${JSON.stringify(startedPayload)}
                         });
 
                         if (cancelled) {
-                            await finalizeTurn("stopped", "");
+                            await finalizeOnDetach("");
                             return;
                         }
 
@@ -942,7 +1007,7 @@ data: ${JSON.stringify(startedPayload)}
                         );
                     } catch (e: any) {
                         if (isAbortError(e, cancelSignal)) {
-                            await finalizeTurn("stopped", "");
+                            await finalizeOnDetach("");
                             return;
                         }
                         controller.enqueue(
@@ -970,7 +1035,7 @@ data: ${JSON.stringify(startedPayload)}
                             }),
                         );
                         if (cancelled) {
-                            await finalizeTurn("stopped", fullAnswer);
+                            await finalizeOnDetach(fullAnswer);
                             return;
                         }
 
@@ -999,7 +1064,7 @@ data: ${JSON.stringify(startedPayload)}
                         }
 
                         if (cancelled) {
-                            await finalizeTurn("stopped", fullAnswer);
+                            await finalizeOnDetach(fullAnswer);
                             return;
                         }
 
@@ -1008,7 +1073,7 @@ data: ${JSON.stringify(startedPayload)}
                         if (logContext) logContext.ragModelUsed = model;
                     } catch (error: any) {
                         if (isAbortError(error, cancelSignal)) {
-                            await finalizeTurn("stopped", fullAnswer);
+                            await finalizeOnDetach(fullAnswer);
                             return;
                         }
                         controller.enqueue(
@@ -1026,7 +1091,7 @@ data: ${JSON.stringify(startedPayload)}
                         // mid-stream stop still persists the real model name.
                         successfulModel = resolvedFallbackStream!.modelId;
                         if (cancelled) {
-                            await finalizeTurn("stopped", fullAnswer);
+                            await finalizeOnDetach(fullAnswer);
                             return;
                         }
 
@@ -1057,7 +1122,7 @@ data: ${JSON.stringify(startedPayload)}
                         }
 
                         if (cancelled) {
-                            await finalizeTurn("stopped", fullAnswer);
+                            await finalizeOnDetach(fullAnswer);
                             return;
                         }
 
@@ -1065,7 +1130,7 @@ data: ${JSON.stringify(startedPayload)}
                         if (logContext) logContext.ragModelUsed = resolvedFallbackStream!.modelId;
                     } catch (error: any) {
                         if (isAbortError(error, cancelSignal)) {
-                            await finalizeTurn("stopped", fullAnswer);
+                            await finalizeOnDetach(fullAnswer);
                             return;
                         }
                         if (logContext) {
@@ -1076,7 +1141,7 @@ data: ${JSON.stringify(startedPayload)}
                 }
 
                 if (cancelled) {
-                    await finalizeTurn("stopped", fullAnswer);
+                    await finalizeOnDetach(fullAnswer);
                     return;
                 }
 
@@ -1156,12 +1221,18 @@ data: ${JSON.stringify(startedPayload)}
                 // trusting the stale `cancelled` flag. A request the user cancelled
                 // must never be recorded as "complete".
                 const abortedAtFinalize = cancelled || cancelSignal.aborted;
+                if (abortedAtFinalize) {
+                    // Client teardown: stopped only for explicit stop / retry
+                    // variants; a page-leave disconnect is handed to the sweep.
+                    await finalizeOnDetach(fullAnswer);
+                } else {
+                    await finalizeTurn(success ? "complete" : "failed", fullAnswer);
+                }
                 const finalStatus: TurnStatus = abortedAtFinalize
                     ? "stopped"
                     : success
                       ? "complete"
                       : "failed";
-                await finalizeTurn(finalStatus, fullAnswer);
 
                 // Follow-up succeeded: promote the selected variant into the
                 // canonical turn row (if one was selected) and delete every
@@ -1797,6 +1868,41 @@ Always include the document references ([Doc N: Page X]) in your answer.
             .orderBy(desc(conversationTurns.createdAt), desc(conversationTurns.id))
             .limit(1);
         return latest?.id ?? null;
+    }
+
+    /**
+     * Explicitly stops an in-flight generation ("Stop generating" button).
+     * When the stream lives in this isolate, the registry entry is flagged and
+     * aborted — the stream finalizes the turn as "stopped". When the stream
+     * lives on another isolate (or already ended), the turn row is marked
+     * stopped directly; the generating isolate's finalize then no-ops on the
+     * status gate. Idempotent: stopping an already-terminal turn is a no-op.
+     */
+    static async stopTurnGeneration(params: {
+        tenantId: string;
+        targetId: string;
+    }): Promise<{ ok: boolean }> {
+        const { tenantId, targetId } = params;
+        const entry = activeGenerations.get(targetId);
+        if (entry && entry.tenantId === tenantId) {
+            entry.stopRequested = true;
+            entry.abort.abort();
+            return { ok: true };
+        }
+        // The stream may run on another isolate — stop via the state machine.
+        await withAuthDb(tenantId, async (tx) => {
+            await tx
+                .update(conversationTurns)
+                .set({ status: "stopped", updatedAt: new Date() })
+                .where(
+                    and(
+                        eq(conversationTurns.id, targetId),
+                        eq(conversationTurns.tenantId, tenantId),
+                        eq(conversationTurns.status, "processing"),
+                    ),
+                );
+        });
+        return { ok: true };
     }
 
     /**

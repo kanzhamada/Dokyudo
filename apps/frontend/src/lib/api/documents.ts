@@ -1,10 +1,34 @@
 import { apiRequest } from './client';
+import type { ApiResult } from '../types/api.types';
 
 /** A file uploaded as a chat attachment — its document id feeds RAG scoping. */
 export interface ChatAttachment {
 	documentId: string;
 	name: string;
 	size: number;
+}
+
+export interface DocumentItem {
+	id: string;
+	title: string;
+	description: string | null;
+	storagePath: string;
+	sizeBytes: number;
+	status: string;
+	createdAt: string;
+}
+
+export interface GetDocumentsResponse {
+	documents: DocumentItem[];
+}
+
+/**
+ * Lists every document owned by the tenant. The mention picker caches the
+ * result in documentsStore — this endpoint is only hit once per session
+ * (plus a periodic revalidation).
+ */
+export function getDocuments(): Promise<ApiResult<GetDocumentsResponse>> {
+	return apiRequest<GetDocumentsResponse>('/api/documents', { method: 'GET' });
 }
 
 export type UploadAttachmentsResult =
@@ -25,9 +49,7 @@ function mimeTypeFor(filename: string): 'application/pdf' | 'text/plain' {
  * On failure, the documents created so far are rolled back (best-effort) so
  * no orphaned rows linger in the tenant's document list or storage quota.
  */
-export async function uploadFilesAsDocuments(
-	files: File[]
-): Promise<UploadAttachmentsResult> {
+export async function uploadFilesAsDocuments(files: File[]): Promise<UploadAttachmentsResult> {
 	const createdDocIds: string[] = [];
 	let allSucceeded = false;
 
@@ -79,10 +101,10 @@ export async function uploadFilesAsDocuments(
 				};
 			}
 
-			const confirmRes = await apiRequest<{ status: string }>(
-				'/api/documents/confirm-upload',
-				{ method: 'POST', body: { documentId: result.documentId } }
-			);
+			const confirmRes = await apiRequest<{ status: string }>('/api/documents/confirm-upload', {
+				method: 'POST',
+				body: { documentId: result.documentId }
+			});
 			if (!confirmRes.ok) {
 				return {
 					ok: false,

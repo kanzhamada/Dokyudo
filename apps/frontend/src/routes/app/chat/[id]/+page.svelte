@@ -54,6 +54,8 @@
 	import { getMeUsage } from '$lib/api/me';
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
+	import { documentsStore } from '$lib/state/documents.store.svelte';
+	import { parseMentionIds, splitMentionSegments } from '$lib/utils/doc-mentions';
 	import {
 		branchConversation,
 		deleteConversation,
@@ -200,6 +202,9 @@
 	let activeAbortController: AbortController | null = null;
 	let cancelActiveStream: (() => void) | null = null;
 	let activeStreamReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+	/** Write-target id of the in-flight stream (turn id, or variant id in
+	 * retry mode) — used by the explicit stop endpoint. */
+	let activeTurnWriteTargetId: string | null = null;
 	const sidebar = useSidebar();
 	let isTitleEditDialogOpen = $state(false);
 	let titleDraft = $state('');
@@ -381,13 +386,30 @@
 		'Cooking...'
 	];
 
+	// Shown first (in order) while an attachment turn is waiting for the STB
+	// worker to finish ingesting its documents, then the general pool takes
+	// over randomly.
+	const ATTACHMENT_WAITING_STATUSES = [
+		'Waiting for documents to be indexed...',
+		'Indexing your attachments...',
+		'Parsing your files...',
+		'Preparing document context...'
+	];
+
 	let currentThinkingStatus = $state(THINKING_STATUS_MESSAGES[0]);
 	let thinkingTimer: ReturnType<typeof setInterval> | null = null;
 
-	function startThinkingTimer() {
+	/**
+	 * Starts the rotating thinking status. `priorityStatuses` (if any) are
+	 * shown once each, in order, before the general pool takes over randomly.
+	 */
+	function startThinkingTimer(priorityStatuses: string[] = []) {
 		if (thinkingTimer) clearInterval(thinkingTimer);
-		const getRandomStatus = () =>
-			THINKING_STATUS_MESSAGES[Math.floor(Math.random() * THINKING_STATUS_MESSAGES.length)];
+		const priorityQueue = [...priorityStatuses];
+		const getRandomStatus = () => {
+			if (priorityQueue.length > 0) return priorityQueue.shift()!;
+			return THINKING_STATUS_MESSAGES[Math.floor(Math.random() * THINKING_STATUS_MESSAGES.length)];
+		};
 		currentThinkingStatus = getRandomStatus();
 		thinkingTimer = setInterval(() => {
 			currentThinkingStatus = getRandomStatus();
@@ -402,7 +424,11 @@
 	}
 
 	onDestroy(() => {
-		cancelActiveStream?.();
+		// The SSE connection is deliberately NOT cancelled here: on SvelteKit
+		// navigation the stream keeps running and completes the turn normally;
+		// on a real page unload the browser drops the connection and the server
+		// hands the turn to the background sweep. Either way the answer is not
+		// lost when the user leaves the page.
 		stopSpeaking();
 		stopThinkingTimer();
 		if (pulseCheckpointTimeout) clearTimeout(pulseCheckpointTimeout);
@@ -545,10 +571,10 @@
 			const initialQ = stateObj.initialQuestion as string;
 			const initialModel = (stateObj.selectedModel as LlmOption) || selectedModel;
 			// Files were uploaded on /app/chat before navigation — their
-			// document ids travel through navigation state.
-			const stateAttachments = (stateObj?.attachmentDocuments as
-				| ChatAttachment[]
-				| undefined) ?? undefined;
+			// document ids travel through navigation state. `@`-mention tokens
+			// live inside the question text and are parsed on send.
+			const stateAttachments =
+				(stateObj?.attachmentDocuments as ChatAttachment[] | undefined) ?? undefined;
 			if (stateObj.selectedModel) selectedModel = stateObj.selectedModel as LlmOption;
 			streamChatTurn(initialQ, initialModel, { attachments: stateAttachments });
 			scrollToBottom();
@@ -845,6 +871,10 @@
 	onMount(async () => {
 		console.log(`[Chat Detail] Mounted view for chat ID: ${chatId}`);
 
+		// Warm the document mention cache — idempotent, and the `@` popover also
+		// ensures it lazily, so this only makes the first mention instant.
+		documentsStore.ensureLoaded();
+
 		// Warm up speech voices — they load asynchronously. getVoices() returns []
 		// until the voiceschanged event fires, so listen for it and cache the list.
 		if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -889,12 +919,26 @@
 		}
 	});
 
-	// Conversation polling for turns awaiting document ingestion (attachment
-	// mode): the turn request returned immediately; the server-side sweep
-	// completes it. Poll the conversation until every awaiting turn resolves.
+	// Conversation polling for turns awaiting background completion (attachment
+	// mode, or normal turns handed off when the user left the page): the turn
+	// request returned immediately; the server-side sweep completes it. Poll
+	// the conversation until every awaiting turn resolves.
 	$effect(() => {
 		const hasAwaitingTurn = messages.some((m) => m.status === 'awaiting_indexing');
 		if (!hasAwaitingTurn) return;
+
+		// Keep the thinking rotation alive while waiting (e.g. after returning
+		// to the page), leading with the waiting-for-documents statuses when
+		// any awaiting turn carries attachments.
+		if (!thinkingTimer) {
+			startThinkingTimer(
+				messages.some(
+					(m) => m.status === 'awaiting_indexing' && (m.attachmentDocumentIds?.length ?? 0) > 0
+				)
+					? ATTACHMENT_WAITING_STATUSES
+					: []
+			);
+		}
 
 		let cancelled = false;
 		const interval = setInterval(async () => {
@@ -904,9 +948,7 @@
 				if (!res.ok || cancelled) return;
 				for (const turn of res.data.turns) {
 					if (turn.status === 'awaiting_indexing') continue;
-					const asst = messages.find(
-						(m) => m.role === 'assistant' && m.turnId === turn.id
-					);
+					const asst = messages.find((m) => m.role === 'assistant' && m.turnId === turn.id);
 					if (!asst || asst.status !== 'awaiting_indexing') continue;
 					asst.status = turn.status as ChatMessage['status'];
 					asst.content = turn.answer;
@@ -919,6 +961,9 @@
 							pages: r.pages,
 							snippet: r.snippet ?? undefined
 						})) ?? [];
+				}
+				if (!messages.some((m) => m.status === 'awaiting_indexing') && !isGenerating) {
+					stopThinkingTimer();
 				}
 			} catch (err) {
 				console.error('[Chat Detail] Awaiting turn poll failed:', err);
@@ -983,6 +1028,8 @@
 	) {
 		if (!questionText || isGenerating || isUploadingAttachments) return;
 
+		activeTurnWriteTargetId = null;
+
 		const isRetryMode = !!opts.retryTurnId;
 		const useByok = modelChoice.provider !== 'auto';
 
@@ -1004,17 +1051,26 @@
 				return;
 			}
 			attachmentDocs = uploadRes.attachments;
+			// Newly uploaded documents are now referenceable via `@` — drop the
+			// mention cache so the next popover shows them.
+			documentsStore.invalidate();
 		}
+		// `@[title](id)` mention tokens embedded in the question scope retrieval
+		// to already-owned documents (main context). They ride in the payload as
+		// attachment_document_ids, but stay OUT of the message's attachment
+		// chips — the question bubble renders them inline as clickable tags.
+		const mentionIds = parseMentionIds(questionText);
 
 		const bodyPayload: Record<string, any> = {
 			question: questionText,
 			conversation_id: chatId,
 			useByok
 		};
-		// Attachment mode: the server scopes retrieval to these documents and
-		// waits for them to finish ingesting before answering.
-		if (attachmentDocs.length > 0) {
-			bodyPayload.attachment_document_ids = attachmentDocs.map((a) => a.documentId);
+		// Attachment mode: the server scopes retrieval to these documents (the
+		// backend answers immediately when they are all already indexed).
+		const scopedDocIds = [...attachmentDocs.map((a) => a.documentId), ...mentionIds];
+		if (scopedDocIds.length > 0) {
+			bodyPayload.attachment_document_ids = scopedDocIds;
 		}
 		// Edit mode: overwrite the existing turn in place instead of creating a new one.
 		if (opts.editTurnId) bodyPayload.edit_turn_id = opts.editTurnId;
@@ -1079,7 +1135,13 @@
 			attachedFiles = [];
 		}
 		isGenerating = true;
-		startThinkingTimer();
+		// Attachment turns answer via the background sweep — lead the thinking
+		// rotation with the waiting-for-documents statuses.
+		startThinkingTimer(
+			!isRetryMode && !opts.editTurnId && attachmentDocs.length > 0
+				? ATTACHMENT_WAITING_STATUSES
+				: []
+		);
 
 		// Instantly move active conversation item to top of sidebar
 		conversationsStore.addOrUpdate(chatId, conversationTitle);
@@ -1162,7 +1224,11 @@
 						activeStreamReader = null;
 					}
 					isTitleLoading = false;
-					stopThinkingTimer();
+					// Awaiting turns keep the thinking rotation running — their
+					// answer arrives via the background sweep, not the stream.
+					if (messages[asstIndex].status !== 'awaiting_indexing') {
+						stopThinkingTimer();
+					}
 
 					if (streamHadError) {
 						if (!isRetryMode) messages[asstIndex].references = [];
@@ -1394,9 +1460,13 @@
 							const startedVar = activeRetryVariant();
 							if (parsed.variantId && startedVar) {
 								startedVar.id = parsed.variantId;
+								// Variant rows are the write target for retries —
+								// the stop endpoint needs this id too.
+								activeTurnWriteTargetId = parsed.variantId;
 							} else if (parsed.turnId && userMsg) {
 								userMsg.turnId = parsed.turnId;
 								messages[asstIndex].turnId = parsed.turnId;
+								activeTurnWriteTargetId = parsed.turnId;
 							}
 						} catch (e) {
 							console.error('[Chat Detail] Failed to parse turn_started event:', e);
@@ -1566,6 +1636,18 @@
 	}
 
 	function stopCurrentStream() {
+		// Explicit server-side stop: abort the in-flight generation and mark
+		// the turn "stopped" (the server distinguishes this from a page-leave
+		// disconnect, which is handed to the background sweep instead). Await
+		// the ack so the server's stop lands before our local teardown.
+		const targetId = activeTurnWriteTargetId;
+		if (targetId) {
+			const token = sessionStore.getAccessToken();
+			fetch(`${PUBLIC_API_URL}/api/rag/turns/${targetId}/stop`, {
+				method: 'POST',
+				headers: token ? { Authorization: `Bearer ${token}` } : {}
+			}).catch(() => {});
+		}
 		cancelActiveStream?.();
 	}
 
@@ -1594,9 +1676,7 @@
 		}
 		const docs = msg?.attachments
 			?.map((a) =>
-				a.documentId
-					? { documentId: a.documentId, name: a.name, size: a.size ?? 0 }
-					: null
+				a.documentId ? { documentId: a.documentId, name: a.name, size: a.size ?? 0 } : null
 			)
 			.filter((a): a is ChatAttachment => a !== null);
 		return docs && docs.length > 0 ? docs : undefined;
@@ -2479,7 +2559,24 @@
 											</div>
 										{/if}
 
-										<p class="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+										<p class="leading-relaxed whitespace-pre-wrap">
+											{#each splitMentionSegments(msg.content) as seg, i}
+												{#if seg.type === 'mention' && seg.id}
+													<button
+														type="button"
+														class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 align-baseline text-[11px] leading-none font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/20 hover:text-white"
+														title="Open {seg.title} in PDF viewer"
+														onclick={() =>
+															openCitationPreview(seg.id!, seg.title ?? 'Document', [])}
+													>
+														<FileText class="size-3 text-white/60" />
+														{seg.title}
+													</button>
+												{:else}
+													<span>{seg.text}</span>
+												{/if}
+											{/each}
+										</p>
 									{/if}
 								</div>
 
@@ -2569,26 +2666,7 @@
 										<div
 											class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
 										>
-											<svg class="size-6 shrink-0 text-white/70" viewBox="0 0 50 50">
-												<g transform="rotate(0 25 25)"
-													><line
-														x1="25"
-														y1="15"
-														x2="25"
-														y2="35"
-														stroke="currentColor"
-														stroke-linecap="round"
-														stroke-width="5"
-													></line
-												></g>
-											</svg>
-											<span>
-												Menunggu dokumen lampiran diproses
-												{#if msg.attachmentDocumentIds?.length}
-													({msg.attachmentDocumentIds.length} file)
-												{/if}
-												...
-											</span>
+											<span>{currentThinkingStatus}</span>
 										</div>
 									{:else if msg.isStreaming || msg.isRetrying}
 										<div
@@ -3016,8 +3094,11 @@
 					onconfigure={() => openConfigureDialog()}
 				/>
 
-				<!-- Lower Row: Disclaimer & Counter -->
-				<div class="flex w-full items-center justify-between px-2 text-xs text-white/40">
+				<!-- Lower Row: Disclaimer & Counter
+				     Fixed h-8: mirrors the mode-toggle row on /app/chat so the
+				     ChatInput capsule keeps the same bottom offset on both pages
+				     (no visual jump on page transition). -->
+				<div class="flex h-8 w-full items-center justify-between px-2 text-xs text-white/40">
 					<p class="text-[11px] text-white/40 select-none">
 						Dokyudo can make mistakes. Check again the source references document.
 					</p>

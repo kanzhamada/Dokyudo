@@ -37,6 +37,20 @@ export async function handleChat(c: Context) {
     });
 }
 
+/**
+ * Handles the explicit "Stop generating" action: aborts the in-flight
+ * generation for the given write-target id and marks the turn stopped.
+ * Idempotent — safe to call after the generation already ended.
+ */
+export async function handleStopTurn(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId } = extractor.extractAuthContext();
+    const { turnId } = c.req.valid("param" as never) as { turnId: string };
+
+    const result = await RagService.stopTurnGeneration({ tenantId, targetId: turnId });
+    return c.json(result);
+}
+
 export async function handleUpdateConversation(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, userId } = extractor.extractAuthContext();

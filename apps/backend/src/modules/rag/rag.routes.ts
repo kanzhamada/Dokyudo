@@ -63,6 +63,47 @@ ragRoutes.openapi(
 ragRoutes.openapi(
     createRoute({
         method: "post",
+        path: "/turns/{turnId}/stop",
+        tags: ["RAG"],
+        summary: "Stop generating a turn",
+        description:
+            "Explicitly aborts the in-flight generation for the write-target id (turn id, or variant id in retry mode) and marks the turn stopped. Idempotent — safe to call after the generation already ended.",
+        request: {
+            params: RagSchema.TurnParamSchema,
+        },
+        responses: {
+            200: {
+                description: "Stop acknowledged",
+                content: {
+                    "application/json": {
+                        schema: RagSchema.StopTurnResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    ragController.handleStopTurn as any,
+);
+
+ragRoutes.openapi(
+    createRoute({
+        method: "post",
         path: "/conversations/{id}/branch",
         tags: ["RAG"],
         summary: "Branch Conversation",
