@@ -13,13 +13,18 @@ Iterasi kedua dari pipeline RAG chat mengubah siklus hidup `conversation_turns` 
 ```mermaid
 stateDiagram-v2
     [*] --> processing : write-ahead insert (question disimpan, answer='', model_used=null)
+    [*] --> awaiting_indexing : write-ahead insert + attachment_document_ids (attachment mode)
     processing --> complete : stream selesai (answer penuh + model aktual)
     processing --> stopped : user cancel (pre-stream via abortAsStopped, atau mid-stream)
     processing --> failed : kegagalan server (provider down, BYOK key error)
     processing --> blocked : prompt injection (answer="Nice try, Diddy.", model_used=null)
+    awaiting_indexing --> complete : Deno.cron sweep (completeTurnDetached) — semua dokumen 'processed'
+    awaiting_indexing --> failed : sweep — ada dokumen failed/failed_vectorizing/quota_exhausted/hilang
+    awaiting_indexing --> blocked : sweep — prompt injection terdeteksi
+    awaiting_indexing --> awaiting_indexing : sweep — dokumen masih diingest (skip)
 ```
 
-Aturan emas: **`processing` tidak boleh jadi status akhir**. Semua jalur kode wajib menuntaskan row.
+Aturan emas: **`processing` dan `awaiting_indexing` tidak boleh jadi status akhir**. Semua jalur kode wajib menuntaskan row — jalur interaktif via `finalizeTurn`/`abortAsStopped`, jalur attachment via sweep (`sweepAwaitingTurns`, dijalankan `Deno.cron` tiap menit, terdaftar di `main.ts`).
 
 ## 3. Alur Request (Write-Ahead)
 
@@ -28,10 +33,11 @@ Aturan emas: **`processing` tidak boleh jadi status akhir**. Semua jalur kode wa
    - Edit mode (`edit_turn_id`): validasi turn milik conversation+tenant → `UPDATE` question baru, `answer=""`, `contextReferences=null`, `status='processing'`, plus `DELETE turn_alternatives` milik turn tersebut.
    - Retry mode (`retry_turn_id`): validasi turn milik conversation+tenant **dan merupakan turn terakhir** (bukan `processing`) → `INSERT` baris `turn_alternatives` dengan `status='processing'` — baris turn kanonik tidak disentuh sama sekali.
    - Mode baru: buat conversation bila belum ada (FK turn ke conversation NOT NULL) → `INSERT` turn dengan `id` pre-generated (`turnId`), `status='processing'`, `answer=""`, `model_used=null`.
-3. **Gatekeeper injeksi**: cek Redis blocklist dulu (lihat §7) → jika hit, block tanpa panggil guard model. Jika miss, panggil guard → `INJECTION` → tulis Redis + block.
+   - **Attachment mode** (turn baru + `attachment_document_ids`): `INSERT` dengan `status='awaiting_indexing'` + `attachment_document_ids` (+ `model_request` bila BYOK), lalu **`incrementQa` langsung di sini** (kuota QA di-reservasi saat submit — pipeline jalan belakangan di sweep). Request langsung `return` stream pendek (`turn_started` + `awaiting_indexing` + `done`) — **tidak ada server-side wait**. Turn diselesaikan `sweepAwaitingTurns` begitu semua dokumen `processed`.
+3. **Gatekeeper injeksi**: cek Redis blocklist dulu (lihat §7) → jika hit, block tanpa panggil guard model. Jika miss, panggil guard → `INJECTION` → tulis Redis + block. (Jalur attachment: gatekeeper dijalankan sweep, di `completeTurnDetached`.)
 4. **History + rewrite query** — hanya turn `status='complete' AND answer != ''` yang dipakai sebagai konteks (lihat §6).
-5. **Hybrid search → context engineering → incrementQa** (quota baru berkurang di sini — request yang di-block/gagal di gatekeeper tidak makan kuota).
-6. **Stream** → `finalizeTurn` (**UPDATE-only**, gate `WHERE status='processing'`).
+5. **Hybrid search → context engineering → incrementQa** (quota baru berkurang di sini — request yang di-block/gagal di gatekeeper tidak makan kuota; jalur attachment: search quota terpakai saat sweep, QA sudah di-reservasi di submit).
+6. **Stream** → `finalizeTurn` (**UPDATE-only**, gate `WHERE status='processing'`). Jalur attachment: `completeTurnDetached` **UPDATE-only** dengan gate `WHERE status='awaiting_indexing'` — membuat sweep idempotent terhadap invokasi cron yang dobel.
 
 Abort sinyal sebelum stream mulai (saat gatekeeper/search/retrieval) ditangani helper `abortAsStopped()` → row di-`UPDATE` ke `stopped` (tetap ber-gate `status='processing'`).
 

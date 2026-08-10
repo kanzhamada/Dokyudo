@@ -108,14 +108,17 @@
 		/** Files attached to this message. `documentId` is set once uploaded —
 		 * it scopes RAG retrieval and is reused by edit/retry of this turn. */
 		attachments?: { name: string; size?: number; documentId?: string }[];
+		/** Attachment document ids as persisted on the server turn — survives
+		 * reloads, lets edit/retry reuse the same RAG scoping. */
+		attachmentDocumentIds?: string[];
 		references?: DocReference[];
 		isStreaming?: boolean;
 		isCancelled?: boolean;
 		isRejection?: boolean;
 		/** Server turn id — needed to re-generate this turn in place (edit mode). */
 		turnId?: string;
-		/** Terminal status from the server: processing | complete | stopped | failed | blocked. */
-		status?: 'processing' | 'complete' | 'stopped' | 'failed' | 'blocked';
+		/** Status from the server: awaiting_indexing | processing | complete | stopped | failed | blocked. */
+		status?: 'awaiting_indexing' | 'processing' | 'complete' | 'stopped' | 'failed' | 'blocked';
 		/** User feedback on the answer: good | bad | null (not rated / cleared). */
 		feedback?: 'good' | 'bad' | null;
 		/** Set on the boundary turn of a branched conversation. */
@@ -570,6 +573,9 @@
 							content: turn.question,
 							turnId: turn.id,
 							branchedFromTurnId: turn.branchedFromTurnId ?? null,
+							// Persisted on the server turn — lets edit/retry reuse
+							// the same RAG scoping after a reload.
+							attachmentDocumentIds: turn.attachmentDocumentIds ?? undefined,
 							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
 								hour: '2-digit',
 								minute: '2-digit'
@@ -881,6 +887,48 @@
 				updateActiveCheckpoint();
 			});
 		}
+	});
+
+	// Conversation polling for turns awaiting document ingestion (attachment
+	// mode): the turn request returned immediately; the server-side sweep
+	// completes it. Poll the conversation until every awaiting turn resolves.
+	$effect(() => {
+		const hasAwaitingTurn = messages.some((m) => m.status === 'awaiting_indexing');
+		if (!hasAwaitingTurn) return;
+
+		let cancelled = false;
+		const interval = setInterval(async () => {
+			if (cancelled) return;
+			try {
+				const res = await getConversation(chatId);
+				if (!res.ok || cancelled) return;
+				for (const turn of res.data.turns) {
+					if (turn.status === 'awaiting_indexing') continue;
+					const asst = messages.find(
+						(m) => m.role === 'assistant' && m.turnId === turn.id
+					);
+					if (!asst || asst.status !== 'awaiting_indexing') continue;
+					asst.status = turn.status as ChatMessage['status'];
+					asst.content = turn.answer;
+					asst.modelName = turn.modelUsed ?? asst.modelName;
+					asst.references =
+						turn.contextReferences?.map((r: any) => ({
+							id: r.documentId,
+							index: r.index || 1,
+							name: r.title || r.documentId,
+							pages: r.pages,
+							snippet: r.snippet ?? undefined
+						})) ?? [];
+				}
+			} catch (err) {
+				console.error('[Chat Detail] Awaiting turn poll failed:', err);
+			}
+		}, 4000);
+
+		return () => {
+			cancelled = true;
+			clearInterval(interval);
+		};
 	});
 
 	function scrollToBottom() {
@@ -1372,6 +1420,22 @@
 						} catch (e) {
 							console.error('[Chat Detail] Failed to parse references event:', e);
 						}
+					} else if (eventName === 'awaiting_indexing' && dataStr) {
+						try {
+							const parsed = JSON.parse(dataStr);
+							// Attachment mode: the server returns immediately and
+							// completes the turn in the background sweep. Mark the
+							// message so the UI shows the waiting state and the
+							// conversation poll takes over.
+							messages[asstIndex].status = 'awaiting_indexing';
+							if (Array.isArray(parsed.attachmentDocumentIds)) {
+								const ids: string[] = parsed.attachmentDocumentIds;
+								messages[asstIndex].attachmentDocumentIds = ids;
+								if (userMsg) userMsg.attachmentDocumentIds = ids;
+							}
+						} catch (e) {
+							console.error('[Chat Detail] Failed to parse awaiting_indexing event:', e);
+						}
 					} else if (eventName === 'token' && dataStr) {
 						try {
 							const parsed = JSON.parse(dataStr);
@@ -1516,8 +1580,18 @@
 		});
 	}
 
-	/** Extracts already-uploaded attachments (with document ids) from a message. */
+	/** Extracts already-uploaded attachments (with document ids) from a message.
+	 * Prefers the server-persisted ids (survive reloads); falls back to the
+	 * local attachment chips for the current session. */
 	function attachmentsOf(msg: ChatMessage | undefined): ChatAttachment[] | undefined {
+		const persistedIds = msg?.attachmentDocumentIds;
+		if (persistedIds && persistedIds.length > 0) {
+			return persistedIds.map((documentId) => ({
+				documentId,
+				name: 'Document',
+				size: 0
+			}));
+		}
 		const docs = msg?.attachments
 			?.map((a) =>
 				a.documentId
@@ -2439,7 +2513,7 @@
 												</Tooltip.Content>
 											</Tooltip.Root>
 										</Tooltip.Provider>
-										{#if msg.id === lastUserMsgId}
+										{#if msg.id === lastUserMsgId && messages[msgIndex + 1]?.status !== 'awaiting_indexing'}
 											<Tooltip.Provider delayDuration={100}>
 												<Tooltip.Root>
 													<Tooltip.Trigger>
@@ -2491,6 +2565,31 @@
 								>
 									{#if displayedContentOf(msg)}
 										{@html renderMarkdown(displayedContentOf(msg), displayedRefsOf(msg))}
+									{:else if msg.status === 'awaiting_indexing'}
+										<div
+											class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
+										>
+											<svg class="size-6 shrink-0 text-white/70" viewBox="0 0 50 50">
+												<g transform="rotate(0 25 25)"
+													><line
+														x1="25"
+														y1="15"
+														x2="25"
+														y2="35"
+														stroke="currentColor"
+														stroke-linecap="round"
+														stroke-width="5"
+													></line
+												></g>
+											</svg>
+											<span>
+												Menunggu dokumen lampiran diproses
+												{#if msg.attachmentDocumentIds?.length}
+													({msg.attachmentDocumentIds.length} file)
+												{/if}
+												...
+											</span>
+										</div>
 									{:else if msg.isStreaming || msg.isRetrying}
 										<div
 											class="flex animate-pulse items-center gap-2 py-1 text-xs font-medium text-white/60 italic select-none"
@@ -2770,7 +2869,7 @@
 												</Tooltip.Root>
 											</Tooltip.Provider>
 
-											{#if !msg.isRejection && msg.status !== 'blocked' && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
+											{#if !msg.isRejection && msg.status !== 'blocked' && msg.status !== 'awaiting_indexing' && messages[msgIndex - 1]?.role === 'user' && messages[msgIndex - 1]?.id === lastUserMsgId}
 												<DropdownMenu.Root>
 													<Tooltip.Provider delayDuration={100}>
 														<Tooltip.Root>

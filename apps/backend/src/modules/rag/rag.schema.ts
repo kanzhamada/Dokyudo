@@ -33,7 +33,7 @@ export const ChatBodySchema = z.object({
 });
 export type ChatBody = z.infer<typeof ChatBodySchema>;
 
-export type TurnStatus = "processing" | "complete" | "stopped" | "failed" | "blocked";
+export type TurnStatus = "processing" | "awaiting_indexing" | "complete" | "stopped" | "failed" | "blocked";
 
 export interface ChatServiceParams {
     tenantId: string;
@@ -106,7 +106,7 @@ export type ContextReference = z.infer<typeof ContextReferenceSchema>;
 export const TurnAlternativeSchema = z.object({
     id: z.string().uuid(),
     answer: z.string(),
-    status: z.enum(["processing", "complete", "stopped", "failed", "blocked"]),
+    status: z.enum(["processing", "awaiting_indexing", "complete", "stopped", "failed", "blocked"]),
     modelUsed: z.string().nullable().optional(),
     latencyMs: z.number().nullable().optional(),
     contextReferences: z.array(ContextReferenceSchema).nullable().optional(),
@@ -118,11 +118,13 @@ export const ConversationTurnSchema = z.object({
     id: z.string().uuid(),
     question: z.string(),
     answer: z.string(),
-    status: z.enum(["processing", "complete", "stopped", "failed", "blocked"]),
+    status: z.enum(["processing", "awaiting_indexing", "complete", "stopped", "failed", "blocked"]),
     feedback: z.enum(["good", "bad"]).nullable().optional(),
     feedbackAt: z.string().nullable().optional(),
     /** Set only on the boundary turn of a branched conversation. */
     branchedFromTurnId: z.string().uuid().nullable().optional(),
+    /** Attachment document ids scoping this turn's retrieval (awaiting turns). */
+    attachmentDocumentIds: z.array(z.string().uuid()).nullable().optional(),
     contextReferences: z.array(ContextReferenceSchema).nullable(),
     /** Retry variants of this turn (terminal, non-empty answers only). */
     alternatives: z.array(TurnAlternativeSchema).default([]),

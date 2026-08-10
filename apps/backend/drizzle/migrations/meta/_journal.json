@@ -190,6 +190,13 @@
       "when": 1786400000000,
       "tag": "0026_drop_boundary_turn_id",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1786341547150,
+      "tag": "0027_awaiting_indexing_attachments",
+      "breakpoints": true
     }
   ]
 }

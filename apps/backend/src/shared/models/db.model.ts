@@ -120,6 +120,7 @@ export const authProviderEnum = pgEnum("auth_provider_enum", [
 
 export const turnStatusEnum = pgEnum("turn_status_enum", [
     "processing",
+    "awaiting_indexing",
     "complete",
     "stopped",
     "failed",
@@ -277,6 +278,13 @@ export const conversationTurns = pgTable("conversation_turns", {
     // being deleted, so the frontend can still render "Branched from Deleted
     // Conversation". It is a lineage pointer, not referential integrity.
     branchedFromTurnId: uuid("branched_from_turn_id"),
+    // Set on turns that carry chat attachments: the document ids that scope
+    // RAG retrieval. Persisted so the background sweep (awaiting_indexing) and
+    // later edit/retry of the turn can reuse the same scoping. Nullable.
+    attachmentDocumentIds: jsonb("attachment_document_ids"),
+    // BYOK choice ({ provider, model }) for awaiting turns — the background
+    // sweep completes them without the client present. Null = system mode.
+    modelRequest: jsonb("model_request"),
     updatedAt: timestamp("updated_at", {
         mode: "date",
         precision: 3,

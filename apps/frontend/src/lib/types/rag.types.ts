@@ -61,7 +61,13 @@ export interface ContextReference {
 	pages: number[];
 }
 
-export type TurnStatus = 'processing' | 'complete' | 'stopped' | 'failed' | 'blocked';
+export type TurnStatus =
+	| 'processing'
+	| 'awaiting_indexing'
+	| 'complete'
+	| 'stopped'
+	| 'failed'
+	| 'blocked';
 
 export interface TurnAlternative {
 	id: string;
@@ -82,6 +88,8 @@ export interface ConversationTurn {
 	feedbackAt?: string | null;
 	/** Set only on the boundary turn of a branched conversation. */
 	branchedFromTurnId?: string | null;
+	/** Attachment document ids scoping this turn's retrieval (awaiting turns). */
+	attachmentDocumentIds?: string[] | null;
 	modelUsed: string | null;
 	contextReferences: ContextReference[] | null;
 	/** Retry variants of this turn (terminal, non-empty answers only). */

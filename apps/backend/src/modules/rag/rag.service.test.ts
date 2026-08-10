@@ -251,7 +251,78 @@ describe("RagService Isolated Tests", () => {
             }
         });
 
-        it("positive: waits for processed attachments, scopes retrieval to them, and persists their references", async () => {
+        it("positive: attachment turns return an awaiting stream immediately (no server wait), persisting awaiting_indexing + ids and reserving QA quota", async () => {
+            const attachedDocId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: attachedDocId,
+                tenantId: TEST_TENANT_ID,
+                title: "Attached Doc",
+                storagePath: "attached.pdf",
+                sizeBytes: 100,
+                status: "confirmed",
+            }).onConflictDoNothing();
+
+            const [subBefore] = await db
+                .select({ qaCount: tenantSubscriptions.qaCount })
+                .from(tenantSubscriptions)
+                .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
+
+            try {
+                const question = `attachment awaiting ${crypto.randomUUID()}`;
+                const stream = await RagService.streamChat({
+                    tenantId: TEST_TENANT_ID,
+                    userId: TEST_USER_ID,
+                    question,
+                    conversationId: TEST_CONVERSATION_ID,
+                    useByok: false,
+                    attachmentDocumentIds: [attachedDocId],
+                    logContext: {},
+                });
+
+                const reader = stream.getReader();
+                const decoder = new TextDecoder();
+                let payload = "";
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) payload += decoder.decode(value, { stream: true });
+                }
+
+                // Immediate stream: turn_started + awaiting_indexing + done —
+                // no tokens, no wait, no LLM calls.
+                assertEquals(payload.includes("event: awaiting_indexing"), true);
+                assertEquals(payload.includes(attachedDocId), true);
+                assertEquals(payload.includes("event: done"), true);
+                assertEquals(payload.includes("event: token"), false);
+
+                // The turn is persisted as awaiting_indexing with the scoping ids.
+                const turns = await db
+                    .select()
+                    .from(conversationTurns)
+                    .where(
+                        and(
+                            eq(conversationTurns.conversationId, TEST_CONVERSATION_ID),
+                            eq(conversationTurns.question, question),
+                        ),
+                    );
+                assertEquals(turns.length, 1);
+                assertEquals(turns[0].status, "awaiting_indexing");
+                assertEquals(turns[0].answer, "");
+                assertEquals(turns[0].attachmentDocumentIds, [attachedDocId]);
+
+                // QA quota was reserved at submit time (the pipeline runs later
+                // in the background sweep).
+                const [subAfter] = await db
+                    .select({ qaCount: tenantSubscriptions.qaCount })
+                    .from(tenantSubscriptions)
+                    .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
+                assertEquals(subAfter.qaCount, (subBefore?.qaCount ?? 0) + 1);
+            } finally {
+                await db.delete(documents).where(eq(documents.id, attachedDocId));
+            }
+        });
+
+        it("positive: sweep completes an awaiting turn once every document is processed", async () => {
             const attachedDocId = crypto.randomUUID();
             await db.insert(documents).values({
                 id: attachedDocId,
@@ -261,6 +332,19 @@ describe("RagService Isolated Tests", () => {
                 sizeBytes: 100,
                 status: "processed",
             }).onConflictDoNothing();
+
+            const question = `sweep complete ${crypto.randomUUID()}`;
+            const turnId = crypto.randomUUID();
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                question,
+                answer: "",
+                modelUsed: null,
+                status: "awaiting_indexing",
+                attachmentDocumentIds: [attachedDocId],
+            });
 
             let searchParams: any = null;
             using geminiStub = stub(gemini, "generateText", (prompt: string) =>
@@ -286,43 +370,74 @@ describe("RagService Isolated Tests", () => {
                 Promise.resolve({ modelId: "test-model", stream: fakeStream }) as any,
             );
 
-            const question = `attachment flow ${crypto.randomUUID()}`;
-            const stream = await RagService.streamChat({
-                tenantId: TEST_TENANT_ID,
-                userId: TEST_USER_ID,
-                question,
-                conversationId: TEST_CONVERSATION_ID,
-                useByok: false,
-                attachmentDocumentIds: [attachedDocId],
-                logContext: {},
-            });
-            await drainStream(stream);
+            try {
+                const result = await RagService.sweepAwaitingTurns();
+                assertEquals(result.completed >= 1, true);
 
-            // Retrieval must have been scoped to the attached document.
-            assertExists(searchParams);
-            assertEquals(searchParams.documentIds, [attachedDocId]);
+                const [turn] = await db
+                    .select()
+                    .from(conversationTurns)
+                    .where(eq(conversationTurns.id, turnId));
+                assertExists(turn);
+                // The detached pipeline ran and persisted the answer.
+                assertEquals(turn.status, "complete");
+                assertEquals(turn.answer, "Jawaban berdasarkan dokumen terlampir [Doc 1: Page 1].");
+                assertEquals(turn.modelUsed, "test-model");
+                assertEquals(turn.contextReferences, [
+                    { index: 1, documentId: attachedDocId, title: "Attached Doc", pages: [1] },
+                ]);
 
-            // The turn completes and its references point only at the attachment.
-            const turns = await waitForTurns(
-                TEST_CONVERSATION_ID,
-                (t) =>
-                    t.some(
-                        (row) =>
-                            row.question === question &&
-                            row.status === "complete",
-                    ),
-            );
-            const turn = turns.find((t) => t.question === question);
-            assertExists(turn);
-            assertEquals(turn.answer, "Jawaban berdasarkan dokumen terlampir [Doc 1: Page 1].");
-            assertEquals(turn.contextReferences, [
-                { index: 1, documentId: attachedDocId, title: "Attached Doc", pages: [1] },
-            ]);
-
-            await db.delete(documents).where(eq(documents.id, attachedDocId));
+                // Retrieval was scoped to the attached document.
+                assertExists(searchParams);
+                assertEquals(searchParams.documentIds, [attachedDocId]);
+            } finally {
+                await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId));
+                await db.delete(documents).where(eq(documents.id, attachedDocId));
+            }
         });
 
-        it("negative: times out waiting for a still-ingesting attachment and fails the turn gracefully", async () => {
+        it("negative: sweep marks an awaiting turn failed when a document fails", async () => {
+            const failedDocId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: failedDocId,
+                tenantId: TEST_TENANT_ID,
+                title: "Failed Doc",
+                storagePath: "failed.pdf",
+                sizeBytes: 100,
+                status: "failed_vectorizing",
+            }).onConflictDoNothing();
+
+            const question = `sweep fail ${crypto.randomUUID()}`;
+            const turnId = crypto.randomUUID();
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                question,
+                answer: "",
+                modelUsed: null,
+                status: "awaiting_indexing",
+                attachmentDocumentIds: [failedDocId],
+            });
+
+            try {
+                const result = await RagService.sweepAwaitingTurns();
+                assertEquals(result.failed >= 1, true);
+
+                const [turn] = await db
+                    .select()
+                    .from(conversationTurns)
+                    .where(eq(conversationTurns.id, turnId));
+                assertExists(turn);
+                assertEquals(turn.status, "failed");
+                assertEquals(turn.answer.includes("gagal"), true);
+            } finally {
+                await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId));
+                await db.delete(documents).where(eq(documents.id, failedDocId));
+            }
+        });
+
+        it("positive: sweep leaves still-ingesting turns untouched", async () => {
             const pendingDocId = crypto.randomUUID();
             await db.insert(documents).values({
                 id: pendingDocId,
@@ -333,47 +448,90 @@ describe("RagService Isolated Tests", () => {
                 status: "confirmed",
             }).onConflictDoNothing();
 
+            const question = `sweep wait ${crypto.randomUUID()}`;
+            const turnId = crypto.randomUUID();
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                question,
+                answer: "",
+                modelUsed: null,
+                status: "awaiting_indexing",
+                attachmentDocumentIds: [pendingDocId],
+            });
+
             try {
-                const question = `attachment timeout ${crypto.randomUUID()}`;
-                // Runs with ATTACHMENT_WAIT_TIMEOUT_MS/ATTACHMENT_POLL_INTERVAL_MS
-                // overridden by the `deno test` task so this does not wait minutes.
-                const stream = await RagService.streamChat({
-                    tenantId: TEST_TENANT_ID,
-                    userId: TEST_USER_ID,
-                    question,
-                    conversationId: TEST_CONVERSATION_ID,
-                    useByok: false,
-                    attachmentDocumentIds: [pendingDocId],
-                    logContext: {},
-                });
+                const result = await RagService.sweepAwaitingTurns();
+                assertEquals(result.stillWaiting >= 1, true);
 
-                const reader = stream.getReader();
-                const decoder = new TextDecoder();
-                let payload = "";
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    if (value) payload += decoder.decode(value, { stream: true });
-                }
-
-                // Graceful error stream — the client gets a clear message...
-                assertEquals(payload.includes("event: error"), true);
-                assertEquals(payload.includes("ATTACHMENT_NOT_READY"), true);
-                assertEquals(payload.includes("event: done"), true);
-
-                // ...and the turn resolves to "failed", never stuck in "processing".
-                const turns = await waitForTurns(
-                    TEST_CONVERSATION_ID,
-                    (t) =>
-                        t.some(
-                            (row) =>
-                                row.question === question &&
-                                row.status === "failed",
-                        ),
-                );
-                assertExists(turns.find((t) => t.question === question));
+                const [turn] = await db
+                    .select()
+                    .from(conversationTurns)
+                    .where(eq(conversationTurns.id, turnId));
+                assertExists(turn);
+                assertEquals(turn.status, "awaiting_indexing");
             } finally {
+                await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId));
                 await db.delete(documents).where(eq(documents.id, pendingDocId));
+            }
+        });
+
+        it("negative: retry and edit of an awaiting turn are rejected", async () => {
+            const attachedDocId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: attachedDocId,
+                tenantId: TEST_TENANT_ID,
+                title: "Attached Doc",
+                storagePath: "attached.pdf",
+                sizeBytes: 100,
+                status: "confirmed",
+            }).onConflictDoNothing();
+
+            const question = `awaiting guard ${crypto.randomUUID()}`;
+            const turnId = crypto.randomUUID();
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                question,
+                answer: "",
+                modelUsed: null,
+                status: "awaiting_indexing",
+                attachmentDocumentIds: [attachedDocId],
+            });
+
+            try {
+                await assertRejects(
+                    () => RagService.streamChat({
+                        tenantId: TEST_TENANT_ID,
+                        userId: TEST_USER_ID,
+                        question: `retry ${crypto.randomUUID()}`,
+                        conversationId: TEST_CONVERSATION_ID,
+                        useByok: false,
+                        retryTurnId: turnId,
+                        logContext: {},
+                    }),
+                    AppError,
+                    "still generating",
+                );
+
+                await assertRejects(
+                    () => RagService.streamChat({
+                        tenantId: TEST_TENANT_ID,
+                        userId: TEST_USER_ID,
+                        question: `edit ${crypto.randomUUID()}`,
+                        conversationId: TEST_CONVERSATION_ID,
+                        useByok: false,
+                        editTurnId: turnId,
+                        logContext: {},
+                    }),
+                    AppError,
+                    "still waiting",
+                );
+            } finally {
+                await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId));
+                await db.delete(documents).where(eq(documents.id, attachedDocId));
             }
         });
 
