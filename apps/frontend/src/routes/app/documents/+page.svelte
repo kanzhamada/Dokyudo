@@ -833,7 +833,7 @@
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50"
+								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white disabled:opacity-50"
 								onclick={toggleFilterMenu}
 								aria-haspopup="menu"
 								aria-expanded={filterMenuOpen}
@@ -905,7 +905,7 @@
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50"
+								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white disabled:opacity-50"
 								onclick={toggleSortMenu}
 								aria-haspopup="menu"
 								aria-expanded={sortMenuOpen}
@@ -982,7 +982,7 @@
 							<Button
 								{...props}
 								variant="ghost"
-								class="h-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white {selectedCount >
+								class="h-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white {selectedCount >
 								0
 									? 'border-white/[0.80] bg-[#B8B5B5]/[0.40] px-2.5'
 									: 'flex w-9 items-center justify-center p-0'}"
@@ -1199,7 +1199,11 @@
 								<span>Summary generation paused due to daily quota. Resuming tomorrow.</span>
 							</div>
 						{:else}
-							<p class="mt-2 line-clamp-2 text-sm font-normal text-white/80">
+							<p
+								class="mt-2 text-sm font-normal text-white/80 {activeSearchQuery.trim()
+									? ''
+									: 'line-clamp-2'}"
+							>
 								{@html highlightMatch(doc.description, activeSearchQuery)}
 							</p>
 						{/if}

@@ -51,7 +51,7 @@
 					{...props}
 					variant="ghost"
 					size="icon"
-					class="relative size-8 cursor-pointer rounded-full text-white/60 transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white"
+					class="relative size-8 cursor-pointer rounded-full text-white/60 transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white aria-expanded:bg-white/10 aria-expanded:text-white"
 					onclick={toggleMenu}
 					aria-haspopup="menu"
 					aria-expanded={menuOpen}
