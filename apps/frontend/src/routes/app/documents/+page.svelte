@@ -968,12 +968,24 @@
 							</div>
 							<div class="flex items-center gap-3" onclick={(e) => e.stopPropagation()} role="none">
 								{#if doc.score !== undefined}
-									<div
-										class="rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2 py-0.5 text-xs font-semibold text-[#DB8F5E]"
-										title="AI Relevance Score"
-									>
-										{(doc.score * 100).toFixed(2)}% Match
-									</div>
+									{@const score = doc.score}
+									<Tooltip.Root>
+										<Tooltip.Trigger>
+											{#snippet child({ props })}
+												<div
+													{...props}
+													class="rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2 py-0.5 text-xs font-semibold text-[#DB8F5E]"
+												>
+													{(score * 100).toFixed(2)}% Match
+												</div>
+											{/snippet}
+										</Tooltip.Trigger>
+										<Tooltip.Content
+											class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+										>
+											<p>AI Relevance Score</p>
+										</Tooltip.Content>
+									</Tooltip.Root>
 								{/if}
 								<DocumentCardActions
 									id={doc.id}
@@ -1057,17 +1069,29 @@
 								</p>
 
 								{#if doc.pages && doc.pages.length > 0}
-									<div
-										class="inline-flex items-center gap-1.5 rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2.5 py-0.5 text-xs font-medium text-[#DB8F5E]"
-										title={`Found on pages: ${doc.pages.join(', ')}`}
-									>
-										<BookOpenIcon class="size-3.5" />
-										<span
-											>Pages: {doc.pages.slice(0, 3).join(', ')}{doc.pages.length > 3
-												? '...'
-												: ''}</span
+									{@const pages = doc.pages}
+									<Tooltip.Root>
+										<Tooltip.Trigger>
+											{#snippet child({ props })}
+												<div
+													{...props}
+													class="inline-flex items-center gap-1.5 rounded-full border border-[#DB8F5E]/30 bg-[#DB8F5E]/10 px-2.5 py-0.5 text-xs font-medium text-[#DB8F5E]"
+												>
+													<BookOpenIcon class="size-3.5" />
+													<span
+														>Pages: {pages.slice(0, 3).join(', ')}{pages.length > 3
+															? '...'
+															: ''}</span
+													>
+												</div>
+											{/snippet}
+										</Tooltip.Trigger>
+										<Tooltip.Content
+											class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
 										>
-									</div>
+											<p>Found on pages: {pages.join(', ')}</p>
+										</Tooltip.Content>
+									</Tooltip.Root>
 								{/if}
 							</div>
 

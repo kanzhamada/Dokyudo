@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import XIcon from '@lucide/svelte/icons/x';
 	import CheckCircle2Icon from '@lucide/svelte/icons/check-circle-2';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
@@ -113,9 +114,7 @@
 	}
 
 	function startBatchUpload() {
-		const itemsToUpload = uploadFiles.filter(
-			(i) => i.status === 'staged' || i.status === 'failed'
-		);
+		const itemsToUpload = uploadFiles.filter((i) => i.status === 'staged' || i.status === 'failed');
 		if (itemsToUpload.length === 0) return;
 
 		hasStartedUpload = true;
@@ -200,7 +199,10 @@
 
 		xhr.onerror = (e) => {
 			item.xhr = null;
-			console.error(`[Upload S3] Network error uploading ${item.name}. Status: ${xhr.status} ${xhr.statusText}`, e);
+			console.error(
+				`[Upload S3] Network error uploading ${item.name}. Status: ${xhr.status} ${xhr.statusText}`,
+				e
+			);
 			item.status = 'failed';
 			item.errorMessage = 'Network error during upload';
 		};
@@ -260,7 +262,10 @@
 		}
 
 		if (item.documentId) {
-			console.log('[Upload Clean] Deleting cancelled/failed document from backend:', item.documentId);
+			console.log(
+				'[Upload Clean] Deleting cancelled/failed document from backend:',
+				item.documentId
+			);
 			await apiRequest('/api/documents/batch-delete', {
 				method: 'POST',
 				body: { documentIds: [item.documentId] }
@@ -280,9 +285,7 @@
 
 	async function cancelAllBackendUploads() {
 		isCleaningUp = true;
-		const docIds = uploadFiles
-			.map((i) => i.documentId)
-			.filter((id): id is string => Boolean(id));
+		const docIds = uploadFiles.map((i) => i.documentId).filter((id): id is string => Boolean(id));
 
 		uploadFiles.forEach((i) => {
 			if (i.xhr) i.xhr.abort();
@@ -340,7 +343,9 @@
 />
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="border-[#302F2F] bg-[#191919]/[0.85] p-0 text-white backdrop-blur-[42px] sm:rounded-[22px]">
+	<Dialog.Content
+		class="border-[#302F2F] bg-[#191919]/[0.85] p-0 text-white backdrop-blur-[42px] sm:rounded-[22px]"
+	>
 		<div class="flex flex-col gap-5 p-8 pb-0 md:p-10 md:pb-0">
 			<!-- Header Section -->
 			<div class="flex flex-col gap-2 text-center">
@@ -367,13 +372,13 @@
 				<div class="relative mb-6 flex h-24 w-32 items-center justify-center">
 					<!-- TXT Icon (Back Right) -->
 					<div
-						class="absolute right-2 top-2 flex h-16 w-12 rotate-6 transform flex-col items-center justify-center rounded border border-[#302F2F] bg-[#1F1E1D] opacity-80 shadow-lg"
+						class="absolute top-2 right-2 flex h-16 w-12 rotate-6 transform flex-col items-center justify-center rounded border border-[#302F2F] bg-[#1F1E1D] opacity-80 shadow-lg"
 					>
 						<span class="text-[10px] font-bold text-[#767676]">TXT</span>
 					</div>
 					<!-- PDF Icon (Back Left) -->
 					<div
-						class="absolute left-2 top-2 flex h-16 w-12 -rotate-6 transform flex-col items-center justify-center rounded opacity-80 shadow-lg"
+						class="absolute top-2 left-2 flex h-16 w-12 -rotate-6 transform flex-col items-center justify-center rounded opacity-80 shadow-lg"
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -464,7 +469,7 @@
 							/>
 						</svg>
 						<div
-							class="absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-[#191919] bg-[#DB8F5E] shadow-md"
+							class="absolute -right-2 -bottom-2 flex h-6 w-6 items-center justify-center rounded-full border border-[#191919] bg-[#DB8F5E] shadow-md"
 						>
 							<PlusIcon class="size-4 text-white" />
 						</div>
@@ -501,20 +506,31 @@
 										<div class="flex flex-col">
 											<span class="text-sm font-bold text-white">{item.name}</span>
 											<span class="text-xs text-[#959595]"
-												>{item.sizeFormatted} - <span class="text-white/60">ready to upload</span
-												></span
+												>{item.sizeFormatted} -
+												<span class="text-white/60">ready to upload</span></span
 											>
 										</div>
 									</div>
 									<div class="flex items-center gap-4">
-										<button
-											type="button"
-											onclick={() => removeItem(item)}
-											class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-											title="Remove File"
-										>
-											<XIcon class="size-5" />
-										</button>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<button
+														type="button"
+														{...props}
+														onclick={() => removeItem(item)}
+														class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+													>
+														<XIcon class="size-5" />
+													</button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content
+												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+											>
+												<p>Remove File</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
 									</div>
 								</div>
 							{:else if item.status === 'success'}
@@ -531,22 +547,33 @@
 										<div class="flex flex-col">
 											<span class="text-sm font-bold text-white">{item.name}</span>
 											<span class="text-xs text-[#959595]"
-												>{item.sizeFormatted} - <span class="text-[#22c55e]">successful upload</span
-												></span
+												>{item.sizeFormatted} -
+												<span class="text-[#22c55e]">successful upload</span></span
 											>
 										</div>
 									</div>
 									<div class="flex items-center gap-4">
 										<span class="text-sm font-bold text-white">100%</span>
 										<CheckCircle2Icon class="size-5 text-[#22c55e]" />
-										<button
-											type="button"
-											onclick={() => removeItem(item)}
-											class="cursor-pointer text-[#767676] transition-colors hover:text-[#ef4444]"
-											title="Delete File"
-										>
-											<MxIcon name="trash-bin-minimalistic-outline" class="size-5" />
-										</button>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<button
+														type="button"
+														{...props}
+														onclick={() => removeItem(item)}
+														class="cursor-pointer text-[#767676] transition-colors hover:text-[#ef4444]"
+													>
+														<MxIcon name="trash-bin-minimalistic-outline" class="size-5" />
+													</button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content
+												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+											>
+												<p>Delete File</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
 									</div>
 								</div>
 							{:else if item.status === 'failed'}
@@ -572,22 +599,44 @@
 									</div>
 									<div class="flex items-center gap-4">
 										<span class="text-sm font-bold text-white">{item.progress}%</span>
-										<button
-											type="button"
-											onclick={() => retryItem(item)}
-											class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-											title="Retry Upload"
-										>
-											<RotateCcwIcon class="size-5" />
-										</button>
-										<button
-											type="button"
-											onclick={() => removeItem(item)}
-											class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-											title="Remove File"
-										>
-											<XIcon class="size-5" />
-										</button>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<button
+														type="button"
+														{...props}
+														onclick={() => retryItem(item)}
+														class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+													>
+														<RotateCcwIcon class="size-5" />
+													</button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content
+												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+											>
+												<p>Retry Upload</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<button
+														type="button"
+														{...props}
+														onclick={() => removeItem(item)}
+														class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+													>
+														<XIcon class="size-5" />
+													</button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content
+												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+											>
+												<p>Remove File</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
 									</div>
 								</div>
 							{:else}
@@ -623,14 +672,25 @@
 										{:else}
 											<Loader2Icon class="size-4 animate-spin text-white/60" />
 										{/if}
-										<button
-											type="button"
-											onclick={() => removeItem(item)}
-											class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-											title="Cancel Upload"
-										>
-											<XIcon class="size-5" />
-										</button>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<button
+														type="button"
+														{...props}
+														onclick={() => removeItem(item)}
+														class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+													>
+														<XIcon class="size-5" />
+													</button>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content
+												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+											>
+												<p>Cancel Upload</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
 									</div>
 								</div>
 							{/if}
@@ -643,14 +703,18 @@
 					>
 						<div class="flex items-center gap-2">
 							<span class="font-medium text-white/60">Total:</span>
-							<span class="font-semibold text-white">{totalFileCount} {totalFileCount === 1 ? 'file' : 'files'}</span>
+							<span class="font-semibold text-white"
+								>{totalFileCount} {totalFileCount === 1 ? 'file' : 'files'}</span
+							>
 							<span class="text-white/30">•</span>
 							<span class="font-semibold text-white">{totalSizeFormatted}</span>
 						</div>
 						{#if hasSuccessfulUploads || isAnyUploading}
 							<div class="flex items-center gap-2">
 								<span class="text-white/60">Status:</span>
-								<span class="font-medium text-white">{completedCount}/{totalFileCount} completed</span>
+								<span class="font-medium text-white"
+									>{completedCount}/{totalFileCount} completed</span
+								>
 							</div>
 						{/if}
 					</div>
@@ -717,40 +781,45 @@
 				{/if}
 
 				<div class="relative">
-					{#if hasFailedUploads}
-						<!-- Text Bubble Tooltip -->
-						<div
-							class="absolute -left-4 -top-12 z-50 flex items-center justify-center whitespace-nowrap rounded-lg bg-[#ef4444] px-3 py-1.5 text-xs font-bold text-white shadow-lg"
-						>
-							Fix Failed Uploads First
-							<div class="absolute -bottom-1 right-8 h-2 w-2 rotate-45 bg-[#ef4444]"></div>
-						</div>
-					{/if}
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									type="button"
+									onclick={hasAllSucceeded ? finishAndClose : startBatchUpload}
+									disabled={uploadFiles.length === 0 || isAnyUploading || hasFailedUploads}
+									class="relative cursor-pointer bg-[#DB8F5E] font-medium text-white hover:bg-[#C47D4E] disabled:bg-[#DB8F5E]/40 disabled:text-white/50 disabled:opacity-100"
+								>
+									{#if isAnyUploading}
+										<Loader2Icon class="mr-2 size-4 animate-spin" />
+										Uploading...
+									{:else if hasAllSucceeded}
+										Done
+									{:else}
+										Upload Documents
+									{/if}
 
-					<Button
-						type="button"
-						onclick={hasAllSucceeded ? finishAndClose : startBatchUpload}
-						disabled={uploadFiles.length === 0 || isAnyUploading || hasFailedUploads}
-						class="relative cursor-pointer bg-[#DB8F5E] font-medium text-white hover:bg-[#C47D4E] disabled:bg-[#DB8F5E]/40 disabled:text-white/50 disabled:opacity-100"
-					>
-						{#if isAnyUploading}
-							<Loader2Icon class="mr-2 size-4 animate-spin" />
-							Uploading...
-						{:else if hasAllSucceeded}
-							Done
-						{:else}
-							Upload Documents
-						{/if}
-
+									{#if hasFailedUploads}
+										<!-- Notification Badge -->
+										<div
+											class="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#1F1E1D] bg-[#ef4444] text-[10px] font-bold text-white"
+										>
+											{failedCount}
+										</div>
+									{/if}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
 						{#if hasFailedUploads}
-							<!-- Notification Badge -->
-							<div
-								class="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#1F1E1D] bg-[#ef4444] text-[10px] font-bold text-white"
+							<Tooltip.Content
+								side="top"
+								class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
 							>
-								{failedCount}
-							</div>
+								<p>Fix Failed Uploads First</p>
+							</Tooltip.Content>
 						{/if}
-					</Button>
+					</Tooltip.Root>
 				</div>
 			</div>
 		</div>
