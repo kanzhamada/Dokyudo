@@ -633,7 +633,7 @@
 							<ToggleGroup.Item
 								value="keyword"
 								aria-label="Toggle keyword search"
-								class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-l-full text-white/50 transition-[background-color,color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.05] hover:text-white/70 data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
+								class="flex h-7 w-7 cursor-pointer items-center justify-center !rounded-l-full text-white/50 transition-[background-color,color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.05] hover:text-white/70 data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
 							>
 								<Tooltip.Root>
 									<Tooltip.Trigger>
@@ -653,7 +653,7 @@
 							<ToggleGroup.Item
 								value="semantic"
 								aria-label="Toggle semantic search"
-								class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-r-full text-white/50 transition-[background-color,color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.05] hover:text-white/70 data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
+								class="flex h-7 w-7 cursor-pointer items-center justify-center !rounded-r-full text-white/50 transition-[background-color,color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.05] hover:text-white/70 data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
 							>
 								<Tooltip.Root>
 									<Tooltip.Trigger>
