@@ -9,7 +9,6 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
-	import { Sparkles } from 'lucide-svelte';
 	import { getMeUsage } from '$lib/api/me';
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
@@ -58,6 +57,9 @@
 	let selectedModel: LlmOption = $state(llmOptions[0]);
 	let attachedFiles: File[] = $state([]);
 	let isUploading = $state(false);
+	/** Sparkles toggle state (menggantikan tombol attach di input landing) —
+	 * search bar ini akan terhubung dengan search bar Documents nanti. */
+	let aiSearchEnabled = $state(false);
 	let isConfigureDialogOpen = $state(false);
 
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
@@ -191,6 +193,17 @@
 					attachmentDocuments
 				}
 			});
+		} else if (activeMode === 'search') {
+			// Connect to the Documents page search: navigate with the query and
+			// the search mode (Sparkles toggle ON = semantic, OFF = keyword) as
+			// URL params. This navigation is animated by the view transition in
+			// app/+layout.svelte (scoped to submit navigations from /app/chat).
+			const query = inputValue.trim();
+			if (!query) return;
+			const mode = aiSearchEnabled ? 'semantic' : 'keyword';
+			goto(
+				`/app/documents?q=${encodeURIComponent(query)}&mode=${mode}`
+			);
 		}
 	}
 </script>
@@ -334,6 +347,8 @@
 			showModelSelector={activeMode === 'chat'}
 			refocusKey={activeMode}
 			transparent
+			showSparkleToggle={activeMode === 'search'}
+			bind:sparkleActive={aiSearchEnabled}
 			{isUploading}
 			{baseUploads}
 			{maxUploads}
@@ -382,25 +397,25 @@
 							</Tooltip.Root>
 						</Tooltip.Provider>
 
-						<!-- Search mode as a Sparkles toggle (active/inactive) —
-						     the landing search bar connects to the Documents page
-						     search later. -->
 						<Tooltip.Provider delayDuration={100}>
 							<Tooltip.Root>
 								<Tooltip.Trigger>
-									<button
-										type="button"
-										class="flex cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 transition-all {activeMode === 'search'
-											? 'border-[0.74px] border-white/[0.80] bg-[#B8B5B5]/[0.40] text-white/[0.80] shadow-none backdrop-blur-[31.16px]'
-											: 'border border-white/[0.16] bg-[#232323]/[0.40] text-white/[0.40] backdrop-blur-[42px] hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px]'}"
-										aria-pressed={activeMode === 'search'}
-										aria-label="Toggle search mode"
-										onclick={() =>
-											(activeMode = activeMode === 'search' ? 'chat' : 'search')}
-									>
-										<Sparkles class="size-4" />
-										<span class="text-sm">Search</span>
-									</button>
+									{#snippet child({ props })}
+										<Tabs.Trigger
+											{...props}
+											value="search"
+											class="flex cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 transition-all
+												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-[#B8B5B5]/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
+												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-[#232323]/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-[#B8B5B5]/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
+										>
+											{#if activeMode === 'search'}
+												<MxIcon name="receipt-search-bold" class="size-4" />
+											{:else}
+												<MxIcon name="receipt-search-outline" class="size-4" />
+											{/if}
+											<span class="text-sm">Search</span>
+										</Tabs.Trigger>
+									{/snippet}
 								</Tooltip.Trigger>
 								<Tooltip.Content
 									class="border-white/[0.16] bg-[#232323] text-white"

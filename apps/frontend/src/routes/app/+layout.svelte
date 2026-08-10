@@ -7,8 +7,11 @@
 
 	let { children } = $props();
 
-	// SvelteKit View Transitions — scoped strictly to the "new chat submit"
-	// navigation (/app/chat → /app/chat/<id> via goto, i.e. type === 'goto').
+	// SvelteKit View Transitions — scoped strictly to SUBMIT navigations from
+	// the landing page:
+	// - chat submit: /app/chat → /app/chat/<id> via goto (type === 'goto')
+	// - search submit: /app/chat → /app/documents, only when the navigation
+	//   state carries a `searchQuery` (sidebar clicks never animate)
 	// Only the main content area (below the sidebar) cross-fades as one flat
 	// unit, via the `app-main` view-transition-name on <main>; the sidebar and
 	// app chrome stay static. The input capsule is intentionally part of that
@@ -17,9 +20,13 @@
 	onNavigate((navigation) => {
 		const from = navigation.from?.url.pathname ?? '';
 		const to = navigation.to?.url.pathname ?? '';
-		const isChatSubmit =
-			navigation.type === 'goto' && from === '/app/chat' && to.startsWith('/app/chat/');
-		if (!isChatSubmit) return;
+		const isScopedNavigation =
+			navigation.type === 'goto' &&
+			from === '/app/chat' &&
+			(to.startsWith('/app/chat/') ||
+				(to === '/app/documents' &&
+					navigation.to?.url.searchParams.get('q') !== null));
+		if (!isScopedNavigation) return;
 		if (typeof document === 'undefined' || !('startViewTransition' in document)) return;
 
 		return new Promise<void>((resolve) => {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronDown, X, Square, Check, Loader2 } from 'lucide-svelte';
+	import { ChevronDown, X, Square, Check, Loader2, Sparkles } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -43,6 +43,12 @@
 		isGenerating = false,
 		/** True while attached files are being uploaded before the turn is sent. */
 		isUploading = false,
+		/** Replace the attach-file button with a Sparkles toggle — used by the
+		 * landing search bar (connects to the Documents page search later).
+		 * When true, `sparkleActive` holds the toggle state. */
+		showSparkleToggle = false,
+		/** Active state of the Sparkles toggle (bindable). */
+		sparkleActive = $bindable(false),
 		/** True = transparent/soft capsule look (used by /app/chat landing page). */
 		transparent = false,
 		onsend = () => {},
@@ -508,28 +514,53 @@
 
 		<!-- Row 2: Input Controls -->
 		<div class="flex w-full flex-row items-end gap-3">
-			<!-- Attach Document -->
+			<!-- Attach Document / Sparkles Toggle -->
 			<div class="relative flex h-9 items-center">
-				<Tooltip.Provider delayDuration={100}>
-					<Tooltip.Root>
-						<Tooltip.Trigger
-							class="flex cursor-pointer items-center text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69]"
-							aria-label="Attach Document"
-							onclick={triggerFileInput}
-						>
-							<MxIcon name="attach-circle-outline" class="size-5" />
-						</Tooltip.Trigger>
-						<Tooltip.Content
-							class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
-							arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
-						>
-							<p>Attach Document (PDF, TXT)</p>
-							<p class="text-xs text-white/[0.69]">
-								{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
-							</p>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
+				{#if showSparkleToggle}
+					<!-- Sparkles toggle (landing search bar — connects to the
+					     Documents page search later). State-only for now. -->
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger
+								class="flex cursor-pointer items-center transition-colors focus:outline-none {sparkleActive
+									? 'text-[#DB8F5E]'
+									: 'text-white/[0.40] hover:text-white/[0.69]'}"
+								aria-label={sparkleActive ? 'AI search active' : 'Enable AI search'}
+								aria-pressed={sparkleActive}
+								onclick={() => (sparkleActive = !sparkleActive)}
+							>
+								<Sparkles class="size-5" />
+							</Tooltip.Trigger>
+							<Tooltip.Content
+								class="border-white/[0.16] bg-[#232323] text-white"
+								arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+							>
+								<p>{sparkleActive ? 'AI search active' : 'Enable AI search'}</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
+				{:else}
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger
+								class="flex cursor-pointer items-center text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69]"
+								aria-label="Attach Document"
+								onclick={triggerFileInput}
+							>
+								<MxIcon name="attach-circle-outline" class="size-5" />
+							</Tooltip.Trigger>
+							<Tooltip.Content
+								class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
+								arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+							>
+								<p>Attach Document (PDF, TXT)</p>
+								<p class="text-xs text-white/[0.69]">
+									{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
+								</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
+				{/if}
 			</div>
 			<Input
 				type="file"

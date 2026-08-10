@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { untrack, onMount } from 'svelte';
+	import { scale } from 'svelte/transition';
+	import { page } from '$app/state';
 	import {
 		type ColumnFiltersState,
 		type PaginationState,
@@ -18,7 +20,6 @@
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Resizable from '$lib/components/ui/resizable/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
@@ -31,6 +32,7 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import CheckSquareIcon from '@lucide/svelte/icons/check-square';
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import FilesIcon from '@lucide/svelte/icons/files';
@@ -192,6 +194,21 @@
 	}
 
 	onMount(() => {
+		// Incoming search from the /app/chat landing search bar (animated view
+		// transition): run the submitted query immediately. `mode` maps the
+		// Sparkles toggle — 'semantic' (AI) or 'keyword'.
+		const incomingQuery = page.url.searchParams.get('q');
+		const incomingMode = page.url.searchParams.get('mode');
+		if (incomingQuery && incomingQuery.trim()) {
+			searchMode = incomingMode === 'semantic' ? 'semantic' : 'keyword';
+			if (searchMode === 'semantic') {
+				semanticSearchQuery = incomingQuery;
+				executeSemanticSearch();
+			} else {
+				globalFilter = incomingQuery;
+			}
+		}
+
 		console.log('[Supabase Realtime] Subscribing to public:documents changes...');
 		const channel = supabase
 			.channel('public:documents')
@@ -561,6 +578,61 @@
 		}
 	}
 
+	/* ── Floating dropdown state (from scratch, AppSidebar pattern) ── */
+	let filterMenuOpen = $state(false);
+	let filterMenuPos = $state({ x: 0, y: 0 });
+	let sortMenuOpen = $state(false);
+	let sortMenuPos = $state({ x: 0, y: 0 });
+	let selectMenuOpen = $state(false);
+	let selectMenuPos = $state({ x: 0, y: 0 });
+
+	function closeMenus() {
+		filterMenuOpen = false;
+		sortMenuOpen = false;
+		selectMenuOpen = false;
+	}
+
+	function positionMenu(e: MouseEvent, width: number) {
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		return { x: rect.right - width, y: rect.bottom + 4 };
+	}
+
+	function toggleFilterMenu(e: MouseEvent) {
+		if (filterMenuOpen) {
+			filterMenuOpen = false;
+			return;
+		}
+		closeMenus();
+		filterMenuPos = positionMenu(e, 208);
+		filterMenuOpen = true;
+	}
+
+	function toggleSortMenu(e: MouseEvent) {
+		if (sortMenuOpen) {
+			sortMenuOpen = false;
+			return;
+		}
+		closeMenus();
+		sortMenuPos = positionMenu(e, 176);
+		sortMenuOpen = true;
+	}
+
+	function toggleSelectMenu(e: MouseEvent) {
+		if (selectMenuOpen) {
+			selectMenuOpen = false;
+			return;
+		}
+		closeMenus();
+		selectMenuPos = positionMenu(e, 240);
+		selectMenuOpen = true;
+	}
+
+	function toggleFilter(kind: 'pdf' | 'docx' | 'txt') {
+		if (kind === 'pdf') filterPdf = !filterPdf;
+		else if (kind === 'docx') filterDocx = !filterDocx;
+		else filterTxt = !filterTxt;
+	}
+
 	function keepDocumentsAtBottom() {
 		requestAnimationFrame(() => {
 			const activeScrollContainer = Array.from(
@@ -576,7 +648,7 @@
 </script>
 
 {#snippet mainList()}
-	<Tooltip.Provider>
+	<Tooltip.Provider delayDuration={100}>
 		<div
 			data-documents-scroll
 			class="flex h-full w-full flex-col gap-6 overflow-y-auto px-4 py-6 font-geist md:px-10 md:py-8"
@@ -644,7 +716,7 @@
 										{/snippet}
 									</Tooltip.Trigger>
 									<Tooltip.Content
-										class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+										class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 									>
 										Keyword Search
 									</Tooltip.Content>
@@ -664,7 +736,7 @@
 										{/snippet}
 									</Tooltip.Trigger>
 									<Tooltip.Content
-										class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+										class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 									>
 										AI Hybrid Search
 									</Tooltip.Content>
@@ -718,232 +790,266 @@
 				</div>
 
 				<!-- Filter Button -->
-				<DropdownMenu.Root>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props: tooltipProps })}
-								<DropdownMenu.Trigger>
-									{#snippet child({ props: dropdownProps })}
-										<Button
-											{...tooltipProps}
-											{...dropdownProps}
-											variant="ghost"
-											disabled={searchMode === 'semantic'}
-											class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50 data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white"
-										>
-											<MxIcon name="filter-outline" class="size-4" />
-										</Button>
-									{/snippet}
-								</DropdownMenu.Trigger>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content
-							class="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-none"
-						>
-							<p>Filter Documents</p>
-						</Tooltip.Content>
-					</Tooltip.Root>
-					<DropdownMenu.Content
-						align="end"
-						class="w-52 min-w-52 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								disabled={searchMode === 'semantic'}
+								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50"
+								onclick={toggleFilterMenu}
+								aria-haspopup="menu"
+								aria-expanded={filterMenuOpen}
+							>
+								<MxIcon name="filter-outline" class="size-4" />
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content
+						class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 					>
-						<DropdownMenu.Group>
-							<DropdownMenu.CheckboxItem
-								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-								bind:checked={filterPdf}
-								closeOnSelect={false}
-							>
-								<FileTextIcon class="size-3.5 text-white/60" />
-								PDF Documents
-							</DropdownMenu.CheckboxItem>
-							<DropdownMenu.CheckboxItem
-								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-								bind:checked={filterDocx}
-								closeOnSelect={false}
-							>
-								<FilesIcon class="size-3.5 text-white/60" />
-								Word Documents (.docx)
-							</DropdownMenu.CheckboxItem>
-							<DropdownMenu.CheckboxItem
-								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-								bind:checked={filterTxt}
-								closeOnSelect={false}
-							>
-								<FileStackIcon class="size-3.5 text-white/60" />
-								Text Files (.txt)
-							</DropdownMenu.CheckboxItem>
-						</DropdownMenu.Group>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+						<p>Filter Documents</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
+
+				{#if filterMenuOpen}
+					<div
+						role="presentation"
+						class="fixed inset-0 z-50 bg-transparent"
+						onclick={closeMenus}
+						onkeydown={closeMenus}
+					></div>
+					<div
+						transition:scale={{ duration: 150, start: 0.95 }}
+						style={`position: fixed; top: ${filterMenuPos.y}px; left: ${filterMenuPos.x}px;`}
+						class="z-50 w-52 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+					>
+						<button
+							type="button"
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							onclick={() => toggleFilter('pdf')}
+						>
+							<FileTextIcon class="size-3.5 text-white/60" />
+							<span>PDF Documents</span>
+							{#if filterPdf}
+								<CheckIcon class="ml-auto size-3.5 text-white/60" />
+							{/if}
+						</button>
+						<button
+							type="button"
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							onclick={() => toggleFilter('docx')}
+						>
+							<FilesIcon class="size-3.5 text-white/60" />
+							<span>Word Documents (.docx)</span>
+							{#if filterDocx}
+								<CheckIcon class="ml-auto size-3.5 text-white/60" />
+							{/if}
+						</button>
+						<button
+							type="button"
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							onclick={() => toggleFilter('txt')}
+						>
+							<FileStackIcon class="size-3.5 text-white/60" />
+							<span>Text Files (.txt)</span>
+							{#if filterTxt}
+								<CheckIcon class="ml-auto size-3.5 text-white/60" />
+							{/if}
+						</button>
+					</div>
+				{/if}
 
 				<!-- Sort Button -->
-				<DropdownMenu.Root>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props: tooltipProps })}
-								<DropdownMenu.Trigger>
-									{#snippet child({ props: dropdownProps })}
-										<Button
-											{...tooltipProps}
-											{...dropdownProps}
-											variant="ghost"
-											disabled={searchMode === 'semantic'}
-											class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50 data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white"
-										>
-											<MxIcon name="sort-outline" class="size-4" />
-										</Button>
-									{/snippet}
-								</DropdownMenu.Trigger>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content
-							class="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-none"
-						>
-							<p>Sort Documents</p>
-						</Tooltip.Content>
-					</Tooltip.Root>
-					<DropdownMenu.Content
-						align="end"
-						class="w-44 min-w-44 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								disabled={searchMode === 'semantic'}
+								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50"
+								onclick={toggleSortMenu}
+								aria-haspopup="menu"
+								aria-expanded={sortMenuOpen}
+							>
+								<MxIcon name="sort-outline" class="size-4" />
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content
+						class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 					>
-						<DropdownMenu.Group>
-							<DropdownMenu.Item
-								class="justify-between rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-								onclick={() => handleSort('name')}
-								closeOnSelect={false}
-							>
-								<span class="flex items-center gap-2">
-									<ArrowDownAZIcon class="size-3.5 text-white/60" />
-									<span>Alphabet</span>
-								</span>
-								{#if table.getColumn('name')?.getIsSorted() === 'asc'}
-									<ArrowUpIcon class="size-4" />
-								{:else if table.getColumn('name')?.getIsSorted() === 'desc'}
-									<ArrowDownIcon class="size-4" />
-								{/if}
-							</DropdownMenu.Item>
-							<DropdownMenu.Item
-								class="justify-between rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-								onclick={() => handleSort('uploadedAt')}
-								closeOnSelect={false}
-							>
-								<span class="flex items-center gap-2">
-									<CalendarDaysIcon class="size-3.5 text-white/60" />
-									<span>Date Uploaded</span>
-								</span>
-								{#if table.getColumn('uploadedAt')?.getIsSorted() === 'asc'}
-									<ArrowUpIcon class="size-4" />
-								{:else if table.getColumn('uploadedAt')?.getIsSorted() === 'desc'}
-									<ArrowDownIcon class="size-4" />
-								{/if}
-							</DropdownMenu.Item>
-							<DropdownMenu.Item
-								class="justify-between rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-								onclick={() => handleSort('size')}
-								closeOnSelect={false}
-							>
-								<span class="flex items-center gap-2">
-									<HardDriveIcon class="size-3.5 text-white/60" />
-									<span>Size</span>
-								</span>
-								{#if table.getColumn('size')?.getIsSorted() === 'asc'}
-									<ArrowUpIcon class="size-4" />
-								{:else if table.getColumn('size')?.getIsSorted() === 'desc'}
-									<ArrowDownIcon class="size-4" />
-								{/if}
-							</DropdownMenu.Item>
-						</DropdownMenu.Group>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+						<p>Sort Documents</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
+
+				{#if sortMenuOpen}
+					<div
+						role="presentation"
+						class="fixed inset-0 z-50 bg-transparent"
+						onclick={closeMenus}
+						onkeydown={closeMenus}
+					></div>
+					<div
+						transition:scale={{ duration: 150, start: 0.95 }}
+						style={`position: fixed; top: ${sortMenuPos.y}px; left: ${sortMenuPos.x}px;`}
+						class="z-50 w-44 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+					>
+						<button
+							type="button"
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							onclick={() => handleSort('name')}
+						>
+							<ArrowDownAZIcon class="size-3.5 text-white/60" />
+							<span>Alphabet</span>
+							{#if table.getColumn('name')?.getIsSorted() === 'asc'}
+								<ArrowUpIcon class="ml-auto size-3.5 text-white/60" />
+							{:else if table.getColumn('name')?.getIsSorted() === 'desc'}
+								<ArrowDownIcon class="ml-auto size-3.5 text-white/60" />
+							{/if}
+						</button>
+						<button
+							type="button"
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							onclick={() => handleSort('uploadedAt')}
+						>
+							<CalendarDaysIcon class="size-3.5 text-white/60" />
+							<span>Date Uploaded</span>
+							{#if table.getColumn('uploadedAt')?.getIsSorted() === 'asc'}
+								<ArrowUpIcon class="ml-auto size-3.5 text-white/60" />
+							{:else if table.getColumn('uploadedAt')?.getIsSorted() === 'desc'}
+								<ArrowDownIcon class="ml-auto size-3.5 text-white/60" />
+							{/if}
+						</button>
+						<button
+							type="button"
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							onclick={() => handleSort('size')}
+						>
+							<HardDriveIcon class="size-3.5 text-white/60" />
+							<span>Size</span>
+							{#if table.getColumn('size')?.getIsSorted() === 'asc'}
+								<ArrowUpIcon class="ml-auto size-3.5 text-white/60" />
+							{:else if table.getColumn('size')?.getIsSorted() === 'desc'}
+								<ArrowDownIcon class="ml-auto size-3.5 text-white/60" />
+							{/if}
+						</button>
+					</div>
+				{/if}
 
 				<!-- Select Button & Dropdown -->
-				<DropdownMenu.Root>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props: tooltipProps })}
-								<DropdownMenu.Trigger>
-									{#snippet child({ props: dropdownProps })}
-										<Button
-											{...tooltipProps}
-											{...dropdownProps}
-											variant="ghost"
-											class="h-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white {selectedCount >
-											0
-												? 'border-white/[0.80] bg-[#B8B5B5]/[0.40] px-2.5'
-												: 'flex w-9 items-center justify-center p-0'}"
-										>
-											<CheckSquareIcon class="size-4" />
-											{#if selectedCount > 0}
-												<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
-											{/if}
-										</Button>
-									{/snippet}
-								</DropdownMenu.Trigger>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content
-							class="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-none"
-						>
-							<p>
-								{selectedCount > 0 ? `Selected Documents (${selectedCount})` : 'Select Documents'}
-							</p>
-						</Tooltip.Content>
-					</Tooltip.Root>
-					<DropdownMenu.Content
-						align="end"
-						class="w-60 min-w-60 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								class="h-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white {selectedCount >
+								0
+									? 'border-white/[0.80] bg-[#B8B5B5]/[0.40] px-2.5'
+									: 'flex w-9 items-center justify-center p-0'}"
+								onclick={toggleSelectMenu}
+								aria-haspopup="menu"
+								aria-expanded={selectMenuOpen}
+							>
+								<CheckSquareIcon class="size-4" />
+								{#if selectedCount > 0}
+									<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
+								{/if}
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content
+						class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 					>
-						<DropdownMenu.Group>
-							<DropdownMenu.Item
-								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-								onclick={selectAllPageDocuments}
+						<p>
+							{selectedCount > 0 ? `Selected Documents (${selectedCount})` : 'Select Documents'}
+						</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
+
+				{#if selectMenuOpen}
+					<div
+						role="presentation"
+						class="fixed inset-0 z-50 bg-transparent"
+						onclick={closeMenus}
+						onkeydown={closeMenus}
+					></div>
+					<div
+						transition:scale={{ duration: 150, start: 0.95 }}
+						style={`position: fixed; top: ${selectMenuPos.y}px; left: ${selectMenuPos.x}px;`}
+						class="z-50 w-60 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+					>
+						<button
+							type="button"
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							onclick={() => {
+								selectAllPageDocuments();
+								closeMenus();
+							}}
+						>
+							<ListChecksIcon class="size-3.5 text-white/60" />
+							<span>Select page ({table.getRowModel().rows.length})</span>
+						</button>
+						<button
+							type="button"
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							onclick={() => {
+								selectAllTotalDocuments();
+								closeMenus();
+							}}
+						>
+							<ListIcon class="size-3.5 text-white/60" />
+							<span>Select all ({documentsList.length})</span>
+						</button>
+						{#if selectedCount > 0}
+							<button
+								type="button"
+								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+								onclick={() => {
+									clearSelection();
+									closeMenus();
+								}}
 							>
-								<ListChecksIcon class="size-3.5 text-white/60" />
-								<span>Select page ({table.getRowModel().rows.length})</span>
-							</DropdownMenu.Item>
-							<DropdownMenu.Item
-								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-								onclick={selectAllTotalDocuments}
+								<ListXIcon class="size-3.5 text-white/60" />
+								<span>Deselect all ({selectedCount})</span>
+							</button>
+							<div class="my-1 h-px bg-white/10"></div>
+							<button
+								type="button"
+								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
+								disabled={isBatchDownloading}
+								onclick={() => {
+									closeMenus();
+									handleBatchDownload();
+								}}
 							>
-								<ListIcon class="size-3.5 text-white/60" />
-								<span>Select all ({documentsList.length})</span>
-							</DropdownMenu.Item>
-							{#if selectedCount > 0}
-								<DropdownMenu.Separator class="bg-white/10" />
-								<DropdownMenu.Item
-									class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-									disabled={isBatchDownloading}
-									onclick={handleBatchDownload}
-								>
-									{#if isBatchDownloading}
-										<Loader2Icon class="size-3.5 animate-spin text-white/60" />
-									{:else}
-										<MxIcon name="arrows-action-import-outline" class="size-3.5 text-white/60" />
-									{/if}
-									<span>Download selected ({selectedCount})</span>
-								</DropdownMenu.Item>
-								<DropdownMenu.Item
-									class="rounded-lg bg-red-500/10 px-2.5 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300"
-									onclick={() => (showBatchDeleteModal = true)}
-								>
-									<MxIcon
-										name="trash-bin-minimalistic-outline"
-										class="size-3.5 shrink-0 text-red-400"
-									/>
-									<span>Delete selected ({selectedCount})</span>
-								</DropdownMenu.Item>
-								<DropdownMenu.Separator class="bg-white/10" />
-								<DropdownMenu.Item
-									class="rounded-lg px-2.5 py-2 text-xs text-white/70 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-									onclick={clearSelection}
-								>
-									<ListXIcon class="size-3.5 text-white/60" />
-									<span>Deselect all ({selectedCount})</span>
-								</DropdownMenu.Item>
-							{/if}
-						</DropdownMenu.Group>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+								{#if isBatchDownloading}
+									<Loader2Icon class="size-3.5 animate-spin text-white/60" />
+								{:else}
+									<MxIcon name="arrows-action-import-outline" class="size-3.5 text-white/60" />
+								{/if}
+								<span>Download selected ({selectedCount})</span>
+							</button>
+							<button
+								type="button"
+								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
+								onclick={() => {
+									closeMenus();
+									showBatchDeleteModal = true;
+								}}
+							>
+								<MxIcon
+									name="trash-bin-minimalistic-outline"
+									class="size-3.5 shrink-0 text-red-400"
+								/>
+								<span>Delete selected ({selectedCount})</span>
+							</button>
+						{/if}
+					</div>
+				{/if}
 			</div>
 
 			<!-- Row 5: Card List -->
@@ -981,7 +1087,7 @@
 											{/snippet}
 										</Tooltip.Trigger>
 										<Tooltip.Content
-											class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+											class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 										>
 											<p>AI Relevance Score</p>
 										</Tooltip.Content>
@@ -1087,7 +1193,7 @@
 											{/snippet}
 										</Tooltip.Trigger>
 										<Tooltip.Content
-											class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+											class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 										>
 											<p>Found on pages: {pages.join(', ')}</p>
 										</Tooltip.Content>
@@ -1117,7 +1223,7 @@
 										{/snippet}
 									</Tooltip.Trigger>
 									<Tooltip.Content
-										class="max-w-xs rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-none"
+										class="max-w-xs rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 									>
 										<p>Daily AI quota reached. Vectorizing will resume tomorrow at 00:00 UTC.</p>
 									</Tooltip.Content>

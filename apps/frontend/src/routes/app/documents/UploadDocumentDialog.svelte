@@ -512,25 +512,27 @@
 										</div>
 									</div>
 									<div class="flex items-center gap-4">
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<button
-														type="button"
-														{...props}
-														onclick={() => removeItem(item)}
-														class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-													>
-														<XIcon class="size-5" />
-													</button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content
-												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
-											>
-												<p>Remove File</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
+										<Tooltip.Provider delayDuration={100}>
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}
+														<button
+															type="button"
+															{...props}
+															onclick={() => removeItem(item)}
+															class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+														>
+															<XIcon class="size-5" />
+														</button>
+													{/snippet}
+												</Tooltip.Trigger>
+												<Tooltip.Content
+													class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+												>
+													<p>Remove File</p>
+												</Tooltip.Content>
+											</Tooltip.Root>
+										</Tooltip.Provider>
 									</div>
 								</div>
 							{:else if item.status === 'success'}
@@ -555,25 +557,27 @@
 									<div class="flex items-center gap-4">
 										<span class="text-sm font-bold text-white">100%</span>
 										<CheckCircle2Icon class="size-5 text-[#22c55e]" />
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<button
-														type="button"
-														{...props}
-														onclick={() => removeItem(item)}
-														class="cursor-pointer text-[#767676] transition-colors hover:text-[#ef4444]"
-													>
-														<MxIcon name="trash-bin-minimalistic-outline" class="size-5" />
-													</button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content
-												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
-											>
-												<p>Delete File</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
+										<Tooltip.Provider delayDuration={100}>
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}
+														<button
+															type="button"
+															{...props}
+															onclick={() => removeItem(item)}
+															class="cursor-pointer text-[#767676] transition-colors hover:text-[#ef4444]"
+														>
+															<MxIcon name="trash-bin-minimalistic-outline" class="size-5" />
+														</button>
+													{/snippet}
+												</Tooltip.Trigger>
+												<Tooltip.Content
+													class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+												>
+													<p>Delete File</p>
+												</Tooltip.Content>
+											</Tooltip.Root>
+										</Tooltip.Provider>
 									</div>
 								</div>
 							{:else if item.status === 'failed'}
@@ -599,44 +603,48 @@
 									</div>
 									<div class="flex items-center gap-4">
 										<span class="text-sm font-bold text-white">{item.progress}%</span>
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<button
-														type="button"
-														{...props}
-														onclick={() => retryItem(item)}
-														class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-													>
-														<RotateCcwIcon class="size-5" />
-													</button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content
-												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
-											>
-												<p>Retry Upload</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<button
-														type="button"
-														{...props}
-														onclick={() => removeItem(item)}
-														class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-													>
-														<XIcon class="size-5" />
-													</button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content
-												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
-											>
-												<p>Remove File</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
+										<Tooltip.Provider delayDuration={100}>
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}
+														<button
+															type="button"
+															{...props}
+															onclick={() => retryItem(item)}
+															class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+														>
+															<RotateCcwIcon class="size-5" />
+														</button>
+													{/snippet}
+												</Tooltip.Trigger>
+												<Tooltip.Content
+													class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+												>
+													<p>Retry Upload</p>
+												</Tooltip.Content>
+											</Tooltip.Root>
+										</Tooltip.Provider>
+										<Tooltip.Provider delayDuration={100}>
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}
+														<button
+															type="button"
+															{...props}
+															onclick={() => removeItem(item)}
+															class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+														>
+															<XIcon class="size-5" />
+														</button>
+													{/snippet}
+												</Tooltip.Trigger>
+												<Tooltip.Content
+													class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+												>
+													<p>Remove File</p>
+												</Tooltip.Content>
+											</Tooltip.Root>
+										</Tooltip.Provider>
 									</div>
 								</div>
 							{:else}
@@ -672,25 +680,27 @@
 										{:else}
 											<Loader2Icon class="size-4 animate-spin text-white/60" />
 										{/if}
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<button
-														type="button"
-														{...props}
-														onclick={() => removeItem(item)}
-														class="cursor-pointer text-[#767676] transition-colors hover:text-white"
-													>
-														<XIcon class="size-5" />
-													</button>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content
-												class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
-											>
-												<p>Cancel Upload</p>
-											</Tooltip.Content>
-										</Tooltip.Root>
+										<Tooltip.Provider delayDuration={100}>
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}
+														<button
+															type="button"
+															{...props}
+															onclick={() => removeItem(item)}
+															class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+														>
+															<XIcon class="size-5" />
+														</button>
+													{/snippet}
+												</Tooltip.Trigger>
+												<Tooltip.Content
+													class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+												>
+													<p>Cancel Upload</p>
+												</Tooltip.Content>
+											</Tooltip.Root>
+										</Tooltip.Provider>
 									</div>
 								</div>
 							{/if}
@@ -781,45 +791,47 @@
 				{/if}
 
 				<div class="relative">
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									type="button"
-									onclick={hasAllSucceeded ? finishAndClose : startBatchUpload}
-									disabled={uploadFiles.length === 0 || isAnyUploading || hasFailedUploads}
-									class="relative cursor-pointer bg-[#DB8F5E] font-medium text-white hover:bg-[#C47D4E] disabled:bg-[#DB8F5E]/40 disabled:text-white/50 disabled:opacity-100"
-								>
-									{#if isAnyUploading}
-										<Loader2Icon class="mr-2 size-4 animate-spin" />
-										Uploading...
-									{:else if hasAllSucceeded}
-										Done
-									{:else}
-										Upload Documents
-									{/if}
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										type="button"
+										onclick={hasAllSucceeded ? finishAndClose : startBatchUpload}
+										disabled={uploadFiles.length === 0 || isAnyUploading || hasFailedUploads}
+										class="relative cursor-pointer bg-[#DB8F5E] font-medium text-white hover:bg-[#C47D4E] disabled:bg-[#DB8F5E]/40 disabled:text-white/50 disabled:opacity-100"
+									>
+										{#if isAnyUploading}
+											<Loader2Icon class="mr-2 size-4 animate-spin" />
+											Uploading...
+										{:else if hasAllSucceeded}
+											Done
+										{:else}
+											Upload Documents
+										{/if}
 
-									{#if hasFailedUploads}
-										<!-- Notification Badge -->
-										<div
-											class="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#1F1E1D] bg-[#ef4444] text-[10px] font-bold text-white"
-										>
-											{failedCount}
-										</div>
-									{/if}
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						{#if hasFailedUploads}
-							<Tooltip.Content
-								side="top"
-								class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
-							>
-								<p>Fix Failed Uploads First</p>
-							</Tooltip.Content>
-						{/if}
-					</Tooltip.Root>
+										{#if hasFailedUploads}
+											<!-- Notification Badge -->
+											<div
+												class="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#1F1E1D] bg-[#ef4444] text-[10px] font-bold text-white"
+											>
+												{failedCount}
+											</div>
+										{/if}
+									</Button>
+								{/snippet}
+							</Tooltip.Trigger>
+							{#if hasFailedUploads}
+								<Tooltip.Content
+									side="top"
+									class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+								>
+									<p>Fix Failed Uploads First</p>
+								</Tooltip.Content>
+							{/if}
+						</Tooltip.Root>
+					</Tooltip.Provider>
 				</div>
 			</div>
 		</div>
