@@ -1635,18 +1635,23 @@
 		});
 	}
 
-	function stopCurrentStream() {
+	async function stopCurrentStream() {
 		// Explicit server-side stop: abort the in-flight generation and mark
-		// the turn "stopped" (the server distinguishes this from a page-leave
-		// disconnect, which is handed to the background sweep instead). Await
-		// the ack so the server's stop lands before our local teardown.
+		// the turn "stopped". Await the ack BEFORE tearing down the local
+		// stream — the server distinguishes this from a page-leave disconnect
+		// (which is handed to the background sweep instead), so the order
+		// matters: stop first, then disconnect.
 		const targetId = activeTurnWriteTargetId;
 		if (targetId) {
 			const token = sessionStore.getAccessToken();
-			fetch(`${PUBLIC_API_URL}/api/rag/turns/${targetId}/stop`, {
-				method: 'POST',
-				headers: token ? { Authorization: `Bearer ${token}` } : {}
-			}).catch(() => {});
+			try {
+				await fetch(`${PUBLIC_API_URL}/api/rag/turns/${targetId}/stop`, {
+					method: 'POST',
+					headers: token ? { Authorization: `Bearer ${token}` } : {}
+				});
+			} catch {
+				// Network hiccup — the local freeze below still applies.
+			}
 		}
 		cancelActiveStream?.();
 	}

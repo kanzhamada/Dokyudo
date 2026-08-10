@@ -480,6 +480,11 @@ export class RagService {
         // during gatekeeper/search/retrieval). Only touches rows still in
         // "processing" — the in-stream finalize path is the single writer for
         // the terminal state once streaming has begun.
+        // Pre-stream client teardown (gatekeeper/search/retrieval): the turn is
+        // handed to the background sweep on a page-leave disconnect; only an
+        // explicit stop (the stop endpoint already wrote "stopped" first — the
+        // frontend awaits it) or a retry variant resolves as "stopped". The
+        // status gate makes the two writers race-safe.
         const abortAsStopped = async (): Promise<ReadableStream> => {
             try {
                 await withAuthDb(userId, async (tx) => {
@@ -497,7 +502,7 @@ export class RagService {
                     } else {
                         await tx
                             .update(conversationTurns)
-                            .set({ status: "stopped", updatedAt: new Date() })
+                            .set({ status: "awaiting_indexing", updatedAt: new Date() })
                             .where(
                                 and(
                                     eq(conversationTurns.id, turnId),

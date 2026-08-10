@@ -419,7 +419,7 @@
 			<div
 				aria-hidden="true"
 				bind:this={mentionOverlay}
-				class="pointer-events-none absolute inset-0 max-h-32 scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent overflow-y-auto px-3 py-1.5 text-sm break-words whitespace-pre-wrap {transparent
+				class="pointer-events-none absolute inset-0 max-h-32 scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent overflow-y-auto px-2.5 py-1.5 text-base break-words whitespace-pre-wrap md:text-sm {transparent
 					? 'text-white/[0.40] group-focus-within:text-white/[0.69]'
 					: 'text-white'}"
 			>
@@ -442,7 +442,8 @@
 				maxlength={690}
 				rows={1}
 				{placeholder}
-				class="max-h-32 min-h-[36px] w-full resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 text-transparent caret-white shadow-none ring-0 transition-colors outline-none selection:bg-white/15 placeholder:text-white/[0.40] hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0 {transparent
+				style="color: transparent"
+				class="max-h-32 min-h-[36px] w-full resize-none scrollbar-thin scrollbar-thumb-white/[0.16] scrollbar-track-transparent overflow-y-auto border-0 border-transparent bg-transparent py-1.5 caret-white shadow-none ring-0 transition-colors outline-none selection:bg-white/15 placeholder:text-white/[0.40] hover:scrollbar-thumb-white/[0.40] focus:border-0 focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0 {transparent
 					? 'focus-within:placeholder-white/[0.69]'
 					: ''}"
 				onkeydown={handleKeyDown}

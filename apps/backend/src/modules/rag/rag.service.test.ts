@@ -766,6 +766,53 @@ describe("RagService Isolated Tests", () => {
             }
         });
 
+        it("positive: aborting during the gatekeeper hands the turn to the sweep (not stopped)", async () => {
+            const abortController = new AbortController();
+            const question = `pre-stream detach ${crypto.randomUUID()}`;
+            // The gatekeeper call aborts the request mid-flight — like the
+            // user navigating away during the pre-stream phase.
+            using gatekeeperStub = stub(gemini, "generateText", () => {
+                abortController.abort();
+                return Promise.resolve({ text: "SAFE" }) as any;
+            });
+            using searchStub = stub(SearchService, "executeHybridSearch", () =>
+                Promise.resolve([]) as any,
+            );
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () =>
+                Promise.resolve({
+                    modelId: "test",
+                    stream: (async function* () {
+                        yield { text: "x" };
+                    })(),
+                }) as any,
+            );
+
+            const stream = await RagService.streamChat({
+                tenantId: TEST_TENANT_ID,
+                userId: TEST_USER_ID,
+                question,
+                conversationId: TEST_CONVERSATION_ID,
+                useByok: false,
+                signal: abortController.signal,
+                logContext: {},
+            });
+            await drainStream(stream);
+
+            const turns = await waitForTurns(
+                TEST_CONVERSATION_ID,
+                (t) =>
+                    t.some(
+                        (row) =>
+                            row.question === question &&
+                            row.status === "awaiting_indexing",
+                    ),
+            );
+            const turn = turns.find((t) => t.question === question);
+            assertExists(turn);
+            assertEquals(turn.status, "awaiting_indexing");
+            await db.delete(conversationTurns).where(eq(conversationTurns.id, turn.id));
+        });
+
         it("positive: sweep completes a background turn without attachments (tenant-wide retrieval)", async () => {
             const question = `background sweep ${crypto.randomUUID()}`;
             const turnId = crypto.randomUUID();
