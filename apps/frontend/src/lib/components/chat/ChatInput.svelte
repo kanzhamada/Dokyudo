@@ -8,7 +8,8 @@
 		Settings2,
 		Check,
 		FileText,
-		Loader2
+		Loader2,
+		AlertCircle
 	} from 'lucide-svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -23,6 +24,8 @@
 		splitMentionSegments,
 		formatMentionsForPayload
 	} from '$lib/utils/doc-mentions';
+
+	const MAX_DOCUMENT_MENTIONS = 5;
 
 	interface LlmOption {
 		name: string;
@@ -72,6 +75,9 @@
 	/** Element refs of the popover items — drives scroll-into-view on keyboard nav. */
 	let mentionItemEls: (HTMLButtonElement | undefined)[] = [];
 
+	let currentMentionCount = $derived(parseMentionIds(value).length);
+	let isMentionLimitReached = $derived(currentMentionCount >= MAX_DOCUMENT_MENTIONS);
+
 	// Keep the highlighted item visible while navigating with ↑/↓.
 	$effect(() => {
 		if (!mentionOpen) return;
@@ -79,7 +85,7 @@
 	});
 
 	let mentionCandidates = $derived.by(() => {
-		if (!mentionOpen) return [];
+		if (!mentionOpen || isMentionLimitReached) return [];
 		const q = mentionQuery.trim().toLowerCase();
 		// Exclude documents already referenced by an inline token in the text.
 		const mentionedIds = new Set(parseMentionIds(value));
@@ -299,6 +305,12 @@
 	}
 
 	function selectMention(doc: DocumentItem) {
+		if (isMentionLimitReached) {
+			showError(`Maximum limit of ${MAX_DOCUMENT_MENTIONS} document mentions per turn reached.`);
+			closeMention();
+			return;
+		}
+
 		const sel = window.getSelection();
 		if (!sel || !sel.rangeCount || !editorEl) return;
 
@@ -431,7 +443,12 @@
 			onmousedown={(e) => e.preventDefault()}
 		>
 			<div class="max-h-64 overflow-y-auto p-1.5">
-				{#if documentsStore.loading}
+				{#if isMentionLimitReached}
+					<div class="flex items-center gap-2 px-3 py-2.5 text-sm text-white/60">
+						<AlertCircle class="size-4 shrink-0 text-white/40" />
+						<span>Maximum limit of 5 document mentions reached.</span>
+					</div>
+				{:else if documentsStore.loading}
 					<div class="flex items-center gap-2 px-3 py-2.5 text-sm text-white/50">
 						<Loader2 class="size-4 animate-spin" />
 						<span>Loading documents...</span>
