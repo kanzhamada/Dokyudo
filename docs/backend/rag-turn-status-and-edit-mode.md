@@ -5,7 +5,7 @@
 Iterasi kedua dari pipeline RAG chat mengubah siklus hidup `conversation_turns` menjadi **write-ahead**: row turn dibuat di **awal** request dengan `status='processing'`, lalu dituntaskan ke salah satu status terminal. Ini menghasilkan tiga hal sekaligus:
 
 1. **Tracking** — pertanyaan user tersimpan segera, sebelum kerja LLM apa pun. Request yang crash/macet bisa terlihat dari row yang tersangkut di `processing`.
-2. **State machine eksplisit** — `processing → complete | stopped | failed | blocked`.
+2. **State machine eksplisit** — `processing → complete | stopped | failed | blocked`, plus `awaiting_indexing` untuk turn yang menunggu background completion.
 3. **Konsistensi UI ↔ DB** — perilaku stop/cancel yang sebelumnya hanya visual (frontend) kini benar-benar tercatat di database.
 
 ## 2. State Machine
@@ -16,16 +16,17 @@ stateDiagram-v2
     [*] --> processing : attachment_document_ids + SEMUA dokumen 'processed' (main context — jawab interaktif)
     [*] --> awaiting_indexing : attachment_document_ids + ada dokumen belum 'processed' (pending/confirmed)
     processing --> complete : stream selesai (answer penuh + model aktual)
-    processing --> stopped : user cancel (pre-stream via abortAsStopped, atau mid-stream)
+    processing --> stopped : STOP eksplisit (POST /api/rag/turns/{id}/stop — lihat §16)
+    processing --> awaiting_indexing : disconnect (client keluar halaman) — fast path: generasi dilanjutkan in-process; sweep = fallback
     processing --> failed : kegagalan server (provider down, BYOK key error)
     processing --> blocked : prompt injection (answer="Nice try, Diddy.", model_used=null)
-    awaiting_indexing --> complete : Deno.cron sweep (completeTurnDetached) — semua dokumen 'processed'
-    awaiting_indexing --> failed : sweep — ada dokumen failed/failed_vectorizing/quota_exhausted/hilang
+    awaiting_indexing --> complete : fast path in-process selesai (gate awaiting_indexing), ATAU Deno.cron sweep (completeTurnDetached)
+    awaiting_indexing --> failed : sweep — ada dokumen failed/failed_vectorizing/quota_exhausted/hilang; atau generasi lanjutan gagal
     awaiting_indexing --> blocked : sweep — prompt injection terdeteksi
     awaiting_indexing --> awaiting_indexing : sweep — dokumen masih diingest (skip)
 ```
 
-Aturan emas: **`processing` dan `awaiting_indexing` tidak boleh jadi status akhir**. Semua jalur kode wajib menuntaskan row — jalur interaktif via `finalizeTurn`/`abortAsStopped`, jalur attachment via sweep (`sweepAwaitingTurns`, dijalankan `Deno.cron` tiap menit, terdaftar di `main.ts`).
+Aturan emas: **`processing` dan `awaiting_indexing` tidak boleh jadi status akhir**. Semua jalur kode wajib menuntaskan row — jalur interaktif via `finalizeTurn`, jalur disconnect via fast path / sweep (`sweepAwaitingTurns`, dijalankan `Deno.cron` tiap menit, terdaftar di `main.ts`).
 
 ## 3. Alur Request (Write-Ahead)
 
@@ -41,13 +42,13 @@ Aturan emas: **`processing` dan `awaiting_indexing` tidak boleh jadi status akhi
 5. **Hybrid search → context engineering → incrementQa** (quota baru berkurang di sini — request yang di-block/gagal di gatekeeper tidak makan kuota; jalur attachment: search quota terpakai saat sweep, QA sudah di-reservasi di submit).
 6. **Stream** → `finalizeTurn` (**UPDATE-only**, gate `WHERE status='processing'`). Jalur attachment: `completeTurnDetached` **UPDATE-only** dengan gate `WHERE status='awaiting_indexing'` — membuat sweep idempotent terhadap invokasi cron yang dobel.
 
-Abort sinyal sebelum stream mulai (saat gatekeeper/search/retrieval) ditangani helper `abortAsStopped()` → row di-`UPDATE` ke `stopped` (tetap ber-gate `status='processing'`).
+Abort sinyal sebelum stream mulai (saat gatekeeper/search/retrieval) ditangani helper `abortAsStopped` → untuk turn kanonik row di-`UPDATE` ke `awaiting_indexing` (disconnect = diserahkan ke background; kalau stop eksplisit sudah menulis `stopped` lebih dulu, gate `status='processing'` membuat flip-nya no-op). Retry variant tetap `stopped` (sweep tidak mengelola variant). Lihat §16 untuk detail stop vs disconnect.
 
 ## 4. Keputusan Arsitektur
 
 - **Insert setelah cek quota**: kalau insert sebelum quota check, request `QUOTA_EXHAUSTED` (HTTP 400) meninggalkan row `processing` yang tidak pernah dituntaskan.
 - **`finalizeTurn` UPDATE-only + gate `status='processing'`**: karena row sudah ada dari awal, tidak ada lagi branch INSERT-vs-UPDATE. Gate-nya mencegah writer basi (mis. abort yang tiba terlambat) menimpa status terminal yang sudah ditulis.
-- **Re-check sinyal abort live saat finalize**: keputusan status terakhir memakai `cancelled || cancelSignal.aborted`, bukan flag `cancelled` yang bisa basi — menutup race "abort tiba tepat setelah token terakhir" agar request yang di-cancel tidak pernah tercatat `complete`.
+- **Keputusan terminal di akhir stream**: tiga cabang — `stopRequested` (flag registri dari endpoint stop) → `stopped`; `detached` (client pergi, generasi dilanjutkan in-process) → `complete`/`failed` dengan **gate `awaiting_indexing`** (sweep yang kebetulan jalan jadi no-op); normal → `finalizeTurn` gate `processing`. Race "abort tiba tepat setelah token terakhir" tertutup: tanpa stop eksplisit, jawaban yang lengkap tetap tercatat `complete`.
 - **`model_used` nullable**: `null` berarti "tidak ada model yang pernah dipanggil" (blocked, atau cancel sebelum model terpilih). Diisi saat model benar-benar terpilih.
 - **Gatekeeper setelah eager insert**: percobaan injeksi tetap tercatat sebagai row `blocked` (tracking penuh), tetapi kuota tidak berkurang karena `incrementQa` ada di akhir alur.
 
@@ -288,3 +289,44 @@ Id write-target dilaporkan **sebelum token pertama**, sehingga turn yang di-stop
 
 **Retry variants + promote/cleanup:** 2026-08-09  
 **Event `turn_started` (retry tanpa reload):** 2026-08-09
+
+## 16. Stop vs Disconnect — Background Continuation (Lifecycle V3)
+
+Sejak fast-path (2026-08-10), server **membedakan** dua bentuk teardown koneksi:
+
+### 16.1 STOP eksplisit → `stopped`
+
+- Endpoint baru `POST /api/rag/turns/{turnId}/stop` (auth, idempotent). `turnId` = write-target (id turn kanonik, atau `variantId` di retry mode — keduanya dikirim via event `turn_started`).
+- Registri in-memory `activeGenerations` (key: write-target id) menyimpan `AbortController` **khusus generasi** (`stopGenerationAbort`) + flag `stopRequested`:
+  - Stream di isolate yang sama → flag + abort → loop berhenti → `finalizeTurn('stopped')` dengan jawaban parsial.
+  - Stream di isolate lain / sudah selesai → fallback UPDATE langsung `processing → stopped` (gate).
+- Frontend **menunggu ack endpoint sebelum men-teardown stream lokal** — urutan ini membuat stop deterministik (tidak kalah race dengan flip disconnect).
+
+### 16.2 Disconnect (keluar halaman / pindah percakapan / tutup tab) → background
+
+Koneksi SSE mati **tanpa** stop eksplisit:
+
+1. **Fast path (utama)**: generasi LLM **tidak di-abort** — ia berjalan di `stopGenerationAbort` yang hanya menyala saat stop. Loop token berhenti mengirim ke koneksi mati tapi tetap mengakumulasi jawaban; saat selesai, turn ditulis `complete` dengan **gate `awaiting_indexing`** (turn di-flip dulu sebagai jaring pengaman). Jawaban jadi dalam hitungan detik — tidak menunggu sweep, tidak regenerate.
+2. **Fallback (sweep)**: kalau isolate mati sebelum selesai (mis. Deno Deploy menyuspensi isolate setelah respons berakhir), turn yang sudah di-flip `awaiting_indexing` di-regenarasi oleh `sweepAwaitingTurns` (Deno.cron tiap menit) → `completeTurnDetached`. Sama dengan jalur attachment.
+3. **Retry variant** pada disconnect → `stopped` (sweep tidak mengelola `turn_alternatives`).
+4. **Pre-stream** (gatekeeper/search, ~1-3 detik pertama) pada disconnect → flip ke `awaiting_indexing` → fallback sweep (≤1 menit). Window kecil; sengaja tidak meneruskan pipeline pre-stream.
+
+Gate status membuat fast path dan sweep race-safe: yang menulis `complete` lebih dulu menang, yang lain no-op (tidak ada jawaban dobel).
+
+### 16.3 Debug Log
+
+- `[RAG DETACH] turnId=... client left — flipped to awaiting_indexing, continuing generation in-process` → fast path mulai.
+- `[RAG DETACH] turnId=... completed in-process after client left (Xms, status=complete)` → fast path selesai (cepat).
+- `[RAG SWEEP] turnId=... picked up after Xs awaiting — running detached pipeline` → fallback (isolate tidak bertahan / pre-stream).
+- `[RAG DETACHED] turnId=... pipeline started / answer generated (Xms) — persisting complete` → pipeline sweep.
+
+### 16.4 File Mapping
+
+- `apps/backend/src/modules/rag/rag.service.ts`: `activeGenerations`, `stopGenerationAbort`, `markTurnDetached`, `detached` finalize (gate awaiting), `stopTurnGeneration`, `abortAsStopped` flip, sweep log.
+- `apps/backend/src/modules/rag/rag.routes.ts` & `rag.controller.ts` & `rag.schema.ts`: `POST /turns/{turnId}/stop` + `StopTurnResponseSchema`.
+- `apps/frontend/src/routes/app/chat/[id]/+page.svelte`: `stopCurrentStream` menunggu endpoint `/stop`; polling conversation untuk turn `awaiting_indexing`; indikator spinner + thinking status.
+- `api-collections/Search & RAG/18_Stop Turn Generation.bru`: contoh request stop.
+
+### 16.5 Completion Timestamp
+
+**Fast-path disconnect + endpoint stop:** 2026-08-10

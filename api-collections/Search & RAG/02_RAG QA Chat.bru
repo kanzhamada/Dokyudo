@@ -60,6 +60,7 @@ docs {
   - `event: turn_started` — id write-target di awal stream (`data: { "turnId": "...", "variantId": "..." }`; `variantId` hanya untuk retry). Membuat turn yang di-stop tetap bisa di-retry/edit tanpa reload.
   - `event: token` — answer text chunk (`data: { "token": "..." }`)
   - `event: references` — context references used for the answer (`data: { "references": [...] }`)
+  - `event: awaiting_indexing` — turn attachment dikirim sebagai `awaiting_indexing`; request langsung selesai (`data: { "turnId": "...", "attachmentDocumentIds": [...] }`). Jawaban dihasilkan background (sweep / fast path) — frontend beralih ke polling `GET /api/rag/conversations/{id}`.
   - `event: title` — auto-generated conversation title (`data: { "title": "..." }`)
   - `event: warning` — e.g. prompt-injection detection (`data: { "code": "PROMPT_INJECTION" }`)
   - `event: done` — stream complete (`data: { "turnId": "...", "variantId": "..." }` untuk retry)
@@ -81,15 +82,23 @@ docs {
   
   // Baca SSE stream...
   
-  // User klik stop → batalkan stream
+  // User klik stop → POST /api/rag/turns/{turnId}/stop (ditunggu dulu),
+  // baru teardown stream lokal.
+  await fetch(`${API_URL}/api/rag/turns/${turnId}/stop`, { method: 'POST', headers });
   abortController.abort();
   ```
   
-  ## Stream Cancellation (Backend)
-  Saat client meng-abort (AbortController / disconnect), server menerima sinyal via `c.req.raw.signal`:
-  - Menghentikan konsumsi stream dari LLM provider (check `signal.aborted` di loop SDK, atau `fetch` abort untuk HTTP-based provider)
-  - Menyimpan jawaban parsial ke `conversation_turns` dengan `status='stopped'`
-  - Melewatkan generasi judul otomatis
+  ## Stop vs Disconnect (Backend)
+  Server membedakan dua bentuk teardown:
   
-  Tidak diperlukan endpoint terpisah — gunakan sinyal abort native HTTP.
+  **Stop eksplisit** (`POST /api/rag/turns/{id}/stop`, lihat collection `18_Stop Turn Generation`):
+  - Abort generasi via registri in-memory (`stopGenerationAbort`) → turn difinalisasi `stopped` dengan jawaban parsial. Deterministik: frontend menunggu ack endpoint sebelum men-teardown koneksi.
+  
+  **Disconnect** (keluar halaman, pindah percakapan, tutup tab — koneksi SSE mati tanpa stop):
+  - Turn kanonik di-flip ke `awaiting_indexing` sebagai jaring pengaman, DAN generasi yang sedang berjalan **dilanjutkan in-process** (fast path) — jawaban penuh disimpan saat selesai (biasanya hitungan detik, tidak menunggu sweep).
+  - Kalau isolate mati sebelum selesai, sweep (Deno.cron tiap menit) meregenerasi jawaban dari turn `awaiting_indexing`.
+  - Retry variant pada disconnect → `stopped` (sweep tidak mengelola variant).
+  - Pre-stream (gatekeeper/search, ~1-3 detik pertama) pada disconnect → flip ke sweep (fallback, ≤1 menit).
+  
+  Debug log: `[RAG DETACH]` (fast path), `[RAG SWEEP]` (fallback pickup), `[RAG DETACHED]` (pipeline sweep).
 }

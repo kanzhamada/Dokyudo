@@ -1,0 +1,35 @@
+meta {
+  name: Stop Turn Generation
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/api/rag/turns/{{turnId}}/stop
+  body: none
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+docs {
+  Explicitly stops an in-flight generation ("Stop generating" button) for the
+  write-target id — the canonical turn id, or the variant id in retry mode
+  (keduanya dikirim via event `turn_started`).
+
+  Behavior:
+  - Stream aktif di isolate yang sama → generasi di-abort, turn difinalisasi
+    `stopped` dengan jawaban parsial.
+  - Stream di isolate lain (multi-isolate Deploy) → fallback: turn langsung
+    di-UPDATE ke `stopped` via state machine (gate `status='processing'`).
+  - Idempotent: stop pada turn yang sudah terminal adalah no-op.
+
+  Bedanya dengan disconnect biasa: disconnect (keluar halaman / pindah
+  percakapan) TIDAK menghentikan generasi — turn di-flip ke `awaiting_indexing`
+  sebagai jaring pengaman dan generasi dilanjutkan in-process, jawaban penuh
+  disimpan saat selesai (fast path). Endpoint ini adalah satu-satunya cara
+  eksplisit untuk benar-benar menghentikan generasi.
+}

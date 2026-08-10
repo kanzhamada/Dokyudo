@@ -6,6 +6,8 @@ Fitur ini meng-handle Q&A dari pengguna dengan melakukan *Hybrid Search* (Semant
 > **UPDATE (2026-08-07):** Sejak *Lifecycle V2*, turn dibuat **write-ahead** di awal request dengan `status='processing'` dan selalu dituntaskan (`complete | stopped | failed | blocked`). Cancel kini **menyimpan jawaban parsial** sebagai `stopped` (bukan dilewati), dan `conversation_turns` sudah punya kolom `status` + `updated_at` serta `model_used` nullable. Dokumentasi lengkap: [`rag-turn-status-and-edit-mode.md`](./rag-turn-status-and-edit-mode.md).
 >
 > **UPDATE (2026-08-09):** Fitur **retry variants** — `POST /api/rag/chat` menerima `retry_turn_id` (stream jawaban alternatif ke `turn_alternatives`, hanya turn terakhir) dan `selected_variant_id` (follow-up memakai jawaban varian sebagai konteks history; dipromosikan ke turn kanonik saat sukses, varian lain dihapus). Event SSE baru `turn_started` (id write-target di awal stream — turn `stopped` tetap bisa di-retry tanpa reload). `GET /api/rag/conversations/:id` kini mengembalikan `turns[].alternatives`. Detail: [`rag-turn-status-and-edit-mode.md` §15](./rag-turn-status-and-edit-mode.md).
+>
+> **UPDATE (2026-08-10):** **Stop ≠ disconnect.** Tombol stop kini eksplisit via `POST /api/rag/turns/{id}/stop` (turn difinalisasi `stopped` dengan jawaban parsial). Disconnect (keluar halaman / pindah percakapan) **tidak** menghentikan generasi: turn di-flip `awaiting_indexing` sebagai jaring pengaman, generasi dilanjutkan in-process (fast path — jawaban penuh tersimpan saat selesai), dan sweep (Deno.cron) hanya fallback kalau isolate mati. Generasi berjalan di `AbortController` terpisah (`stopGenerationAbort`) yang hanya menyala saat stop eksplisit. Detail: [`rag-turn-status-and-edit-mode.md` §16](./rag-turn-status-and-edit-mode.md).
 
 ## 2. Flow Diagram
 ```mermaid
@@ -23,12 +25,18 @@ sequenceDiagram
     Gemini-->>Hono: SSE Stream Tokens
     Hono-->>User: SSE Stream Tokens
 
-    alt User Cancels (click stop / disconnect)
-        User-->>Hono: AbortController.abort() → TCP close
-        Note over Hono: cancelSignal = AbortSignal.any([reqSignal, streamAbort.signal])
-        Hono-->>Gemini: check cancelSignal.aborted per chunk / fetch(signal)
-        Note over Hono: isConsumerGone() → desiredSize <= 0 x10
-        Note over Hono: UPDATE turn → status='stopped', answer parsial (sejak Lifecycle V2)
+    alt User Stops (explicit)
+        User-->>Hono: POST /api/rag/turns/{id}/stop (ditunggu ack)
+        Note over Hono: activeGenerations[turnId].stopRequested = true; stopGenerationAbort.abort()
+        Hono-->>Gemini: abort stream LLM (signal khusus stop)
+        Note over Hono: UPDATE turn → status='stopped', answer parsial
+    else Client Disconnects (keluar halaman / pindah percakapan)
+        User-->>Hono: koneksi SSE mati (tanpa stop)
+        Note over Hono: cancelSignal fires → flip turn → awaiting_indexing (jaring pengaman)
+        Note over Hono: generasi DILANJUTKAN in-process (fast path) — enqueue dihentikan
+        Hono-->>Gemini: terus konsumsi token (stopGenerationAbort tidak menyala)
+        Note over Hono: UPDATE turn → status='complete' (gate awaiting_indexing) saat selesai
+        Note over Hono: fallback: isolate mati → sweep (Deno.cron) regenerate dari awaiting_indexing
     else Stream Completes
         Gemini-->>Hono: [DONE]
         Hono->>PostgreSQL: UPDATE turn → status='complete' (row sudah ada via write-ahead)
@@ -70,7 +78,7 @@ sequenceDiagram
 - **Denormalization for Context References**: Daripada menggunakan SQL `JOIN` dari array JSONB `chunkIds` ke tabel `document_chunks` (yang lambat dan melanggar prinsip *immutability* sejarah), `contextReferences` disimpan langsung dengan format terstruktur `[{ documentId, pages: [...] }]` saat penulisan (`INSERT`). Dengan ini, query `GET /api/rag/conversations/:id` dapat beroperasi dalam kecepatan sub-10ms (Zero-JOIN).
 - **SSE Fallback Streaming**: Jika model LLM pertama gagal karena *Rate Limit*, *circuit breaker* otomatis mencari fallback model lain dan meneruskan token *streaming* ke Svelte.
 - **Prompt Injection Gatekeeper**: Mengeksekusi *pre-flight prompt* dengan model *lite* untuk mendeteksi injeksi perintah sebelum masuk ke jalur RAG utama demi keamanan basis data konteks.
-- **Stream Cancellation via Combined AbortSignal**: Ketika user mengklik stop (atau disconnect), frontend memanggil `AbortController.abort()`. Backend menggabungkan dua sumber sinyal menjadi satu `cancelSignal`:
+- **Combined AbortSignal untuk DETEKSI, AbortController terpisah untuk GENERASI**: `cancelSignal` menggabungkan dua sumber sinyal:
   ```ts
   const streamAbort = new AbortController();
   const cancelSignal = signal
@@ -80,16 +88,16 @@ sequenceDiagram
   - `signal` = `c.req.raw.signal` (abort dari request HTTP).
   - `streamAbort.signal` = dipicu oleh callback `cancel()` pada `ReadableStream`, yang dipanggil runtime saat consumer (HTTP layer) mendeteksi client disconnect.
   
-  `cancelSignal` dipakai untuk:
-  - Memutus koneksi HTTP ke LLM provider berbasis `fetch()` (OpenRouter, Groq, SambaNova, Cohere) — TCP langsung terputus.
-  - Menghentikan iterasi stream pada provider berbasis SDK (Gemini, Mistral) dengan mengecek `signal.aborted` di setiap iterasi `for await`.
-  - Melewatkan penyimpanan ke DB (`conversation_turns`) dan generasi judul otomatis.
+  Sejak Lifecycle V3, `cancelSignal` **hanya untuk deteksi teardown** (flip jaring pengaman + berhenti enqueue). Panggilan LLM (fallback & BYOK) memakai **`stopGenerationAbort.signal`** — controller terpisah yang hanya di-abort oleh endpoint `/stop` — sehingga disconnect tidak pernah memutus stream LLM yang sedang berjalan (fast path).
+- **Stop vs Disconnect (Lifecycle V3)**: Koneksi client dibedakan menjadi dua kasus teardown:
+  - **Stop eksplisit** (`POST /api/rag/turns/{id}/stop`): registri in-memory `activeGenerations` (key = write-target id) menandai `stopRequested` dan me-abort **`stopGenerationAbort`** — `AbortController` terpisah yang hanya menyala saat stop. Generasi dihentikan, turn difinalisasi `stopped` dengan jawaban parsial. Frontend menunggu ack endpoint sebelum men-teardown stream lokal.
+  - **Disconnect** (tanpa stop): `cancelSignal` tetap menyala, tapi **generasi tidak di-abort** — loop token berhenti meng-enqueue dan melanjutkan akumulasi jawaban in-process (fast path). Turn di-flip `awaiting_indexing` sebagai jaring pengaman; saat generasi selesai, jawaban penuh ditulis `complete` dengan gate `awaiting_indexing`. Kalau isolate mati lebih dulu, `sweepAwaitingTurns` (Deno.cron) meregenerasi dari turn `awaiting_indexing`. Retry variant pada disconnect → `stopped`.
 - **Live Cancel Detection (bukan snapshot)**: Bug awal: `let cancelled = cancelSignal.aborted` disimpan sekali dan tidak pernah diupdate, sehingga loop token tidak pernah berhenti saat cancel terjadi di tengah stream. Perbaikan: helper `isConsumerGone()` dipanggil di **setiap iterasi** kedua token loop (BYOK + fallback), melakukan dua pengecekan:
   1. `cancelSignal.aborted` — sinyal abort benar-benar fired.
   2. `controller.desiredSize <= 0` selama ≥10 iterasi berturut-turut — deteksi backpressure saat HTTP layer berhenti menarik data (client disconnect tanpa signal eksplisit).
   
-  Selain itu `controller.enqueue()` di-wrap `try/catch` — jika stream sudah ditutup consumer, `enqueue()` melempar dan loop berhenti.
-- **DB Save Guard (Iterasi 1 — digantikan Lifecycle V2)**: Awalnya pengecekan `cancelled || cancelSignal.aborted` sebelum `INSERT` membuat turn yang dibatalkan tidak tercatat di riwayat. Sejak Lifecycle V2 (lihat [`rag-turn-status-and-edit-mode.md`](./rag-turn-status-and-edit-mode.md)), turn dibuat write-ahead di awal dan **selalu** dituntaskan: cancel → `stopped` (parsial), selesai → `complete`, gagal server → `failed`, injeksi → `blocked`. Re-check sinyal abort live tetap dilakukan di finalize agar request yang di-cancel tidak pernah tercatat `complete`.
+  Sejak fast-path, `isConsumerGone()` memicu **detach** (flip + lanjutkan in-process), bukan berhenti; hanya `stopRequested` yang menghentikan loop. `controller.enqueue()` tetap di-wrap `try/catch` — jika stream sudah ditutup consumer, `enqueue()` melempar dan loop beralih ke mode detached.
+- **DB Save Guard (Iterasi 1 — digantikan Lifecycle V2)**: Awalnya pengecekan `cancelled || cancelSignal.aborted` sebelum `INSERT` membuat turn yang dibatalkan tidak tercatat di riwayat. Sejak Lifecycle V2 (lihat [`rag-turn-status-and-edit-mode.md`](./rag-turn-status-and-edit-mode.md)), turn dibuat write-ahead di awal dan **selalu** dituntaskan: stop eksplisit → `stopped` (parsial), selesai → `complete`, gagal server → `failed`, injeksi → `blocked`, disconnect → `awaiting_indexing` lalu `complete` (fast path / sweep).
 
 ## 6. Context References & Citation Rendering
 
