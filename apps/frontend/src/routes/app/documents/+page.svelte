@@ -31,8 +31,16 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import CheckSquareIcon from '@lucide/svelte/icons/check-square';
-	import CheckIcon from '@lucide/svelte/icons/check';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import FilesIcon from '@lucide/svelte/icons/files';
+	import FileStackIcon from '@lucide/svelte/icons/file-stack';
+	import ArrowDownAZIcon from '@lucide/svelte/icons/arrow-down-a-z';
+	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
+	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+	import ListIcon from '@lucide/svelte/icons/list';
+	import ListXIcon from '@lucide/svelte/icons/list-x';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { createZipArchive } from '$lib/utils/zip';
 
@@ -112,9 +120,6 @@
 		}
 	}
 
-
-
-
 	/* ── Delete Handler & Dialog State ── */
 	let deleteDialogOpen = $state(false);
 	let documentToDelete = $state<Document | null>(null);
@@ -190,41 +195,37 @@
 		console.log('[Supabase Realtime] Subscribing to public:documents changes...');
 		const channel = supabase
 			.channel('public:documents')
-			.on(
-				'postgres_changes',
-				{ event: '*', schema: 'public', table: 'documents' },
-				(payload) => {
-					console.log('[Supabase Realtime] Realtime Payload received:', payload);
-					if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-						const updated = payload.new as {
-							id: string;
-							status: Document['status'];
-							description?: string;
-						};
-						if (updated && updated.id) {
-							const idx = documentsList.findIndex((d) => d.id === updated.id);
-							if (idx !== -1) {
-								if (updated.status) {
-									documentsList[idx].status = updated.status;
-								}
-								if (updated.description) {
-									documentsList[idx].description = updated.description;
-								}
-								documentsList = [...documentsList];
-
-								if (updated.status === 'processed') {
-									showSuccess('Document processed', documentsList[idx].name);
-								} else if (updated.status === 'failed') {
-									showError(`Processing failed for ${documentsList[idx].name}`);
-								}
-							} else {
-								// New document inserted, refresh list
-								refreshDocuments();
+			.on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, (payload) => {
+				console.log('[Supabase Realtime] Realtime Payload received:', payload);
+				if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+					const updated = payload.new as {
+						id: string;
+						status: Document['status'];
+						description?: string;
+					};
+					if (updated && updated.id) {
+						const idx = documentsList.findIndex((d) => d.id === updated.id);
+						if (idx !== -1) {
+							if (updated.status) {
+								documentsList[idx].status = updated.status;
 							}
+							if (updated.description) {
+								documentsList[idx].description = updated.description;
+							}
+							documentsList = [...documentsList];
+
+							if (updated.status === 'processed') {
+								showSuccess('Document processed', documentsList[idx].name);
+							} else if (updated.status === 'failed') {
+								showError(`Processing failed for ${documentsList[idx].name}`);
+							}
+						} else {
+							// New document inserted, refresh list
+							refreshDocuments();
 						}
 					}
 				}
-			)
+			})
 			.subscribe((status, err) => {
 				console.log('[Supabase Realtime] Channel Subscription Status:', status, err || '');
 			});
@@ -494,7 +495,9 @@
 			return;
 		}
 		isSemanticSearching = true;
-		const res = await apiRequest<{ data: any[] }>(`/api/search?query=${encodeURIComponent(semanticSearchQuery)}&limit=10`);
+		const res = await apiRequest<{ data: any[] }>(
+			`/api/search?query=${encodeURIComponent(semanticSearchQuery)}&limit=10`
+		);
 		isSemanticSearching = false;
 
 		if (res.ok) {
@@ -557,12 +560,26 @@
 			col.toggleSorting(col.getIsSorted() === 'asc');
 		}
 	}
+
+	function keepDocumentsAtBottom() {
+		requestAnimationFrame(() => {
+			const activeScrollContainer = Array.from(
+				document.querySelectorAll<HTMLElement>('[data-documents-scroll]')
+			).find((element) => element.clientHeight > 0);
+
+			activeScrollContainer?.scrollTo({
+				top: activeScrollContainer.scrollHeight,
+				behavior: 'auto'
+			});
+		});
+	}
 </script>
 
 {#snippet mainList()}
 	<Tooltip.Provider>
 		<div
-			class="flex h-full w-full flex-col gap-6 overflow-y-auto px-6 py-6 font-sans md:px-10 md:py-8"
+			data-documents-scroll
+			class="flex h-full w-full flex-col gap-6 overflow-y-auto px-4 py-6 font-geist md:px-10 md:py-8"
 		>
 			<!-- Row 1: Breadcrumb -->
 			<Breadcrumb.Root class="mt-16 md:mt-0">
@@ -580,38 +597,43 @@
 			</Breadcrumb.Root>
 
 			<!-- Row 2: Header & Primary Action -->
-			<div class="flex items-center justify-between">
-				<h1 class="text-3xl font-semibold text-white md:text-4xl">Document Library</h1>
+			<div class="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
+				<h1 class="text-3xl font-semibold tracking-[-0.03em] text-white md:text-4xl">
+					Document Library
+				</h1>
 
 				<Button
-					class="cursor-pointer rounded-[6px] bg-[#DB8F5E] font-normal text-white hover:bg-[#C47D4E]"
+					class="group cursor-pointer rounded-full bg-[#DB8F5E] px-4 font-normal text-white transition-[background-color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-[#C47D4E] active:scale-[0.98]"
 					onclick={() => (uploadDialogOpen = true)}
 				>
-					<PlusIcon data-icon="inline-start" />
+					<PlusIcon
+						data-icon="inline-start"
+						class="transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:rotate-90"
+					/>
 					Add New
 				</Button>
 			</div>
 
 			<!-- Row 3: Description -->
-			<p class="text-sm font-normal text-[#767676] md:text-base">
+			<p class="max-w-3xl text-sm leading-6 font-normal text-[#767676] md:text-base">
 				Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
 			</p>
 
 			<!-- Row 4: Data Table Controls -->
-			<div class="flex flex-wrap items-center gap-3 md:gap-4">
+			<div class="flex flex-wrap items-center gap-2 md:gap-3">
 				<!-- Search Input with Integrated Toggle -->
-				<div class="relative flex-1">
+				<div class="relative min-w-0 flex-1 basis-full md:basis-0">
 					<!-- Toggle Group positioned absolutely inside the input on the left -->
-					<div class="absolute left-1.5 top-1/2 flex -translate-y-1/2 items-center z-10">
+					<div class="absolute top-1/2 left-1.5 z-10 flex -translate-y-1/2 items-center">
 						<ToggleGroup.Root
 							type="single"
 							bind:value={searchMode}
-							class="flex h-8 items-center rounded-full bg-[#191919]/[0.80] p-1 backdrop-blur-md border border-white/10"
+							class="flex h-7 items-center rounded-full bg-white/[0.03] p-0"
 						>
 							<ToggleGroup.Item
 								value="keyword"
 								aria-label="Toggle keyword search"
-								class="h-6 w-8 flex items-center justify-center rounded-full text-white/50 hover:text-white/80 data-[state=on]:bg-[#DB8F5E] data-[state=on]:text-white transition-all cursor-pointer"
+								class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-l-full text-white/50 transition-[background-color,color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.05] hover:text-white/70 data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
 							>
 								<Tooltip.Root>
 									<Tooltip.Trigger>
@@ -621,7 +643,9 @@
 											</div>
 										{/snippet}
 									</Tooltip.Trigger>
-									<Tooltip.Content class="rounded-md bg-white px-2 py-1 text-xs text-black">
+									<Tooltip.Content
+										class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+									>
 										Keyword Search
 									</Tooltip.Content>
 								</Tooltip.Root>
@@ -629,7 +653,7 @@
 							<ToggleGroup.Item
 								value="semantic"
 								aria-label="Toggle semantic search"
-								class="h-6 w-8 flex items-center justify-center rounded-full text-white/50 hover:text-white/80 data-[state=on]:bg-[#DB8F5E] data-[state=on]:text-white transition-all cursor-pointer"
+								class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-r-full text-white/50 transition-[background-color,color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.05] hover:text-white/70 data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
 							>
 								<Tooltip.Root>
 									<Tooltip.Trigger>
@@ -639,7 +663,9 @@
 											</div>
 										{/snippet}
 									</Tooltip.Trigger>
-									<Tooltip.Content class="rounded-md bg-white px-2 py-1 text-xs text-black">
+									<Tooltip.Content
+										class="rounded-full border border-black/10 bg-white px-2 py-1 text-xs text-black shadow-none"
+									>
 										AI Hybrid Search
 									</Tooltip.Content>
 								</Tooltip.Root>
@@ -648,7 +674,9 @@
 					</div>
 
 					<Input
-						placeholder={searchMode === 'keyword' ? "Search by title or description..." : "Ask AI about your documents (Press Enter)..."}
+						placeholder={searchMode === 'keyword'
+							? 'Search by title or description...'
+							: 'Ask AI about your documents (Press Enter)...'}
 						value={searchMode === 'keyword' ? globalFilter : semanticSearchQuery}
 						oninput={(e) => {
 							if (searchMode === 'keyword') {
@@ -662,11 +690,11 @@
 								executeSemanticSearch();
 							}
 						}}
-						class="h-10 rounded-full border border-white/[0.16] bg-transparent pl-[88px] pr-10 font-normal text-white placeholder:text-white/40 focus-visible:ring-white/20 transition-all"
+						class="h-9 rounded-full border border-white/[0.16] bg-transparent pr-10 pl-[82px] font-normal text-white transition-[border-color,box-shadow] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] placeholder:text-white/40 focus-visible:border-white/35 focus-visible:ring-white/20"
 					/>
 
 					<!-- Loading Spinner or Clear Button on the right -->
-					<div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+					<div class="absolute top-1/2 right-3 z-10 flex -translate-y-1/2 items-center gap-1.5">
 						{#if isSemanticSearching}
 							<Loader2Icon class="size-4 animate-spin text-[#DB8F5E]" />
 						{:else if (searchMode === 'keyword' && globalFilter) || (searchMode === 'semantic' && semanticSearchQuery)}
@@ -680,7 +708,7 @@
 										refreshDocuments();
 									}
 								}}
-								class="flex size-5 items-center justify-center rounded-full text-white/50 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+								class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white"
 								aria-label="Clear search"
 							>
 								<XIcon class="size-3.5" />
@@ -701,7 +729,7 @@
 											{...dropdownProps}
 											variant="ghost"
 											disabled={searchMode === 'semantic'}
-											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50"
+											class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50 data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white"
 										>
 											<MxIcon name="filter-outline" class="size-4" />
 										</Button>
@@ -709,34 +737,39 @@
 								</DropdownMenu.Trigger>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+						<Tooltip.Content
+							class="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-none"
+						>
 							<p>Filter Documents</p>
 						</Tooltip.Content>
 					</Tooltip.Root>
 					<DropdownMenu.Content
 						align="end"
-						class="w-48 rounded-xl border-white/10 bg-[#2A2A2A] text-white shadow-xl"
+						class="w-52 min-w-52 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
 						<DropdownMenu.Group>
 							<DropdownMenu.CheckboxItem
-								class="cursor-pointer text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 								bind:checked={filterPdf}
 								closeOnSelect={false}
 							>
+								<FileTextIcon class="size-3.5 text-white/60" />
 								PDF Documents
 							</DropdownMenu.CheckboxItem>
 							<DropdownMenu.CheckboxItem
-								class="cursor-pointer text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 								bind:checked={filterDocx}
 								closeOnSelect={false}
 							>
+								<FilesIcon class="size-3.5 text-white/60" />
 								Word Documents (.docx)
 							</DropdownMenu.CheckboxItem>
 							<DropdownMenu.CheckboxItem
-								class="cursor-pointer text-white hover:bg-white/10 focus:bg-white/10 focus:text-white "
+								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 								bind:checked={filterTxt}
 								closeOnSelect={false}
 							>
+								<FileStackIcon class="size-3.5 text-white/60" />
 								Text Files (.txt)
 							</DropdownMenu.CheckboxItem>
 						</DropdownMenu.Group>
@@ -755,7 +788,7 @@
 											{...dropdownProps}
 											variant="ghost"
 											disabled={searchMode === 'semantic'}
-											class="h-10 w-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] disabled:opacity-50"
+											class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50 data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white"
 										>
 											<MxIcon name="sort-outline" class="size-4" />
 										</Button>
@@ -763,21 +796,26 @@
 								</DropdownMenu.Trigger>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
+						<Tooltip.Content
+							class="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-none"
+						>
 							<p>Sort Documents</p>
 						</Tooltip.Content>
 					</Tooltip.Root>
 					<DropdownMenu.Content
 						align="end"
-						class="w-40 rounded-xl border-white/10 bg-[#2A2A2A] text-white shadow-xl"
+						class="w-44 min-w-44 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
 						<DropdownMenu.Group>
 							<DropdownMenu.Item
-								class="flex cursor-pointer justify-between text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+								class="justify-between rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 								onclick={() => handleSort('name')}
 								closeOnSelect={false}
 							>
-								<span>Alphabet</span>
+								<span class="flex items-center gap-2">
+									<ArrowDownAZIcon class="size-3.5 text-white/60" />
+									<span>Alphabet</span>
+								</span>
 								{#if table.getColumn('name')?.getIsSorted() === 'asc'}
 									<ArrowUpIcon class="size-4" />
 								{:else if table.getColumn('name')?.getIsSorted() === 'desc'}
@@ -785,11 +823,14 @@
 								{/if}
 							</DropdownMenu.Item>
 							<DropdownMenu.Item
-								class="flex cursor-pointer justify-between text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+								class="justify-between rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 								onclick={() => handleSort('uploadedAt')}
 								closeOnSelect={false}
 							>
-								<span>Date Uploaded</span>
+								<span class="flex items-center gap-2">
+									<CalendarDaysIcon class="size-3.5 text-white/60" />
+									<span>Date Uploaded</span>
+								</span>
 								{#if table.getColumn('uploadedAt')?.getIsSorted() === 'asc'}
 									<ArrowUpIcon class="size-4" />
 								{:else if table.getColumn('uploadedAt')?.getIsSorted() === 'desc'}
@@ -797,11 +838,14 @@
 								{/if}
 							</DropdownMenu.Item>
 							<DropdownMenu.Item
-								class="flex cursor-pointer justify-between text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+								class="justify-between rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 								onclick={() => handleSort('size')}
 								closeOnSelect={false}
 							>
-								<span>Size</span>
+								<span class="flex items-center gap-2">
+									<HardDriveIcon class="size-3.5 text-white/60" />
+									<span>Size</span>
+								</span>
 								{#if table.getColumn('size')?.getIsSorted() === 'asc'}
 									<ArrowUpIcon class="size-4" />
 								{:else if table.getColumn('size')?.getIsSorted() === 'desc'}
@@ -823,7 +867,10 @@
 											{...tooltipProps}
 											{...dropdownProps}
 											variant="ghost"
-											class="h-10 cursor-pointer rounded-full border border-white/[0.16] bg-transparent font-normal text-white hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white hover:backdrop-blur-[44.23px] data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white data-[state=open]:backdrop-blur-[44.23px] {selectedCount > 0 ? 'border-white/[0.80] bg-[#B8B5B5]/[0.40] px-3' : 'w-10 p-0 flex items-center justify-center'}"
+											class="h-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white data-[state=open]:border-white/[0.80] data-[state=open]:bg-[#B8B5B5]/[0.40] data-[state=open]:text-white {selectedCount >
+											0
+												? 'border-white/[0.80] bg-[#B8B5B5]/[0.40] px-2.5'
+												: 'flex w-9 items-center justify-center p-0'}"
 										>
 											<CheckSquareIcon class="size-4" />
 											{#if selectedCount > 0}
@@ -834,88 +881,69 @@
 								</DropdownMenu.Trigger>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-							<p>{selectedCount > 0 ? `Selected Documents (${selectedCount})` : 'Select Documents'}</p>
+						<Tooltip.Content
+							class="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-none"
+						>
+							<p>
+								{selectedCount > 0 ? `Selected Documents (${selectedCount})` : 'Select Documents'}
+							</p>
 						</Tooltip.Content>
 					</Tooltip.Root>
 					<DropdownMenu.Content
 						align="end"
-						class="w-56 rounded-xl border-white/10 bg-[#2A2A2A] text-white shadow-xl"
+						class="w-60 min-w-60 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
 						<DropdownMenu.Group>
 							<DropdownMenu.Item
-								class="flex cursor-pointer items-center justify-between text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 								onclick={selectAllPageDocuments}
 							>
+								<ListChecksIcon class="size-3.5 text-white/60" />
 								<span>Select page ({table.getRowModel().rows.length})</span>
 							</DropdownMenu.Item>
 							<DropdownMenu.Item
-								class="flex cursor-pointer items-center justify-between text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+								class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 								onclick={selectAllTotalDocuments}
 							>
+								<ListIcon class="size-3.5 text-white/60" />
 								<span>Select all ({documentsList.length})</span>
 							</DropdownMenu.Item>
 							{#if selectedCount > 0}
 								<DropdownMenu.Separator class="bg-white/10" />
 								<DropdownMenu.Item
-									class="flex cursor-pointer items-center justify-between text-white/70 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+									class="rounded-lg px-2.5 py-2 text-xs text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+									disabled={isBatchDownloading}
+									onclick={handleBatchDownload}
+								>
+									{#if isBatchDownloading}
+										<Loader2Icon class="size-3.5 animate-spin text-white/60" />
+									{:else}
+										<MxIcon name="arrows-action-import-outline" class="size-3.5 text-white/60" />
+									{/if}
+									<span>Download selected ({selectedCount})</span>
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									class="rounded-lg bg-red-500/10 px-2.5 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300"
+									onclick={() => (showBatchDeleteModal = true)}
+								>
+									<MxIcon
+										name="trash-bin-minimalistic-outline"
+										class="size-3.5 shrink-0 text-red-400"
+									/>
+									<span>Delete selected ({selectedCount})</span>
+								</DropdownMenu.Item>
+								<DropdownMenu.Separator class="bg-white/10" />
+								<DropdownMenu.Item
+									class="rounded-lg px-2.5 py-2 text-xs text-white/70 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
 									onclick={clearSelection}
 								>
+									<ListXIcon class="size-3.5 text-white/60" />
 									<span>Deselect all ({selectedCount})</span>
 								</DropdownMenu.Item>
 							{/if}
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
-
-				{#if selectedCount > 0}
-					<!-- Batch Download Button -->
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									type="button"
-									variant="ghost"
-									disabled={isBatchDownloading}
-									onclick={handleBatchDownload}
-									class="h-10 cursor-pointer rounded-full border border-blue-500/40 bg-blue-950/40 px-3 text-sm font-medium text-blue-400 hover:bg-blue-900/60 hover:text-blue-300 transition-colors flex items-center justify-center disabled:opacity-50"
-								>
-									{#if isBatchDownloading}
-										<Loader2Icon class="size-4 animate-spin" />
-									{:else}
-										<MxIcon name="arrows-action-import-outline" class="size-4" />
-									{/if}
-									<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-							<p>{selectedCount > 1 ? `Download Selected as ZIP (${selectedCount})` : `Download Selected Document`}</p>
-						</Tooltip.Content>
-					</Tooltip.Root>
-
-					<!-- Batch Delete Button -->
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									type="button"
-									variant="ghost"
-									onclick={() => (showBatchDeleteModal = true)}
-									class="h-10 cursor-pointer rounded-full border border-red-500/40 bg-red-950/40 px-3 text-sm font-medium text-red-400 hover:bg-red-900/60 hover:text-red-300 transition-colors flex items-center justify-center"
-								>
-									<MxIcon name="trash-bin-minimalistic-outline" class="size-4" />
-									<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
-							<p>Delete Selected Documents ({selectedCount})</p>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				{/if}
 			</div>
 
 			<!-- Row 5: Card List -->
@@ -928,8 +956,8 @@
 						tabindex="0"
 						onclick={() => toggleSelectDoc(doc.id)}
 						onkeydown={(e) => e.key === 'Enter' && toggleSelectDoc(doc.id)}
-						class="group relative cursor-pointer rounded-[22px] border p-5 transition-all duration-200 md:p-6 {isSelected
-							? 'border-[#949494] bg-[#525252]/[0.53]'
+						class="group relative cursor-pointer overflow-hidden rounded-[22px] border p-5 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px md:p-6 {isSelected
+							? 'selected-card-glass border-white/45 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] ring-1 ring-white/10'
 							: 'border-[#302F2F] bg-[#191919]/[0.53] hover:border-[#949494] hover:bg-[#525252]/[0.53]'}"
 					>
 						<!-- Card Row 1: Header -->
@@ -959,7 +987,7 @@
 						<!-- Card Row 2: Description -->
 						{#if (doc.status === 'pending' || doc.status === 'confirmed') && (!doc.description || doc.description === 'No description provided.')}
 							<div
-								class="mt-2.5 flex items-center gap-2 text-sm font-normal text-white/50 italic animate-pulse"
+								class="mt-2.5 flex animate-pulse items-center gap-2 text-sm font-normal text-white/50 italic"
 							>
 								<SparklesIcon class="size-3.5 shrink-0 text-white/70" />
 								<span>Generating summary with AI...</span>
@@ -978,26 +1006,44 @@
 						{/if}
 
 						{#if doc.semanticContent}
-							<div class="mt-4 relative overflow-hidden rounded-xl border border-[#DB8F5E]/20 bg-[#1A1512] p-4">
-								<div class="absolute left-0 top-0 h-full w-1 bg-[#DB8F5E]/50"></div>
-								<div class="flex cursor-pointer items-center justify-between" onclick={(e) => {
-									e.stopPropagation();
-									if (expandedDocs.includes(doc.id)) {
-										expandedDocs = expandedDocs.filter(id => id !== doc.id);
-									} else {
-										expandedDocs = [...expandedDocs, doc.id];
-									}
-								}} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && e.stopPropagation()}>
+							<div
+								class="relative mt-4 overflow-hidden rounded-xl border border-[#DB8F5E]/20 bg-[#1A1512] p-4"
+							>
+								<div class="absolute top-0 left-0 h-full w-1 bg-[#DB8F5E]/50"></div>
+								<div
+									class="flex cursor-pointer items-center justify-between"
+									onclick={(e) => {
+										e.stopPropagation();
+										if (expandedDocs.includes(doc.id)) {
+											expandedDocs = expandedDocs.filter((id) => id !== doc.id);
+										} else {
+											expandedDocs = [...expandedDocs, doc.id];
+										}
+									}}
+									role="button"
+									tabindex="0"
+									onkeydown={(e) => e.key === 'Enter' && e.stopPropagation()}
+								>
 									<div class="flex items-center gap-2 text-[#DB8F5E]">
 										<BookOpenIcon class="size-4" />
 										<span class="text-sm font-medium">Relevant Chunk</span>
 									</div>
-									<Button variant="ghost" size="sm" class="h-6 px-2 text-xs text-[#DB8F5E] hover:bg-[#DB8F5E]/20 hover:text-[#DB8F5E]">
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-6 px-2 text-xs text-[#DB8F5E] hover:bg-[#DB8F5E]/20 hover:text-[#DB8F5E]"
+									>
 										{expandedDocs.includes(doc.id) ? 'Collapse' : 'Expand'}
 									</Button>
 								</div>
 
-								<div class="mt-3 text-sm font-normal text-white/80 transition-all duration-300 {expandedDocs.includes(doc.id) ? '' : 'line-clamp-3'}" >
+								<div
+									class="mt-3 text-sm font-normal text-white/80 transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] {expandedDocs.includes(
+										doc.id
+									)
+										? ''
+										: 'line-clamp-3'}"
+								>
 									{doc.semanticContent}
 								</div>
 							</div>
@@ -1016,7 +1062,11 @@
 										title={`Found on pages: ${doc.pages.join(', ')}`}
 									>
 										<BookOpenIcon class="size-3.5" />
-										<span>Pages: {doc.pages.slice(0, 3).join(', ')}{doc.pages.length > 3 ? '...' : ''}</span>
+										<span
+											>Pages: {doc.pages.slice(0, 3).join(', ')}{doc.pages.length > 3
+												? '...'
+												: ''}</span
+										>
 									</div>
 								{/if}
 							</div>
@@ -1024,7 +1074,7 @@
 							<!-- Vectorizing / Quota / Failed Status Badge -->
 							{#if doc.status === 'pending' || doc.status === 'confirmed'}
 								<div
-									class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 shadow-sm backdrop-blur-md transition-all duration-300 group-hover:border-white/30 group-hover:bg-white/20"
+									class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:-translate-y-px group-hover:border-white/30 group-hover:bg-white/20"
 								>
 									<SparklesIcon class="size-3.5 animate-pulse text-white" />
 									<span class="tracking-wide">Vectorizing...</span>
@@ -1035,30 +1085,32 @@
 										{#snippet child({ props })}
 											<div
 												{...props}
-												class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300 shadow-sm backdrop-blur-md cursor-help"
+												class="inline-flex cursor-help items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300"
 											>
 												<MxIcon name="clock-outline" class="size-3.5 text-amber-400" />
-												<span class="tracking-wide font-medium">Resuming Tomorrow</span>
+												<span class="font-medium tracking-wide">Resuming Tomorrow</span>
 											</div>
 										{/snippet}
 									</Tooltip.Trigger>
-									<Tooltip.Content class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md max-w-xs">
+									<Tooltip.Content
+										class="max-w-xs rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-none"
+									>
 										<p>Daily AI quota reached. Vectorizing will resume tomorrow at 00:00 UTC.</p>
 									</Tooltip.Content>
 								</Tooltip.Root>
 							{:else if doc.status === 'failed_vectorizing'}
 								<div
-									class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400 shadow-sm backdrop-blur-md"
+									class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
 								>
 									<XIcon class="size-3.5 text-red-400" />
-									<span class="tracking-wide font-medium">Failed Vectorizing</span>
+									<span class="font-medium tracking-wide">Failed Vectorizing</span>
 								</div>
 							{:else if doc.status === 'failed'}
 								<div
-									class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400 shadow-sm backdrop-blur-md"
+									class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
 								>
 									<XIcon class="size-3.5 text-red-400" />
-									<span class="tracking-wide font-medium">Processing Failed</span>
+									<span class="font-medium tracking-wide">Processing Failed</span>
 								</div>
 							{/if}
 						</div>
@@ -1085,7 +1137,8 @@
 							<Pagination.Content>
 								<Pagination.Item>
 									<Pagination.Previous
-										class="cursor-pointer text-white hover:bg-white/10 hover:text-white disabled:text-white/20"
+										onclick={keepDocumentsAtBottom}
+										class="cursor-pointer rounded-full text-white transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white disabled:text-white/20"
 									/>
 								</Pagination.Item>
 
@@ -1099,7 +1152,8 @@
 											<Pagination.Link
 												{page}
 												isActive={currentPage === page.value}
-												class="cursor-pointer text-white hover:bg-white/10 hover:text-white data-[active=true]:border-[#DB8F5E] data-[active=true]:bg-[#DB8F5E]/20 data-[active=true]:text-white"
+												onclick={keepDocumentsAtBottom}
+												class="cursor-pointer rounded-full text-white/75 transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white data-[active=true]:border-white/45 data-[active=true]:bg-white/10 data-[active=true]:text-white"
 											>
 												{page.value}
 											</Pagination.Link>
@@ -1109,7 +1163,8 @@
 
 								<Pagination.Item>
 									<Pagination.Next
-										class="cursor-pointer text-white hover:bg-white/10 hover:text-white disabled:text-white/20"
+										onclick={keepDocumentsAtBottom}
+										class="cursor-pointer rounded-full text-white transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white disabled:text-white/20"
 									/>
 								</Pagination.Item>
 							</Pagination.Content>
@@ -1120,7 +1175,6 @@
 		</div>
 	</Tooltip.Provider>
 {/snippet}
-
 
 <div class="absolute inset-0 h-full w-full">
 	<div class="h-full w-full md:hidden">
@@ -1173,7 +1227,9 @@
 		<Dialog.Header>
 			<Dialog.Title class="text-xl font-semibold text-white">Delete Document</Dialog.Title>
 			<Dialog.Description class="mt-2 text-sm text-[#959595]">
-				Are you sure you want to delete <span class="font-medium text-white">{documentToDelete?.name}</span>? This action cannot be undone.
+				Are you sure you want to delete <span class="font-medium text-white"
+					>{documentToDelete?.name}</span
+				>? This action cannot be undone.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -1204,10 +1260,13 @@
 
 <!-- Batch Delete Confirmation Modal -->
 <Dialog.Root bind:open={showBatchDeleteModal}>
-	<Dialog.Content class="border-[#302F2F] bg-[#191919]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md sm:rounded-[22px]">
+	<Dialog.Content
+		class="border-[#302F2F] bg-[#191919]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md sm:rounded-[22px]"
+	>
 		<Dialog.Header class="gap-2">
 			<Dialog.Title class="text-xl font-semibold text-white">
-				Delete {selectedCount} {selectedCount === 1 ? 'Document' : 'Documents'}?
+				Delete {selectedCount}
+				{selectedCount === 1 ? 'Document' : 'Documents'}?
 			</Dialog.Title>
 			<Dialog.Description class="text-sm text-[#767676]">
 				This action will permanently delete {selectedCount} selected {selectedCount === 1
@@ -1241,3 +1300,51 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+<style>
+	.selected-card-glass {
+		animation: document-card-select 700ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	}
+
+	.selected-card-glass::after {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		content: '';
+		border-radius: inherit;
+		background: linear-gradient(
+			105deg,
+			transparent 24%,
+			rgb(255 255 255 / 0.16) 48%,
+			transparent 70%
+		);
+		transform: translateX(-120%);
+		opacity: 0;
+		animation: document-card-sheen 900ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	}
+
+	@keyframes document-card-select {
+		from {
+			transform: scale(0.985);
+			opacity: 0.82;
+		}
+		to {
+			transform: scale(1);
+			opacity: 1;
+		}
+	}
+
+	@keyframes document-card-sheen {
+		0% {
+			transform: translateX(-120%);
+			opacity: 0;
+		}
+		20% {
+			opacity: 1;
+		}
+		100% {
+			transform: translateX(120%);
+			opacity: 0;
+		}
+	}
+</style>

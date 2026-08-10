@@ -83,7 +83,7 @@ Format token: `@[judul](uuid)` — persis seperti markdown link dengan prefix `@
 
 - **Penyimpanan:** `question` dikirim apa adanya (termasuk token) → tersimpan verbatim di `conversation_turns.question`. Tidak ada perubahan backend untuk storage.
 - **Limit karakter (mention tidak dihitung):** counter `/690` di ketiga tempat (landing, detail, edit bubble) dan validasi backend sama-sama menghitung teks **tanpa 5 token pertama** (`mentionStrippedLength` frontend ↔ `stripMentionTokens` di zod `superRefine`). Pertanyaan yang hanya berisi token ditolak ("Question cannot be empty"). Frontend tidak memakai `maxlength` native pada editor (contenteditable) — batas di-enforce backend; tombol send/guard disabled saat stripped kosong.
-- **Payload:** `attachment_document_ids` kini **murni file upload** (max 10) — id mention TIDAK lagi dikirim di situ. Backend mem-parse token dari question sendiri (`mentionTokenIds`), menggabungkan dengan id file (dedup), memvalidasi kepemilikan (404) dan status terminal (400).
+- **Payload:** `attachment_document_ids` kini **murni file upload** (max 5) — id mention TIDAK lagi dikirim di situ. Backend mem-parse token dari question sendiri (`mentionTokenIds`), menggabungkan dengan id file (dedup), memvalidasi kepemilikan (404) dan status terminal (400).
 - **Retry/edit:** id mention di-parse ulang dari teks question — retry memakai question asli, edit memakai teks hasil edit → scoping otomatis mengikuti teks.
 - **Landing → Detail:** token berada di dalam `initialQuestion` (navigation state) — detail page tidak mem-parse untuk payload; hanya file upload yang lewat `attachmentDocuments` state.
 
@@ -149,7 +149,7 @@ const needsAwaiting =
 ## Architectural Decisions
 
 1. **Token inline, bukan chip/struktur terpisah:** token `@[title](id)` hidup di teks question — tersimpan di DB tanpa kolom baru, survive retry/edit, dan rendering hanya urusan client-side. Chip (konsep attach) ditolak karena user eksplisit ingin mention sebagai bagian prompt, bukan lampiran.
-2. **Backend mem-parse token sendiri, bukan field terpisah:** `mentionTokenIds(question)` di pre-flight melayani validasi, scoping, dan stripping sekaligus; `attachment_document_ids` kembali murni untuk file upload (max 10).
+2. **Backend mem-parse token sendiri, bukan field terpisah:** `mentionTokenIds(question)` di pre-flight melayani validasi, scoping, dan stripping sekaligus; `attachment_document_ids` kembali murni untuk file upload (max 5).
 3. **Limit 5 = aturan parse/render, bukan penolakan:** token ke-6+ diperlakukan sebagai teks biasa di semua lapisan (frontend + backend) — konsisten tanpa perlu error handling khusus.
 4. **Mention tidak dihitung sebagai karakter:** limit 690 dan cek non-empty dihitung dari teks tanpa 5 token pertama — frontend (counter, guard send) dan backend (zod `superRefine`) memakai aturan yang sama.
 5. **Strip dari prompt, simpan asli di DB:** token dihapus dari rewrite/history/augmented prompt/title agar konteks LLM hemat; `conversation_turns.question` tetap menyimpan token verbatim agar frontend bisa render dari history. Guard prompt-injection tetap memakai question mentah (input user tidak pernah di-strip sebelum security check).

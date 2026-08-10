@@ -45,12 +45,12 @@ export const ChatBodySchema = z.object({
     /**
      * Documents attached to this turn. Their chunks become the primary search
      * scope — RAG retrieval runs only over these documents, never the whole
-     * tenant knowledge base. Max 10 per submit. Documents that are already
+     * tenant knowledge base. Max 5 per submit. Documents that are already
      * indexed (status "processed") answer immediately through the interactive
      * stream (main context); documents still ingesting are waited on via the
      * awaiting_indexing background sweep (the file-upload flow).
      */
-    attachment_document_ids: z.array(z.string().uuid("Invalid attachment ID")).max(10, "Maximum of 10 attachments per message").optional(),
+    attachment_document_ids: z.array(z.string().uuid("Invalid attachment ID")).max(5, "Maximum of 5 attachments per message").optional(),
 });
 export type ChatBody = z.infer<typeof ChatBodySchema>;
 

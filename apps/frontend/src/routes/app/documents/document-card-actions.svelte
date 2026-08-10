@@ -23,7 +23,7 @@
 				{...props}
 				variant="ghost"
 				size="icon"
-				class="relative size-8 cursor-pointer rounded-full text-white/60 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white data-[state=open]:bg-white/10"
+				class="relative size-8 cursor-pointer rounded-full text-white/60 transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white data-[state=open]:bg-white/10"
 			>
 				<span class="sr-only">Open menu</span>
 				<MxIcon name="menu-dots-outline" class="rotate-90" />
@@ -32,7 +32,7 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content
 		align="end"
-		class="w-40 rounded-xl border-white/10 bg-[#2A2A2A] text-white shadow-xl"
+		class="w-40 rounded-2xl border-white/10 bg-[#2A2A2A] text-white shadow-none"
 	>
 		<DropdownMenu.Group>
 			<DropdownMenu.Item
@@ -60,4 +60,3 @@
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
-

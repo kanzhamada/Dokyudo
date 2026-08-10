@@ -17,6 +17,8 @@
 	} from '$lib/utils/doc-mentions';
 
 	const MAX_DOCUMENT_MENTIONS = 5;
+	/** Per-submit cap for file attachments in the chat flow. */
+	const MAX_CHAT_ATTACHMENTS = 5;
 
 	interface LlmOption {
 		name: string;
@@ -233,6 +235,13 @@
 				if (file.size > maxFileSizeBytes) {
 					showError(
 						`File "${file.name}" exceeds the ${maxFileSizeMB}MB limit for your plan and was rejected.`
+					);
+					continue;
+				}
+
+				if (attachedFiles.length + validFiles.length >= MAX_CHAT_ATTACHMENTS) {
+					showError(
+						`Cannot attach "${file.name}": Maximum of ${MAX_CHAT_ATTACHMENTS} files per message.`
 					);
 					continue;
 				}
