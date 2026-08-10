@@ -626,7 +626,7 @@ describe("RagService Isolated Tests", () => {
     });
 
     describe("background continuation (leave page while generating)", () => {
-        it("positive: leaving the page mid-generation hands the turn to the sweep (not stopped)", async () => {
+        it("positive: leaving the page mid-generation completes the turn in-process (fast path, not stopped)", async () => {
             const question = `disconnect flip ${crypto.randomUUID()}`;
             using geminiStub = stub(gemini, "generateText", (prompt: string) =>
                 Promise.resolve({
@@ -677,20 +677,22 @@ describe("RagService Isolated Tests", () => {
             await reader.cancel();
 
             try {
-                // The turn must be handed to the sweep — NOT stopped.
+                // The in-process generation keeps running and completes the
+                // turn with the FULL answer — no sweep wait, never "stopped".
                 const turns = await waitForTurns(
                     TEST_CONVERSATION_ID,
                     (t) =>
                         t.some(
                             (row) =>
                                 row.question === question &&
-                                row.status === "awaiting_indexing",
+                                row.status === "complete",
                         ),
                     8000,
                 );
                 const turn = turns.find((t) => t.question === question);
                 assertExists(turn);
-                assertEquals(turn.status, "awaiting_indexing");
+                assertEquals(turn.status, "complete");
+                assertEquals(turn.answer, "Jawaban [Doc 1: Page 1].");
             } finally {
                 await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId!));
             }

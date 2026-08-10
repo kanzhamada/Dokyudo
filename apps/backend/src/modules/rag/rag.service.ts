@@ -486,6 +486,7 @@ export class RagService {
         // frontend awaits it) or a retry variant resolves as "stopped". The
         // status gate makes the two writers race-safe.
         const abortAsStopped = async (): Promise<ReadableStream> => {
+            activeGenerations.delete(turnId);
             try {
                 await withAuthDb(userId, async (tx) => {
                     if (isRetry) {
@@ -802,43 +803,30 @@ ${effectiveQuestion}`;
             }
         };
 
-        // Client-teardown finalize: "stopped" only when the user explicitly
-        // pressed stop (the stop endpoint set the flag), or the write target is
-        // a retry variant (the sweep does not own variants). Otherwise the
-        // client left the page mid-generation — hand the canonical turn to the
-        // background sweep (awaiting_indexing) so the answer is still produced
-        // and survives reloads.
-        const finalizeOnDetach = async (answer: string) => {
-            const entry = activeGenerations.get(turnId);
-            const stopRequested = entry?.stopRequested === true;
-            activeGenerations.delete(turnId);
-            if (stopRequested || isRetry) {
-                await finalizeTurn("stopped", answer);
-                return;
-            }
-            try {
-                await withAuthDb(userId, async (tx) => {
-                    await tx
-                        .update(conversationTurns)
-                        .set({ status: "awaiting_indexing", updatedAt: new Date() })
-                        .where(
-                            and(
-                                eq(conversationTurns.id, turnId),
-                                eq(conversationTurns.status, "processing"),
-                            ),
-                        );
-                });
-            } catch (dbErr: any) {
-                if (logContext) logContext.ragDetachMarkError = dbErr.message;
-            }
-        };
+        // Client-teardown: the turn is flipped to awaiting_indexing as a
+        // SAFETY NET only (the sweep regenerates the answer if this isolate
+        // dies mid-continuation). The in-flight generation itself keeps
+        // running in-process and normally completes the turn first — see the
+        // stream's markTurnDetached / detached-completion path.
 
         // 5.2 Pre-stream model selection (system mode). Resolving the fallback
         // model BEFORE the stream is returned lets the selection — tier,
         // fallbackChain, selected model — land in the http_request log, which is
         // emitted when the handler returns (before the stream body is pumped).
-        // Aborts during selection mark the turn 'stopped'; selection failure
-        // marks it 'failed' and returns a graceful error stream.
+        // Selection failure marks it 'failed' and returns a graceful error
+        // stream.
+        // The generation runs on a DEDICATED abort controller that fires ONLY
+        // on an explicit stop — a client disconnect never aborts it, so the
+        // answer keeps being produced in-process after the user leaves the
+        // page (the turn is flipped to awaiting_indexing as a safety net and
+        // the sweep regenerates only if this isolate dies first).
+        const stopGenerationAbort = new AbortController();
+        activeGenerations.set(turnId, {
+            abort: stopGenerationAbort,
+            stopRequested: false,
+            tenantId,
+        });
+
         let resolvedFallbackStream: FallbackStreamResponse | null = null;
         if (!useByok) {
             try {
@@ -848,11 +836,13 @@ ${effectiveQuestion}`;
                     questionTokens: estimateTokenCount(question),
                     historyTokens: estimateTokenCount(historyText),
                     contextTokens: estimateTokenCount(contextText),
-                    signal,
+                    signal: stopGenerationAbort.signal,
                     logContext,
                 });
             } catch (error: any) {
-                if (isAbortError(error, signal)) return await abortAsStopped();
+                if (isAbortError(error, stopGenerationAbort.signal)) {
+                    return await abortAsStopped();
+                }
                 if (logContext) {
                     logContext.ragEvent = "fallback_failed_exhausted";
                     logContext.ragError = error.message;
@@ -903,15 +893,38 @@ data: ${JSON.stringify(startedPayload)}
                 let cancelled = cancelSignal.aborted;
                 let stalledPulls = 0;
 
-                // Register the in-flight generation so the stop endpoint can
-                // abort it explicitly — and so the disconnect path can tell
-                // "user pressed stop" from "user left the page". finalizeTurn
-                // removes the entry on every terminal path.
-                activeGenerations.set(turnId, {
-                    abort: streamAbort,
-                    stopRequested: false,
-                    tenantId,
-                });
+                // The generation registry entry was created pre-stream (keyed
+                // by turnId) with the stop-only abort controller. Here we add
+                // the client-teardown helpers shared by both generation modes.
+                let detached = false;
+                // Client-teardown: flip the canonical turn to awaiting_indexing
+                // as a SAFETY NET (the sweep regenerates the answer if this
+                // isolate dies mid-continuation). The in-flight generation
+                // keeps running and normally completes the turn first.
+                const markTurnDetached = async (): Promise<void> => {
+                    if (detached || isRetry) return;
+                    detached = true;
+                    try {
+                        await withAuthDb(userId, async (tx) => {
+                            await tx
+                                .update(conversationTurns)
+                                .set({ status: "awaiting_indexing", updatedAt: new Date() })
+                                .where(
+                                    and(
+                                        eq(conversationTurns.id, turnId),
+                                        eq(conversationTurns.status, "processing"),
+                                    ),
+                                );
+                        });
+                        console.log(
+                            `[RAG DETACH] turnId=${turnId} client left — flipped to awaiting_indexing, continuing generation in-process`,
+                        );
+                    } catch (dbErr: any) {
+                        if (logContext) logContext.ragDetachMarkError = dbErr.message;
+                    }
+                };
+                const isStopRequested = () =>
+                    activeGenerations.get(turnId)?.stopRequested === true;
 
                 // Live check: true when the client is gone (abort signal fired)
                 // OR the HTTP layer stopped pulling (backpressure / disconnect).
@@ -947,10 +960,15 @@ data: ${JSON.stringify(startedPayload)}
                 // Listen on the COMBINED signal so both request-abort and stream-cancel
                 // (client disconnect mid-stream) trigger closeOnCancel.
                 cancelSignal.addEventListener("abort", closeOnCancel, { once: true });
-								if (cancelled) {
-									closeOnCancel();
-									return;
-								}
+				if (cancelled) {
+					closeOnCancel();
+					// The client vanished between write-ahead and stream
+					// start — hand the turn to the sweep (safety net) and
+					// drop the registry entry.
+					activeGenerations.delete(turnId);
+					if (!isRetry) await markTurnDetached();
+					return;
+				}
 
 								// Report the write-target id up front — the client needs it to edit or
 								// retry this turn even if the stream is cancelled before `done` (e.g. a
@@ -994,8 +1012,9 @@ data: ${JSON.stringify(startedPayload)}
                         });
 
                         if (cancelled) {
-                            await finalizeOnDetach("");
-                            return;
+                            // Client already gone — flip the safety net and
+                            // keep going; the generation runs in-process.
+                            await markTurnDetached();
                         }
 
                         if (!encryptedRecord) {
@@ -1011,23 +1030,32 @@ data: ${JSON.stringify(startedPayload)}
                             encryptedRecord.iv,
                         );
                     } catch (e: any) {
-                        if (isAbortError(e, cancelSignal)) {
-                            await finalizeOnDetach("");
-                            return;
+                        if (!cancelled) {
+                            try {
+                                controller.enqueue(
+                                    encoder.encode(
+                                        `event: error\ndata: ${JSON.stringify({ code: e.code || "UNAUTHORIZED", message: e.message || "Failed to load BYOK key" })}\n\n`,
+                                    ),
+                                );
+                            } catch {
+                                // Consumer is gone — the finalize below still
+                                // resolves the turn.
+                            }
+                            try {
+                                controller.close();
+                            } catch {
+                                // already closed
+                            }
                         }
-                        controller.enqueue(
-                            encoder.encode(
-                                `event: error\ndata: ${JSON.stringify({ code: e.code || "UNAUTHORIZED", message: e.message || "Failed to load BYOK key" })}\n\n`,
-                            ),
-                        );
-                        controller.close();
                         await finalizeTurn("failed", "");
                         return;
                     }
                 }
 
                 if (useByok) {
-                    // BYOK mode: Strict routing to specific model, no fallback
+                    // BYOK mode: Strict routing to specific model, no fallback.
+                    // The generation runs on the stop-only controller — a
+                    // client disconnect never aborts it.
                     try {
                         const cb = createCircuitBreaker(`llm-gen-${model}`);
                         const responseStream = await cb.execute(() =>
@@ -1036,15 +1064,16 @@ data: ${JSON.stringify(startedPayload)}
                                 model: model!,
                                 prompt: augmentedPrompt,
                                 apiKey: byokKey,
-                                signal: cancelSignal,
+                                signal: stopGenerationAbort.signal,
                             }),
                         );
                         if (cancelled) {
-                            await finalizeOnDetach(fullAnswer);
-                            return;
+                            // Client already gone — flip the safety net and
+                            // keep generating in-process.
+                            await markTurnDetached();
                         }
 
-                        if (references.length > 0) {
+                        if (references.length > 0 && !detached) {
                             controller.enqueue(
                                 encoder.encode(
                                     `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
@@ -1053,39 +1082,50 @@ data: ${JSON.stringify(startedPayload)}
                         }
 
                         for await (const chunk of responseStream.stream) {
-                            if (isConsumerGone()) break;
-                            fullAnswer += chunk.text;
-                            try {
-                                controller.enqueue(
-                                    encoder.encode(
-                                        `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
-                                    ),
-                                );
-                            } catch {
-                                // Stream already closed by the consumer — stop producing.
-                                cancelled = true;
-                                break;
+                            if (isStopRequested()) break;
+                            if (isConsumerGone()) {
+                                // Client left — continue generating in-process.
+                                await markTurnDetached();
                             }
-                        }
-
-                        if (cancelled) {
-                            await finalizeOnDetach(fullAnswer);
-                            return;
+                            fullAnswer += chunk.text;
+                            if (!detached) {
+                                try {
+                                    controller.enqueue(
+                                        encoder.encode(
+                                            `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
+                                        ),
+                                    );
+                                } catch {
+                                    // Consumer closed the stream — continue
+                                    // generating in-process.
+                                    await markTurnDetached();
+                                }
+                            }
                         }
 
                         success = true;
                         successfulModel = model;
                         if (logContext) logContext.ragModelUsed = model;
                     } catch (error: any) {
-                        if (isAbortError(error, cancelSignal)) {
-                            await finalizeOnDetach(fullAnswer);
+                        if (isAbortError(error, stopGenerationAbort.signal)) {
+                            // Explicit stop aborted the generation.
+                            await finalizeTurn("stopped", fullAnswer);
                             return;
                         }
-                        controller.enqueue(
-                            encoder.encode(
-                                `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: error.message })}\n\n`,
-                            ),
-                        );
+                        // Generation failure — surface it only while the client
+                        // is still connected; the shared finalize below
+                        // resolves the turn either way.
+                        if (!cancelled) {
+                            try {
+                                controller.enqueue(
+                                    encoder.encode(
+                                        `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: error.message })}\n\n`,
+                                    ),
+                                );
+                            } catch {
+                                // consumer is gone
+                            }
+                        }
                     }
                 } else {
                     // System Mode: the fallback model was already resolved
@@ -1096,11 +1136,12 @@ data: ${JSON.stringify(startedPayload)}
                         // mid-stream stop still persists the real model name.
                         successfulModel = resolvedFallbackStream!.modelId;
                         if (cancelled) {
-                            await finalizeOnDetach(fullAnswer);
-                            return;
+                            // Client already gone — flip the safety net and
+                            // keep generating in-process.
+                            await markTurnDetached();
                         }
 
-                        if (references.length > 0) {
+                        if (references.length > 0 && !detached) {
                             controller.enqueue(
                                 encoder.encode(
                                     `event: references\ndata: ${JSON.stringify({ references })}\n\n`,
@@ -1109,33 +1150,35 @@ data: ${JSON.stringify(startedPayload)}
                         }
 
                         for await (const chunk of resolvedFallbackStream!.stream) {
-                            if (isConsumerGone()) break;
+                            if (isStopRequested()) break;
+                            if (isConsumerGone()) {
+                                // Client left — continue generating in-process.
+                                await markTurnDetached();
+                            }
                             if (chunk.text) {
                                 fullAnswer += chunk.text;
-                                try {
-                                    controller.enqueue(
-                                        encoder.encode(
-                                            `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
-                                        ),
-                                    );
-                                } catch {
-                                    // Stream already closed by the consumer — stop producing.
-                                    cancelled = true;
-                                    break;
+                                if (!detached) {
+                                    try {
+                                        controller.enqueue(
+                                            encoder.encode(
+                                                `event: token\ndata: ${JSON.stringify({ token: chunk.text })}\n\n`,
+                                            ),
+                                        );
+                                    } catch {
+                                        // Consumer closed the stream — continue
+                                        // generating in-process.
+                                        await markTurnDetached();
+                                    }
                                 }
                             }
-                        }
-
-                        if (cancelled) {
-                            await finalizeOnDetach(fullAnswer);
-                            return;
                         }
 
                         success = true;
                         if (logContext) logContext.ragModelUsed = resolvedFallbackStream!.modelId;
                     } catch (error: any) {
-                        if (isAbortError(error, cancelSignal)) {
-                            await finalizeOnDetach(fullAnswer);
+                        if (isAbortError(error, stopGenerationAbort.signal)) {
+                            // Explicit stop aborted the generation.
+                            await finalizeTurn("stopped", fullAnswer);
                             return;
                         }
                         if (logContext) {
@@ -1145,19 +1188,21 @@ data: ${JSON.stringify(startedPayload)}
                     }
                 }
 
-                if (cancelled) {
-                    await finalizeOnDetach(fullAnswer);
-                    return;
-                }
-
                 // Emit an error event when generation failed (system mode also
                 // surfaced it inside the branch; BYOK surfaced it in its catch).
+                // Only while the client is still connected.
                 if (!success && !useByok) {
-                    controller.enqueue(
-                        encoder.encode(
-                            `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: "All LLM providers are unavailable" })}\n\n`,
-                        ),
-                    );
+                    if (!cancelled) {
+                        try {
+                            controller.enqueue(
+                                encoder.encode(
+                                    `event: error\ndata: ${JSON.stringify({ code: "PROVIDER_UNAVAILABLE", message: "All LLM providers are unavailable" })}\n\n`,
+                                ),
+                            );
+                        } catch {
+                            // consumer is gone
+                        }
+                    }
                 } else if (success) {
                     if (isNewConversation) {
                         let smartTitle = question.substring(0, 50);
@@ -1220,20 +1265,63 @@ data: ${JSON.stringify(startedPayload)}
                 if (!cancelled) controller.close();
                 cancelSignal.removeEventListener("abort", closeOnCancel);
 
-                // Persist the turn with a terminal status. The abort can land right
-                // as the last token arrives — after the in-stream cancellation checks
-                // but before this point — so re-check the live signal instead of
-                // trusting the stale `cancelled` flag. A request the user cancelled
-                // must never be recorded as "complete".
-                const abortedAtFinalize = cancelled || cancelSignal.aborted;
-                if (abortedAtFinalize) {
-                    // Client teardown: stopped only for explicit stop / retry
-                    // variants; a page-leave disconnect is handed to the sweep.
-                    await finalizeOnDetach(fullAnswer);
+                // Terminal write. Explicit stop → stopped. Client-left detach
+                // → the in-process generation finished: complete (or failed)
+                // written with a gate matching the awaiting_indexing safety
+                // net, so a concurrent sweep run no-ops. Normal end → as
+                // before.
+                const stopRequested = activeGenerations.get(turnId)?.stopRequested === true;
+                if (stopRequested) {
+                    await finalizeTurn("stopped", fullAnswer);
+                } else if (detached) {
+                    const latencyMs = Date.now() - startMs;
+                    const modelUsed = successfulModel || modelUsedFallback;
+                    try {
+                        await withAuthDb(userId, async (tx) => {
+                            await tx
+                                .update(conversationTurns)
+                                .set({
+                                    answer: fullAnswer,
+                                    modelUsed,
+                                    latencyMs,
+                                    contextReferences:
+                                        RagService.filterReferencesByCitations(
+                                            fullAnswer,
+                                            references,
+                                        ),
+                                    status: success ? "complete" : "failed",
+                                    updatedAt: new Date(),
+                                })
+                                .where(
+                                    and(
+                                        eq(conversationTurns.id, turnId),
+                                        eq(conversationTurns.status, "awaiting_indexing"),
+                                    ),
+                                );
+                            await tx
+                                .update(conversations)
+                                .set({ updatedAt: new Date() })
+                                .where(
+                                    and(
+                                        eq(conversations.id, cid!),
+                                        eq(conversations.tenantId, tenantId),
+                                    ),
+                                );
+                        });
+                        console.log(
+                            `[RAG DETACH] turnId=${turnId} completed in-process after client left (${latencyMs}ms, status=${success ? "complete" : "failed"})`,
+                        );
+                    } catch (dbErr: any) {
+                        console.error(
+                            `[RAG DETACH] turnId=${turnId} failed to persist detached completion:`,
+                            dbErr.message,
+                        );
+                        // The turn stays awaiting — the sweep regenerates it.
+                    }
                 } else {
                     await finalizeTurn(success ? "complete" : "failed", fullAnswer);
                 }
-                const finalStatus: TurnStatus = abortedAtFinalize
+                const finalStatus: TurnStatus = stopRequested
                     ? "stopped"
                     : success
                       ? "complete"
@@ -1623,6 +1711,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
             logContext,
         } = params;
         const startMs = Date.now();
+        console.log(`[RAG DETACHED] turnId=${turnId} pipeline started (sweep, question="${question.slice(0, 60)}")`);
 
         const persistBlocked = async (): Promise<void> => {
             await withAuthDb(tenantId, async (tx) => {
@@ -1758,6 +1847,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
             // idempotent: if a duplicate cron invocation already completed the
             // turn, this update matches no row.
             const latencyMs = Date.now() - startMs;
+            console.log(`[RAG DETACHED] turnId=${turnId} answer generated (${latencyMs}ms) — persisting complete`);
             const modelUsed = successfulModel || (useByok ? (model || "auto") : "auto");
             await withAuthDb(tenantId, async (tx) => {
                 await tx
@@ -1930,6 +2020,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
             question: string;
             attachmentDocumentIds: string[] | null;
             modelRequest: { provider?: string; model?: string } | null;
+            updatedAt: Date;
         }> = [];
         try {
             turns = (await db
@@ -1940,6 +2031,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
                     question: conversationTurns.question,
                     attachmentDocumentIds: conversationTurns.attachmentDocumentIds,
                     modelRequest: conversationTurns.modelRequest,
+                    updatedAt: conversationTurns.updatedAt,
                 })
                 .from(conversationTurns)
                 .where(eq(conversationTurns.status, "awaiting_indexing"))
@@ -1950,6 +2042,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 question: string;
                 attachmentDocumentIds: string[] | null;
                 modelRequest: { provider?: string; model?: string } | null;
+                updatedAt: Date;
             }>;
         } catch (err: any) {
             console.error("[RAG SWEEP] Failed to load awaiting turns:", err.message);
@@ -2008,6 +2101,10 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 }
             } else if (allReady) {
                 try {
+                    const awaitingMs = Date.now() - new Date(turn.updatedAt).getTime();
+                    console.log(
+                        `[RAG SWEEP] turnId=${turn.id} picked up after ${Math.round(awaitingMs / 1000)}s awaiting — running detached pipeline`,
+                    );
                     await RagService.completeTurnDetached({
                         tenantId: turn.tenantId,
                         conversationId: turn.conversationId,
