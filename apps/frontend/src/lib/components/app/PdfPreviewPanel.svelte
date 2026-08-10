@@ -2,7 +2,6 @@
 	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import AlertTriangleIcon from '@lucide/svelte/icons/triangle-alert';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import XIcon from '@lucide/svelte/icons/x';
 
 	interface Props {
@@ -116,21 +115,15 @@
 	<!-- Header: document name + close button -->
 	<div class="panel-header relative mt-10 mb-3 flex items-start justify-between gap-3 md:mt-0">
 		<div class="min-w-0 flex-1">
-			<div
-				class="mb-2 flex items-center gap-2 text-[10px] font-medium tracking-[0.16em] text-dk-muted-gray uppercase"
-			>
-				<span class="title-mark" aria-hidden="true">
-					<FileTextIcon class="size-3.5" strokeWidth={1.7} />
-				</span>
-				<span>Document preview</span>
-				<span class="status-chip">Read only</span>
+			<div class="flex min-w-0 items-start gap-2">
+				<h3
+					class="line-clamp-2 min-w-0 font-geist text-base leading-snug font-medium text-dk-light sm:text-lg"
+					title={name}
+				>
+					{name}
+				</h3>
+				<span class="status-chip mt-0.5 shrink-0">Read only</span>
 			</div>
-			<h3
-				class="line-clamp-2 font-geist text-base leading-snug font-medium text-dk-light sm:text-lg"
-				title={name}
-			>
-				{name}
-			</h3>
 			<div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
 				<p
 					class="warning-note flex min-w-0 items-start gap-1.5 text-[11px] leading-relaxed text-dk-copper sm:text-xs"
@@ -142,9 +135,6 @@
 					/>
 					<span>Preview edits aren't saved. Export the document to keep changes.</span>
 				</p>
-				{#if initialPages[0]}
-					<span class="page-chip">Page {initialPages[0]}</span>
-				{/if}
 			</div>
 		</div>
 		{#if onclose}
@@ -181,16 +171,20 @@
 <style>
 	.pdf-panel {
 		isolation: isolate;
-		background:
-			radial-gradient(circle at 100% 0%, rgba(217, 142, 104, 0.1), transparent 32%),
-			linear-gradient(145deg, #251e1b 0%, #1c1b1b 42%, #191919 100%);
+		background: #1f1e1d;
 	}
 
 	.pdf-panel::before {
 		position: absolute;
-		inset: 0;
-		z-index: -1;
-		background: linear-gradient(90deg, transparent, rgba(244, 230, 212, 0.035) 50%, transparent);
+		top: -19.875rem;
+		left: -18.4375rem;
+		z-index: 0;
+		height: 74.375rem;
+		width: 74.375rem;
+		border-radius: 999px;
+		background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%);
+		filter: blur(99px);
+		opacity: 0.07;
 		content: '';
 		pointer-events: none;
 	}
@@ -201,7 +195,7 @@
 		right: 1.25rem;
 		left: 1.25rem;
 		height: 1px;
-		background: linear-gradient(90deg, transparent, rgba(217, 142, 104, 0.7), transparent);
+		background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
 		content: '';
 		pointer-events: none;
 	}
@@ -217,20 +211,7 @@
 		animation: viewer-enter 680ms cubic-bezier(0.32, 0.72, 0, 1) 80ms both;
 	}
 
-	.title-mark {
-		display: inline-flex;
-		height: 1.25rem;
-		width: 1.25rem;
-		align-items: center;
-		justify-content: center;
-		border: 1px solid rgba(217, 142, 104, 0.28);
-		border-radius: 0.375rem;
-		background: rgba(217, 142, 104, 0.12);
-		color: #d98e68;
-	}
-
-	.status-chip,
-	.page-chip {
+	.status-chip {
 		border: 1px solid rgba(244, 230, 212, 0.1);
 		border-radius: 999px;
 		background: rgba(244, 230, 212, 0.045);
@@ -243,11 +224,6 @@
 
 	.status-chip {
 		color: rgba(244, 230, 212, 0.52);
-	}
-
-	.page-chip {
-		color: rgba(244, 230, 212, 0.7);
-		letter-spacing: 0.02em;
 	}
 
 	.warning-note {
