@@ -11,7 +11,7 @@ import {
     turnAlternatives,
     chatShares,
 } from "../../shared/models/db.model.ts";
-import { desc, eq, and, lt, ne, sql } from "drizzle-orm";
+import { desc, eq, and, lt, ne, sql, or } from "drizzle-orm";
 import { TierQuotaUtil } from "../../shared/utils/tier_quota.util.ts";
 import { LlmRouterService } from "./llm_router.service.ts";
 import { FallbackLlmService, type FallbackStreamResponse } from "./fallback_llm.service.ts";
@@ -40,6 +40,34 @@ function createClosedStream(): ReadableStream<Uint8Array> {
 
 function isAbortError(error: unknown, signal?: AbortSignal): boolean {
     return signal?.aborted === true || (error instanceof DOMException && error.name === "AbortError");
+}
+
+/**
+ * Parses the composite keyset cursor for listConversations.
+ * Shape: JSON { p: isPinned, u: updatedAt (ISO string), i: conversation id }.
+ * Returns null when absent or malformed — the caller then serves the first page.
+ */
+function parseConversationCursor(
+    cursor: string | undefined,
+): { isPinned: boolean; updatedAt: Date; id: string } | null {
+    if (!cursor) return null;
+    try {
+        const parsed = JSON.parse(cursor);
+        if (
+            typeof parsed !== "object" ||
+            parsed === null ||
+            typeof parsed.p !== "boolean" ||
+            typeof parsed.u !== "string" ||
+            typeof parsed.i !== "string"
+        ) {
+            return null;
+        }
+        const updatedAt = new Date(parsed.u);
+        if (Number.isNaN(updatedAt.getTime())) return null;
+        return { isPinned: parsed.p, updatedAt, id: parsed.i };
+    } catch {
+        return null;
+    }
 }
 
 export class RagService {
@@ -1338,6 +1366,31 @@ data: ${JSON.stringify(startedPayload)}
             // the caller's own tenant rows.
             const hasActiveShare = sql<boolean>`EXISTS (SELECT 1 FROM chat_shares cs WHERE cs.conversation_id = ${conversations.id} AND (cs.expires_at IS NULL OR cs.expires_at > now()))`;
 
+            // Composite keyset pagination: the cursor carries the last row's
+            // (isPinned, updatedAt, id) and the WHERE clause walks the SAME order
+            // the rows are returned in (isPinned DESC, updatedAt DESC, id DESC).
+            // Filtering by updatedAt alone re-returned pinned conversations on
+            // the next page (they sort first by pin priority but their
+            // updatedAt is older than the cursor) — duplicate ids crashed the
+            // sidebar's keyed each block. The id tiebreaker also makes rows
+            // with an identical updatedAt (same-transaction writes share the
+            // `now()` timestamp) neither skipped nor duplicated across pages.
+            const parsedCursor = parseConversationCursor(cursor);
+            const cursorConditions = parsedCursor
+                ? or(
+                      lt(conversations.isPinned, parsedCursor.isPinned),
+                      and(
+                          eq(conversations.isPinned, parsedCursor.isPinned),
+                          lt(conversations.updatedAt, parsedCursor.updatedAt),
+                      ),
+                      and(
+                          eq(conversations.isPinned, parsedCursor.isPinned),
+                          eq(conversations.updatedAt, parsedCursor.updatedAt),
+                          lt(conversations.id, parsedCursor.id),
+                      ),
+                  )
+                : undefined;
+
             let query = tx
                 .select({
                     id: conversations.id,
@@ -1349,14 +1402,15 @@ data: ${JSON.stringify(startedPayload)}
                 })
                 .from(conversations)
                 .where(
-                    cursor
-                        ? and(
-                              eq(conversations.tenantId, tenantId),
-                              lt(conversations.updatedAt, new Date(cursor)),
-                          )
+                    cursorConditions
+                        ? and(eq(conversations.tenantId, tenantId), cursorConditions)
                         : eq(conversations.tenantId, tenantId),
                 )
-                .orderBy(desc(conversations.isPinned), desc(conversations.updatedAt))
+                .orderBy(
+                    desc(conversations.isPinned),
+                    desc(conversations.updatedAt),
+                    desc(conversations.id),
+                )
                 .limit(limit);
 
             results = await query;
@@ -1364,7 +1418,12 @@ data: ${JSON.stringify(startedPayload)}
 
         let nextCursor: string | null = null;
         if (results.length === limit) {
-            nextCursor = results[results.length - 1].updatedAt.toISOString();
+            const last = results[results.length - 1];
+            nextCursor = JSON.stringify({
+                p: last.isPinned,
+                u: last.updatedAt.toISOString(),
+                i: last.id,
+            });
         }
 
         return {

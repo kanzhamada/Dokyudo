@@ -101,7 +101,14 @@
 			const result = await getConversations({ limit: 20, cursor });
 			if (result.ok) {
 				if (cursor) {
-					conversations = sortConversations([...conversations, ...result.data.conversations]);
+					// Cursor pagination can return items already in the list: the backend
+					// orders by isPinned + updatedAt but filters by updatedAt only, so
+					// pinned items straddle page boundaries; concurrent updates bump
+					// updatedAt mid-scroll too. Dedupe by id before merging — a duplicate
+					// key would crash the keyed each block (each_key_duplicate).
+					const seenIds = new Set(conversations.map((c) => c.id));
+					const freshItems = result.data.conversations.filter((c) => !seenIds.has(c.id));
+					conversations = sortConversations([...conversations, ...freshItems]);
 				} else {
 					conversations = sortConversations(result.data.conversations);
 				}

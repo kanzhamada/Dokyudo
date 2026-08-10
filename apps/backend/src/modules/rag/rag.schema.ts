@@ -236,7 +236,9 @@ export const ShareListResponseSchema = z.object({
 
 export const ListConversationsQuerySchema = z.object({
     limit: z.coerce.number().min(1).max(100).default(20),
-    cursor: z.string().datetime().optional(), // ISO string of updatedAt
+    // Opaque composite keyset cursor (JSON: { p: isPinned, u: updatedAt, i: id }).
+    // The frontend passes it through verbatim — never inspected here.
+    cursor: z.string().optional(),
 });
 
 export const ListConversationsResponseSchema = z.object({

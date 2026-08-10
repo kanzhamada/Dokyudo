@@ -233,6 +233,86 @@ describe("RagService Isolated Tests", () => {
             assertEquals(res2.conversations.length, 1);
             assertEquals(res2.conversations[0].id, TEST_CONVERSATION_ID);
         });
+
+        it("positive: pinned conversations are not returned twice across pages", async () => {
+            // Regression: the old cursor (updatedAt ISO only) re-returned pinned
+            // conversations on the next page, because they sort first by pin
+            // priority even when their updatedAt is older than the cursor.
+            const pinnedId = crypto.randomUUID();
+            await db.insert(conversations).values({
+                id: pinnedId,
+                tenantId: TEST_TENANT_ID,
+                title: "Old Pinned",
+                isPinned: true,
+                updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+            });
+
+            // limit 2: page 1 = [pinned (pin priority), newest unpinned]
+            const page1 = await RagService.listConversations({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                limit: 2,
+            });
+
+            assertEquals(page1.conversations.some((c) => c.id === pinnedId), true);
+            assertExists(page1.nextCursor);
+
+            // Page 2 must NOT re-return the pinned conversation
+            const page2 = await RagService.listConversations({
+                userId: TEST_USER_ID,
+                tenantId: TEST_TENANT_ID,
+                limit: 2,
+                cursor: page1.nextCursor!,
+            });
+
+            assertEquals(page2.conversations.some((c) => c.id === pinnedId), false);
+        });
+
+        it("positive: same-timestamp conversations are neither skipped nor duplicated across pages", async () => {
+            // Writes inside one transaction share the `now()` timestamp, so ties
+            // are real. The id tiebreaker must keep the walk complete and clean.
+            const tieTime = new Date("2026-01-01T00:00:00.000Z");
+            const tiedA = crypto.randomUUID();
+            const tiedB = crypto.randomUUID();
+            await db.insert(conversations).values([
+                { id: tiedA, tenantId: TEST_TENANT_ID, title: "Tie A", updatedAt: tieTime },
+                { id: tiedB, tenantId: TEST_TENANT_ID, title: "Tie B", updatedAt: tieTime },
+            ]);
+
+            // Walk the whole list one row at a time — the old cursor would skip
+            // the second tied row forever (lt(updatedAt, cursor) excludes ties).
+            // Note: when the row count is an exact multiple of the page size the
+            // final full page still emits a cursor, so the walk ends with one
+            // legitimately empty page — treat it as normal completion.
+            const seen = new Set<string>();
+            let cursor: string | null = null;
+            let foundA = false;
+            let foundB = false;
+            let pages = 0;
+            do {
+                const page = await RagService.listConversations({
+                    userId: TEST_USER_ID,
+                    tenantId: TEST_TENANT_ID,
+                    limit: 1,
+                    cursor: cursor ?? undefined,
+                });
+                pages++;
+                if (pages > 100) throw new Error("pagination did not terminate");
+                if (page.conversations.length === 0) {
+                    assertEquals(page.nextCursor, null);
+                    break;
+                }
+                const item = page.conversations[0];
+                assertEquals(seen.has(item.id), false, `duplicate id ${item.id} on page ${pages}`);
+                seen.add(item.id);
+                if (item.id === tiedA) foundA = true;
+                if (item.id === tiedB) foundB = true;
+                cursor = page.nextCursor;
+            } while (cursor);
+
+            assertEquals(foundA, true);
+            assertEquals(foundB, true);
+        });
     });
 
     describe("getConversation", () => {
