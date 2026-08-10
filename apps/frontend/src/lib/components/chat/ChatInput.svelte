@@ -428,15 +428,13 @@
 	}
 </script>
 
-<div
-	class="group relative flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] px-4 py-2 backdrop-blur-[42px] transition-all {transparent
-		? 'bg-[#232323]/[0.40]'
-		: 'bg-[#232323]/[0.85] shadow-2xl'}"
->
+<div class="relative w-full">
 	<!-- Document mention popover (@ trigger) — floats above capsule -->
 	{#if mentionOpen}
 		<div
-			class="absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden rounded-2xl border border-white/[0.16] bg-[#232323]/[0.95] text-white shadow-2xl backdrop-blur-[42px]"
+			class="absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden rounded-2xl border border-white/[0.16] text-white shadow-2xl backdrop-blur-[42px] {transparent
+				? 'bg-[#232323]/[0.40]'
+				: 'bg-[#232323]/[0.85]'}"
 			role="listbox"
 			aria-label="Documents"
 			tabindex="-1"
@@ -482,189 +480,196 @@
 		</div>
 	{/if}
 
-	<!-- Row 1: Attached Files -->
-	{#if attachedFiles.length > 0}
-		<div class="flex flex-wrap gap-2 pt-1 pb-1">
-			{#each attachedFiles as file, index}
-				<div
-					class="flex items-center gap-2 rounded-full bg-[#121212]/[0.80] py-1.5 pr-2 pl-3 text-sm text-white/[0.80] backdrop-blur-[20px] transition-all"
-				>
-					<span class="max-w-[200px] truncate">{file.name}</span>
-					<button
-						class="flex cursor-pointer items-center justify-center rounded-full p-0.5 text-white/[0.40] transition-colors hover:bg-white/[0.16] hover:text-white"
-						onclick={() => removeFile(index)}
-						aria-label="Remove file"
+	<!-- Main Input Capsule -->
+	<div
+		class="group relative flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] px-4 py-2 backdrop-blur-[42px] transition-all {transparent
+			? 'bg-[#232323]/[0.40]'
+			: 'bg-[#232323]/[0.85] shadow-2xl'}"
+	>
+		<!-- Row 1: Attached Files -->
+		{#if attachedFiles.length > 0}
+			<div class="flex flex-wrap gap-2 pt-1 pb-1">
+				{#each attachedFiles as file, index}
+					<div
+						class="flex items-center gap-2 rounded-full bg-[#121212]/[0.80] py-1.5 pr-2 pl-3 text-sm text-white/[0.80] backdrop-blur-[20px] transition-all"
 					>
-						<X class="size-3.5" />
-					</button>
-				</div>
-			{/each}
-		</div>
-	{/if}
-
-	<!-- Row 2: Input Controls -->
-	<div class="flex w-full flex-row items-end gap-3">
-		<!-- Attach Document -->
-		<div class="relative flex h-9 items-center">
-			<Tooltip.Provider delayDuration={100}>
-				<Tooltip.Root>
-					<Tooltip.Trigger
-						class="flex cursor-pointer items-center text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69]"
-						aria-label="Attach Document"
-						onclick={triggerFileInput}
-					>
-						<Paperclip class="size-5" />
-					</Tooltip.Trigger>
-					<Tooltip.Content
-						class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
-						arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
-					>
-						<p>Attach Document (PDF, TXT)</p>
-						<p class="text-xs text-white/[0.69]">
-							{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
-						</p>
-					</Tooltip.Content>
-				</Tooltip.Root>
-			</Tooltip.Provider>
-		</div>
-		<Input
-			type="file"
-			bind:ref={fileInput}
-			id="file-upload"
-			accept=".pdf,.txt"
-			class="hidden"
-			multiple
-			onchange={handleFileChange}
-		/>
-
-		<!-- Input Text Field: Rich contenteditable editor with native atomic mention nodes -->
-		<div class="relative min-w-0 flex-1">
-			<div
-				bind:this={editorEl}
-				contenteditable="true"
-				role="textbox"
-				tabindex="0"
-				aria-multiline="true"
-				aria-placeholder={placeholder}
-				data-placeholder={placeholder}
-				class="mention-editor max-h-32 min-h-[36px] w-full overflow-y-auto bg-transparent py-1.5 text-base md:text-sm text-white caret-white outline-none selection:bg-white/15 break-words whitespace-pre-wrap"
-				oninput={() => {
-					syncValue();
-					updateMentionState();
-				}}
-				onkeydown={handleKeyDown}
-				onpaste={handlePaste}
-				onfocus={updateMentionState}
-				onblur={closeMention}
-			></div>
-		</div>
-
-		<!-- Model Switcher Dropdown -->
-		{#if showModelSelector}
-			<div class="group/model relative flex h-9 items-center">
-				<DropdownMenu.Root
-					onOpenChange={(open) => {
-						if (!open) modelSearchQuery = '';
-					}}
-				>
-					<DropdownMenu.Trigger
-						class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors group-focus-within/model:text-white/[0.69] group-hover/model:text-white/[0.69] focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
-					>
-						<img
-							src={selectedModel.icon}
-							alt={selectedModel.name}
-							class="size-5 opacity-40 brightness-0 invert transition-opacity group-focus-within/model:opacity-[0.69] group-hover/model:opacity-[0.69]"
-						/>
-						<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
-						<ChevronDown class="size-4" />
-					</DropdownMenu.Trigger>
-
-					{#if onconfigure}
-						<DropdownMenu.Content
-							class="w-80 border border-white/[0.16] p-0 text-white backdrop-blur-[42px] {transparent
-								? 'bg-[#232323]/[0.40]'
-								: 'bg-[#232323]/[0.85]'}"
+						<span class="max-w-[200px] truncate">{file.name}</span>
+						<button
+							class="flex cursor-pointer items-center justify-center rounded-full p-0.5 text-white/[0.40] transition-colors hover:bg-white/[0.16] hover:text-white"
+							onclick={() => removeFile(index)}
+							aria-label="Remove file"
 						>
-							<div class="max-h-72 overflow-y-auto px-1 py-1">
-								<Input
-									type="search"
-									bind:value={modelSearchQuery}
-									placeholder="Select a model..."
-									class="h-9 rounded-none border-0 border-b border-white/10 bg-transparent px-2.5 text-xs text-white shadow-none focus-visible:border-white/20 focus-visible:ring-0"
-									onkeydown={(event) => event.stopPropagation()}
-								/>
-								{#each modelGroups as group (group.provider)}
-									<div class="px-2.5 pt-3 pb-1 text-[11px] font-medium text-white/40">
-										{group.label}
-									</div>
-									{#each group.options as option (`${option.provider}:${option.model}`)}
-										<DropdownMenu.Item
-											class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/75 focus:bg-white/[0.16] focus:text-white data-highlighted:bg-white/[0.12]"
-											onclick={() => (selectedModel = option)}
-										>
-											<img
-												src={option.icon}
-												alt={option.name}
-												class="size-4 opacity-60 brightness-0 invert"
-											/>
-											<span class="min-w-0 flex-1 truncate">{option.name}</span>
-											{#if selectedModel.provider === option.provider && selectedModel.model === option.model}
-												<Check class="size-3.5 text-[#DB8F5E]" />
-											{/if}
-										</DropdownMenu.Item>
-									{/each}
-								{/each}
-							</div>
-							<div class="border-t border-white/10 p-1">
-								<DropdownMenu.Item
-									class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 focus:bg-white/[0.12] focus:text-white data-highlighted:bg-white/[0.12]"
-									onclick={onconfigure}
-								>
-									<Settings2 class="size-3.5" />
-									<span>Configure</span>
-								</DropdownMenu.Item>
-							</div>
-						</DropdownMenu.Content>
-					{:else}
-						<DropdownMenu.Content
-							class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] text-white backdrop-blur-[42px] {transparent
-								? 'bg-[#232323]/[0.40]'
-								: 'bg-[#232323]/[0.85]'}"
-						>
-							{#each llmOptions as option}
-								<DropdownMenu.Item
-									class="flex cursor-pointer items-center gap-2 focus:bg-white/[0.16] focus:text-white"
-									onclick={() => (selectedModel = option)}
-								>
-									<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
-									<span class="truncate">{option.name}</span>
-								</DropdownMenu.Item>
-							{/each}
-						</DropdownMenu.Content>
-					{/if}
-				</DropdownMenu.Root>
+							<X class="size-3.5" />
+						</button>
+					</div>
+				{/each}
 			</div>
 		{/if}
 
-		<!-- Send Button -->
-		<button
-			class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
-			disabled={isUploading || (!isGenerating && !value.trim() && attachedFiles.length === 0)}
-			onclick={handleSendClick}
-			aria-label={isUploading
-				? 'Uploading attachments'
-				: isGenerating
-					? 'Stop generating'
-					: 'Send Message'}
-		>
-			{#if isUploading}
-				<Loader2 class="size-5 animate-spin" />
-			{:else if isGenerating}
-				<Square class="size-4" />
-			{:else}
-				<SendHorizontal class="size-5 -rotate-90" />
+		<!-- Row 2: Input Controls -->
+		<div class="flex w-full flex-row items-end gap-3">
+			<!-- Attach Document -->
+			<div class="relative flex h-9 items-center">
+				<Tooltip.Provider delayDuration={100}>
+					<Tooltip.Root>
+						<Tooltip.Trigger
+							class="flex cursor-pointer items-center text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69]"
+							aria-label="Attach Document"
+							onclick={triggerFileInput}
+						>
+							<Paperclip class="size-5" />
+						</Tooltip.Trigger>
+						<Tooltip.Content
+							class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
+							arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+						>
+							<p>Attach Document (PDF, TXT)</p>
+							<p class="text-xs text-white/[0.69]">
+								{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
+							</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
+			</div>
+			<Input
+				type="file"
+				bind:ref={fileInput}
+				id="file-upload"
+				accept=".pdf,.txt"
+				class="hidden"
+				multiple
+				onchange={handleFileChange}
+			/>
+
+			<!-- Input Text Field: Rich contenteditable editor with native atomic mention nodes -->
+			<div class="relative min-w-0 flex-1">
+				<div
+					bind:this={editorEl}
+					contenteditable="true"
+					role="textbox"
+					tabindex="0"
+					aria-multiline="true"
+					aria-placeholder={placeholder}
+					data-placeholder={placeholder}
+					class="mention-editor max-h-32 min-h-[36px] w-full overflow-y-auto bg-transparent py-1.5 text-base md:text-sm text-white caret-white outline-none selection:bg-white/15 break-words whitespace-pre-wrap"
+					oninput={() => {
+						syncValue();
+						updateMentionState();
+					}}
+					onkeydown={handleKeyDown}
+					onpaste={handlePaste}
+					onfocus={updateMentionState}
+					onblur={closeMention}
+				></div>
+			</div>
+
+			<!-- Model Switcher Dropdown -->
+			{#if showModelSelector}
+				<div class="group/model relative flex h-9 items-center">
+					<DropdownMenu.Root
+						onOpenChange={(open) => {
+							if (!open) modelSearchQuery = '';
+						}}
+					>
+						<DropdownMenu.Trigger
+							class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors group-focus-within/model:text-white/[0.69] group-hover/model:text-white/[0.69] focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
+						>
+							<img
+								src={selectedModel.icon}
+								alt={selectedModel.name}
+								class="size-5 opacity-40 brightness-0 invert transition-opacity group-focus-within/model:opacity-[0.69] group-hover/model:opacity-[0.69]"
+							/>
+							<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
+							<ChevronDown class="size-4" />
+						</DropdownMenu.Trigger>
+
+						{#if onconfigure}
+							<DropdownMenu.Content
+								class="w-80 border border-white/[0.16] p-0 text-white backdrop-blur-[42px] {transparent
+									? 'bg-[#232323]/[0.40]'
+									: 'bg-[#232323]/[0.85]'}"
+							>
+								<div class="max-h-72 overflow-y-auto px-1 py-1">
+									<Input
+										type="search"
+										bind:value={modelSearchQuery}
+										placeholder="Select a model..."
+										class="h-9 rounded-none border-0 border-b border-white/10 bg-transparent px-2.5 text-xs text-white shadow-none focus-visible:border-white/20 focus-visible:ring-0"
+										onkeydown={(event) => event.stopPropagation()}
+									/>
+									{#each modelGroups as group (group.provider)}
+										<div class="px-2.5 pt-3 pb-1 text-[11px] font-medium text-white/40">
+											{group.label}
+										</div>
+										{#each group.options as option (`${option.provider}:${option.model}`)}
+											<DropdownMenu.Item
+												class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/75 focus:bg-white/[0.16] focus:text-white data-highlighted:bg-white/[0.12]"
+												onclick={() => (selectedModel = option)}
+											>
+												<img
+													src={option.icon}
+													alt={option.name}
+													class="size-4 opacity-60 brightness-0 invert"
+												/>
+												<span class="min-w-0 flex-1 truncate">{option.name}</span>
+												{#if selectedModel.provider === option.provider && selectedModel.model === option.model}
+													<Check class="size-3.5 text-[#DB8F5E]" />
+												{/if}
+											</DropdownMenu.Item>
+										{/each}
+									{/each}
+								</div>
+								<div class="border-t border-white/10 p-1">
+									<DropdownMenu.Item
+										class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 focus:bg-white/[0.12] focus:text-white data-highlighted:bg-white/[0.12]"
+										onclick={onconfigure}
+									>
+										<Settings2 class="size-3.5" />
+										<span>Configure</span>
+									</DropdownMenu.Item>
+								</div>
+							</DropdownMenu.Content>
+						{:else}
+							<DropdownMenu.Content
+								class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] text-white backdrop-blur-[42px] {transparent
+									? 'bg-[#232323]/[0.40]'
+									: 'bg-[#232323]/[0.85]'}"
+							>
+								{#each llmOptions as option}
+									<DropdownMenu.Item
+										class="flex cursor-pointer items-center gap-2 focus:bg-white/[0.16] focus:text-white"
+										onclick={() => (selectedModel = option)}
+									>
+										<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
+										<span class="truncate">{option.name}</span>
+									</DropdownMenu.Item>
+								{/each}
+							</DropdownMenu.Content>
+						{/if}
+					</DropdownMenu.Root>
+				</div>
 			{/if}
-		</button>
+
+			<!-- Send Button -->
+			<button
+				class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
+				disabled={isUploading || (!isGenerating && !value.trim() && attachedFiles.length === 0)}
+				onclick={handleSendClick}
+				aria-label={isUploading
+					? 'Uploading attachments'
+					: isGenerating
+						? 'Stop generating'
+						: 'Send Message'}
+			>
+				{#if isUploading}
+					<Loader2 class="size-5 animate-spin" />
+				{:else if isGenerating}
+					<Square class="size-4" />
+				{:else}
+					<SendHorizontal class="size-5 -rotate-90" />
+				{/if}
+			</button>
+		</div>
 	</div>
 </div>
 
