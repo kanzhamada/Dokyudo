@@ -356,10 +356,8 @@
 
 		<!-- Send Button -->
 		<button
-			class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full {transparent
-				? 'bg-[#B8B5B5]/[0] text-white/[0.80] backdrop-blur-[31.16px]'
-				: 'bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40'}"
-			disabled={!transparent && !isGenerating && !value.trim() && attachedFiles.length === 0}
+			class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
+			disabled={!isGenerating && !value.trim() && attachedFiles.length === 0}
 			onclick={handleSendClick}
 			aria-label={isGenerating ? 'Stop generating' : 'Send Message'}
 		>
