@@ -53,6 +53,7 @@
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsage } from '$lib/api/me';
 	import { getKeys } from '$lib/api/keys';
+	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
 	import {
 		branchConversation,
 		deleteConversation,
@@ -104,7 +105,9 @@
 		content: string;
 		timestamp: string;
 		modelName?: string;
-		attachments?: { name: string; size?: number }[];
+		/** Files attached to this message. `documentId` is set once uploaded —
+		 * it scopes RAG retrieval and is reused by edit/retry of this turn. */
+		attachments?: { name: string; size?: number; documentId?: string }[];
 		references?: DocReference[];
 		isStreaming?: boolean;
 		isCancelled?: boolean;
@@ -187,6 +190,7 @@
 	let attachedFiles: File[] = $state([]);
 	let copiedMessageId: string | null = $state(null);
 	let isGenerating = $state(false);
+	let isUploadingAttachments = $state(false);
 	let editingMessageId = $state<string | null>(null);
 	let editingMessageValue = $state('');
 	let editingTextInput: HTMLTextAreaElement | null = $state(null);
@@ -537,8 +541,13 @@
 			isTitleLoading = true;
 			const initialQ = stateObj.initialQuestion as string;
 			const initialModel = (stateObj.selectedModel as LlmOption) || selectedModel;
+			// Files were uploaded on /app/chat before navigation — their
+			// document ids travel through navigation state.
+			const stateAttachments = (stateObj?.attachmentDocuments as
+				| ChatAttachment[]
+				| undefined) ?? undefined;
 			if (stateObj.selectedModel) selectedModel = stateObj.selectedModel as LlmOption;
-			streamChatTurn(initialQ, initialModel);
+			streamChatTurn(initialQ, initialModel, { attachments: stateAttachments });
 			scrollToBottom();
 			return;
 		}
@@ -913,17 +922,52 @@
 	async function streamChatTurn(
 		questionText: string,
 		modelChoice: LlmOption,
-		opts: { editTurnId?: string; retryTurnId?: string; selectedVariantId?: string } = {}
+		opts: {
+			editTurnId?: string;
+			retryTurnId?: string;
+			selectedVariantId?: string;
+			/** Attachments for this turn, already uploaded (initial navigation
+			 * state) or carried over from the original message (edit/retry).
+			 * When absent and files are attached locally, they are uploaded
+			 * right here before the turn is sent. */
+			attachments?: ChatAttachment[];
+		} = {}
 	) {
-		if (!questionText || isGenerating) return;
+		if (!questionText || isGenerating || isUploadingAttachments) return;
 
 		const isRetryMode = !!opts.retryTurnId;
 		const useByok = modelChoice.provider !== 'auto';
+
+		// Resolve the attachments that scope this turn's RAG retrieval:
+		// 1. Already-uploaded docs (initial question from /app/chat state, or
+		//    edit/retry reusing the ids stored on the original message);
+		// 2. Locally attached files — upload them as tenant documents now
+		//    (the pg_net trigger hands them to the STB worker, and the server
+		//    waits for ingestion before answering).
+		let attachmentDocs: ChatAttachment[] = [];
+		if (opts.attachments && opts.attachments.length > 0) {
+			attachmentDocs = opts.attachments;
+		} else if (!isRetryMode && attachedFiles.length > 0) {
+			isUploadingAttachments = true;
+			const uploadRes = await uploadFilesAsDocuments(attachedFiles);
+			isUploadingAttachments = false;
+			if (!uploadRes.ok) {
+				showError(uploadRes.error);
+				return;
+			}
+			attachmentDocs = uploadRes.attachments;
+		}
+
 		const bodyPayload: Record<string, any> = {
 			question: questionText,
 			conversation_id: chatId,
 			useByok
 		};
+		// Attachment mode: the server scopes retrieval to these documents and
+		// waits for them to finish ingesting before answering.
+		if (attachmentDocs.length > 0) {
+			bodyPayload.attachment_document_ids = attachmentDocs.map((a) => a.documentId);
+		}
 		// Edit mode: overwrite the existing turn in place instead of creating a new one.
 		if (opts.editTurnId) bodyPayload.edit_turn_id = opts.editTurnId;
 		// Retry mode: stream a new variant of the latest turn instead of a new turn.
@@ -975,7 +1019,11 @@
 				content: questionText,
 				timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 				turnId: opts.editTurnId,
-				attachments: attachedFiles.map((f) => ({ name: f.name, size: f.size }))
+				attachments: attachmentDocs.map((a) => ({
+					name: a.name,
+					size: a.size,
+					documentId: a.documentId
+				}))
 			};
 
 			messages = [...messages, userMsg];
@@ -1438,7 +1486,7 @@
 	}
 
 	function handleSendMessage() {
-		if (!inputValue.trim() || isGenerating) return;
+		if (!inputValue.trim() || isGenerating || isUploadingAttachments) return;
 		// The retry variant currently displayed (if any) is the one the
 		// follow-up context is built on; nothing is sent when the canonical
 		// answer is shown (server then deletes all variants on success).
@@ -1460,8 +1508,24 @@
 	function retryMessage(msg: ChatMessage, userMsg: ChatMessage | undefined) {
 		if (isGenerating || !userMsg || !msg.turnId) return;
 		// Retry streams a NEW variant of this turn (the latest one) instead
-		// of creating a duplicate turn.
-		streamChatTurn(userMsg.content, selectedModel, { retryTurnId: msg.turnId });
+		// of creating a duplicate turn. The original attachments (document ids)
+		// are re-sent so the retried answer keeps the same RAG scoping.
+		streamChatTurn(userMsg.content, selectedModel, {
+			retryTurnId: msg.turnId,
+			attachments: attachmentsOf(userMsg)
+		});
+	}
+
+	/** Extracts already-uploaded attachments (with document ids) from a message. */
+	function attachmentsOf(msg: ChatMessage | undefined): ChatAttachment[] | undefined {
+		const docs = msg?.attachments
+			?.map((a) =>
+				a.documentId
+					? { documentId: a.documentId, name: a.name, size: a.size ?? 0 }
+					: null
+			)
+			.filter((a): a is ChatAttachment => a !== null);
+		return docs && docs.length > 0 ? docs : undefined;
 	}
 
 	function browseVariant(msg: ChatMessage, delta: number) {
@@ -1499,7 +1563,10 @@
 			messages = messages.slice(0, msgIndex);
 		}
 		cancelEditMessage();
-		streamChatTurn(editedPrompt, selectedModel, { editTurnId: msg.turnId });
+		streamChatTurn(editedPrompt, selectedModel, {
+			editTurnId: msg.turnId,
+			attachments: attachmentsOf(msg)
+		});
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -2839,6 +2906,7 @@
 					{llmOptions}
 					placeholder="Ask a follow-up question..."
 					{isGenerating}
+					isUploading={isUploadingAttachments}
 					{baseUploads}
 					{maxUploads}
 					{baseStorage}

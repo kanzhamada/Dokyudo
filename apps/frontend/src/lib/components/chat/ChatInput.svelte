@@ -6,7 +6,8 @@
 		X,
 		Square,
 		Settings2,
-		Check
+		Check,
+		Loader2
 	} from 'lucide-svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -36,6 +37,8 @@
 		placeholder = 'Ask a follow-up question...',
 		showModelSelector = true,
 		isGenerating = false,
+		/** True while attached files are being uploaded before the turn is sent. */
+		isUploading = false,
 		/** True = transparent/soft capsule look (used by /app/chat landing page). */
 		transparent = false,
 		onsend = () => {},
@@ -119,12 +122,12 @@
 			for (let i = 0; i < target.files.length; i++) {
 				const file = target.files[i];
 
-				// 0. Extension validation
-				const allowedExtensions = ['.pdf', '.docx', '.txt'];
+				// 0. Extension validation (must match the backend upload contract)
+				const allowedExtensions = ['.pdf', '.txt'];
 				const lowerName = file.name.toLowerCase();
 				if (!allowedExtensions.some((ext) => lowerName.endsWith(ext))) {
 					showError(
-						`File "${file.name}" has an invalid extension. Only PDF, DOCX, and TXT are allowed.`
+						`File "${file.name}" has an invalid extension. Only PDF and TXT are allowed.`
 					);
 					continue;
 				}
@@ -225,7 +228,7 @@
 						class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
 						arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
 					>
-						<p>Attach Document (PDF, TXT, DOCX)</p>
+						<p>Attach Document (PDF, TXT)</p>
 						<p class="text-xs text-white/[0.69]">
 							{maxUploads - currentUploadCount} uploads remaining • Max {maxFileSizeMB}MB/file
 						</p>
@@ -237,7 +240,7 @@
 			type="file"
 			bind:ref={fileInput}
 			id="file-upload"
-			accept=".pdf,.txt,.docx"
+			accept=".pdf,.txt"
 			class="hidden"
 			multiple
 			onchange={handleFileChange}
@@ -357,11 +360,13 @@
 		<!-- Send Button -->
 		<button
 			class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
-			disabled={!isGenerating && !value.trim() && attachedFiles.length === 0}
+			disabled={isUploading || (!isGenerating && !value.trim() && attachedFiles.length === 0)}
 			onclick={handleSendClick}
-			aria-label={isGenerating ? 'Stop generating' : 'Send Message'}
+			aria-label={isUploading ? 'Uploading attachments' : isGenerating ? 'Stop generating' : 'Send Message'}
 		>
-			{#if isGenerating}
+			{#if isUploading}
+				<Loader2 class="size-5 animate-spin" />
+			{:else if isGenerating}
 				<Square class="size-4" />
 			{:else}
 				<SendHorizontal class="size-5 -rotate-90" />

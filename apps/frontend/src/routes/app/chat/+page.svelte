@@ -7,8 +7,10 @@
 	import ConfigureByokDialog from '$lib/components/chat/ConfigureByokDialog.svelte';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { toast } from 'svelte-sonner';
 	import { getMeUsage } from '$lib/api/me';
 	import { getKeys } from '$lib/api/keys';
+	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
@@ -51,6 +53,7 @@
 	let inputValue = $state('');
 	let selectedModel: LlmOption = $state(llmOptions[0]);
 	let attachedFiles: File[] = $state([]);
+	let isUploading = $state(false);
 	let isConfigureDialogOpen = $state(false);
 
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
@@ -148,20 +151,38 @@
 		isConfigureDialogOpen = true;
 	}
 
-	function handleSubmit() {
-		if (!inputValue.trim()) return;
+	async function handleSubmit() {
+		if (!inputValue.trim() || isUploading) return;
 
 		if (activeMode === 'chat') {
+			// Upload attached files BEFORE navigating — the conversation does not
+			// exist yet, so the detail page receives their document ids through
+			// navigation state and sends the turn with them. The server then
+			// waits for ingestion before answering.
+			let attachmentDocuments: ChatAttachment[] | undefined;
+			if (attachedFiles.length > 0) {
+				isUploading = true;
+				const uploadRes = await uploadFilesAsDocuments(attachedFiles);
+				isUploading = false;
+				if (!uploadRes.ok) {
+					toast.error('Upload failed', { description: uploadRes.error });
+					return;
+				}
+				attachmentDocuments = uploadRes.attachments;
+			}
+
 			const newId = crypto.randomUUID();
 			console.log('[Chat Page] Initial Chat Submit:', {
 				newId,
 				question: inputValue.trim(),
-				selectedModel
+				selectedModel,
+				attachmentDocuments
 			});
 			goto(`/app/chat/${newId}`, {
 				state: {
 					initialQuestion: inputValue.trim(),
-					selectedModel: $state.snapshot(selectedModel)
+					selectedModel: $state.snapshot(selectedModel),
+					attachmentDocuments
 				}
 			});
 		}
@@ -302,6 +323,7 @@
 			showModelSelector={activeMode === 'chat'}
 			refocusKey={activeMode}
 			transparent
+			{isUploading}
 			{baseUploads}
 			{maxUploads}
 			{baseStorage}
