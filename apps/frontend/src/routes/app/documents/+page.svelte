@@ -1625,6 +1625,7 @@
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 4;
+		line-clamp: 4;
 		overflow: hidden;
 		max-height: calc(1.65em * 4);
 		-webkit-mask-image: linear-gradient(
@@ -1645,6 +1646,7 @@
 		color: rgba(255, 255, 255, 0.8);
 		max-height: none;
 		-webkit-line-clamp: unset;
+		line-clamp: unset;
 		-webkit-mask-image: none;
 		mask-image: none;
 	}
