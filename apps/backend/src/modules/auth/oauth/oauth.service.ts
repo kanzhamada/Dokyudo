@@ -1,11 +1,12 @@
-import { getSupabaseAnon } from "../../../config/supabase.ts";
+import { getSupabaseAnon, getSupabaseAdmin } from "../../../config/supabase.ts";
 import { getEnv } from "../../../config/env.ts";
 import { redis } from "../../../config/redis.ts";
 import { AppError } from "../../../shared/utils/errors.util.ts";
 import * as OAuthSchema from "./oauth.schema.ts";
-import { getSupabaseAdmin } from "../../../config/supabase.ts";
 import { db } from "../../../config/drizzle.ts";
-import { loginAttempts } from "../../../shared/models/db.model.ts";
+import { loginAttempts, users } from "../../../shared/models/db.model.ts";
+import { eq, or } from "drizzle-orm";
+import { logActivity } from "../../../shared/utils/activity.util.ts";
 
 export interface OAuthCallbackResult {
     accessToken: string;
@@ -134,6 +135,30 @@ export class OAuthService {
                         err.message;
                 }
             }
+        }
+
+        const [userRecord] = await db
+            .select({ tenantId: users.tenantId })
+            .from(users)
+            .where(
+                user.email
+                    ? or(eq(users.id, user.id), eq(users.email, user.email))
+                    : eq(users.id, user.id),
+            );
+
+        if (userRecord) {
+            await logActivity({
+                tenantId: userRecord.tenantId,
+                userId: user.id,
+                action: "auth.login",
+                ipAddress: params.clientIp,
+                userAgent: params.userAgent,
+                requestId: params.requestId,
+                metadata: { provider: params.provider },
+            });
+        } else if (params.logContext) {
+            params.logContext.activityLogWarning =
+                `Could not log activity for OAuth user ${user.id}: user record not found in public.users`;
         }
 
         return {

@@ -2336,6 +2336,10 @@ Always include the document references ([Doc N: Page X]) in your answer.
         let branchParent: { id: string; title: string } | null = null;
         let turns: any[] = [];
         let alternativesByTurn = new Map<string, any[]>();
+        // Attached document id → display title, resolved once per conversation
+        // (tenant-scoped) so the frontend chips survive reloads. Missing docs
+        // fall back to a generic label at render time.
+        let attachmentTitles = new Map<string, string>();
 
         await withAuthDb(userId, async (tx) => {
             const results = await tx

@@ -132,6 +132,13 @@ export const ContextReferenceSchema = z.object({
 });
 export type ContextReference = z.infer<typeof ContextReferenceSchema>;
 
+/** A document attached to a turn (or baked into a share snapshot) — id + display title. */
+export const AttachmentDocumentSchema = z.object({
+    documentId: z.string(),
+    title: z.string(),
+});
+export type AttachmentDocument = z.infer<typeof AttachmentDocumentSchema>;
+
 export const TurnAlternativeSchema = z.object({
     id: z.string().uuid(),
     answer: z.string(),
@@ -154,6 +161,9 @@ export const ConversationTurnSchema = z.object({
     branchedFromTurnId: z.string().uuid().nullable().optional(),
     /** Attachment document ids scoping this turn's retrieval (awaiting turns). */
     attachmentDocumentIds: z.array(z.string().uuid()).nullable().optional(),
+    /** Attached documents with display titles — resolved from the documents
+     * table on read so the chips survive reloads. */
+    attachmentDocuments: z.array(AttachmentDocumentSchema).nullable().optional(),
     contextReferences: z.array(ContextReferenceSchema).nullable(),
     /** Retry variants of this turn (terminal, non-empty answers only). */
     alternatives: z.array(TurnAlternativeSchema).default([]),
@@ -232,6 +242,12 @@ export const PublicShareTurnSchema = z.object({
     modelUsed: z.string().nullable(),
     status: z.enum(["complete", "stopped", "failed", "blocked"]),
     contextReferences: z.array(ContextReferenceSchema).nullable(),
+    /**
+     * Attachments baked into the snapshot at share time — id + title only. The
+     * title is visible to public viewers; the document itself is not openable
+     * (preview requires auth + tenant ownership).
+     */
+    attachments: z.array(AttachmentDocumentSchema).nullable().optional(),
     createdAt: z.string(),
 });
 export type PublicShareTurn = z.infer<typeof PublicShareTurnSchema>;

@@ -53,7 +53,7 @@ export class ActivitiesService {
                 .where(whereClause);
 
             const total = totalResult.count;
-            const totalPages = Math.max(1, Math.ceil(total / limit));
+            const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
             const activities = await db
                 .select({

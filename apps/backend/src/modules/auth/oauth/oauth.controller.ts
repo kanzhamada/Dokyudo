@@ -76,7 +76,7 @@ async function processOAuthCallback(c: Context, provider: "google" | "github") {
     }
 
     try {
-        const { clientIp, userAgent } = extractor.extractAuditContext();
+        const { clientIp, userAgent, requestId } = extractor.extractAuditContext();
         const params: OAuthSchema.OAuthCallbackParams = {
             code,
             provider,
@@ -84,6 +84,7 @@ async function processOAuthCallback(c: Context, provider: "google" | "github") {
             error_description: errorDescription,
             clientIp,
             userAgent,
+            requestId,
             logContext,
         };
 

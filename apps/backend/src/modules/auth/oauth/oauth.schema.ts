@@ -18,6 +18,7 @@ export const OAuthCallbackParamsSchema = OAuthCallbackQuerySchema.extend({
     provider: z.enum(["google", "github"]),
     clientIp: z.string(),
     userAgent: z.string().optional(),
+    requestId: z.string().optional(),
     logContext: z.any().optional(),
 });
 
