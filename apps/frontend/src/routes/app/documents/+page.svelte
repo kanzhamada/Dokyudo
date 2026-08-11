@@ -1260,7 +1260,7 @@
 										id={`semantic-match-${doc.id}`}
 										class="semantic-match-copy {expandedDocs.includes(doc.id)
 											? 'semantic-match-copy-expanded'
-											: 'line-clamp-3'}"
+											: 'semantic-match-copy-collapsed'}"
 									>
 										{@html highlightMatch(doc.semanticContent, activeSearchQuery)}
 									</div>
@@ -1621,8 +1621,32 @@
 			transform 500ms cubic-bezier(0.32, 0.72, 0, 1);
 	}
 
+	.semantic-match-copy-collapsed {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 4;
+		overflow: hidden;
+		max-height: calc(1.65em * 4);
+		-webkit-mask-image: linear-gradient(
+			to bottom,
+			#000 0,
+			#000 4.5em,
+			rgba(0, 0, 0, 0.3) 6.6em
+		);
+		mask-image: linear-gradient(
+			to bottom,
+			#000 0,
+			#000 4.5em,
+			rgba(0, 0, 0, 0.3) 6.6em
+		);
+	}
+
 	.semantic-match-copy-expanded {
 		color: rgba(255, 255, 255, 0.8);
+		max-height: none;
+		-webkit-line-clamp: unset;
+		-webkit-mask-image: none;
+		mask-image: none;
 	}
 
 	.match-score {
