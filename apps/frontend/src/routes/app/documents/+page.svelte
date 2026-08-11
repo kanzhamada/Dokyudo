@@ -1115,7 +1115,6 @@
 							<!-- "Why this matched" box -->
 							<div class="rounded-lg border border-[#DB8F5E]/20 bg-[#1A1512] p-3.5">
 								<div class="flex items-center gap-1.5">
-									<div class="size-3.5 rounded-full bg-[#DB8F5E]/30"></div>
 									<div class="h-3 w-24 rounded-full bg-[#DB8F5E]/20"></div>
 								</div>
 								<div class="mt-2.5 flex flex-col gap-1.5">
@@ -1216,7 +1215,6 @@
 
 							{#if doc.semanticContent}
 								<div class="semantic-match-panel">
-									<div class="semantic-match-rail" aria-hidden="true"></div>
 									<button
 										type="button"
 										class="semantic-match-trigger"
@@ -1232,9 +1230,6 @@
 										aria-controls={`semantic-match-${doc.id}`}
 									>
 										<span class="flex min-w-0 items-center gap-2.5">
-											<span class="semantic-match-icon" aria-hidden="true">
-												<SparklesIcon class="size-3.5" strokeWidth={1.7} />
-											</span>
 											<span class="min-w-0 text-left">
 												<span
 													class="block text-[13px] font-medium tracking-[-0.01em] text-white/90"
@@ -1566,15 +1561,6 @@
 		transform: translateY(-1px);
 	}
 
-	.semantic-match-rail {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		left: 0;
-		width: 2px;
-		background: linear-gradient(180deg, #db8f5e 0%, rgba(219, 143, 94, 0.18) 100%);
-	}
-
 	.semantic-match-trigger {
 		position: relative;
 		display: flex;
@@ -1594,27 +1580,6 @@
 	.semantic-match-trigger:focus-visible {
 		outline: none;
 		box-shadow: inset 0 0 0 1px rgba(219, 143, 94, 0.72);
-	}
-
-	.semantic-match-icon {
-		display: inline-flex;
-		height: 1.75rem;
-		width: 1.75rem;
-		flex-shrink: 0;
-		align-items: center;
-		justify-content: center;
-		border: 1px solid rgba(219, 143, 94, 0.28);
-		border-radius: 0.5rem;
-		background: rgba(219, 143, 94, 0.1);
-		color: #db8f5e;
-		transition:
-			background-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
-			transform 500ms cubic-bezier(0.32, 0.72, 0, 1);
-	}
-
-	.semantic-match-trigger:hover .semantic-match-icon {
-		background: rgba(219, 143, 94, 0.18);
-		transform: translateY(-1px) rotate(-3deg);
 	}
 
 	.semantic-match-action {
@@ -1646,7 +1611,7 @@
 
 	.semantic-match-copy {
 		border-top: 1px solid rgba(255, 255, 255, 0.08);
-		padding: 0.8rem 1rem 1rem 3.75rem;
+		padding: 0.8rem 1rem 1rem 1rem;
 		font-size: 0.8125rem;
 		font-weight: 400;
 		line-height: 1.65;
@@ -1734,7 +1699,6 @@
 	@media (prefers-reduced-motion: reduce) {
 		.semantic-match-panel,
 		.semantic-match-trigger,
-		.semantic-match-icon,
 		.semantic-match-action,
 		.semantic-match-copy,
 		.match-score,
