@@ -24,7 +24,7 @@ export const KeyResponseSchema = z.object({
     maskedKey: z.string().openapi({ example: "AIza...1234" }),
     models: z.array(z.string()).openapi({
         description: "Available models for this provider",
-        example: ["gemini-2.5-flash", "gemini-2.5-pro"],
+        example: ["gemini-3.5-flash", "gemini-3-flash-preview"],
     }),
     updatedAt: z.string().openapi({ example: "2024-01-01T00:00:00.000Z" }),
 });
