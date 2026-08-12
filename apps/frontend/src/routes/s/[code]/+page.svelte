@@ -392,6 +392,21 @@
 								class="w-fit rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md"
 							>
 								<p class="leading-relaxed whitespace-pre-wrap">{turn.question}</p>
+
+								<!-- Attached documents (title only — static chips, not openable:
+								public viewers have no document access, by design). -->
+								{#if turn.attachments && turn.attachments.length > 0}
+									<div class="mt-2 flex flex-wrap gap-1.5">
+										{#each turn.attachments as att}
+											<span
+												class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80"
+											>
+												<MxIcon name="document-outline" class="size-3 text-white/60" />
+												{att.title}
+											</span>
+										{/each}
+									</div>
+								{/if}
 							</div>
 
 							<!-- Action Toolbar (Copy only — no edit on a shared chat) -->

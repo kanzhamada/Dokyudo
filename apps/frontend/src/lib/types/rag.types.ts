@@ -61,6 +61,12 @@ export interface ContextReference {
 	pages: number[];
 }
 
+/** A document attached to a turn — id + display title. */
+export interface AttachmentDocument {
+	documentId: string;
+	title: string;
+}
+
 export type TurnStatus =
 	| 'processing'
 	| 'awaiting_indexing'
@@ -90,6 +96,9 @@ export interface ConversationTurn {
 	branchedFromTurnId?: string | null;
 	/** Attachment document ids scoping this turn's retrieval (awaiting turns). */
 	attachmentDocumentIds?: string[] | null;
+	/** Attached documents with display titles — returned by the server so the
+	 * chips survive reloads. */
+	attachmentDocuments?: AttachmentDocument[] | null;
 	modelUsed: string | null;
 	contextReferences: ContextReference[] | null;
 	/** Retry variants of this turn (terminal, non-empty answers only). */
@@ -150,6 +159,11 @@ export interface PublicShareTurn {
 	modelUsed: string | null;
 	status: 'complete' | 'stopped' | 'failed' | 'blocked';
 	contextReferences: ContextReference[] | null;
+	/**
+	 * Attachments baked into the snapshot at share time (id + title). Titles
+	 * are visible to public viewers; the documents are not openable.
+	 */
+	attachments?: AttachmentDocument[] | null;
 	createdAt: string;
 }
 

@@ -2377,6 +2377,26 @@ Always include the document references ([Doc N: Page X]) in your answer.
                     )
                     .orderBy(conversationTurns.createdAt);
 
+                // Resolve the display titles of every attached document in one
+                // tenant-scoped query (only when any turn carries attachments).
+                const allAttachmentIds = turns.flatMap((t) =>
+                    Array.isArray(t.attachmentDocumentIds) ? t.attachmentDocumentIds : [],
+                );
+                if (allAttachmentIds.length > 0) {
+                    const attachmentRows = await tx
+                        .select({ id: documents.id, title: documents.title })
+                        .from(documents)
+                        .where(
+                            and(
+                                eq(documents.tenantId, tenantId),
+                                inArray(documents.id, allAttachmentIds),
+                            ),
+                        );
+                    for (const row of attachmentRows) {
+                        attachmentTitles.set(row.id, row.title);
+                    }
+                }
+
                 // Retry variants (terminal, non-empty answers only — in-flight
                 // or junk rows are not rendered), grouped by turn id.
                 const altRows = await tx
@@ -2422,6 +2442,17 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 feedback: t.feedback ?? null,
                 feedbackAt: t.feedbackAt?.toISOString() ?? null,
                 branchedFromTurnId: t.branchedFromTurnId ?? null,
+                // Persisted scoping ids (previously dropped here — the reload
+                // lost the attachments entirely) plus display titles resolved
+                // from the documents table above.
+                attachmentDocumentIds: t.attachmentDocumentIds ?? null,
+                attachmentDocuments: (Array.isArray(t.attachmentDocumentIds)
+                    ? t.attachmentDocumentIds
+                    : []
+                ).map((id: string) => ({
+                    documentId: id,
+                    title: attachmentTitles.get(id) ?? "Document",
+                })),
                 contextReferences: RagService.filterReferencesByCitations(
                     t.answer,
                     t.contextReferences as any,

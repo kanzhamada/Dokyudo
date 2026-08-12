@@ -1,10 +1,11 @@
-import { and, desc, eq, gt, isNull, ne, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, ne, or } from "drizzle-orm";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { db, withAnonDb, withAuthDb } from "../../config/drizzle.ts";
 import {
     chatShares,
     conversations,
     conversationTurns,
+    documents,
     shareInvitees,
     tenants,
     users,
@@ -142,6 +143,16 @@ interface SnapshotTurn {
     modelUsed: string | null;
     status: string;
     contextReferences: unknown;
+    /** Attached document ids — restored on "continue chat" so the rebuilt
+     * turns keep the same RAG scoping. */
+    attachmentDocumentIds?: string[] | null;
+    /**
+     * Attachments baked into the snapshot at share time (id + title). The
+     * titles are visible on the public page; the anon role cannot resolve them
+     * from the tenant's documents table, so they must be frozen here. The
+     * documents themselves are never openable through the public view.
+     */
+    attachments?: { documentId: string; title: string }[] | null;
     createdAt: string;
 }
 
@@ -226,6 +237,7 @@ export class ShareService {
                     modelUsed: conversationTurns.modelUsed,
                     status: conversationTurns.status,
                     contextReferences: conversationTurns.contextReferences,
+                    attachmentDocumentIds: conversationTurns.attachmentDocumentIds,
                     createdAt: conversationTurns.createdAt,
                     id: conversationTurns.id,
                 })
@@ -247,12 +259,42 @@ export class ShareService {
                 });
             }
 
+            // Resolve the attached documents' display titles in one tenant-scoped
+            // query. They are baked into the immutable snapshot because the anon
+            // role that serves public shares cannot read the documents table.
+            const shareAttachmentIds = turns.flatMap((t) =>
+                Array.isArray(t.attachmentDocumentIds) ? t.attachmentDocumentIds : [],
+            );
+            const attachmentTitles = new Map<string, string>();
+            if (shareAttachmentIds.length > 0) {
+                const attachmentRows = await tx
+                    .select({ id: documents.id, title: documents.title })
+                    .from(documents)
+                    .where(
+                        and(
+                            eq(documents.tenantId, tenantId),
+                            inArray(documents.id, shareAttachmentIds),
+                        ),
+                    );
+                for (const row of attachmentRows) {
+                    attachmentTitles.set(row.id, row.title);
+                }
+            }
+
             snapshot = turns.map((t) => ({
                 question: t.question,
                 answer: t.answer,
                 modelUsed: t.modelUsed,
                 status: t.status,
                 contextReferences: t.contextReferences,
+                attachmentDocumentIds: (t.attachmentDocumentIds as string[] | null) ?? null,
+                attachments: (Array.isArray(t.attachmentDocumentIds)
+                    ? t.attachmentDocumentIds
+                    : []
+                ).map((id: string) => ({
+                    documentId: id,
+                    title: attachmentTitles.get(id) ?? "Document",
+                })),
                 createdAt: t.createdAt.toISOString(),
             }));
 
@@ -687,6 +729,10 @@ export class ShareService {
                         modelUsed: t.modelUsed,
                         contextReferences: t.contextReferences as any,
                         status: t.status as any,
+                        // Restore the attachment scoping captured in the snapshot
+                        // so edit/retry of the rebuilt turns keep the same scope.
+                        // (Display titles are resolved live by getConversation.)
+                        attachmentDocumentIds: t.attachmentDocumentIds ?? null,
                         branchedFromTurnId: null,
                         createdAt: new Date(t.createdAt),
                     })),

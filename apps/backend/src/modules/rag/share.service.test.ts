@@ -7,6 +7,7 @@ import {
     chatShares,
     conversations,
     conversationTurns,
+    documents,
     tenants,
     users,
 } from "../../shared/models/db.model.ts";
@@ -77,6 +78,8 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
     const TEST_TENANT_ID = crypto.randomUUID();
     const TEST_USER_ID = crypto.randomUUID();
     const TEST_CONVERSATION_ID = crypto.randomUUID();
+    const TEST_DOC_ID = crypto.randomUUID();
+    const TEST_DOC_TITLE = "Laporan Tahunan 2025";
     let shareCode = "";
 
     beforeAll(async () => {
@@ -97,6 +100,19 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
             .insert(conversations)
             .values({ id: TEST_CONVERSATION_ID, tenantId: TEST_TENANT_ID, title: "Share Test Conversation" })
             .onConflictDoNothing();
+        // A real document the second turn attaches — its title must appear in
+        // the share snapshot (baked at share time, anon readers cannot query it).
+        await db
+            .insert(documents)
+            .values({
+                id: TEST_DOC_ID,
+                tenantId: TEST_TENANT_ID,
+                title: TEST_DOC_TITLE,
+                storagePath: `${TEST_DOC_ID}.pdf`,
+                sizeBytes: 1024,
+                status: "processed",
+            })
+            .onConflictDoNothing();
         await db.insert(conversationTurns).values([
             {
                 id: crypto.randomUUID(),
@@ -113,6 +129,7 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
                 question: "Pertanyaan kedua",
                 answer: "Jawaban kedua",
                 status: "complete",
+                attachmentDocumentIds: [TEST_DOC_ID],
             },
         ]);
     });
@@ -123,6 +140,9 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
             .delete(conversationTurns)
             .where(eq(conversationTurns.tenantId, TEST_TENANT_ID));
         await db.delete(conversations).where(eq(conversations.tenantId, TEST_TENANT_ID));
+        // Explicit delete: documents.tenant_id has ON DELETE RESTRICT, so the
+        // tenant row cannot be removed while the document still exists.
+        await db.delete(documents).where(eq(documents.tenantId, TEST_TENANT_ID));
         await db.delete(users).where(eq(users.id, TEST_USER_ID));
         await db.delete(authUsers).where(eq(authUsers.id, TEST_USER_ID));
         await db.delete(tenants).where(eq(tenants.id, TEST_TENANT_ID));
@@ -146,6 +166,13 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
         assertEquals(pub.turns[0].question, "Pertanyaan pertama");
         assertEquals(pub.turns[1].answer, "Jawaban kedua");
         assertEquals(pub.expiresAt !== null, true);
+
+        // Attachments are baked into the snapshot with their titles — visible
+        // on the public page (the documents themselves are not openable there).
+        assertEquals(pub.turns[0].attachments, []);
+        assertEquals(pub.turns[1].attachments, [
+            { documentId: TEST_DOC_ID, title: TEST_DOC_TITLE },
+        ]);
     });
 
     it("createShare: rejects inviting the sharer's own email", async () => {
@@ -303,6 +330,7 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
             .select({
                 question: conversationTurns.question,
                 answer: conversationTurns.answer,
+                attachmentDocumentIds: conversationTurns.attachmentDocumentIds,
                 branchedFromTurnId: conversationTurns.branchedFromTurnId,
             })
             .from(conversationTurns)
@@ -314,6 +342,10 @@ describe("ShareService Integration", { ignore: !shareTableReady }, () => {
         assertEquals(turns[1].answer, "Jawaban kedua");
         // No boundary marker on the last copied turn either.
         assertEquals(turns[1].branchedFromTurnId, null);
+        // The attachment scoping captured in the snapshot is restored, so the
+        // rebuilt turns keep the same RAG scope on edit/retry.
+        assertEquals(turns[0].attachmentDocumentIds ?? null, null);
+        assertEquals(turns[1].attachmentDocumentIds, [TEST_DOC_ID]);
 
         await db.delete(conversations).where(eq(conversations.id, result.id));
     });

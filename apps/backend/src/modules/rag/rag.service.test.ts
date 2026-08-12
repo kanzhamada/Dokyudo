@@ -1135,6 +1135,53 @@ describe("RagService Isolated Tests", () => {
             assertEquals(Array.isArray(res.turns), true);
         });
 
+        it("positive: turns with attachments return the persisted ids and resolved titles", async () => {
+            const convId = crypto.randomUUID();
+            const docId = crypto.randomUUID();
+            await db.insert(conversations).values({
+                id: convId,
+                tenantId: TEST_TENANT_ID,
+                title: "Attachment Conversation",
+            });
+            await db.insert(documents).values({
+                id: docId,
+                tenantId: TEST_TENANT_ID,
+                title: "Dokumen Terlampir",
+                storagePath: `${docId}.pdf`,
+                sizeBytes: 2048,
+                status: "processed",
+            });
+            await db.insert(conversationTurns).values({
+                id: crypto.randomUUID(),
+                tenantId: TEST_TENANT_ID,
+                conversationId: convId,
+                question: "Pertanyaan dengan lampiran",
+                answer: "Jawaban",
+                status: "complete",
+                attachmentDocumentIds: [docId],
+            });
+
+            try {
+                const res = await RagService.getConversation({
+                    userId: TEST_USER_ID,
+                    tenantId: TEST_TENANT_ID,
+                    conversationId: convId,
+                });
+                assertEquals(res.turns.length, 1);
+                // The persisted scoping ids survive reloads (previously dropped).
+                assertEquals(res.turns[0].attachmentDocumentIds, [docId]);
+                // Display titles are resolved from the documents table.
+                assertEquals(res.turns[0].attachmentDocuments, [
+                    { documentId: docId, title: "Dokumen Terlampir" },
+                ]);
+            } finally {
+                // Deleting the conversation cascades its turns; the document row
+                // must go explicitly (tenant FK is ON DELETE RESTRICT).
+                await db.delete(conversations).where(eq(conversations.id, convId));
+                await db.delete(documents).where(eq(documents.id, docId));
+            }
+        });
+
         it("negative: throws 404 for invalid conversation", async () => {
             await assertRejects(
                 () => RagService.getConversation({

@@ -589,6 +589,12 @@
 							// Persisted on the server turn — lets edit/retry reuse
 							// the same RAG scoping after a reload.
 							attachmentDocumentIds: turn.attachmentDocumentIds ?? undefined,
+							// Display metadata (titles) returned by the server — the
+							// attachment chips survive reloads with real document titles.
+							attachments: turn.attachmentDocuments?.map((a) => ({
+								name: a.title,
+								documentId: a.documentId
+							})),
 							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
 								hour: '2-digit',
 								minute: '2-digit'
@@ -1659,9 +1665,14 @@
 	function attachmentsOf(msg: ChatMessage | undefined): ChatAttachment[] | undefined {
 		const persistedIds = msg?.attachmentDocumentIds;
 		if (persistedIds && persistedIds.length > 0) {
+			// Persisted ids win (they survive reloads); reuse the display titles
+			// from the local chips when this turn was loaded in the session.
+			const names = new Map(
+				(msg?.attachments ?? []).filter((a) => a.documentId).map((a) => [a.documentId!, a.name])
+			);
 			return persistedIds.map((documentId) => ({
 				documentId,
-				name: 'Document',
+				name: names.get(documentId) ?? 'Document',
 				size: 0
 			}));
 		}
@@ -2545,12 +2556,24 @@
 										{#if msg.attachments && msg.attachments.length > 0}
 											<div class="mb-2 flex flex-wrap gap-1.5">
 												{#each msg.attachments as att}
-													<span
-														class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80"
-													>
-														<MxIcon name="document-outline" class="size-3 text-white/60" />
-														{att.name}
-													</span>
+													{#if att.documentId}
+														<button
+															type="button"
+															class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80 transition-colors hover:border-white/30 hover:bg-white/20 hover:text-white"
+															title="Open {att.name} in PDF viewer"
+															onclick={() => openCitationPreview(att.documentId!, att.name, [])}
+														>
+															<MxIcon name="document-outline" class="size-3 text-white/60" />
+															{att.name}
+														</button>
+													{:else}
+														<span
+															class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80"
+														>
+															<MxIcon name="document-outline" class="size-3 text-white/60" />
+															{att.name}
+														</span>
+													{/if}
 												{/each}
 											</div>
 										{/if}
