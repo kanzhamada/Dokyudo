@@ -24,14 +24,34 @@ graph TD
     J --> L[recentChatItem]
 ```
 
+## Account Panel Dialog (Unified)
+
+Sejak 2026-08-12, Settings, Billing, Shared Links, dan Configure BYOK digabung menjadi **satu dialog panel** dengan side tab.
+
+- **`apps/frontend/src/lib/components/app/AccountPanelDialog.svelte`**: dialog tunggal (glassy `#242322/85`, `sm:max-w-[880px] lg:max-w-[940px]`) dengan tab rail di kiri (`w-52`) dan panel konten di kanan. Di mobile rail berubah jadi bar horizontal scroll di atas konten.
+- **Tinggi konsisten & scrollable**: area panel memakai tinggi tetap `h-[70vh]` (mobile) / `h-[600px]` (desktop); header + rail statis, konten tiap tab scroll sendiri (`overflow-y-auto`). Semua tab punya tinggi yang sama.
+- **Tab yang tersedia**:
+  - `settings` — display name (`PATCH /api/auth/tenant/name`) + ganti password (`PUT /api/auth/update-password`, schema `profilePasswordSchema`).
+  - `billing` — usage (`GET /api/me/usage`) dengan limit dari `TIER_LIMITS`, countdown reset bulanan realtime (FREE) atau `expiresAt` + tombol `Manage billing` (`POST /api/payments/portal`), pricing plans dari `TIER_PLANS`, checkout Sandbox (`POST /api/payments/checkout`).
+  - `shared-links` — daftar link aktif (`GET /api/rag/shares`), search, group by conversation, delete/revoke/copy.
+  - `byok` — Configure BYOK (Google AI / Mistral / OpenRouter), save/reset key (`upsertKey`/`deleteKey`), masked key state.
+- **State bersama**: `apps/frontend/src/lib/state/account-panel.store.svelte.ts` mengekspos `accountPanel` (`$state` berisi `open`, `tab`, `byokSavedAt`) + helper `openAccountPanel(tab)`, `closeAccountPanel()`, `markByokSaved()`. Halaman mana pun (mis. `/app/chat` tombol *configure*) bisa membuka panel dengan tab aktif tertentu.
+- **Refresh BYOK**: setelah key disave/reset, `markByokSaved()` menaikkan `byokSavedAt`; halaman chat me-refresh `llmOptions` via `$effect` yang mengamati nilai tersebut.
+- **Auto-open**: redirect dari payment success ke `/app?billing=open` membuka panel langsung di tab `billing`.
+- Menu profile footer (Settings / Billing / Shared links / Log out) kini memanggil `openAccountPanel(...)` alih-alih tiga dialog terpisah.
+
 ## Completion Timestamp
-**Completed At:** 2026-06-21T21:25:35+07:00
+**Completed At:** 2026-06-21T21:25:35+07:00 (diperbarui 2026-08-12: unified Account Panel)
 
 ## File Mapping
 * **`apps/frontend/src/routes/app/+layout.svelte`**
   * Serves as the main layout wrapper, rendering the `Sidebar.Provider`, the `AppSidebar`, and the new `MobileHeader`.
 * **`apps/frontend/src/lib/components/app/AppSidebar.svelte`**
-  * The core navigation component. Extensively refactored to use Svelte 5 snippets (`#snippet navItem`, `#snippet recentChatItem`) for DRY architecture. Uses Tailwind classes mapped to central CSS variables.
+  * The core navigation component. Extensively refactored to use Svelte 5 snippets (`#snippet navItem`, `#snippet recentChatItem`) for DRY architecture. Uses Tailwind classes mapped to central CSS variables. Menu profile membuka `AccountPanelDialog` via `account-panel.store`.
+* **`apps/frontend/src/lib/components/app/AccountPanelDialog.svelte`**
+  * [NEW] Unified account panel (Settings / Billing / Shared links / BYOK) dengan side tab dan tinggi konsisten scrollable.
+* **`apps/frontend/src/lib/state/account-panel.store.svelte.ts`**
+  * [NEW] Shared state untuk membuka panel dari komponen/page mana pun.
 * **`apps/frontend/src/lib/components/app/MobileHeader.svelte`**
   * [NEW] A mobile-exclusive (`md:hidden`) top navigation bar that contains a hamburger menu (triggering `sidebar.toggle()`) and the Dokyudo logo.
 * **`apps/frontend/src/routes/layout.css`**

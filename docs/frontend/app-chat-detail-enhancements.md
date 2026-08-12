@@ -270,6 +270,8 @@ Dialog "Configure BYOK" (tab provider Google AI/Mistral/OpenRouter, masked-key "
 - Halaman ini kini hanya menyisakan `isConfigureDialogOpen` + `openConfigureDialog()`; `loadLlmOptions` disederhanakan (tanpa `configuredKeyMasks`).
 - Styling glassmorphic seragam dengan input chat: `bg-[#232323]/[0.85] backdrop-blur-[42px] border-white/[0.16]` (sebelumnya solid `bg-[#232323]`). Dropdown model juga `bg-[#232323]/[0.85]` (atau `[0.40]` saat `transparent`).
 
+> **Update Iteration 7 (2026-08-12):** `ConfigureByokDialog.svelte` **dihapus**. Seluruh logikanya dipindah ke tab **`byok`** di `AccountPanelDialog.svelte` (panel akun terpadu). Tombol configure di `/chat` dan `/chat/[id]` kini memanggil `openAccountPanel('byok')` dari `$lib/state/account-panel.store.svelte.ts`; refresh `llmOptions` setelah save/reset dilakukan via `$effect` yang mengamati `accountPanel.byokSavedAt` (pengganti prop `onSaved`).
+
 ### 3. View Transitions & penghapusan fade `isMounted`
 
 - Root div halaman **tidak lagi** memakai `transition-opacity duration-500` + `isMounted` (opacity 0→1) — fade ini beradu dengan SvelteKit View Transition dan membuat input berkedip. State `isMounted` dihapus.
@@ -280,8 +282,10 @@ Dialog "Configure BYOK" (tab provider Google AI/Mistral/OpenRouter, masked-key "
 | File | Change |
 |---|---|
 | `apps/frontend/src/lib/components/chat/ChatInput.svelte` | Komponen baru (baseline style dari halaman ini) |
-| `apps/frontend/src/lib/components/chat/ConfigureByokDialog.svelte` | Komponen baru (dialog BYOK, diextract dari halaman ini) |
-| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | Pakai ChatInput + ConfigureByokDialog; hapus state/fungsi configure & file, derived usage, fade isMounted |
+| `apps/frontend/src/lib/components/chat/ConfigureByokDialog.svelte` | ~~Komponen baru (dialog BYOK, diextract dari halaman ini)~~ — dihapus Iteration 7, digabung ke `AccountPanelDialog.svelte` tab `byok` |
+| `apps/frontend/src/lib/components/app/AccountPanelDialog.svelte` | Tab `byok` (pengganti ConfigureByokDialog) |
+| `apps/frontend/src/lib/state/account-panel.store.svelte.ts` | Shared state panel (`openAccountPanel('byok')`, `byokSavedAt`) |
+| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | Pakai ChatInput; configure → `openAccountPanel('byok')`; hapus state/fungsi configure & file, derived usage, fade isMounted |
 
 ### 5. Completion Timestamp
 
@@ -323,3 +327,10 @@ Komponen baru `apps/frontend/src/lib/components/chat/AttachmentCards.svelte` men
 ### 5. Completion Timestamp
 
 **Iteration 6 (attachment cards di luar bubble):** 2026-08-12
+
+## Iteration 7 — Configure BYOK digabung ke Account Panel (2026-08-12)
+
+- `ConfigureByokDialog.svelte` dihapus; logika BYOK (provider Google AI/Mistral/OpenRouter, masked keys, save/reset via `upsertKey`/`deleteKey`) dipindah ke tab `byok` `AccountPanelDialog.svelte`.
+- Tombol *configure* di kedua halaman chat memanggil `openAccountPanel('byok')` (store `$lib/state/account-panel.store.svelte.ts`).
+- `markByokSaved()` menaikkan `byokSavedAt`; halaman me-refresh `llmOptions` via `$effect` (menggantikan prop `onSaved`).
+- Detail panel: `docs/frontend/app-sidebar.md` § Account Panel Dialog.

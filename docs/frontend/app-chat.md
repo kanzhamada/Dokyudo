@@ -78,7 +78,7 @@ Kapsul input chat (file chips, attach + quota tooltip, textarea auto-resize, mod
 ### 2. Model selection `/chat` sama persis dengan `/chat/[id]`
 
 - Halaman `/chat` kini melempar `onconfigure={openConfigureDialog}` → ChatInput merender dropdown **rich** (search + grup model + item Configure), bukan flat list lagi.
-- `ConfigureByokDialog.svelte` (komponen reusable, diextract dari `/chat/[id]`) dipasang di `/chat`: tab provider (Google AI/Mistral/OpenRouter), masked-key "API Key Configured", save/reset, `onSaved` → refresh `llmOptions`.
+- Sejak 2026-08-12, `openConfigureDialog()` memanggil `openAccountPanel('byok')` dari `$lib/state/account-panel.store.svelte.ts` — `ConfigureByokDialog.svelte` dihapus dan logikanya (tab provider Google AI/Mistral/OpenRouter, masked-key "API Key Configured", save/reset) digabung ke tab **Configure BYOK** di `AccountPanelDialog.svelte`. Setelah save/reset, `markByokSaved()` menaikkan `byokSavedAt` dan halaman me-refresh `llmOptions` via `$effect`.
 - Loading model disamakan: `Free Auto` memakai `free.svg`, hanya provider BYOK (gemini/mistral/openrouter) yang dimuat ke dropdown.
 
 ### 3. Ukuran & posisi input disamakan dengan `/chat/[id]`
@@ -99,11 +99,13 @@ Kapsul input chat (file chips, attach + quota tooltip, textarea auto-resize, mod
 | File | Change |
 |---|---|
 | `apps/frontend/src/lib/components/chat/ChatInput.svelte` | Komponen baru: kapsul input + validasi file + dropdown model (rich/flat) + tombol send/stop + `transparent` |
-| `apps/frontend/src/lib/components/chat/ConfigureByokDialog.svelte` | Komponen baru: dialog Configure BYOK reusable (provider, masks, save/reset, `onSaved`) |
-| `apps/frontend/src/routes/app/chat/+page.svelte` | Pakai ChatInput (+`transparent`), onconfigure, ConfigureByokDialog; loading model BYOK; container 4xl/bottom-4 |
-| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | Pakai ChatInput + ConfigureByokDialog; state/fungsi configure & file dipindah ke komponen |
+| `apps/frontend/src/lib/components/app/AccountPanelDialog.svelte` | Tab `byok` (pengganti `ConfigureByokDialog.svelte`): provider, masks, save/reset |
+| `apps/frontend/src/lib/state/account-panel.store.svelte.ts` | Shared state panel akun (`openAccountPanel('byok')`, `byokSavedAt`) |
+| `apps/frontend/src/routes/app/chat/+page.svelte` | Pakai ChatInput (+`transparent`), onconfigure → `openAccountPanel('byok')`; loading model BYOK; container 4xl/bottom-4 |
+| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | Pakai ChatInput; configure → `openAccountPanel('byok')`; state/fungsi configure dipindah ke panel |
 | `apps/frontend/src/routes/app/+layout.svelte` | `onNavigate` view transition (submit-only) + `view-transition-name: app-main` |
 | `apps/frontend/src/routes/layout.css` | `::view-transition-*` root:none + app-main crossfade 700ms |
 
 ### 6. Completion Timestamp
 **Iteration 2 (ChatInput reusable, model selection unified, view transitions submit-only):** 2026-08-09
+**Iteration 3 (BYOK configure digabung ke AccountPanelDialog tab `byok`):** 2026-08-12

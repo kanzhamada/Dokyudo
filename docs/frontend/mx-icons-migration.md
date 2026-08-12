@@ -229,7 +229,7 @@ Note: `mxBoldName` in the data file is hand-maintained logic (it rewrites the `o
   * `apps/frontend/src/lib/components/chat/TurnStatusBadge.svelte`
   * `apps/frontend/src/lib/components/app/AppSidebar.svelte`
   * `apps/frontend/src/lib/components/app/MobileHeader.svelte`
-  * `apps/frontend/src/lib/components/app/SharedLinksDialog.svelte`
+  * `apps/frontend/src/lib/components/app/AccountPanelDialog.svelte`
   * `apps/frontend/src/lib/components/app/ShareConversationDialog.svelte`
   * `apps/frontend/src/routes/app/chat/+page.svelte`
   * `apps/frontend/src/routes/app/chat/[id]/+page.svelte`

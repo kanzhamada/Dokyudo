@@ -7,7 +7,7 @@
 The user profile endpoint (`GET /api/auth/me`) has been refactored and moved to a dedicated backend module `me` mounted at `GET /api/me`. To optimize P95 latency and adhere to the Single Responsibility Principle, usage statistics (`uploadsCount`, `searchesCount`, `qaCount`, `storageUsedBytes`) were extracted into a separate endpoint `GET /api/me/usage`.
 
 - **`GET /api/me`**: Returns essential user identity, tenant workspace info, and subscription tier status. Automatically handles lazy evaluation to auto-downgrade expired subscriptions to `FREE`.
-- **`GET /api/me/usage`**: Returns realtime usage statistics (`uploadsCount`, `searchesCount`, `qaCount`, `storageUsedBytes`) for the authenticated tenant using `withAuthDb` for multi-tenant data isolation.
+- **`GET /api/me/usage`**: Returns realtime usage statistics (`uploadsCount`, `searchesCount`, `qaCount`, `storageUsedBytes`) for the authenticated tenant using `withAuthDb` for multi-tenant data isolation. Sejak 2026-08-12 response juga menyertakan **`expiresAt`** (ISO string atau `null`) yang dibaca langsung dari kolom `tenant_subscriptions.expires_at` — dipakai UI Billing untuk menampilkan masa akses tier berbayar (FREE/plan permanen → `null`).
 - **Frontend Tier Limits**: Hardcoded in `$lib/constants/tiers.constant.ts` matching backend `TIER_LIMITS`. The Chat page (`/app/chat`) fetches `/api/me/usage` on mount to populate realtime counters, looking up limits locally without extra server payload.
 
 ---
@@ -34,8 +34,8 @@ sequenceDiagram
         ChatPage->>Router: GET /api/me/usage
         Router->>MeModule: handleGetUsage()
         MeModule->>DB: withAuthDb(userId) — Query tenant_subscriptions
-        DB-->>MeModule: { uploadsCount, searchesCount, qaCount, storageUsedBytes }
-        MeModule-->>ChatPage: 200 OK { tier, uploadsCount, searchesCount, qaCount, storageUsedBytes }
+        DB-->>MeModule: { tier, expiresAt, uploadsCount, searchesCount, qaCount, storageUsedBytes }
+        MeModule-->>ChatPage: 200 OK { tier, expiresAt, uploadsCount, searchesCount, qaCount, storageUsedBytes }
         ChatPage->>ChatPage: Match tier with TIER_LIMITS constant for local limit validation
     end
 ```
@@ -46,8 +46,8 @@ sequenceDiagram
 
 | File | Purpose / Changes |
 |---|---|
-| `apps/backend/src/modules/me/me.schema.ts` | Created `ProfileResponseSchema` and `UsageResponseSchema`. |
-| `apps/backend/src/modules/me/me.service.ts` | Implemented `MeService.getProfile()` and `MeService.getUsage()` with `withAuthDb`. |
+| `apps/backend/src/modules/me/me.schema.ts` | Created `ProfileResponseSchema` and `UsageResponseSchema`; `UsageResponseSchema` menyertakan `expiresAt` (nullable). |
+| `apps/backend/src/modules/me/me.service.ts` | Implemented `MeService.getProfile()` and `MeService.getUsage()` with `withAuthDb`; `getUsage` select + serialize `expiresAt` dari `tenant_subscriptions.expires_at`. |
 | `apps/backend/src/modules/me/me.controller.ts` | Implemented `handleGetProfile` and `handleGetUsage` with `ContextExtractor`. |
 | `apps/backend/src/modules/me/me.routes.ts` | Defined OpenAPI routes `GET /` and `GET /usage` under `/api/me`. |
 | `apps/backend/src/modules/me/mod.ts` | Re-exported `meRoutes`, `MeService`, and `MeSchema`. |
@@ -78,3 +78,4 @@ sequenceDiagram
 1. **Endpoint Separation for P95 Performance**: Separating general profile information from realtime usage counts prevents unnecessary database payload transfers when rendering global layout elements like the sidebar.
 2. **Local Tier Limits Constant**: Keeping `TIER_LIMITS` in `$lib/constants/tiers.constant.ts` allows instantaneous client-side file upload and storage validation without needing redundant network calls for static limit thresholds.
 3. **Module Independence**: Extracted all profile and usage operations into a dedicated `me` module (`apps/backend/src/modules/me/`) out of `auth`, maintaining clean domain boundaries.
+4. **expiresAt pada usage**: kolom `expires_at` di `tenant_subscriptions` sudah ada (dipakai lazy auto-downgrade di `getProfile`); `getUsage` kini juga men-serialize-nya agar UI Billing bisa menampilkan masa akses tanpa panggilan tambahan.

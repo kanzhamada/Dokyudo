@@ -21,10 +21,11 @@ auth:bearer {
 
 body:json {
   {
-    "tierToUnlock": "PRO"
+    "tierToUnlock": "SIMULATE"
   }
 }
 
 docs {
   Creates a new Checkout Session via Stripe API. Returns a checkoutUrl that you can open in your browser to complete the payment. Requires valid JWT (tenant session).
+  tierToUnlock accepts: SIMULATE (24h sandbox evaluation, one-time payment), OIL_INVESTOR (one-time invoice), PRO (recurring subscription).
 }

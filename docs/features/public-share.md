@@ -149,9 +149,10 @@ const isPublicShareRead =
 
 ### Sidebar — `AppSidebar.svelte`
 - Indikator `Share` amber **dihapus**; aksi "Stop sharing" di context menu **dihapus** (pin indicator tetap).
-- Menu profile footer: Settings / Billing / **Shared links** / Log out → membuka `SharedLinksDialog`.
+- Menu profile footer: Settings / Billing / **Shared links** / Log out → membuka `AccountPanelDialog` (tab `shared-links`) via `account-panel.store`.
 
-### Dialog Shared Links — `SharedLinksDialog.svelte`
+### Tab Shared Links — `AccountPanelDialog.svelte` (tab `shared-links`)
+- Sejak 2026-08-12 `SharedLinksDialog.svelte` digabung ke panel akun terpadu; logika di bawah tetap sama, hanya lokasi render berubah (tab di dialog `AccountPanelDialog`).
 - `GET /api/rag/shares` (semua link aktif tenant), search client-side (title/code).
 - **Group by conversation** (`conversationId` dari list response): tiap group menampilkan judul conversation, jumlah link, dan tombol **Delete** yang memanggil `DELETE /api/rag/conversations/{id}/shares` (revoke semua link group). Pagination 10 **group**/page.
 - Per baris: badge `Private`, open/copy (private otomatis `?invite={accessToken}`), revoke per link.
@@ -187,8 +188,9 @@ const isPublicShareRead =
 - `apps/backend/src/api/router.ts`: bypass auth GET publik.
 - `apps/frontend/src/lib/types/rag.types.ts` / `lib/api/rag.ts`: tipe + `addShareInvitees`/`listAllShares`/`deleteAllTenantShares`/`getPublicShare(code, invite?)`.
 - `apps/frontend/src/lib/components/app/ShareConversationDialog.svelte`: dialog create/invite.
-- `apps/frontend/src/lib/components/app/SharedLinksDialog.svelte`: daftar link aktif.
-- `apps/frontend/src/lib/components/app/AppSidebar.svelte`: menu profile → Shared Links.
+- `apps/frontend/src/lib/components/app/AccountPanelDialog.svelte`: tab shared-links (daftar link aktif) — pengganti `SharedLinksDialog.svelte`.
+- `apps/frontend/src/lib/state/account-panel.store.svelte.ts`: shared state tab panel akun.
+- `apps/frontend/src/lib/components/app/AppSidebar.svelte`: menu profile → tab Shared links panel.
 - `apps/frontend/src/routes/s/[code]/+page.svelte` / `+page.server.ts` / `opengraph-image.svg/+server.ts`: halaman publik + OG.
 - `api-collections/Search & RAG/10-17_*.bru`: koleksi Bruno endpoint share.
 
