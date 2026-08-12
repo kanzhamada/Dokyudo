@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import AlertTriangleIcon from '@lucide/svelte/icons/triangle-alert';
 	import XIcon from '@lucide/svelte/icons/x';
 
@@ -138,16 +138,28 @@
 			</div>
 		</div>
 		{#if onclose}
-			<Button
-				variant="ghost"
-				size="icon-sm"
-				class="close-button cursor-pointer rounded-full text-dk-muted-gray hover:-translate-y-px hover:bg-white/10 hover:text-dk-light active:translate-y-0"
-				onclick={onclose}
-				aria-label="Close document preview"
-				title="Close preview"
-			>
-				<XIcon class="size-4" strokeWidth={1.8} />
-			</Button>
+			<Tooltip.Provider delayDuration={100}>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<button
+								{...props}
+								type="button"
+								class="close-button cursor-pointer rounded-full text-dk-muted-gray hover:-translate-y-px hover:bg-white/10 hover:text-dk-light active:translate-y-0"
+								onclick={onclose}
+								aria-label="Close document preview"
+							>
+								<XIcon class="size-4" strokeWidth={1.8} />
+							</button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content
+						class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+					>
+						<p>Close preview</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			</Tooltip.Provider>
 		{/if}
 	</div>
 
