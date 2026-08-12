@@ -64,6 +64,7 @@
 	import { mount, unmount, untrack } from 'svelte';
 	import TurnStatusBadge from '$lib/components/chat/TurnStatusBadge.svelte';
 	import SourceReferences from '$lib/components/chat/SourceReferences.svelte';
+	import AttachmentCards from '$lib/components/chat/AttachmentCards.svelte';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import ConfigureByokDialog from '$lib/components/chat/ConfigureByokDialog.svelte';
@@ -2506,6 +2507,16 @@
 									? 'w-full'
 									: ''}"
 							>
+								{#if !(editingMessageId === msg.id) && msg.attachments && msg.attachments.length > 0}
+									<AttachmentCards
+										attachments={msg.attachments.map((a) => ({
+											name: a.name,
+											documentId: a.documentId
+										}))}
+										interactive
+										onPreview={(documentId, name) => openCitationPreview(documentId, name, [])}
+									/>
+								{/if}
 								<div
 									class="rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md {editingMessageId ===
 									msg.id
@@ -2553,31 +2564,6 @@
 											</div>
 										</div>
 									{:else}
-										{#if msg.attachments && msg.attachments.length > 0}
-											<div class="mb-2 flex flex-wrap gap-1.5">
-												{#each msg.attachments as att}
-													{#if att.documentId}
-														<button
-															type="button"
-															class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80 transition-colors hover:border-white/30 hover:bg-white/20 hover:text-white"
-															title="Open {att.name} in PDF viewer"
-															onclick={() => openCitationPreview(att.documentId!, att.name, [])}
-														>
-															<MxIcon name="document-outline" class="size-3 text-white/60" />
-															{att.name}
-														</button>
-													{:else}
-														<span
-															class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-0.5 text-xs text-white/80"
-														>
-															<MxIcon name="document-outline" class="size-3 text-white/60" />
-															{att.name}
-														</span>
-													{/if}
-												{/each}
-											</div>
-										{/if}
-
 										<p class="leading-relaxed whitespace-pre-wrap">
 											{#each splitMentionSegments(msg.content) as seg, i}
 												{#if seg.type === 'mention' && seg.id}

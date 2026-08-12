@@ -312,10 +312,14 @@
 		// 		refreshDocuments();
 		// 	}
 		// }, 4000);
+		const resetInterval = setInterval(() => {
+			currentTime = Date.now();
+		}, 1000);
 
 		return () => {
 			console.log('[Supabase Realtime] Unsubscribing from documents channel...');
 			// clearInterval(pollInterval);
+			clearInterval(resetInterval);
 			supabase.removeChannel(channel);
 		};
 	});
@@ -328,10 +332,28 @@
 	let storageUsedBytes = $state(0);
 	let maxStorageBytes = $state(TIER_LIMITS.FREE.maxStorageBytes);
 	let isRefreshing = $state(false);
+	let currentTime = $state(Date.now());
 	let uploadUsageDisplay = $derived(`${uploadsCount} / ${maxUploads}`);
 	let storageUsageDisplay = $derived(
 		`${formatStorage(storageUsedBytes)} / ${formatStorage(maxStorageBytes)}`
 	);
+	let storageUsagePercent = $derived(
+		maxStorageBytes > 0 ? Math.min(100, Math.round((storageUsedBytes / maxStorageBytes) * 100)) : 0
+	);
+	let storageNearLimit = $derived(storageUsagePercent >= 90);
+	let uploadResetCountdown = $derived.by(() => {
+		const now = new Date(currentTime);
+		const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+		const remainingMinutes = Math.max(
+			0,
+			Math.ceil((nextMonth.getTime() - currentTime) / (1000 * 60))
+		);
+		const days = Math.floor(remainingMinutes / (24 * 60));
+		const hours = Math.floor((remainingMinutes % (24 * 60)) / 60);
+		const minutes = remainingMinutes % 60;
+
+		return `${days}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`;
+	});
 
 	$effect(() => {
 		documentsList = data.documents;
@@ -559,6 +581,11 @@
 	/* ── Pagination sync: bits-ui Pagination is 1-indexed, TanStack is 0-indexed ── */
 	let uiPage = $state(1);
 	let totalFilteredRows = $derived(table.getFilteredRowModel().rows.length);
+	let totalPages = $derived(Math.max(1, Math.ceil(totalFilteredRows / pagination.pageSize)));
+	let paginationRange = $derived.by(() => ({
+		start: totalFilteredRows === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1,
+		end: Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalFilteredRows)
+	}));
 
 	$effect(() => {
 		// Sync UI page → TanStack (only when user changes page via UI)
@@ -570,8 +597,7 @@
 
 	$effect(() => {
 		// Reset to page 1 when filters change and current page exceeds available pages
-		const maxPage = Math.max(1, Math.ceil(totalFilteredRows / 10));
-		if (uiPage > maxPage) {
+		if (uiPage > totalPages) {
 			uiPage = 1;
 		}
 	});
@@ -838,7 +864,7 @@
 					<p class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
 						{uploadUsageDisplay}
 					</p>
-					<p class="mt-1 text-xs text-white/40">uploads this month</p>
+					<p class="mt-1 text-xs text-white/40">Reset in {uploadResetCountdown}</p>
 				</div>
 
 				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4">
@@ -849,7 +875,26 @@
 					<p class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
 						{storageUsageDisplay}
 					</p>
-					<p class="mt-1 text-xs text-white/40">used of available storage</p>
+					<div class="mt-3 flex items-center gap-2">
+						<div
+							class="relative h-2.5 flex-1 overflow-hidden rounded-full border border-white/15 bg-white/[0.06]"
+							role="progressbar"
+							aria-label="Storage usage"
+							aria-valuemin="0"
+							aria-valuemax="100"
+							aria-valuenow={storageUsagePercent}
+						>
+							<div
+								class="h-full rounded-full transition-[width,background-color] duration-700 {storageNearLimit
+									? 'bg-red-500'
+									: 'bg-white/60'}"
+								style:width={`${storageUsagePercent}%`}
+							></div>
+						</div>
+						<span class="w-9 text-right text-[11px] text-white/50 tabular-nums"
+							>{storageUsagePercent}%</span
+						>
+					</div>
 				</div>
 			</div>
 
@@ -1479,51 +1524,60 @@
 			</div>
 
 			<!-- Bottom: Pagination -->
-			{#if totalFilteredRows > 10}
-				<div class="flex items-center justify-center pt-2">
-					<Pagination.Root
-						count={totalFilteredRows}
-						perPage={10}
-						bind:page={uiPage}
-						siblingCount={1}
-					>
-						{#snippet children({ pages, currentPage })}
-							<Pagination.Content>
-								<Pagination.Item>
-									<Pagination.Previous
-										onclick={keepDocumentsAtBottom}
-										class="cursor-pointer rounded-full text-white transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white disabled:text-white/20"
-									/>
-								</Pagination.Item>
+			{#if totalFilteredRows > 0}
+				<div class="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+					<p class="px-1 text-xs text-[#767676]">
+						{paginationRange.start}–{paginationRange.end} of {totalFilteredRows}
+						{totalFilteredRows === 1 ? 'document' : 'documents'}
+					</p>
 
-								{#each pages as page (page.key)}
-									{#if page.type === 'ellipsis'}
+					{#if totalFilteredRows > 10}
+						<div class="flex items-center justify-end gap-2">
+							<Pagination.Root
+								count={totalFilteredRows}
+								perPage={10}
+								bind:page={uiPage}
+								siblingCount={1}
+							>
+								{#snippet children({ pages, currentPage })}
+									<Pagination.Content>
 										<Pagination.Item>
-											<Pagination.Ellipsis class="text-white/60" />
-										</Pagination.Item>
-									{:else}
-										<Pagination.Item>
-											<Pagination.Link
-												{page}
-												isActive={currentPage === page.value}
+											<Pagination.Previous
 												onclick={keepDocumentsAtBottom}
-												class="cursor-pointer rounded-full text-white/75 transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white data-[active=true]:border-white/45 data-[active=true]:bg-white/10 data-[active=true]:text-white"
-											>
-												{page.value}
-											</Pagination.Link>
+												class="cursor-pointer rounded-full text-white transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white disabled:text-white/20"
+											/>
 										</Pagination.Item>
-									{/if}
-								{/each}
 
-								<Pagination.Item>
-									<Pagination.Next
-										onclick={keepDocumentsAtBottom}
-										class="cursor-pointer rounded-full text-white transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white disabled:text-white/20"
-									/>
-								</Pagination.Item>
-							</Pagination.Content>
-						{/snippet}
-					</Pagination.Root>
+										{#each pages as page (page.key)}
+											{#if page.type === 'ellipsis'}
+												<Pagination.Item>
+													<Pagination.Ellipsis class="text-white/60" />
+												</Pagination.Item>
+											{:else}
+												<Pagination.Item>
+													<Pagination.Link
+														{page}
+														isActive={currentPage === page.value}
+														onclick={keepDocumentsAtBottom}
+														class="cursor-pointer rounded-full text-white/75 transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white data-[active=true]:border-white/45 data-[active=true]:bg-white/10 data-[active=true]:text-white"
+													>
+														{page.value}
+													</Pagination.Link>
+												</Pagination.Item>
+											{/if}
+										{/each}
+
+										<Pagination.Item>
+											<Pagination.Next
+												onclick={keepDocumentsAtBottom}
+												class="cursor-pointer rounded-full text-white transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white disabled:text-white/20"
+											/>
+										</Pagination.Item>
+									</Pagination.Content>
+								{/snippet}
+							</Pagination.Root>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		</div>

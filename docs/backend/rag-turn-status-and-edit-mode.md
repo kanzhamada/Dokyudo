@@ -263,7 +263,7 @@ Saat follow-up dikirim dengan `selected_variant_id`:
 
 Response turn bertambah `alternatives: [{ id, answer, status, modelUsed, latencyMs, contextReferences, createdAt }]` — hanya varian **terminal** (`status != 'processing'`) dengan `answer != ''` (varian junk tidak dirender), `contextReferences` difilter ulang via `filterReferencesByCitations` per varian, urut `createdAt` ASC.
 
-Selain itu, serialisasi turn mengembalikan dua field attachment yang membuat chip lampiran tetap tampil setelah reload:
+Selain itu, serialisasi turn mengembalikan dua field attachment yang membuat kartu lampiran tetap tampil setelah reload:
 
 - `attachmentDocumentIds` — id dokumen yang meng-scope retrieval (diambil langsung dari kolom `attachment_document_ids`; sebelumnya tidak ikut diserialisasi sehingga attachment "hilang" saat refresh).
 - `attachmentDocuments: [{ documentId, title }]` — judul di-resolve dari tabel `documents` (satu query tenant-scoped per conversation, hanya jika ada lampiran). Dokumen yang sudah dihapus jatuh ke fallback `"Document"`.
