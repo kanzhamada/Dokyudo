@@ -2562,6 +2562,8 @@ Always include the document references ([Doc N: Page X]) in your answer.
                         feedback: null,
                         feedbackAt: null,
                         branchedFromTurnId: i === prefix.length - 1 ? t.id : null,
+                        attachmentDocumentIds: t.attachmentDocumentIds,
+                        modelRequest: t.modelRequest,
                         createdAt: t.createdAt,
                     })),
                 );
@@ -2705,6 +2707,17 @@ Always include the document references ([Doc N: Page X]) in your answer.
         });
 
         await withAuthDb(userId, async (tx) => {
+            // Nullify branchOfId on all branches BEFORE the parent is deleted.
+            // The FK has ON DELETE SET NULL, but that is a DB-level cascade that
+            // skips Drizzle's $onUpdateFn — ETags on the branches would stay
+            // stale and the frontend cache would keep rendering a link to the
+            // now-deleted parent. Doing it through the ORM updates updatedAt and
+            // invalidates the ETag caches.
+            await tx
+                .update(conversations)
+                .set({ branchOfId: null })
+                .where(eq(conversations.branchOfId, conversationId));
+
             const result = await tx
                 .delete(conversations)
                 .where(

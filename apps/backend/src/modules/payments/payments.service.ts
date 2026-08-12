@@ -4,7 +4,6 @@ import {
     tenantSubscriptions,
     tenants,
 } from "../../shared/models/db.model.ts";
-import { logActivity } from "../../shared/utils/activity.util.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { stripe } from "../../config/stripe.ts";
 import { CreateCheckoutBody } from "./payments.schema.ts";
@@ -255,17 +254,6 @@ export class PaymentsService {
                             : null,
                     });
                 }
-                
-                await logActivity({
-                    tenantId: trx.tenantId,
-                    action: "billing.payment_completed",
-                    resourceType: "payment",
-                    resourceId: trx.id,
-                    metadata: { amount: session.amount_total, currency: session.currency, tier: tierToUnlock },
-                    ipAddress: params.clientIp,
-                    userAgent: params.userAgent,
-                    requestId: logContext?.requestId,
-                });
                 break;
             }
             case "customer.subscription.created":
@@ -310,9 +298,7 @@ export class PaymentsService {
             }
             case "checkout.session.async_payment_failed": {
                 const session = event.data.object as Stripe.Checkout.Session;
-                const tenantId = session.metadata?.tenantId;
                 const externalId = session.metadata?.externalId;
-                const tierToUnlock = session.metadata?.tierToUnlock;
 
                 if (externalId) {
                     await db
@@ -322,19 +308,6 @@ export class PaymentsService {
                             updatedAt: new Date(),
                         })
                         .where(eq(paymentTransactions.externalId, externalId));
-                }
-
-                if (tenantId) {
-                    await logActivity({
-                        tenantId,
-                        action: "billing.payment_failed",
-                        resourceType: "payment",
-                        resourceId: externalId || undefined,
-                        metadata: { tier: tierToUnlock, reason: "Async payment failed" },
-                        ipAddress: params.clientIp,
-                        userAgent: params.userAgent,
-                        requestId: logContext?.requestId,
-                    });
                 }
                 break;
             }
@@ -347,22 +320,6 @@ export class PaymentsService {
                         .select({ tenantId: tenantSubscriptions.tenantId })
                         .from(tenantSubscriptions)
                         .where(eq(tenantSubscriptions.stripeCustomerId, customerId));
-
-                    if (sub) {
-                        await logActivity({
-                            tenantId: sub.tenantId,
-                            action: "billing.payment_failed",
-                            resourceType: "payment",
-                            metadata: {
-                                amount: invoice.amount_due,
-                                currency: invoice.currency,
-                                reason: invoice.last_finalization_error?.message || "Invoice payment failed",
-                            },
-                            ipAddress: params.clientIp,
-                            userAgent: params.userAgent,
-                            requestId: logContext?.requestId,
-                        });
-                    }
                 }
                 break;
             }

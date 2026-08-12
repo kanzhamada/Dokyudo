@@ -153,11 +153,11 @@
 																</span>
 															{/snippet}
 														</Tooltip.Trigger>
-														<Tooltip.Content
-															class="max-w-xs break-all rounded-lg border border-white/10 bg-[#2A2A2A] px-3 py-2 text-xs text-white shadow-xl"
-														>
-															{cellData.full}
-														</Tooltip.Content>
+												<Tooltip.Content
+													class="max-w-xs break-all rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-black shadow-md"
+												>
+													{cellData.full}
+												</Tooltip.Content>
 													</Tooltip.Root>
 												{:else}
 													<span class="text-sm text-[#959595]">
@@ -185,11 +185,11 @@
 															</span>
 														{/snippet}
 													</Tooltip.Trigger>
-													<Tooltip.Content
-														class="rounded-lg border border-white/10 bg-[#2A2A2A] px-3 py-2 text-xs text-white shadow-xl"
-													>
-														{cellData.full}
-													</Tooltip.Content>
+												<Tooltip.Content
+													class="rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-black shadow-md"
+												>
+													{cellData.full}
+												</Tooltip.Content>
 												</Tooltip.Root>
 											{:else}
 												<span class="text-sm text-[#959595]">{value}</span>

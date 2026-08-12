@@ -5,10 +5,8 @@
 	import { scale } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
-	import { Avatar } from '$lib/components/ui/avatar/index.js';
 	import * as AvatarPrimitive from '$lib/components/ui/avatar/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
 
 	// Icons
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
@@ -23,7 +21,7 @@
 	import favicon from '$lib/assets/favicon.svg?raw';
 
 	// App Logic
-	import PanelLeft from '@lucide/svelte/icons/panel-left';
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -371,18 +369,7 @@
 		}
 	]);
 
-	const recentChats = [
-		'beatae vitae dicta',
-		'Lorem ipsum dolor sit amet, c...',
-		'But I must explain to you',
-		'ptatem accusantium doloremq aksfnaksfakjs kdjnfkjdfn',
-		'Lorem Ipsum 123',
-		'Lorem Ipsum 123',
-		'Lorem Ipsum 123',
-		'Lorem Ipsum 123',
-		'Lorem Ipsum 123',
-		'Lorem Ipsum 123'
-	];
+	const conversationSkeletons = [0, 1, 2, 3];
 
 	const sidebar = useSidebar();
 
@@ -393,18 +380,18 @@
 <Sidebar.Root collapsible="icon" class="border-none">
 	<!-- HEADER -->
 	<Sidebar.Header class="group-data-[collapsible=icon]:hidden">
-		<div class="group/header flex items-center justify-between px-2 py-3">
-			<div class="flex items-center gap-1">
+		<div class="group/header flex items-center justify-between px-1.5 py-2">
+			<div class="flex items-center gap-1.5">
 				<!-- Brand Logo -->
 				<div
-					class="flex size-8 items-center justify-center [&_path]:fill-sidebar-brand [&_svg]:h-9 [&_svg]:w-auto"
+					class="flex size-7 items-center justify-center [&_path]:fill-sidebar-brand [&_svg]:h-8 [&_svg]:w-auto"
 				>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html favicon}
 				</div>
 				<!-- Brand Text (Hidden when collapsed) -->
 				<span
-					class="font-sans text-xl font-medium tracking-tight text-sidebar-brand group-data-[collapsible=icon]:hidden"
+					class="font-sans text-[18px] font-medium tracking-tight text-sidebar-brand group-data-[collapsible=icon]:hidden"
 				>
 					okyudo
 				</span>
@@ -414,23 +401,23 @@
 				class="transition-opacity group-hover/header:pointer-events-auto group-hover/header:opacity-100 group-data-[collapsible=icon]:hidden"
 			>
 				<Sidebar.Trigger
-					class="size-6 shrink-0 cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+					class="size-5 shrink-0 cursor-pointer text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
 				/>
 			</div>
 		</div>
 	</Sidebar.Header>
 
-	<div class="no-scrollbar flex-1 overflow-y-auto" onscroll={handleSidebarScroll}>
+	<div class="flex min-h-0 flex-1 flex-col">
 		<!-- CONTENT -->
-		<Sidebar.Content>
+		<Sidebar.Content class="gap-0 overflow-hidden">
 			<!-- Main Navigation -->
-			<Sidebar.Group class="pt-4">
-				<Sidebar.Menu class="gap-2">
+			<Sidebar.Group class="shrink-0 px-2 pt-2 pb-1">
+				<Sidebar.Menu class="gap-1">
 					<!-- Collapsed mode logo injected directly into the menu structure -->
 					<Sidebar.MenuItem class="hidden group-data-[collapsible=icon]:block">
 						<Sidebar.MenuButton
-							class="h-10 px-3 font-geist text-[15px]"
-							tooltipContent="Expand Sidebar (Ctrl + B)"
+							class="h-9 px-2 font-geist text-[13px]"
+							tooltipContent="Open sidebar (Ctrl + B)"
 						>
 							{#snippet child({ props })}
 								<a
@@ -450,15 +437,17 @@
 											<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 											{@html favicon}
 										</div>
-										<!-- Expand Icon (Visible on hover) -->
-										<PanelLeft class="hidden size-[18px] group-hover/logo:block" />
+										<!-- Clear direction cue for opening the collapsed sidebar -->
+										<ArrowRight
+											class="hidden size-4 text-sidebar-brand transition-transform group-hover/logo:block group-hover/logo:translate-x-0.5"
+										/>
 									</div>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 
-					{#each navItems as item}
+					{#each navItems as item (item.href)}
 						{@render navItem(item)}
 					{/each}
 				</Sidebar.Menu>
@@ -466,51 +455,60 @@
 
 			<!-- Recent Chats -->
 			<!-- Hide entire group when collapsed -->
-			<Sidebar.Group class="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
-				<Sidebar.GroupLabel class="mb-2 px-3 font-geist text-xs font-medium text-sidebar-muted">
+			<Sidebar.Group
+				class="min-h-0 flex-1 overflow-hidden px-2 pt-2 pb-1 group-data-[collapsible=icon]:hidden"
+			>
+				<Sidebar.GroupLabel
+					class="mb-1 h-6 shrink-0 px-2 font-geist text-[10px] font-medium tracking-[0.08em] text-sidebar-muted"
+				>
 					Recent Chats
 				</Sidebar.GroupLabel>
 
-				<Sidebar.Menu class="gap-[2px]">
-					{#if !hasLoadedInitialConversations && isLoadingConversations}
-						{#each Array(4) as _}
-							<Sidebar.MenuItem class="px-3 py-1">
-								<Skeleton class="h-6 w-full rounded bg-white/5" />
-							</Sidebar.MenuItem>
-						{/each}
-					{:else if (conversationsStore.list.length > 0 ? conversationsStore.list : conversations).length === 0}
-						<div class="px-3 py-2 font-geist text-xs text-sidebar-muted-foreground/60">
-							No recent chats
-						</div>
-					{:else}
-						{#each conversationsStore.list.length > 0 ? conversationsStore.list : conversations as item (item.id)}
-							{@render recentChatItem(item)}
-						{/each}
-
-						{#if isLoadingConversations}
-							<div class="flex items-center justify-center py-2">
-								<Spinner class="size-4 text-white/50" />
+				<div
+					class="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5"
+					onscroll={handleSidebarScroll}
+				>
+					<Sidebar.Menu class="gap-px">
+						{#if !hasLoadedInitialConversations && isLoadingConversations}
+							{#each conversationSkeletons as skeleton (skeleton)}
+								<Sidebar.MenuItem class="px-2 py-1">
+									<Skeleton class="h-5 w-full rounded bg-white/5" />
+								</Sidebar.MenuItem>
+							{/each}
+						{:else if (conversationsStore.list.length > 0 ? conversationsStore.list : conversations).length === 0}
+							<div class="px-2 py-1.5 font-geist text-[11px] text-sidebar-muted-foreground/60">
+								No recent chats
 							</div>
+						{:else}
+							{#each conversationsStore.list.length > 0 ? conversationsStore.list : conversations as item (item.id)}
+								{@render recentChatItem(item)}
+							{/each}
+
+							{#if isLoadingConversations}
+								<div class="flex items-center justify-center py-1.5">
+									<Spinner class="size-3.5 text-white/50" />
+								</div>
+							{/if}
 						{/if}
-					{/if}
-				</Sidebar.Menu>
+					</Sidebar.Menu>
+				</div>
 			</Sidebar.Group>
 		</Sidebar.Content>
 	</div>
 
 	<!-- FOOTER -->
-	<Sidebar.Footer class="pb-4">
-		<div class="mx-2 mb-2 h-px bg-white/10"></div>
+	<Sidebar.Footer class="pb-3">
+		<div class="mx-2 mb-1.5 h-px bg-white/10"></div>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton
 					size="lg"
 					tooltipContent="Profile"
-					class="w-full cursor-pointer p-2 hover:bg-sidebar-accent"
+					class="h-9! w-full cursor-pointer p-1.5 hover:bg-sidebar-accent"
 					onclick={() => (isUserMenuOpen = !isUserMenuOpen)}
 				>
 					<AvatarPrimitive.Root
-						class="size-8 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
+						class="size-7 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
 					>
 						{#if userProfile?.user?.profilePictureUrl}
 							<AvatarPrimitive.Image
@@ -520,21 +518,22 @@
 							/>
 						{/if}
 						<AvatarPrimitive.Fallback
-							class="flex size-full items-center justify-center rounded-md bg-sidebar-avatar font-geist text-sm font-medium text-sidebar"
+							class="flex size-full items-center justify-center rounded-md bg-sidebar-avatar font-geist text-xs font-medium text-sidebar"
 						>
 							{userInitials}
 						</AvatarPrimitive.Fallback>
 					</AvatarPrimitive.Root>
 					<div
-						class="ml-2 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
+						class="ml-1.5 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
 					>
-						<span class="truncate font-geist text-sm font-medium text-white">{displayName}</span>
-						<span class="truncate font-geist text-xs text-sidebar-muted-foreground"
+						<span class="truncate font-geist text-[13px] font-medium text-white">{displayName}</span
+						>
+						<span class="truncate font-geist text-[11px] text-sidebar-muted-foreground"
 							>{subscriptionTier}</span
 						>
 					</div>
 					<ChevronsUpDown
-						class="size-4 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
+						class="size-3.5 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
 					/>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
@@ -547,7 +546,7 @@
 		<Sidebar.MenuButton
 			isActive={item.active}
 			tooltipContent={item.label}
-			class="h-10 px-3 font-geist text-[15px]"
+			class="h-9 px-2 font-geist text-[13px]"
 		>
 			{#snippet child({ props })}
 				<a
@@ -560,16 +559,13 @@
 						{#if mxBoldName(item.icon) && (item.active || hoveredNavHref === item.href)}
 							<MxIcon
 								name={mxBoldName(item.icon)!}
-								class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0"
+								class="mr-2.5 size-4 group-data-[collapsible=icon]:mr-0"
 							/>
 						{:else}
-							<MxIcon
-								name={item.icon}
-								class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0"
-							/>
+							<MxIcon name={item.icon} class="mr-2.5 size-4 group-data-[collapsible=icon]:mr-0" />
 						{/if}
 					{:else}
-						<item.icon class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
+						<item.icon class="mr-2.5 size-4 group-data-[collapsible=icon]:mr-0" />
 					{/if}
 					<span class="group-data-[collapsible=icon]:hidden">{item.label}</span>
 				</a>
@@ -582,7 +578,7 @@
 	<Sidebar.MenuItem>
 		<Sidebar.MenuButton
 			isActive={$page.url.pathname === `/app/chat/${item.id}`}
-			class="h-8 cursor-pointer px-3 font-geist text-sm text-sidebar-muted-foreground"
+			class="h-7 cursor-pointer px-2 font-geist text-xs text-sidebar-muted-foreground"
 		>
 			{#snippet child({ props })}
 				<a
@@ -783,29 +779,29 @@
 <!-- Confirmation Dialog for Logout -->
 <Dialog.Root bind:open={isLogoutDialogOpen}>
 	<Dialog.Content
-		class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-[425px]"
+		class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md"
 	>
 		<Dialog.Header>
-			<Dialog.Title class="font-sans text-xl font-medium text-white">Log out</Dialog.Title>
-			<Dialog.Description class="text-sm text-white/70">
+			<Dialog.Title class="text-lg font-semibold text-white">Log out</Dialog.Title>
+			<Dialog.Description class="text-sm text-white/45">
 				Are you sure you want to log out? You will need to sign in again to access your Dokyudo
 				workspace.
 			</Dialog.Description>
 		</Dialog.Header>
 
-		<Dialog.Footer class="mt-4 flex gap-2 sm:justify-end">
+		<Dialog.Footer class="mt-1 flex gap-2 sm:justify-end">
 			<Button
-				variant="outline"
+				variant="ghost"
 				disabled={isLoggingOut}
 				onclick={() => (isLogoutDialogOpen = false)}
-				class="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+				class="cursor-pointer text-white/60 hover:bg-white/10 hover:text-white"
 			>
 				Cancel
 			</Button>
 			<Button
 				disabled={isLoggingOut}
 				onclick={handleLogout}
-				class="bg-[#FB6363] text-white hover:bg-[#FB6363]/90"
+				class="cursor-pointer bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
 			>
 				{#if isLoggingOut}
 					<Spinner class="mr-2 size-4" />

@@ -798,10 +798,15 @@
 			</Breadcrumb.Root>
 
 			<!-- Row 2: Header & Primary Action -->
-			<div class="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
-				<h1 class="text-3xl font-semibold tracking-[-0.03em] text-white md:text-4xl">
-					Document Library
-				</h1>
+			<div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-start">
+				<div>
+					<h1 class="text-3xl font-semibold text-white md:text-4xl">
+						Document Library
+					</h1>
+					<p class="mt-1 max-w-3xl text-sm font-normal text-[#767676] md:text-base">
+						Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+					</p>
+				</div>
 
 				<div class="flex items-center gap-2">
 					<Tooltip.Root>
@@ -839,11 +844,6 @@
 					</Button>
 				</div>
 			</div>
-
-			<!-- Row 3: Description -->
-			<p class="max-w-3xl text-sm leading-6 font-normal text-[#767676] md:text-base">
-				Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-			</p>
 
 			<!-- Usage Summary -->
 			<div class="grid gap-3 sm:grid-cols-3">
