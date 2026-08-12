@@ -66,15 +66,15 @@ export const TIER_PLANS: Record<TierType, TierPlan> = {
 	},
 	SIMULATE: {
 		name: 'Sandbox & Evaluation',
-		price: '24h',
-		cadence: 'evaluation window',
+		price: 'Rp 11,100',
+		cadence: 'trial 1 day',
 		description: 'A guided evaluation with no card and no real charges.',
 		features: ['Dummy credentials only', 'Counters reset monthly', 'Self-destruct on expiry'],
 		locked: false
 	},
 	OIL_INVESTOR: {
 		name: 'Pro Investor',
-		price: 'Rp 1,440,000',
+		price: 'Rp 19,000,000',
 		cadence: 'one-time',
 		description: 'The portfolio showcase that unlocks the full platform.',
 		features: [
@@ -86,8 +86,8 @@ export const TIER_PLANS: Record<TierType, TierPlan> = {
 	},
 	PRO: {
 		name: 'Pro Real',
-		price: 'Recurring',
-		cadence: 'auto-debit',
+		price: 'Rp 58,000',
+		cadence: 'per month',
 		description: 'The commercial B2B tier for recurring operations.',
 		features: [
 			'Tokenized recurring billing',

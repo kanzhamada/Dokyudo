@@ -751,7 +751,7 @@
 									<Button
 										type="submit"
 										disabled={profileLoading || savingName || !profile}
-										class="h-9 rounded-lg bg-white px-3 text-xs font-medium text-[#1B1B1B] hover:bg-white/85 disabled:opacity-40"
+										class="h-9 rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-40"
 									>
 										{#if savingName}
 											<Spinner class="mr-1.5 size-3.5" />
@@ -859,7 +859,7 @@
 									<Button
 										type="submit"
 										disabled={updatingPassword}
-										class="h-9 rounded-lg bg-white px-3 text-xs font-medium text-[#1B1B1B] hover:bg-white/85 disabled:opacity-40"
+										class="h-9 rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-40"
 									>
 										{#if updatingPassword}
 											<Spinner class="mr-1.5 size-3.5" />
