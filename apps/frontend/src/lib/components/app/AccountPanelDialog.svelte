@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import {
 		CalendarClock,
 		Check,
@@ -574,11 +575,12 @@
 				toast.error(result.error.message);
 				return;
 			}
-			testResult = result.data;
-			if (result.data.valid) {
-				toast.success('Key is valid', { description: result.data.message });
+			const payload = result.data.data;
+			testResult = payload;
+			if (payload.valid) {
+				toast.success('Key is valid', { description: payload.message });
 			} else {
-				toast.error('Key is invalid', { description: result.data.message });
+				toast.error('Key is invalid', { description: payload.message });
 			}
 		} catch (err) {
 			console.error('[AccountPanel] Failed to test BYOK key:', err);

@@ -4,6 +4,16 @@ import { encryptApiKey, decryptApiKey, maskApiKey } from "../../shared/utils/cry
 import { and, eq } from "drizzle-orm";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { PROVIDER_MODELS, type LlmProvider } from "../../shared/constants/llm_providers.constant.ts";
+import { GoogleGenAI } from "@google/genai";
+
+const TEST_PROMPT = "1";
+
+/** Fastest model per provider for quick key validation. */
+const FAST_MODELS: Record<string, string> = {
+    gemini: "gemini-2.5-flash",
+    mistral: "ministral-3b-latest",
+    openrouter: "openrouter/free",
+};
 
 export class KeysService {
     static async upsertKey(params: {
@@ -128,87 +138,64 @@ export class KeysService {
         const { provider, apiKey } = params;
 
         try {
-            const resp = await fetch(TEST_ENDPOINTS[provider]!.url(apiKey), {
-                method: "POST",
-                headers: TEST_ENDPOINTS[provider]!.headers(apiKey),
-                body: JSON.stringify(TEST_ENDPOINTS[provider]!.body),
-            });
-
-            const text = await resp.text();
-
-            if (resp.ok) return { valid: true, message: "API key is valid" };
-
-            const parsed = parseTestError(provider, resp.status, text);
-            return { valid: false, message: parsed };
+            if (provider === "gemini") {
+                return await testGemini(apiKey);
+            }
+            if (provider === "mistral") {
+                return await testMistral(apiKey);
+            }
+            if (provider === "openrouter") {
+                return await testOpenRouter(apiKey);
+            }
+            return { valid: false, message: `Unknown provider: ${provider}` };
         } catch (e: any) {
             return { valid: false, message: `Connection failed: ${e.message}` };
         }
     }
 }
 
-const TEST_ENDPOINTS: Record<string, {
-    url: (key: string) => string;
-    headers: (key: string) => Record<string, string>;
-    body: Record<string, unknown>;
-}> = {
-    gemini: {
-        url: (key: string) =>
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`,
-        headers: () => ({ "Content-Type": "application/json" }),
-        body: { contents: [{ parts: [{ text: "1" }] }] },
-    },
-    mistral: {
-        url: () => "https://api.mistral.ai/v1/chat/completions",
-        headers: (key: string) => ({
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${key}`,
-        }),
-        body: {
-            model: "ministral-3b-latest",
-            messages: [{ role: "user", content: "1" }],
-            max_tokens: 1,
-        },
-    },
-    openrouter: {
-        url: () => "https://openrouter.ai/api/v1/chat/completions",
-        headers: (key: string) => ({
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${key}`,
-            "HTTP-Referer": "https://dokyudo.app",
-            "X-Title": "Dokyudo",
-        }),
-        body: {
-            model: "openai/gpt-3.5-turbo",
-            messages: [{ role: "user", content: "1" }],
-            max_tokens: 1,
-        },
-    },
-};
+async function testGemini(apiKey: string): Promise<{ valid: boolean; message: string }> {
+    const client = new GoogleGenAI({ apiKey });
+    await client.models.generateContent({
+        model: FAST_MODELS.gemini,
+        contents: TEST_PROMPT,
+    });
+    return { valid: true, message: "API key is valid" };
+}
 
-function parseTestError(provider: string, status: number, body: string): string {
+async function testMistral(apiKey: string): Promise<{ valid: boolean; message: string }> {
+    const { Mistral: MistralClient } = await import("npm:@mistralai/mistralai");
+    const client = new MistralClient({ apiKey }) as InstanceType<typeof MistralClient>;
+    await client.chat.complete({
+        model: FAST_MODELS.mistral,
+        messages: [{ role: "user", content: TEST_PROMPT }],
+    });
+    return { valid: true, message: "API key is valid" };
+}
+
+async function testOpenRouter(apiKey: string): Promise<{ valid: boolean; message: string }> {
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+            "HTTP-Referer": "https://dokyudo.com",
+            "X-OpenRouter-Title": "Dokyudo",
+        },
+        body: JSON.stringify({
+            model: FAST_MODELS.openrouter,
+            messages: [{ role: "user", content: TEST_PROMPT }],
+        }),
+    });
+
+    const text = await resp.text();
+
+    if (resp.ok) return { valid: true, message: "API key is valid" };
+
     try {
-        const json = JSON.parse(body);
+        const json = JSON.parse(text);
+        if (json?.error?.message) return { valid: false, message: json.error.message };
+    } catch { /* body not JSON */ }
 
-        if (provider === "gemini") {
-            const reason = json?.error?.status || json?.error?.message;
-            if (status === 400 && reason) return `Invalid API key (${reason})`;
-            return `API request failed (${status})`;
-        }
-
-        if (provider === "mistral") {
-            if (status === 401) return "Invalid API Key";
-            if (json?.detail) return json.detail;
-            return `API request failed (${status})`;
-        }
-
-        if (provider === "openrouter") {
-            if (status === 401) return "Invalid API key";
-            if (json?.error?.message) return json.error.message;
-            return `API request failed (${status})`;
-        }
-
-        return `Request failed with status ${status}`;
-    } catch {
-        return `Request failed with status ${status}`;
-    }
+    return { valid: false, message: `Request failed with status ${resp.status}` };
 }
