@@ -538,7 +538,7 @@
 				<Sidebar.MenuButton
 					size="lg"
 					tooltipContent="Profile"
-					class="h-9! w-full cursor-pointer p-1.5 hover:bg-sidebar-accent"
+					class="h-12! w-full cursor-pointer p-1.5 hover:bg-sidebar-accent"
 					onclick={() => (isUserMenuOpen = !isUserMenuOpen)}
 				>
 					<AvatarPrimitive.Root
