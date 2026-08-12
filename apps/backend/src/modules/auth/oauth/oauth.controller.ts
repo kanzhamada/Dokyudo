@@ -96,6 +96,14 @@ async function processOAuthCallback(c: Context, provider: "google" | "github") {
             logContext.userId = result.user.id;
         }
 
+        // Debug: confirm the callback completed and tokens are being handed to the frontend.
+        console.log(JSON.stringify({
+            event: "oauth_debug.callback_redirect",
+            provider,
+            userId: result.user.id,
+            email: result.user.email,
+        }));
+
         // Redirect to frontend with tokens
         const frontendUrl = getEnv("FRONTEND_URL");
         const paramsObj = new URLSearchParams({

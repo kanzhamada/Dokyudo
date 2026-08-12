@@ -5,12 +5,13 @@ import { AppError } from "../../../shared/utils/errors.util.ts";
 import * as OAuthSchema from "./oauth.schema.ts";
 import { db } from "../../../config/drizzle.ts";
 import {
+    activityLogs,
     loginAttempts,
     tenantSubscriptions,
     tenants,
     users,
 } from "../../../shared/models/db.model.ts";
-import { eq, or } from "drizzle-orm";
+import { and, count, eq, or } from "drizzle-orm";
 import { logActivity } from "../../../shared/utils/activity.util.ts";
 
 export interface OAuthCallbackResult {
@@ -23,6 +24,15 @@ export interface OAuthCallbackResult {
 }
 
 export class OAuthService {
+    /**
+     * Temporary debug instrumentation for tracing the OAuth flow end to end.
+     * Emits one-line JSON events (same style as logger.middleware.ts).
+     * TODO: remove once the activity_logs issue is confirmed fixed.
+     */
+    private static debugLog(event: string, data: Record<string, unknown> = {}) {
+        console.log(JSON.stringify({ event: `oauth_debug.${event}`, ...data }));
+    }
+
     /**
      * Initiates the OAuth flow by generating the Supabase authorization URL.
      * Uses Supabase's built-in PKCE flow — no client_secret needed in our backend.
@@ -47,6 +57,11 @@ export class OAuthService {
                 status: 500,
             });
         }
+
+        this.debugLog("initiate", {
+            provider: params.provider,
+            url: data.url,
+        });
 
         return data.url;
     }
@@ -88,6 +103,13 @@ export class OAuthService {
         const isEmailVerified =
             user.email_confirmed_at != null ||
             user.identities?.[0]?.identity_data?.email_verified === true;
+
+        this.debugLog("code_exchanged", {
+            userId: user.id,
+            email: user.email ?? "unknown",
+            emailVerified: isEmailVerified,
+            provider: params.provider,
+        });
 
         if (!isEmailVerified) {
             // Kill the session immediately — do not let unverified users through
@@ -157,6 +179,11 @@ export class OAuthService {
         });
 
         if (tenantId) {
+            this.debugLog("activity_logging", {
+                tenantId,
+                userId: user.id,
+                action: "auth.login",
+            });
             await logActivity({
                 tenantId,
                 userId: user.id,
@@ -166,9 +193,30 @@ export class OAuthService {
                 requestId: params.requestId,
                 metadata: { provider: params.provider },
             });
-        } else if (params.logContext) {
-            params.logContext.activityLogWarning =
-                `Could not log activity for OAuth user ${user.id}: user record not found in public.users`;
+
+            // Verify the row actually landed in activity_logs.
+            const [verify] = await db
+                .select({ total: count() })
+                .from(activityLogs)
+                .where(
+                    and(
+                        eq(activityLogs.userId, user.id),
+                        eq(activityLogs.action, "auth.login"),
+                    ),
+                );
+            this.debugLog("activity_verified", {
+                userId: user.id,
+                rowsInTable: verify.total,
+            });
+        } else {
+            this.debugLog("activity_skipped", {
+                userId: user.id,
+                reason: "no tenant mapping resolved",
+            });
+            if (params.logContext) {
+                params.logContext.activityLogWarning =
+                    `Could not log activity for OAuth user ${user.id}: user record not found in public.users`;
+            }
         }
 
         return {
@@ -217,6 +265,12 @@ export class OAuthService {
         //    code exchange completed.
         for (let attempt = 0; attempt < 3; attempt++) {
             const tenantId = await lookupTenantId();
+            this.debugLog("tenant_lookup", {
+                attempt: attempt + 1,
+                found: !!tenantId,
+                tenantId: tenantId ?? undefined,
+                userId: params.userId,
+            });
             if (tenantId) return tenantId;
             if (attempt < 2) {
                 await new Promise((resolve) => setTimeout(resolve, 200));
@@ -236,7 +290,7 @@ export class OAuthService {
         }
 
         try {
-            return await db.transaction(async (tx) => {
+            const provisionedTenantId = await db.transaction(async (tx) => {
                 const [tenant] = await tx
                     .insert(tenants)
                     .values({ name: params.email!.slice(0, 255) })
@@ -272,7 +326,19 @@ export class OAuthService {
 
                 return tenant.id;
             });
+
+            this.debugLog("fallback_provisioned", {
+                userId: params.userId,
+                email: params.email,
+                tenantId: provisionedTenantId ?? null,
+            });
+
+            return provisionedTenantId;
         } catch (err: any) {
+            this.debugLog("provision_failed", {
+                userId: params.userId,
+                error: err.message,
+            });
             if (params.logContext) {
                 params.logContext.oauthProvisioningError = err.message;
             }

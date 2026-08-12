@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { Calendar, RotateCcw } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
@@ -95,6 +94,9 @@
 	const hasActiveFilters = $derived(
 		!!searchQuery || !!selectedCategory || !!startDate || !!endDate
 	);
+	const activeFilterCount = $derived(
+		[searchQuery, selectedCategory, startDate, endDate].filter(Boolean).length
+	);
 
 	onMount(() => {
 		const urlParams = $page.url.searchParams;
@@ -108,9 +110,7 @@
 	});
 </script>
 
-<div
-	class="flex h-full w-full flex-col gap-6 overflow-y-auto px-6 py-6 font-sans md:px-10 md:py-8"
->
+<div class="flex h-full w-full flex-col gap-6 overflow-y-auto px-6 py-6 font-sans md:px-10 md:py-8">
 	<!-- Breadcrumb -->
 	<Breadcrumb.Root class="mt-16 md:mt-0">
 		<Breadcrumb.List class="text-sm text-[#767676]">
@@ -136,82 +136,94 @@
 
 	<!-- Controls & Filters Toolbar -->
 	<div
-		class="flex flex-col gap-4 rounded-xl border border-white/10 bg-[#161616] p-4 md:flex-row md:items-center md:justify-between"
+		class="grid gap-2.5 rounded-xl border border-[#DB8F5E]/20 bg-[#25211F]/90 p-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.12)] lg:grid-cols-[minmax(220px,1fr)_auto] xl:grid-cols-[minmax(220px,0.8fr)_auto_auto]"
 	>
-		<!-- Left: Search & Category Buttons -->
-		<div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-			<!-- Search Bar -->
-			<div class="relative flex-1 max-w-xs sm:max-w-sm">
-				<MxIcon name="receipt-search-outline" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-				<Input
-					type="text"
-					placeholder="Search action, IP, metadata..."
-					class="border-white/10 bg-[#0F0F0F] pl-9 text-sm text-white placeholder:text-white/40 focus:border-white/20"
-					bind:value={searchQuery}
-					oninput={handleSearchInput}
-				/>
-			</div>
-
-			<!-- Category Buttons -->
-			<div
-				class="flex flex-wrap items-center gap-1.5 rounded-lg border border-white/5 bg-[#0F0F0F] p-1"
-			>
-				{#each [
-					{ id: '', label: 'All' },
-					{ id: 'auth', label: 'Auth' },
-					{ id: 'document', label: 'Documents' },
-					{ id: 'billing', label: 'Billing' },
-					{ id: 'tenant', label: 'Workspace' }
-				] as cat}
-					<button
-						type="button"
-						class="rounded-md px-3 py-1 text-xs font-medium transition-all {selectedCategory === cat.id
-							? 'bg-[#262626] text-white shadow-sm'
-							: 'text-[#888888] hover:text-white'}"
-						onclick={() => handleCategorySelect(cat.id)}
-					>
-						{cat.label}
-					</button>
-				{/each}
-			</div>
+		<!-- Search -->
+		<div class="relative min-w-0">
+			<label for="activity-search" class="sr-only">Search activity</label>
+			<MxIcon
+				name="receipt-search-outline"
+				class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#DB8F5E]/75"
+			/>
+			<Input
+				id="activity-search"
+				type="text"
+				placeholder="Search activity, IP, or metadata"
+				class="h-9 border-white/10 bg-[#171514] pl-9 text-[13px] text-[#F7F4EF] placeholder:text-[#8F8984] focus-visible:border-[#DB8F5E]/70 focus-visible:ring-2 focus-visible:ring-[#DB8F5E]/15"
+				bind:value={searchQuery}
+				oninput={handleSearchInput}
+			/>
 		</div>
 
-		<!-- Right: Date Range & Reset -->
-		<div class="flex flex-wrap items-center gap-3">
-			<div class="flex items-center gap-2 text-xs text-[#888888]">
-				<Calendar class="h-4 w-4 text-white/40" />
+		<!-- Category Segmented Control -->
+		<div
+			class="flex min-w-0 [scrollbar-width:none] items-center gap-0.5 overflow-x-auto rounded-lg border border-white/10 bg-[#171514] p-1 [&::-webkit-scrollbar]:hidden"
+			role="group"
+			aria-label="Filter by category"
+		>
+			{#each [{ id: '', label: 'All' }, { id: 'auth', label: 'Auth' }, { id: 'document', label: 'Documents' }, { id: 'billing', label: 'Billing' }, { id: 'tenant', label: 'Workspace' }] as cat}
+				<button
+					type="button"
+					aria-pressed={selectedCategory === cat.id}
+					class="h-7 shrink-0 rounded-md px-2.5 text-[11px] font-medium transition-[background-color,color,transform] duration-200 active:scale-[0.98] {selectedCategory ===
+					cat.id
+						? 'bg-[#DB8F5E] text-[#211916] shadow-[0_2px_8px_rgba(217,142,104,0.18)]'
+						: 'text-[#9B938E] hover:bg-white/[0.06] hover:text-[#F7F4EF]'}"
+					onclick={() => handleCategorySelect(cat.id)}
+				>
+					{cat.label}
+				</button>
+			{/each}
+		</div>
+
+		<!-- Date Range & Reset -->
+		<div class="flex min-w-0 items-center gap-2 lg:col-span-2 lg:justify-self-end xl:col-span-1">
+			<div class="flex min-w-0 flex-1 items-center gap-1.5 text-[11px] text-[#9B938E] sm:flex-none">
+				<Calendar class="hidden size-4 shrink-0 text-[#DB8F5E]/75 sm:block" strokeWidth={1.8} />
+				<label for="activity-start-date" class="sr-only">Start date</label>
 				<input
+					id="activity-start-date"
 					type="date"
-					class="rounded-lg border border-white/10 bg-[#0F0F0F] px-2.5 py-1.5 text-xs text-white focus:border-white/20 focus:outline-none"
+					aria-label="Start date"
+					class="h-9 min-w-0 flex-1 rounded-lg border border-white/10 bg-[#171514] px-2.5 text-[11px] text-[#F7F4EF] transition-colors outline-none focus:border-[#DB8F5E]/70 focus:ring-2 focus:ring-[#DB8F5E]/15 sm:w-[132px] sm:flex-none"
+					style="color-scheme: dark"
 					bind:value={startDate}
 					onchange={handleDateChange}
 				/>
-				<span>to</span>
+				<span class="shrink-0 text-[#6F6864]">to</span>
+				<label for="activity-end-date" class="sr-only">End date</label>
 				<input
+					id="activity-end-date"
 					type="date"
-					class="rounded-lg border border-white/10 bg-[#0F0F0F] px-2.5 py-1.5 text-xs text-white focus:border-white/20 focus:outline-none"
+					aria-label="End date"
+					class="h-9 min-w-0 flex-1 rounded-lg border border-white/10 bg-[#171514] px-2.5 text-[11px] text-[#F7F4EF] transition-colors outline-none focus:border-[#DB8F5E]/70 focus:ring-2 focus:ring-[#DB8F5E]/15 sm:w-[132px] sm:flex-none"
+					style="color-scheme: dark"
 					bind:value={endDate}
 					onchange={handleDateChange}
 				/>
 			</div>
 
-				<Button
-					variant="ghost"
-					size="sm"
-					class="h-8 px-2 text-xs text-[#888888] hover:bg-white/5 hover:text-white"
-					onclick={resetFilters}
-				>
-					<RotateCcw class="mr-1 h-3.5 w-3.5" />
-					Reset
-				</Button>
+			<Button
+				variant="ghost"
+				size="sm"
+				class="h-9 shrink-0 gap-1.5 rounded-lg px-2.5 text-[11px] text-[#9B938E] hover:bg-white/[0.06] hover:text-[#F7F4EF] disabled:opacity-40"
+				onclick={resetFilters}
+				disabled={!hasActiveFilters}
+				aria-label="Reset filters"
+			>
+				<RotateCcw class="size-3.5" strokeWidth={1.8} />
+				<span>Reset</span>
+				{#if hasActiveFilters}
+					<span
+						class="flex size-4 items-center justify-center rounded-full bg-[#DB8F5E]/15 text-[10px] font-semibold text-[#DB8F5E]"
+					>
+						{activeFilterCount}
+					</span>
+				{/if}
+			</Button>
 		</div>
 	</div>
 
 	<!-- Data Table -->
-	<DataTable
-		data={activities}
-		{meta}
-		{isLoading}
-		onPageChange={handlePageChange}
-	/>
+	<DataTable data={activities} {meta} {isLoading} onPageChange={handlePageChange} />
 </div>

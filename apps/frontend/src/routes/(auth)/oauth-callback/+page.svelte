@@ -83,7 +83,14 @@
 			}
 		});
 
+		console.log('[OAuthDebug] Tokens accepted, session stored:', {
+			userId: payload.sub,
+			email: payload.email ?? '',
+			tokensFrom: hashParams.has('access_token') ? 'hash' : 'query'
+		});
+
 		await goto('/app/chat');
+		console.log('[OAuthDebug] Navigated to /app/chat');
 	});
 
 	$effect(() => {
