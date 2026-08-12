@@ -7,13 +7,13 @@
 The OAuth flow uses **Supabase's built-in Server-Side PKCE** rather than manually implementing the full OAuth dance (state management, code exchange, userinfo fetch). This eliminates the need for `GOOGLE_CLIENT_SECRET` / `GITHUB_CLIENT_SECRET` in the backend environment — they're configured once in the Supabase Dashboard.
 
 **Initiate Flow** (`GET /api/auth/oauth/google` or `/github`):
-1. Calls `supabase.auth.signInWithOAuth({ provider, options: { redirectTo, skipBrowserRedirect: true } })`.
-2. Returns the Supabase-generated authorization URL.
+1. Calls `supabase.auth.signInWithOAuth({ provider, options: { flowType: "pkce", redirectTo: "{API_URL}/api/auth/oauth/{provider}/callback", skipBrowserRedirect: true } })`.
+2. Returns the Supabase-generated PKCE authorization URL (with `code_challenge`).
 3. Issues a `302 Redirect` to the user's browser.
 
 **Callback Flow** (`GET /api/auth/oauth/google/callback` or `/github/callback`):
-1. Receives the authorization `code` from the provider via Supabase's redirect.
-2. Exchanges the code for a Supabase session via `exchangeCodeForSession(code)`.
+1. Receives the authorization `code` from the provider via Supabase's redirect to the **backend callback** (not the frontend).
+2. Exchanges the code for a Supabase session via `exchangeCodeForSession(code)`. The PKCE verifier lives in the backend process's singleton Supabase client.
 3. **Email Verification Gate (PRD §5.1)**: Checks `user.email_confirmed_at` or `identities[0].identity_data.email_verified`. If unverified, the session is immediately revoked via `admin.signOut()` and a `401 UNAUTHORIZED` is returned.
 4. On success, redirects to `{FRONTEND_URL}/oauth-callback?access_token=...&refresh_token=...`.
 5. Cleans up the Redis `unverified_email:{email}` cache if present.
@@ -61,7 +61,7 @@ sequenceDiagram
 - **[NEW]** `apps/backend/src/modules/auth/oauth.controller.ts`: HTTP handlers for 4 endpoints (Google/GitHub × redirect/callback).
 - **[NEW]** `apps/backend/src/modules/auth/oauth.routes.ts`: OpenAPI route definitions with full request/response documentation.
 - **[MODIFY]** `apps/backend/src/modules/auth/auth.routes.ts`: Mounted `oauthRoutes` via `authRoutes.route("/", oauthRoutes)`.
-- **[MODIFY]** `apps/backend/src/config/env.ts`: Added `FRONTEND_URL` as optional env var (default: `http://localhost:5173`) + `getEnv()` helper.
+- **[MODIFY]** `apps/backend/src/config/env.ts`: Added `FRONTEND_URL` (default `http://localhost:5173`) + `API_URL` (default `http://localhost:8000`, the backend's own public URL used as the PKCE callback target) + `getEnv()` helper.
 - **[SYNC]** `api-collections/Auth/06-09_OAuth*.bru`: Updated docs to reflect Supabase PKCE flow.
 
 ## Connections

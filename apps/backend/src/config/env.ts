@@ -25,6 +25,8 @@ const REQUIRED_ENV_VARS = [
 /** Optional env vars with sensible defaults */
 const OPTIONAL_ENV_VARS_WITH_DEFAULTS: Record<string, string> = {
     FRONTEND_URL: "http://localhost:5173",
+    // Backend's own public URL, used for OAuth callback redirects (PKCE).
+    API_URL: "http://localhost:8000",
     // Free provider keys — optional so server still boots without them
     GROQ_API_KEY: "",
     SAMBANOVA_API_KEY: "",

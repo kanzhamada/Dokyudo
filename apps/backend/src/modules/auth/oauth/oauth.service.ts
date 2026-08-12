@@ -45,7 +45,12 @@ export class OAuthService {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: params.provider,
             options: {
-                redirectTo: `${getEnv("FRONTEND_URL")}/oauth-callback`,
+                // The anon client is created with flowType "pkce" (see
+                // config/supabase.ts), so the auth code comes back to OUR
+                // backend callback — not the frontend — and
+                // handleOAuthCallback can provision the tenant and record
+                // auth.login in activity_logs.
+                redirectTo: `${getEnv("API_URL")}/api/auth/oauth/${params.provider}/callback`,
                 skipBrowserRedirect: true,
             },
         });
@@ -84,9 +89,29 @@ export class OAuthService {
         const supabase = getSupabaseAnon();
 
         // Exchange the PKCE code for a Supabase session
-        const { data, error } = await supabase.auth.exchangeCodeForSession(
-            params.code,
-        );
+        let exchangeResult;
+        try {
+            exchangeResult = await supabase.auth.exchangeCodeForSession(
+                params.code,
+            );
+        } catch (exchangeErr: any) {
+            // Thrown (not returned as {error}) e.g. when the PKCE verifier is
+            // gone from memory — a server restart between initiate and
+            // callback. Report it as a clean auth failure, not a 500.
+            this.debugLog("code_exchange_threw", {
+                error: exchangeErr.message,
+            });
+            if (params.logContext) {
+                params.logContext.oauthExchangeError = exchangeErr.message;
+            }
+            throw new AppError({
+                code: "UNAUTHORIZED",
+                message: "OAuth code exchange failed. Please try again.",
+                status: 401,
+            });
+        }
+
+        const { data, error } = exchangeResult;
 
         if (error || !data.session) {
             throw new AppError({

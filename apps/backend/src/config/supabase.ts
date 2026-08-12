@@ -27,6 +27,9 @@ export function getSupabaseAnon(): SupabaseClient {
             auth: {
                 autoRefreshToken: false,
                 persistSession: false,
+                // OAuth uses server-side PKCE so the auth code comes back to
+                // our backend callback (see oauth.service.ts initiateOAuth).
+                flowType: "pkce",
             },
         });
     }
