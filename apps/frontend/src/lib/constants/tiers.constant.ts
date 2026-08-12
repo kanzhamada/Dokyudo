@@ -6,10 +6,7 @@ export interface TierLimit {
 	maxSearchesPerMonth: number;
 }
 
-export const TIER_LIMITS: Record<
-	'FREE' | 'SIMULATE' | 'OIL_INVESTOR' | 'PRO',
-	TierLimit
-> = {
+export const TIER_LIMITS: Record<'FREE' | 'SIMULATE' | 'OIL_INVESTOR' | 'PRO', TierLimit> = {
 	FREE: {
 		maxFileSizeBytes: 10 * 1024 * 1024, // 10 MB
 		maxUploadsPerMonth: 10,
@@ -43,3 +40,60 @@ export const TIER_LIMITS: Record<
 } as const;
 
 export type TierType = keyof typeof TIER_LIMITS;
+
+export interface TierPlan {
+	name: string;
+	price: string;
+	cadence: string;
+	description: string;
+	features: readonly string[];
+	locked: boolean;
+}
+
+/** Pricing copy and benefits shared by billing surfaces. Quotas stay in TIER_LIMITS. */
+export const TIER_PLANS: Record<TierType, TierPlan> = {
+	FREE: {
+		name: 'Free',
+		price: 'Rp 0',
+		cadence: 'forever',
+		description: 'The default tier for every new tenant.',
+		features: [
+			'Hybrid search + RAG included',
+			'OAuth via Google and GitHub',
+			'Automatic 7-day teardown'
+		],
+		locked: false
+	},
+	SIMULATE: {
+		name: 'Sandbox & Evaluation',
+		price: '24h',
+		cadence: 'evaluation window',
+		description: 'A guided evaluation with no card and no real charges.',
+		features: ['Dummy credentials only', 'Counters reset monthly', 'Self-destruct on expiry'],
+		locked: false
+	},
+	OIL_INVESTOR: {
+		name: 'Pro Investor',
+		price: 'Rp 1,440,000',
+		cadence: 'one-time',
+		description: 'The portfolio showcase that unlocks the full platform.',
+		features: [
+			'One-time sandbox invoice',
+			'3 activation vouchers',
+			'Unlocks PRO REAL platform-wide'
+		],
+		locked: true
+	},
+	PRO: {
+		name: 'Pro Real',
+		price: 'Recurring',
+		cadence: 'auto-debit',
+		description: 'The commercial B2B tier for recurring operations.',
+		features: [
+			'Tokenized recurring billing',
+			'Multi-seat license provisioning',
+			'Recurring webhook lifecycle'
+		],
+		locked: true
+	}
+} as const;

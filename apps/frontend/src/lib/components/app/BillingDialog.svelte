@@ -4,19 +4,26 @@
 	import { Spinner } from '$lib/components/ui/spinner';
 	import {
 		Check,
+		CalendarClock,
 		CreditCard,
-		Database,
 		ExternalLink,
 		FileText,
 		HardDrive,
+		LockKeyhole,
 		MessageCircle,
 		RefreshCw,
 		Search
 	} from 'lucide-svelte';
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { getMeUsage } from '$lib/api/me';
-	import { createBillingPortalSession } from '$lib/api/payments';
+	import { createBillingPortalSession, createCheckoutSession } from '$lib/api/payments';
+	import {
+		TIER_LIMITS,
+		TIER_PLANS,
+		type TierPlan,
+		type TierType
+	} from '$lib/constants/tiers.constant';
 	import type { UserUsageResponse } from '$lib/types/auth.types';
 
 	interface Props {
@@ -24,105 +31,18 @@
 		onClose?: () => void;
 	}
 
-	type Tier = UserUsageResponse['tier'];
+	type Plan = TierPlan & { tier: TierType; limits: string[] };
 
-	interface Plan {
-		tier: Tier;
-		name: string;
-		price: string;
-		cadence: string;
-		description: string;
-		limits: string[];
-		features: string[];
-	}
-
-	const plans: Plan[] = [
-		{
-			tier: 'FREE',
-			name: 'Free',
-			price: 'Rp 0',
-			cadence: 'forever',
-			description: 'The default tier for every new tenant.',
-			limits: [
-				'10 MB max file',
-				'5 uploads / mo',
-				'50 searches / mo',
-				'10 Q&A / mo',
-				'500 MB storage'
-			],
-			features: [
-				'Hybrid search + RAG included',
-				'OAuth via Google and GitHub',
-				'Automatic 7-day teardown'
-			]
-		},
-		{
-			tier: 'OIL_INVESTOR',
-			name: 'Pro Investor',
-			price: 'Rp 1,440,000',
-			cadence: 'one-time',
-			description: 'The portfolio showcase that unlocks the full platform.',
-			limits: [
-				'25 MB max file',
-				'Unlimited* uploads',
-				'Unlimited* searches',
-				'100 Q&A / mo',
-				'40 GB storage'
-			],
-			features: [
-				'One-time sandbox invoice',
-				'3 activation vouchers',
-				'Unlocks PRO REAL platform-wide'
-			]
-		},
-		{
-			tier: 'PRO',
-			name: 'Pro Real',
-			price: 'Recurring',
-			cadence: 'auto-debit',
-			description: 'The commercial B2B tier for recurring operations.',
-			limits: [
-				'25 MB+ max file',
-				'Expanded uploads',
-				'Expanded searches',
-				'100+ Q&A / mo',
-				'40 GB+ storage'
-			],
-			features: [
-				'Tokenized recurring billing',
-				'Multi-seat license provisioning',
-				'Recurring webhook lifecycle'
-			]
-		},
-		{
-			tier: 'SIMULATE',
-			name: 'Sandbox & Evaluation',
-			price: '24h',
-			cadence: 'evaluation window',
-			description: 'A guided evaluation with no card and no real charges.',
-			limits: [
-				'25 MB max file',
-				'Unlimited* uploads',
-				'Unlimited* searches',
-				'100 Q&A / mo',
-				'2 GB storage'
-			],
-			features: ['Dummy credentials only', 'Counters reset monthly', 'Self-destruct on expiry']
-		}
-	];
+	const planOrder: TierType[] = ['FREE', 'OIL_INVESTOR', 'PRO', 'SIMULATE'];
 
 	let { open = $bindable(false), onClose }: Props = $props();
 
 	let usage = $state<UserUsageResponse | null>(null);
 	let isLoading = $state(false);
 	let isPortalLoading = $state(false);
+	let isCheckoutLoading = $state(false);
 	let errorMessage = $state('');
-
-	const activePlan = $derived(plans.find((plan) => plan.tier === usage?.tier) ?? null);
-
-	function formatTier(tier: Tier): string {
-		return plans.find((plan) => plan.tier === tier)?.name ?? tier;
-	}
+	let currentTime = $state(new Date());
 
 	function formatBytes(bytes: number): string {
 		if (bytes === 0) return '0 B';
@@ -131,6 +51,41 @@
 		const value = bytes / 1024 ** exponent;
 		return `${value >= 100 || exponent === 0 ? Math.round(value) : value.toFixed(1)} ${units[exponent]}`;
 	}
+
+	function formatPlanLimits(tier: TierType): string[] {
+		const limits = TIER_LIMITS[tier];
+		return [
+			`${formatBytes(limits.maxFileSizeBytes)} max file`,
+			`${limits.maxUploadsPerMonth.toLocaleString()} uploads / mo`,
+			`${limits.maxSearchesPerMonth.toLocaleString()} searches / mo`,
+			`${limits.maxQnaPerMonth.toLocaleString()} Q&A / mo`,
+			`${formatBytes(limits.maxStorageBytes)} storage`
+		];
+	}
+
+	const plans: Plan[] = planOrder.map((tier) => ({
+		tier,
+		...TIER_PLANS[tier],
+		limits: formatPlanLimits(tier)
+	}));
+
+	const activePlan = $derived(plans.find((plan) => plan.tier === usage?.tier) ?? null);
+	const activeLimits = $derived(usage ? TIER_LIMITS[usage.tier] : null);
+
+	const resetCountdown = $derived.by(() => {
+		if (usage?.tier !== 'FREE') return '';
+		const nextReset = new Date(
+			Date.UTC(currentTime.getUTCFullYear(), currentTime.getUTCMonth() + 1, 1)
+		);
+		const totalMinutes = Math.max(
+			0,
+			Math.ceil((nextReset.getTime() - currentTime.getTime()) / 60000)
+		);
+		const days = Math.floor(totalMinutes / (24 * 60));
+		const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+		const minutes = totalMinutes % 60;
+		return `${days}d ${hours}h ${minutes}m`;
+	});
 
 	function formatExpiry(expiresAt: string | null): string {
 		if (!expiresAt) return 'No expiration';
@@ -177,6 +132,31 @@
 			isPortalLoading = false;
 		}
 	}
+
+	async function openSandboxCheckout() {
+		if (isCheckoutLoading) return;
+		isCheckoutLoading = true;
+
+		try {
+			const result = await createCheckoutSession({ tierToUnlock: 'SIMULATE' });
+			if (result.ok) {
+				window.location.assign(result.data.checkoutUrl);
+			} else {
+				toast.error(result.error.message || 'Unable to open Sandbox checkout.');
+			}
+		} catch {
+			toast.error('Unable to open Sandbox checkout.');
+		} finally {
+			isCheckoutLoading = false;
+		}
+	}
+
+	onMount(() => {
+		const timer = window.setInterval(() => {
+			currentTime = new Date();
+		}, 1000);
+		return () => window.clearInterval(timer);
+	});
 
 	$effect(() => {
 		if (open) {
@@ -227,7 +207,9 @@
 									Active
 								</span>
 							</div>
-							<p class="mt-1 text-xs text-white/40">{formatExpiry(usage?.expiresAt ?? null)}</p>
+							<p class="mt-1 text-xs text-white/40">
+								{usage?.tier === 'FREE' ? 'Monthly access' : formatExpiry(usage?.expiresAt ?? null)}
+							</p>
 						{:else}
 							<div class="mt-2 h-5 w-28 animate-pulse rounded bg-white/[0.07]"></div>
 						{/if}
@@ -269,6 +251,9 @@
 							<p class="text-[10px] text-white/35">Uploads</p>
 							<p class="mt-1 text-base font-medium text-white/85">
 								{usage.uploadsCount.toLocaleString()}
+								<span class="text-[10px] font-normal text-white/35">
+									/ {activeLimits?.maxUploadsPerMonth}</span
+								>
 							</p>
 						</div>
 						<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-3">
@@ -276,6 +261,9 @@
 							<p class="text-[10px] text-white/35">Searches</p>
 							<p class="mt-1 text-base font-medium text-white/85">
 								{usage.searchesCount.toLocaleString()}
+								<span class="text-[10px] font-normal text-white/35">
+									/ {activeLimits?.maxSearchesPerMonth}</span
+								>
 							</p>
 						</div>
 						<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-3">
@@ -283,6 +271,9 @@
 							<p class="text-[10px] text-white/35">Q&amp;A</p>
 							<p class="mt-1 text-base font-medium text-white/85">
 								{usage.qaCount.toLocaleString()}
+								<span class="text-[10px] font-normal text-white/35">
+									/ {activeLimits?.maxQnaPerMonth}</span
+								>
 							</p>
 						</div>
 						<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-3">
@@ -290,36 +281,51 @@
 							<p class="text-[10px] text-white/35">Storage</p>
 							<p class="mt-1 text-base font-medium text-white/85">
 								{formatBytes(usage.storageUsedBytes)}
+								<span class="text-[10px] font-normal text-white/35">
+									/ {formatBytes(activeLimits?.maxStorageBytes ?? 0)}</span
+								>
 							</p>
 						</div>
 					</div>
-					<div
-						class="mt-3 flex flex-col gap-3 rounded-lg border border-white/[0.1] bg-white/[0.025] p-3 sm:flex-row sm:items-center sm:justify-between"
-					>
-						<div class="flex items-center gap-2.5">
-							<Database class="size-4 text-white/40" strokeWidth={1.8} />
+					{#if usage.tier === 'FREE'}
+						<div
+							class="mt-3 flex items-center gap-2.5 rounded-lg border border-white/[0.1] bg-white/[0.025] p-3"
+						>
+							<CalendarClock class="size-4 shrink-0 text-white/40" strokeWidth={1.8} />
 							<div>
-								<p class="text-xs text-white/60">Usage tier</p>
+								<p class="text-xs text-white/60">Monthly reset</p>
 								<p class="mt-0.5 text-[11px] text-white/35">
-									{formatTier(usage.tier)} · counters reset monthly
+									Resets in {resetCountdown} · 1st at 00:00 UTC
 								</p>
 							</div>
 						</div>
-						<Button
-							variant="outline"
-							disabled={isPortalLoading}
-							onclick={openBillingPortal}
-							class="h-9 shrink-0 border-white/[0.15] bg-white/[0.04] text-xs text-white/75 hover:bg-white/[0.1] hover:text-white disabled:opacity-40"
+					{:else}
+						<div
+							class="mt-3 flex flex-col gap-3 rounded-lg border border-white/[0.1] bg-white/[0.025] p-3 sm:flex-row sm:items-center sm:justify-between"
 						>
-							{#if isPortalLoading}
-								<Spinner class="mr-1.5 size-3.5" />
-								Opening...
-							{:else}
-								<ExternalLink class="mr-1.5 size-3.5" strokeWidth={1.8} />
-								Manage billing
-							{/if}
-						</Button>
-					</div>
+							<div class="flex items-center gap-2.5">
+								<CalendarClock class="size-4 shrink-0 text-white/40" strokeWidth={1.8} />
+								<div>
+									<p class="text-xs text-white/60">Subscription</p>
+									<p class="mt-0.5 text-[11px] text-white/35">{formatExpiry(usage.expiresAt)}</p>
+								</div>
+							</div>
+							<Button
+								variant="outline"
+								disabled={isPortalLoading}
+								onclick={openBillingPortal}
+								class="h-9 shrink-0 border-white/[0.15] bg-white/[0.04] text-xs text-white/75 hover:bg-white/[0.1] hover:text-white disabled:opacity-40"
+							>
+								{#if isPortalLoading}
+									<Spinner class="mr-1.5 size-3.5" />
+									Opening...
+								{:else}
+									<ExternalLink class="mr-1.5 size-3.5" strokeWidth={1.8} />
+									Manage billing
+								{/if}
+							</Button>
+						</div>
+					{/if}
 				{/if}
 			</section>
 
@@ -381,6 +387,43 @@
 									</div>
 								{/each}
 							</div>
+
+							{#if plan.tier === 'SIMULATE'}
+								<button
+									type="button"
+									disabled={isCheckoutLoading || usage?.tier === 'SIMULATE'}
+									onclick={openSandboxCheckout}
+									class="mt-3 inline-flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-xs font-medium text-[#1B1B1B] transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-40"
+								>
+									{#if isCheckoutLoading}
+										<Spinner class="size-3.5" />
+										Opening checkout...
+									{:else if usage?.tier === 'SIMULATE'}
+										Sandbox active
+									{:else}
+										Access Sandbox
+									{/if}
+								</button>
+							{:else if plan.locked}
+								<button
+									type="button"
+									disabled
+									class="relative mt-3 inline-flex h-9 w-full cursor-not-allowed items-center justify-center overflow-hidden rounded-lg border border-white/[0.1] bg-white/[0.03] px-3 text-xs font-medium text-white/30"
+								>
+									Unavailable
+									<span class="absolute inset-0 flex items-center justify-center bg-[#242322]/70">
+										<LockKeyhole class="size-3.5 text-white/55" strokeWidth={1.8} />
+									</span>
+								</button>
+							{:else}
+								<button
+									type="button"
+									disabled
+									class="mt-3 inline-flex h-9 w-full cursor-not-allowed items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.03] px-3 text-xs font-medium text-white/35"
+								>
+									{usage?.tier === plan.tier ? 'Current plan' : 'Included'}
+								</button>
+							{/if}
 						</article>
 					{/each}
 				</div>
