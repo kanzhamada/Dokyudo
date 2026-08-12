@@ -15,6 +15,17 @@ export const UpsertKeyBodySchema = z.object({
     }),
 });
 
+export const TestKeyBodySchema = z.object({
+    provider: z.enum(PROVIDERS).openapi({
+        description: "LLM provider to test the API key against",
+        example: "gemini",
+    }),
+    apiKey: z.string().min(1, "API Key is required").openapi({
+        description: "BYOK API key to validate",
+        example: "sk-or-v1-...",
+    }),
+});
+
 export const ProviderParamSchema = z.object({
     provider: z.enum(PROVIDERS),
 });

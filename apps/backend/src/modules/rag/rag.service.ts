@@ -182,10 +182,13 @@ export class RagService {
         // on. Its unselected variants are deleted once the follow-up completes.
         let prevLatestTurnId: string | null = null;
 
-        // -1. Tier Quota Validation (Check Only)
-        await withAuthDb(userId, async (tx) => {
-            await TierQuotaUtil.checkQaQuota(tx, tenantId);
-        });
+        // -1. Tier Quota Validation (Check Only) — bypassed for BYOK users
+        //      who bring their own API keys and don't consume platform credits.
+        if (!useByok) {
+            await withAuthDb(userId, async (tx) => {
+                await TierQuotaUtil.checkQaQuota(tx, tenantId);
+            });
+        }
         if (signal?.aborted) return createClosedStream();
 
         // 0. Pre-flight: validate chat attachments BEFORE the write-ahead insert
@@ -472,7 +475,11 @@ export class RagService {
                     // Reserve the QA quota at submit time — the pipeline runs
                     // later, in the background sweep, when quota may differ.
                     // (Search quota is consumed at completion, inside search.)
-                    await TierQuotaUtil.incrementQa(tx, tenantId);
+                    // Skip for BYOK: user brings their own keys, doesn't consume
+                    // platform credits.
+                    if (!useByok) {
+                        await TierQuotaUtil.incrementQa(tx, tenantId);
+                    }
                     isAwaitingTurn = true;
                 }
             }
@@ -710,10 +717,13 @@ ${effectiveQuestion}`;
         const augmentedPrompt = built.augmentedPrompt;
 
         // 4. Cascading Fallback & SSE Streaming
-        // Increment the Q&A counter atomically right before streaming
-        await withAuthDb(userId, async (tx) => {
-            await TierQuotaUtil.incrementQa(tx, tenantId);
-        });
+        // Increment the Q&A counter atomically right before streaming.
+        // Skip for BYOK: user brings their own keys.
+        if (!useByok) {
+            await withAuthDb(userId, async (tx) => {
+                await TierQuotaUtil.incrementQa(tx, tenantId);
+            });
+        }
         if (signal?.aborted) return await abortAsStopped();
 
         // 5. Stream construction

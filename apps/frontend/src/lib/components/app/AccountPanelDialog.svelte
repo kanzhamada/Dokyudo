@@ -32,7 +32,7 @@
 		getMeUsageCached,
 		invalidateMeCache
 	} from '$lib/state/me-cache.store.svelte';
-	import { deleteKey, getKeys, upsertKey } from '$lib/api/keys';
+	import { deleteKey, getKeys, upsertKey, testKey } from '$lib/api/keys';
 	import { createBillingPortalSession, createCheckoutSession } from '$lib/api/payments';
 	import { deleteAllShares, deleteAllTenantShares, deleteShare, listAllShares } from '$lib/api/rag';
 	import {
@@ -520,6 +520,8 @@
 	let isSavingKey = $state(false);
 	let isResettingKey = $state(false);
 	let byokError = $state('');
+	let isTestingKey = $state(false);
+	let testResult = $state<{ valid: boolean; message: string } | null>(null);
 	let keyMasks = $state<Record<ByokProvider, string>>({
 		gemini: '',
 		mistral: '',
@@ -555,6 +557,29 @@
 		provider = next;
 		apiKey = '';
 		byokError = '';
+		testResult = null;
+	}
+
+	async function testConfigureKey() {
+		const key = apiKey.trim();
+		if (!key || isTestingKey) return;
+
+		isTestingKey = true;
+		testResult = null;
+		byokError = '';
+		try {
+			const result = await testKey(provider, key);
+			if (!result.ok) {
+				byokError = result.error.message;
+				return;
+			}
+			testResult = result.data;
+		} catch (err) {
+			console.error('[AccountPanel] Failed to test BYOK key:', err);
+			byokError = 'Failed to test API key.';
+		} finally {
+			isTestingKey = false;
+		}
 	}
 
 	async function saveConfigureKey() {
@@ -1226,10 +1251,30 @@
 								<p class="text-xs text-red-400">{byokError}</p>
 							{/if}
 
-							<div class="flex justify-end pt-0.5">
+							{#if testResult}
+								<p
+									class="text-xs {testResult.valid ? 'text-emerald-400' : 'text-red-400'}"
+								>
+									{testResult.message}
+								</p>
+							{/if}
+
+							<div class="flex justify-end gap-2 pt-0.5">
+								<Button
+									class="h-9 cursor-pointer rounded-lg border border-white/20 bg-transparent px-3 text-xs font-medium text-white/70 hover:bg-white/10 disabled:opacity-50"
+									disabled={!apiKey.trim() || isTestingKey || isSavingKey || isResettingKey}
+									onclick={testConfigureKey}
+								>
+									{#if isTestingKey}
+										<Spinner class="mr-1.5 size-3.5" />
+										Testing...
+									{:else}
+										Test
+									{/if}
+								</Button>
 								<Button
 									class="h-9 cursor-pointer rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-50"
-									disabled={!apiKey.trim() || isSavingKey || isResettingKey}
+									disabled={!apiKey.trim() || isSavingKey || isResettingKey || !testResult?.valid}
 									onclick={saveConfigureKey}
 								>
 									{#if isSavingKey}

@@ -2,6 +2,7 @@ import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { KeysController } from "./keys.controller.ts";
 import {
     UpsertKeyBodySchema,
+    TestKeyBodySchema,
     ProviderParamSchema,
     KeyResponseSchema,
 } from "./keys.schema.ts";
@@ -116,4 +117,54 @@ keysRoutes.openapi(
         },
     }),
     KeysController.deleteKey as any,
+);
+
+keysRoutes.openapi(
+    createRoute({
+        method: "post",
+        path: "/test",
+        summary: "Test API Key",
+        description: "Validates the API key by making a minimal test call to the provider.",
+        request: {
+            body: {
+                content: {
+                    "application/json": { schema: TestKeyBodySchema },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: "Test result",
+                content: {
+                    "application/json": {
+                        schema: z.object({
+                            data: z.object({
+                                valid: z.boolean(),
+                                message: z.string(),
+                            }),
+                        }),
+                    },
+                },
+            },
+            400: {
+                description: "Validation error",
+                content: {
+                    "application/json": { schema: ErrorResponseSchema },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": { schema: ErrorResponseSchema },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": { schema: ErrorResponseSchema },
+                },
+            },
+        },
+    }),
+    KeysController.testKey as any,
 );

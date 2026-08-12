@@ -33,3 +33,18 @@ export function deleteKey(
 		method: 'DELETE'
 	});
 }
+
+export interface TestKeyResponse {
+	valid: boolean;
+	message: string;
+}
+
+export function testKey(
+	provider: 'gemini' | 'mistral' | 'openrouter',
+	apiKey: string
+): Promise<ApiResult<{ data: TestKeyResponse }>> {
+	return apiRequest<{ data: TestKeyResponse }>('/api/keys/test', {
+		method: 'POST',
+		body: { provider, apiKey }
+	});
+}

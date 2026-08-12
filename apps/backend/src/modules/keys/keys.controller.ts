@@ -34,4 +34,16 @@ export class KeysController {
         await KeysService.deleteKey({ tenantId, provider, logContext });
         return c.json({ data: { success: true } }, 200);
     }
+
+    static async testKey(c: Context) {
+        const extractor = new ContextExtractor(c);
+        const body = extractor.extractValidJson<{ provider: string; apiKey: string }>();
+
+        const result = await KeysService.testKey({
+            provider: body.provider,
+            apiKey: body.apiKey,
+        });
+
+        return c.json({ data: result }, 200);
+    }
 }
