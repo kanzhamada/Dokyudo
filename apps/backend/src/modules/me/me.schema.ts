@@ -31,6 +31,7 @@ export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
 export const UsageResponseSchema = z
     .object({
         tier: z.enum(["FREE", "SIMULATE", "OIL_INVESTOR", "PRO"]),
+        expiresAt: z.string().nullable().optional(),
         uploadsCount: z.number().openapi({
             description: "Number of documents uploaded by tenant",
             example: 3,

@@ -38,6 +38,7 @@
 	import ShareConversationDialog from '$lib/components/app/ShareConversationDialog.svelte';
 	import SharedLinksDialog from '$lib/components/app/SharedLinksDialog.svelte';
 	import ProfileSettingsDialog from '$lib/components/app/ProfileSettingsDialog.svelte';
+	import BillingDialog from '$lib/components/app/BillingDialog.svelte';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
 	import type { UserProfileResponse } from '$lib/types/auth.types';
@@ -239,6 +240,7 @@
 	let sharingConversation = $state<ConversationItem | null>(null);
 	let isSharedLinksDialogOpen = $state(false);
 	let isProfileSettingsDialogOpen = $state(false);
+	let isBillingDialogOpen = $state(false);
 
 	function openShareDialog(item: ConversationItem) {
 		sharingConversation = item;
@@ -555,9 +557,15 @@
 				>
 					{#if typeof item.icon === 'string'}
 						{#if mxBoldName(item.icon) && (item.active || hoveredNavHref === item.href)}
-							<MxIcon name={mxBoldName(item.icon)!} class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
+							<MxIcon
+								name={mxBoldName(item.icon)!}
+								class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0"
+							/>
 						{:else}
-							<MxIcon name={item.icon} class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
+							<MxIcon
+								name={item.icon}
+								class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0"
+							/>
 						{/if}
 					{:else}
 						<item.icon class="mr-3 size-[18px] group-data-[collapsible=icon]:mr-0" />
@@ -663,7 +671,10 @@
 		<button
 			type="button"
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-			onclick={() => (isUserMenuOpen = false)}
+			onclick={() => {
+				isUserMenuOpen = false;
+				isBillingDialogOpen = true;
+			}}
 		>
 			<MxIcon name="card-linear" class="size-3.5 text-white/60" />
 			<span>Billing</span>
@@ -769,7 +780,9 @@
 
 <!-- Confirmation Dialog for Logout -->
 <Dialog.Root bind:open={isLogoutDialogOpen}>
-	<Dialog.Content class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-[425px]">
+	<Dialog.Content
+		class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-[425px]"
+	>
 		<Dialog.Header>
 			<Dialog.Title class="font-sans text-xl font-medium text-white">Log out</Dialog.Title>
 			<Dialog.Description class="text-sm text-white/70">
@@ -857,3 +870,5 @@
 		}
 	}}
 />
+
+<BillingDialog bind:open={isBillingDialogOpen} onClose={() => (isBillingDialogOpen = false)} />

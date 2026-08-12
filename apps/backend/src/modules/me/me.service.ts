@@ -104,6 +104,7 @@ export class MeService {
             return await tx
                 .select({
                     tier: tenantSubscriptions.tier,
+                    expiresAt: tenantSubscriptions.expiresAt,
                     uploadsCount: tenantSubscriptions.uploadsCount,
                     searchesCount: tenantSubscriptions.searchesCount,
                     qaCount: tenantSubscriptions.qaCount,
@@ -131,6 +132,7 @@ export class MeService {
 
         return {
             tier,
+            expiresAt: subscription.expiresAt?.toISOString() ?? null,
             uploadsCount: subscription.uploadsCount,
             searchesCount: subscription.searchesCount,
             qaCount: subscription.qaCount,

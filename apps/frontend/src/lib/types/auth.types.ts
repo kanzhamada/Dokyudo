@@ -115,6 +115,7 @@ export interface UserProfileResponse {
 /** Realtime usage metrics (/api/me/usage) response */
 export interface UserUsageResponse {
 	tier: 'FREE' | 'SIMULATE' | 'OIL_INVESTOR' | 'PRO';
+	expiresAt: string | null;
 	uploadsCount: number;
 	searchesCount: number;
 	qaCount: number;
