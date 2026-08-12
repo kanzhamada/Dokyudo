@@ -44,6 +44,7 @@
 	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 	import ListIcon from '@lucide/svelte/icons/list';
 	import ListXIcon from '@lucide/svelte/icons/list-x';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { createZipArchive } from '$lib/utils/zip';
 
@@ -56,6 +57,8 @@
 
 	/* ── Local modules ── */
 	import { apiRequest } from '$lib/api/client.js';
+	import { getMeUsage } from '$lib/api/me';
+	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { supabase } from '$lib/supabase/client.js';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { columns } from './columns.js';
@@ -148,6 +151,8 @@
 
 			if (res.ok) {
 				documentsList = documentsList.filter((d) => d.id !== target.id);
+				totalDocumentCount = Math.max(0, totalDocumentCount - 1);
+				void loadUsage();
 				if (previewDocument?.id === target.id) {
 					previewDocument = null;
 				}
@@ -165,32 +170,80 @@
 			isDeleting = false;
 		}
 	}
-	async function refreshDocuments() {
-		const res = await apiRequest<{ documents: any[] }>('/api/documents');
-		if (res.ok) {
-			documentsList = res.data.documents.map((doc) => {
-				let sizeStr = '';
-				const sizeKB = doc.sizeBytes / 1024;
-				if (sizeKB > 1024) {
-					sizeStr = (sizeKB / 1024).toFixed(1) + ' MB';
-				} else {
-					sizeStr = sizeKB.toFixed(0) + ' KB';
-				}
 
-				return {
-					id: doc.id,
-					name: doc.title,
-					description: doc.description || 'No description provided.',
-					uploadedAt: new Date(doc.createdAt).toLocaleDateString('en-US', {
-						month: 'short',
-						day: 'numeric',
-						year: 'numeric'
-					}),
-					size: sizeStr,
-					status: doc.status as Document['status'],
-					url: undefined
-				};
-			});
+	function formatStorage(bytes: number): string {
+		if (bytes >= 1024 * 1024 * 1024) {
+			return `${Number((bytes / (1024 * 1024 * 1024)).toFixed(1))} GB`;
+		}
+		return `${Number((bytes / (1024 * 1024)).toFixed(1))} MB`;
+	}
+
+	async function loadUsage(): Promise<boolean> {
+		try {
+			const res = await getMeUsage();
+			if (!res.ok) {
+				console.error('[Document Library] Failed to load usage:', res.error);
+				return false;
+			}
+
+			uploadsCount = res.data.uploadsCount;
+			storageUsedBytes = res.data.storageUsedBytes;
+			const tier = (res.data.tier as TierType) ?? 'FREE';
+			const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.FREE;
+			maxUploads = limits.maxUploadsPerMonth;
+			maxStorageBytes = limits.maxStorageBytes;
+			return true;
+		} catch (err) {
+			console.error('[Document Library] Unexpected usage error:', err);
+			return false;
+		}
+	}
+
+	async function refreshDocuments(): Promise<boolean> {
+		const res = await apiRequest<{ documents: any[] }>('/api/documents');
+		if (!res.ok) return false;
+
+		totalDocumentCount = res.data.documents.length;
+		documentsList = res.data.documents.map((doc) => {
+			let sizeStr = '';
+			const sizeKB = doc.sizeBytes / 1024;
+			if (sizeKB > 1024) {
+				sizeStr = (sizeKB / 1024).toFixed(1) + ' MB';
+			} else {
+				sizeStr = sizeKB.toFixed(0) + ' KB';
+			}
+
+			return {
+				id: doc.id,
+				name: doc.title,
+				description: doc.description || 'No description provided.',
+				uploadedAt: new Date(doc.createdAt).toLocaleDateString('en-US', {
+					month: 'short',
+					day: 'numeric',
+					year: 'numeric'
+				}),
+				size: sizeStr,
+				status: doc.status as Document['status'],
+				url: undefined
+			};
+		});
+		return true;
+	}
+
+	async function refreshPage() {
+		if (isRefreshing) return;
+		isRefreshing = true;
+
+		try {
+			const [documentsRefreshed, usageRefreshed] = await Promise.all([
+				refreshDocuments(),
+				loadUsage()
+			]);
+			if (!documentsRefreshed || !usageRefreshed) {
+				showError('Failed to refresh document data.');
+			}
+		} finally {
+			isRefreshing = false;
 		}
 	}
 
@@ -209,6 +262,7 @@
 				globalFilter = incomingQuery;
 			}
 		}
+		void loadUsage();
 
 		console.log('[Supabase Realtime] Subscribing to public:documents changes...');
 		const channel = supabase
@@ -239,7 +293,7 @@
 							}
 						} else {
 							// New document inserted, refresh list
-							refreshDocuments();
+							void Promise.all([refreshDocuments(), loadUsage()]);
 						}
 					}
 				}
@@ -268,9 +322,20 @@
 
 	/* ── Reactive documents state for instant UI updates ── */
 	let documentsList = $state<Document[]>([]);
+	let totalDocumentCount = $state(0);
+	let uploadsCount = $state(0);
+	let maxUploads = $state(TIER_LIMITS.FREE.maxUploadsPerMonth);
+	let storageUsedBytes = $state(0);
+	let maxStorageBytes = $state(TIER_LIMITS.FREE.maxStorageBytes);
+	let isRefreshing = $state(false);
+	let uploadUsageDisplay = $derived(`${uploadsCount} / ${maxUploads}`);
+	let storageUsageDisplay = $derived(
+		`${formatStorage(storageUsedBytes)} / ${formatStorage(maxStorageBytes)}`
+	);
 
 	$effect(() => {
 		documentsList = data.documents;
+		totalDocumentCount = data.documents.length;
 	});
 
 	/* ── TanStack Table State ── */
@@ -412,6 +477,8 @@
 		if (res.ok) {
 			const count = selectedDocIds.length;
 			documentsList = documentsList.filter((d) => !selectedDocIds.includes(d.id));
+			totalDocumentCount = Math.max(0, totalDocumentCount - count);
+			void loadUsage();
 			if (previewDocument && selectedDocIds.includes(previewDocument.id)) {
 				previewDocument = null;
 			}
@@ -709,22 +776,82 @@
 					Document Library
 				</h1>
 
-				<Button
-					class="group cursor-pointer rounded-full bg-[#DB8F5E] px-4 font-normal text-white transition-[background-color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-[#C47D4E] active:scale-[0.98]"
-					onclick={() => (uploadDialogOpen = true)}
-				>
-					<PlusIcon
-						data-icon="inline-start"
-						class="transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:rotate-90"
-					/>
-					Add New
-				</Button>
+				<div class="flex items-center gap-2">
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="ghost"
+									type="button"
+									disabled={isRefreshing}
+									aria-label="Refresh document data"
+									onclick={refreshPage}
+									class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:cursor-wait disabled:opacity-60"
+								>
+									<RefreshCwIcon class="size-4 {isRefreshing ? 'animate-spin' : ''}" />
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content
+							class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+						>
+							Refresh document data
+						</Tooltip.Content>
+					</Tooltip.Root>
+
+					<Button
+						class="group cursor-pointer rounded-full bg-[#DB8F5E] px-4 font-normal text-white transition-[background-color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-[#C47D4E] active:scale-[0.98]"
+						onclick={() => (uploadDialogOpen = true)}
+					>
+						<PlusIcon
+							data-icon="inline-start"
+							class="transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:rotate-90"
+						/>
+						Add New
+					</Button>
+				</div>
 			</div>
 
 			<!-- Row 3: Description -->
 			<p class="max-w-3xl text-sm leading-6 font-normal text-[#767676] md:text-base">
 				Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
 			</p>
+
+			<!-- Usage Summary -->
+			<div class="grid gap-3 sm:grid-cols-3">
+				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4">
+					<div class="flex items-center gap-2 text-xs font-medium text-[#959595]">
+						<FilesIcon class="size-4 text-white/60" />
+						<span>Total Documents</span>
+					</div>
+					<p class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+						{totalDocumentCount}
+					</p>
+				</div>
+
+				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4">
+					<div class="flex items-center gap-2 text-xs font-medium text-[#959595]">
+						<ArrowUpIcon class="size-4 text-white/60" />
+						<span>Max Upload</span>
+					</div>
+					<p class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+						{uploadUsageDisplay}
+					</p>
+					<p class="mt-1 text-xs text-white/40">uploads this month</p>
+				</div>
+
+				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4">
+					<div class="flex items-center gap-2 text-xs font-medium text-[#959595]">
+						<HardDriveIcon class="size-4 text-white/60" />
+						<span>Total Storage</span>
+					</div>
+					<p class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+						{storageUsageDisplay}
+					</p>
+					<p class="mt-1 text-xs text-white/40">used of available storage</p>
+				</div>
+			</div>
 
 			<!-- Row 4: Data Table Controls -->
 			<div class="flex flex-wrap items-center gap-2 md:gap-3">
@@ -1444,7 +1571,7 @@
 	</div>
 </div>
 
-<UploadDocumentDialog bind:open={uploadDialogOpen} onSuccess={refreshDocuments} />
+<UploadDocumentDialog bind:open={uploadDialogOpen} onSuccess={refreshPage} />
 
 <!-- Delete Confirmation Dialog -->
 <Dialog.Root bind:open={deleteDialogOpen}>
@@ -1628,18 +1755,8 @@
 		line-clamp: 4;
 		overflow: hidden;
 		max-height: calc(1.65em * 4);
-		-webkit-mask-image: linear-gradient(
-			to bottom,
-			#000 0,
-			#000 4.5em,
-			rgba(0, 0, 0, 0.3) 6.6em
-		);
-		mask-image: linear-gradient(
-			to bottom,
-			#000 0,
-			#000 4.5em,
-			rgba(0, 0, 0, 0.3) 6.6em
-		);
+		-webkit-mask-image: linear-gradient(to bottom, #000 0, #000 4.5em, rgba(0, 0, 0, 0.3) 6.6em);
+		mask-image: linear-gradient(to bottom, #000 0, #000 4.5em, rgba(0, 0, 0, 0.3) 6.6em);
 	}
 
 	.semantic-match-copy-expanded {
