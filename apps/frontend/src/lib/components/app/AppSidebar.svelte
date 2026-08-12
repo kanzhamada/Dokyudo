@@ -284,6 +284,10 @@
 	}
 
 	onMount(async () => {
+		if ($page.url.searchParams.get('billing') === 'open') {
+			isBillingDialogOpen = true;
+		}
+
 		try {
 			const result = await getMe();
 			if (result.ok) {
