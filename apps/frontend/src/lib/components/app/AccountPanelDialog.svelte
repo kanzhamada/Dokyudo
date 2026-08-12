@@ -571,12 +571,19 @@
 			const result = await testKey(provider, key);
 			if (!result.ok) {
 				byokError = result.error.message;
+				toast.error(result.error.message);
 				return;
 			}
 			testResult = result.data;
+			if (result.data.valid) {
+				toast.success('Key is valid', { description: result.data.message });
+			} else {
+				toast.error('Key is invalid', { description: result.data.message });
+			}
 		} catch (err) {
 			console.error('[AccountPanel] Failed to test BYOK key:', err);
 			byokError = 'Failed to test API key.';
+			toast.error('Connection failed', { description: 'Unable to reach the provider. Check your network.' });
 		} finally {
 			isTestingKey = false;
 		}
@@ -1261,7 +1268,7 @@
 
 							<div class="flex justify-end gap-2 pt-0.5">
 								<Button
-									class="h-9 cursor-pointer rounded-lg border border-white/20 bg-transparent px-3 text-xs font-medium text-white/70 hover:bg-white/10 disabled:opacity-50"
+									class="h-9 cursor-pointer rounded-lg bg-white px-3 text-xs font-medium text-black hover:bg-white/90 disabled:opacity-50"
 									disabled={!apiKey.trim() || isTestingKey || isSavingKey || isResettingKey}
 									onclick={testConfigureKey}
 								>
@@ -1272,18 +1279,42 @@
 										Test
 									{/if}
 								</Button>
-								<Button
-									class="h-9 cursor-pointer rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-50"
-									disabled={!apiKey.trim() || isSavingKey || isResettingKey || !testResult?.valid}
-									onclick={saveConfigureKey}
-								>
-									{#if isSavingKey}
-										<Spinner class="mr-1.5 size-3.5" />
-										Saving...
-									{:else}
-										Save key
-									{/if}
-								</Button>
+								{#if !testResult?.valid && apiKey.trim()}
+									<Tooltip.Provider delayDuration={100}>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<span {...props} class="inline-flex">
+														<Button
+															class="h-9 cursor-pointer rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-50"
+															disabled={true}
+														>
+															Save key
+														</Button>
+													</span>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content
+												class="rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+											>
+												<p>Test the API key first</p>
+											</Tooltip.Content>
+										</Tooltip.Root>
+									</Tooltip.Provider>
+								{:else}
+									<Button
+										class="h-9 cursor-pointer rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-50"
+										disabled={!apiKey.trim() || isSavingKey || isResettingKey || !testResult?.valid}
+										onclick={saveConfigureKey}
+									>
+										{#if isSavingKey}
+											<Spinner class="mr-1.5 size-3.5" />
+											Saving...
+										{:else}
+											Save key
+										{/if}
+									</Button>
+								{/if}
 							</div>
 						</div>
 					</div>
