@@ -334,3 +334,15 @@ Komponen baru `apps/frontend/src/lib/components/chat/AttachmentCards.svelte` men
 - Tombol *configure* di kedua halaman chat memanggil `openAccountPanel('byok')` (store `$lib/state/account-panel.store.svelte.ts`).
 - `markByokSaved()` menaikkan `byokSavedAt`; halaman me-refresh `llmOptions` via `$effect` (menggantikan prop `onSaved`).
 - Detail panel: `docs/frontend/app-sidebar.md` § Account Panel Dialog.
+
+## Iteration 8 — Conversation Cache & SWR (2026-08-12)
+
+Navigasi antar `/chat/[id]` kini memakai cache client-side (`$lib/state/conversation-cache.store.svelte.ts`):
+
+- **LRU max 5 conversation** — pindah bolak-balik antar percakapan = render instan tanpa menunggu network.
+- **Stale-while-revalidate**: halaman render dari cache dulu, refetch background dengan **ETag**; 304 → cache dipertahankan. Backend `handleGetConversation` kini mengembalikan `ETag` weak (hash `updatedAt|turns.length`) dan membalas `304` saat `If-None-Match` cocok.
+- **Skip saat streaming**: conversation dengan turn `processing`/`awaiting_indexing` tidak pernah di-serve dari cache.
+- **Invalidate pada mutasi**: edit judul, toggle pin, delete turn → `conversationCache.invalidate(id)` (hapus ETag, revalidation berikutnya pasti 200).
+- **Revalidate on focus**: `visibilitychange` → SWR refresh conversation aktif (aman dari `isGenerating`).
+- **Prefetch hover sidebar**: `AppSidebar` memanggil `conversationCache.prefetch(id)` saat hover item recent chat (dilewati jika sudah fresh).
+- Pendukung: `$lib/state/me-cache.store.svelte.ts` — cache TTL 30s untuk `/api/me` & `/api/me/usage` (dipakai sidebar, chat, documents, billing) agar navigasi `/app/*` tidak menembak endpoint yang sama berulang.

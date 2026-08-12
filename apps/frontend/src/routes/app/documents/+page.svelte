@@ -57,7 +57,7 @@
 
 	/* ── Local modules ── */
 	import { apiRequest } from '$lib/api/client.js';
-	import { getMeUsage } from '$lib/api/me';
+	import { getMeUsageCached } from '$lib/state/me-cache.store.svelte';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { supabase } from '$lib/supabase/client.js';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
@@ -181,7 +181,7 @@
 
 	async function loadUsage(): Promise<boolean> {
 		try {
-			const res = await getMeUsage();
+			const res = await getMeUsageCached();
 			if (!res.ok) {
 				console.error('[Document Library] Failed to load usage:', res.error);
 				return false;
@@ -1634,7 +1634,7 @@
 	title="Delete"
 	itemName={documentToDelete?.name}
 	description="This action cannot be undone."
-	isDeleting={isDeleting}
+	{isDeleting}
 	confirmLabel="Delete"
 	onConfirm={confirmDelete}
 	onClose={() => (deleteDialogOpen = false)}

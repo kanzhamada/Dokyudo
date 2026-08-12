@@ -27,7 +27,11 @@
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { authUpdatePassword, authUpdateTenantName } from '$lib/api/auth';
-	import { getMe, getMeUsage } from '$lib/api/me';
+	import {
+		getMeCached,
+		getMeUsageCached,
+		invalidateMeCache
+	} from '$lib/state/me-cache.store.svelte';
 	import { deleteKey, getKeys, upsertKey } from '$lib/api/keys';
 	import { createBillingPortalSession, createCheckoutSession } from '$lib/api/payments';
 	import { deleteAllShares, deleteAllTenantShares, deleteShare, listAllShares } from '$lib/api/rag';
@@ -256,7 +260,7 @@
 		billingError = '';
 
 		try {
-			const result = await getMeUsage();
+			const result = await getMeUsageCached();
 			if (result.ok) {
 				usage = result.data;
 			} else {
@@ -312,7 +316,7 @@
 		profileError = '';
 
 		try {
-			const result = await getMe();
+			const result = await getMeCached();
 			if (result.ok) {
 				profile = result.data;
 				displayName = result.data.tenant.name;
@@ -355,6 +359,7 @@
 					profile = { ...profile, tenant: { ...profile.tenant, name: result.data.tenant.name } };
 				}
 				onNameUpdated?.(result.data.tenant.name);
+				invalidateMeCache();
 				toast.success(result.data.message || 'Display name updated');
 			} else {
 				nameError = result.error.message || 'Unable to update display name.';

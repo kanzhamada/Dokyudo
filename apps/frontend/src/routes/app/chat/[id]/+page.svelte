@@ -37,7 +37,8 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
-	import { getMeUsage } from '$lib/api/me';
+	import { getMeUsageCached } from '$lib/state/me-cache.store.svelte';
+	import { conversationCache } from '$lib/state/conversation-cache.store.svelte';
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
 	import { documentsStore } from '$lib/state/documents.store.svelte';
@@ -59,7 +60,7 @@
 	import { accountPanel, openAccountPanel } from '$lib/state/account-panel.store.svelte';
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 	import { mergeConversationReferences, type DocReference } from '$lib/utils/doc-references';
-	import type { TurnAlternative } from '$lib/types/rag.types';
+	import type { TurnAlternative, GetConversationResponse } from '$lib/types/rag.types';
 	import CodeBlockPreview from '$lib/components/chat/CodeBlockPreview.svelte';
 	import CitationTooltip from '$lib/components/chat/CitationTooltip.svelte';
 	import { mount, unmount, untrack } from 'svelte';
@@ -535,6 +536,73 @@
 	let qaCount = $state(0);
 	let maxQa = $state(50);
 
+	function applyConversationData(data: GetConversationResponse) {
+		if (data.title) conversationTitle = data.title;
+		branchOfTitle = data.branchOf?.title ?? null;
+		branchOfId = data.branchOf?.id ?? null;
+		isPinned = data.isPinned ?? false;
+		if (data.turns && data.turns.length > 0) {
+			const historyMsgs: ChatMessage[] = [];
+			for (const turn of data.turns) {
+				historyMsgs.push({
+					id: `${turn.id}-user`,
+					role: 'user',
+					content: turn.question,
+					turnId: turn.id,
+					branchedFromTurnId: turn.branchedFromTurnId ?? null,
+					// Persisted on the server turn — lets edit/retry reuse
+					// the same RAG scoping after a reload.
+					attachmentDocumentIds: turn.attachmentDocumentIds ?? undefined,
+					// Display metadata (titles) returned by the server — the
+					// attachment chips survive reloads with real document titles.
+					attachments: turn.attachmentDocuments?.map((a) => ({
+						name: a.title,
+						documentId: a.documentId
+					})),
+					timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
+						hour: '2-digit',
+						minute: '2-digit'
+					})
+				});
+				historyMsgs.push({
+					id: `${turn.id}-asst`,
+					role: 'assistant',
+					turnId: turn.id,
+					branchedFromTurnId: turn.branchedFromTurnId ?? null,
+					modelName: turn.modelUsed || undefined,
+					content: turn.answer,
+					status: turn.status ?? 'complete',
+					feedback: turn.feedback ?? null,
+					timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
+						hour: '2-digit',
+						minute: '2-digit'
+					}),
+					references: turn.contextReferences?.map((r: any) => ({
+						id: r.documentId,
+						index: r.index || 1,
+						name: r.title || r.documentId,
+						pages: r.pages,
+						snippet: r.snippet ?? undefined
+					})),
+					variants: (turn.alternatives ?? []).map((alt) => ({
+						...alt,
+						references: alt.contextReferences?.map((r: any) => ({
+							id: r.documentId,
+							index: r.index || 1,
+							name: r.title || r.documentId,
+							pages: r.pages,
+							snippet: r.snippet ?? undefined
+						})),
+						isStreaming: false
+					})),
+					variantIndex: 0,
+					isStreaming: false
+				});
+			}
+			messages = historyMsgs;
+		}
+	}
+
 	async function loadConversation(id: string) {
 		const requestId = ++conversationRequestId;
 		cancelActiveStream?.();
@@ -568,76 +636,20 @@
 			return;
 		}
 
+		// Cache-first: render instan dari LRU cache, lalu revalidasi di background (SWR).
+		const cached = conversationCache.get(id);
+		if (cached && !conversationCache.isProcessing(id)) {
+			applyConversationData(cached);
+			scrollToBottom();
+		}
+
 		try {
 			console.log(`[Chat Detail] Fetching conversation history for ID: ${id}`);
-			const convRes = await getConversation(id);
+			const convRes = await conversationCache.refresh(id);
 			if (requestId !== conversationRequestId) return;
-			if (convRes.ok) {
-				if (convRes.data.title) conversationTitle = convRes.data.title;
-				branchOfTitle = convRes.data.branchOf?.title ?? null;
-				branchOfId = convRes.data.branchOf?.id ?? null;
-				isPinned = convRes.data.isPinned ?? false;
-				if (convRes.data.turns && convRes.data.turns.length > 0) {
-					const historyMsgs: ChatMessage[] = [];
-					for (const turn of convRes.data.turns) {
-						historyMsgs.push({
-							id: `${turn.id}-user`,
-							role: 'user',
-							content: turn.question,
-							turnId: turn.id,
-							branchedFromTurnId: turn.branchedFromTurnId ?? null,
-							// Persisted on the server turn — lets edit/retry reuse
-							// the same RAG scoping after a reload.
-							attachmentDocumentIds: turn.attachmentDocumentIds ?? undefined,
-							// Display metadata (titles) returned by the server — the
-							// attachment chips survive reloads with real document titles.
-							attachments: turn.attachmentDocuments?.map((a) => ({
-								name: a.title,
-								documentId: a.documentId
-							})),
-							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
-								hour: '2-digit',
-								minute: '2-digit'
-							})
-						});
-						historyMsgs.push({
-							id: `${turn.id}-asst`,
-							role: 'assistant',
-							turnId: turn.id,
-							branchedFromTurnId: turn.branchedFromTurnId ?? null,
-							modelName: turn.modelUsed || undefined,
-							content: turn.answer,
-							status: turn.status ?? 'complete',
-							feedback: turn.feedback ?? null,
-							timestamp: new Date(turn.createdAt).toLocaleTimeString([], {
-								hour: '2-digit',
-								minute: '2-digit'
-							}),
-							references: turn.contextReferences?.map((r: any) => ({
-								id: r.documentId,
-								index: r.index || 1,
-								name: r.title || r.documentId,
-								pages: r.pages,
-								snippet: r.snippet ?? undefined
-							})),
-							variants: (turn.alternatives ?? []).map((alt) => ({
-								...alt,
-								references: alt.contextReferences?.map((r: any) => ({
-									id: r.documentId,
-									index: r.index || 1,
-									name: r.title || r.documentId,
-									pages: r.pages,
-									snippet: r.snippet ?? undefined
-								})),
-								isStreaming: false
-							})),
-							variantIndex: 0,
-							isStreaming: false
-						});
-					}
-					messages = historyMsgs;
-				}
-			} else if (convRes.error?.code === 'NOT_FOUND') {
+			if (convRes.ok && convRes.data && !convRes.notModified) {
+				applyConversationData(convRes.data);
+			} else if (!convRes.ok && convRes.error?.code === 'NOT_FOUND') {
 				console.log(
 					`[Chat Detail] Conversation ID ${id} not found in DB. Redirecting to /app/chat`
 				);
@@ -725,6 +737,7 @@
 		try {
 			const result = await updateConversation(chatId, { title: trimmed });
 			if (result.ok) {
+				conversationCache.invalidate(chatId);
 				toast.success('Conversation title updated');
 			} else {
 				console.error('[Chat Detail] Update title failed, reverting:', result.error);
@@ -759,6 +772,7 @@
 		try {
 			const result = await updateConversation(targetChatId, { isPinned: newPinnedState });
 			if (result.ok) {
+				conversationCache.invalidate(targetChatId);
 				console.log('[Chat Detail] Pin toggle success:', result.data);
 				toast.success(newPinnedState ? 'Conversation pinned' : 'Conversation unpinned');
 			} else {
@@ -885,7 +899,7 @@
 		}
 
 		try {
-			const res = await getMeUsage();
+			const res = await getMeUsageCached();
 			if (res.ok) {
 				baseUploads = res.data.uploadsCount;
 				baseStorage = res.data.storageUsedBytes;
@@ -906,6 +920,22 @@
 
 		await loadLlmOptions();
 	});
+
+	// Revalidate aktif conversation saat tab kembali fokus (mis. streaming
+	// selesai di tab lain) — SWR background, tanpa mengganggu UI yang berjalan.
+	onMount(() => {
+		document.addEventListener('visibilitychange', handleVisibilityRevalidate);
+		return () => document.removeEventListener('visibilitychange', handleVisibilityRevalidate);
+	});
+
+	function handleVisibilityRevalidate() {
+		if (document.visibilityState !== 'visible' || isGenerating) return;
+		void conversationCache.refresh(chatId).then((res) => {
+			if (res.ok && res.data && !res.notModified) {
+				applyConversationData(res.data);
+			}
+		});
+	}
 
 	$effect(() => {
 		if (messages.length) {
@@ -2021,6 +2051,7 @@
 					index !== msgIndex && !(index === msgIndex - 1 && messages[index].role === 'user')
 			);
 
+			conversationCache.invalidate(chatId);
 			isDeleteResponseDialogOpen = false;
 			targetDeleteMessageIndex = null;
 			toast.success('Response deleted');

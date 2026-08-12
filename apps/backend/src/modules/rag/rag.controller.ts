@@ -1,4 +1,5 @@
 import { Context } from "hono";
+import { createHash } from "node:crypto";
 import { ContextExtractor } from "../../shared/utils/context.util.ts";
 import { RagService } from "./rag.service.ts";
 import { ShareService } from "./share.service.ts";
@@ -152,6 +153,16 @@ export async function handleGetConversation(c: Context) {
         conversationId,
     });
 
+    // Weak ETag over the data the client renders: conversation freshness +
+    // turn count. A 304 lets the client keep its cached copy (SWR revalidation).
+    const etag = `W/"${createHash("sha1")
+        .update(`${result.updatedAt}|${result.turns.length}`)
+        .digest("hex")
+        .slice(0, 20)}"`;
+    if (c.req.header("if-none-match") === etag) {
+        return c.body(null, 304);
+    }
+    c.header("ETag", etag);
     return c.json(result);
 }
 

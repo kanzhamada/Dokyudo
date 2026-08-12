@@ -8,7 +8,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
-	import { getMeUsage } from '$lib/api/me';
+	import { getMeUsageCached } from '$lib/state/me-cache.store.svelte';
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
 	import { documentsStore } from '$lib/state/documents.store.svelte';
@@ -98,7 +98,7 @@
 		documentsStore.ensureLoaded();
 
 		try {
-			const res = await getMeUsage();
+			const res = await getMeUsageCached();
 			if (res.ok) {
 				baseUploads = res.data.uploadsCount;
 				baseStorage = res.data.storageUsedBytes;

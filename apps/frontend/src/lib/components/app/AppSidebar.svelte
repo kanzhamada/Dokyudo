@@ -33,7 +33,8 @@
 	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
 	import ConfirmDeleteDialog from '$lib/components/app/ConfirmDeleteDialog.svelte';
 	import { authLogout } from '$lib/api/auth';
-	import { getMe } from '$lib/api/me';
+	import { getMeCached } from '$lib/state/me-cache.store.svelte';
+	import { conversationCache } from '$lib/state/conversation-cache.store.svelte';
 	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
 	import ShareConversationDialog from '$lib/components/app/ShareConversationDialog.svelte';
 	import AccountPanelDialog from '$lib/components/app/AccountPanelDialog.svelte';
@@ -285,7 +286,7 @@
 		}
 
 		try {
-			const result = await getMe();
+			const result = await getMeCached();
 			if (result.ok) {
 				userProfile = result.data;
 				console.log('[Auth Me] User details loaded:', result.data);
@@ -588,6 +589,7 @@
 					href="/app/chat/{item.id}"
 					{...props}
 					class={(props.class as string) + ' w-full overflow-hidden text-left'}
+					onmouseenter={() => conversationCache.prefetch(item.id)}
 				>
 					{#if item.title.length > 25}
 						<Tooltip.Root>
