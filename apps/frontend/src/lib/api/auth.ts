@@ -7,6 +7,7 @@ import type {
 	ForgotPasswordResponse,
 	ResetPasswordResponse,
 	UpdatePasswordResponse,
+	UpdateTenantNameResponse,
 	VerifyEmailResponse,
 	UserProfileResponse,
 	LoginRequestPayload,
@@ -14,6 +15,7 @@ import type {
 	ForgotPasswordRequestPayload,
 	ResetPasswordRequestPayload,
 	UpdatePasswordRequestPayload,
+	UpdateTenantNameRequestPayload,
 	VerifyEmailRequestPayload
 } from '../types/auth.types';
 import { PUBLIC_API_URL } from '$env/static/public';
@@ -53,6 +55,15 @@ export function authUpdatePassword(
 ): Promise<ApiResult<UpdatePasswordResponse>> {
 	return apiRequest<UpdatePasswordResponse>('/api/auth/update-password', {
 		method: 'PUT',
+		body: params
+	});
+}
+
+export function authUpdateTenantName(
+	params: UpdateTenantNameRequestPayload
+): Promise<ApiResult<UpdateTenantNameResponse>> {
+	return apiRequest<UpdateTenantNameResponse>('/api/auth/tenant/name', {
+		method: 'PATCH',
 		body: params
 	});
 }

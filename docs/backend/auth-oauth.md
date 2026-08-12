@@ -7,7 +7,7 @@
 The OAuth flow uses **Supabase's built-in Server-Side PKCE** rather than manually implementing the full OAuth dance (state management, code exchange, userinfo fetch). This eliminates the need for `GOOGLE_CLIENT_SECRET` / `GITHUB_CLIENT_SECRET` in the backend environment — they're configured once in the Supabase Dashboard.
 
 **Initiate Flow** (`GET /api/auth/oauth/google` or `/github`):
-1. Calls `supabase.auth.signInWithOAuth({ provider, options: { flowType: "pkce", redirectTo: "{API_URL}/api/auth/oauth/{provider}/callback", skipBrowserRedirect: true } })`.
+1. Calls `supabase.auth.signInWithOAuth({ provider, options: { redirectTo: "{API_URL}/api/auth/oauth/{provider}/callback", skipBrowserRedirect: true } })`. The anon client is created with `flowType: "pkce"` (see `config/supabase.ts`), so the URL carries a PKCE `code_challenge` and the auth code returns to the backend callback.
 2. Returns the Supabase-generated PKCE authorization URL (with `code_challenge`).
 3. Issues a `302 Redirect` to the user's browser.
 
@@ -62,7 +62,9 @@ sequenceDiagram
 - **[NEW]** `apps/backend/src/modules/auth/oauth.routes.ts`: OpenAPI route definitions with full request/response documentation.
 - **[MODIFY]** `apps/backend/src/modules/auth/auth.routes.ts`: Mounted `oauthRoutes` via `authRoutes.route("/", oauthRoutes)`.
 - **[MODIFY]** `apps/backend/src/config/env.ts`: Added `FRONTEND_URL` (default `http://localhost:5173`) + `API_URL` (default `http://localhost:8000`, the backend's own public URL used as the PKCE callback target) + `getEnv()` helper.
-- **[SYNC]** `api-collections/Auth/06-09_OAuth*.bru`: Updated docs to reflect Supabase PKCE flow.
+- **[MODIFY]** `apps/backend/src/config/supabase.ts`: Anon client created with `flowType: "pkce"` (server-side PKCE; the verifier lives in the process's singleton client memory).
+- **[MODIFY]** `apps/backend/src/modules/auth/oauth/oauth.service.ts`: `resolveUserTenantId()` — retry lookup then app-side fallback provisioning (tenant + user + FREE subscription); `auth.login` recorded in `activity_logs`; `exchangeCodeForSession` wrapped so a missing PKCE verifier (e.g. restart between initiate and callback) fails as a clean 401.
+- **[SYNC]** `api-collections/Auth/06-09_OAuth*.bru`: Updated docs to reflect Supabase PKCE flow with backend callback target.
 
 ## Connections
 

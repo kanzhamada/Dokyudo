@@ -51,6 +51,20 @@ export interface UpdatePasswordResponse {
 	message: string;
 }
 
+/** Update tenant display name request payload */
+export type UpdateTenantNameRequestPayload = {
+	name: string;
+};
+
+/** Update tenant display name response */
+export interface UpdateTenantNameResponse {
+	tenant: {
+		id: string;
+		name: string;
+	};
+	message: string;
+}
+
 /** Login request payload */
 export type LoginRequestPayload = {
 	email: string;
