@@ -115,6 +115,7 @@ Branch = conversation baru yang dimulai dari **salinan history** sampai turn bat
 
 - Level conversation: `branchOf: { id, title } | null` — null saat parent dihapus.
 - Per turn: `branchedFromTurnId: string | null` — frontend render divider **setelah** turn dengan marker ini.
+- Per turn (attachment): `attachmentDocumentIds: string[] | null` (id yang meng-scope retrieval, persisten) + `attachmentDocuments: [{ documentId, title }]` (judul di-resolve dari `documents` saat baca — kartu lampiran tetap tampil setelah reload; dokumen terhapus jatuh ke `"Document"`). Detail: `docs/backend/rag-turn-status-and-edit-mode.md` §15.7.
 
 ### 5. Frontend
 

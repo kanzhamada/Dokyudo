@@ -65,6 +65,7 @@
 	import type { Document } from './data.js';
 	import DocumentCardActions from './document-card-actions.svelte';
 	import UploadDocumentDialog from './UploadDocumentDialog.svelte';
+	import ConfirmDeleteDialog from '$lib/components/app/ConfirmDeleteDialog.svelte';
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -1628,43 +1629,16 @@
 <UploadDocumentDialog bind:open={uploadDialogOpen} onSuccess={refreshPage} />
 
 <!-- Delete Confirmation Dialog -->
-<Dialog.Root bind:open={deleteDialogOpen}>
-	<Dialog.Content
-		class="w-full max-w-md rounded-2xl border border-white/10 bg-[#2A2A2A]/[0.85] p-6 text-white shadow-2xl backdrop-blur-[42px]"
-	>
-		<Dialog.Header>
-			<Dialog.Title class="text-xl font-semibold text-white">Delete Document</Dialog.Title>
-			<Dialog.Description class="mt-2 text-sm text-[#959595]">
-				Are you sure you want to delete <span class="font-medium text-white"
-					>{documentToDelete?.name}</span
-				>? This action cannot be undone.
-			</Dialog.Description>
-		</Dialog.Header>
-
-		<Dialog.Footer class="mt-6 flex items-center justify-end gap-3">
-			<Button
-				variant="ghost"
-				class="cursor-pointer text-white/70 hover:bg-white/10 hover:text-white"
-				disabled={isDeleting}
-				onclick={() => (deleteDialogOpen = false)}
-			>
-				Cancel
-			</Button>
-			<Button
-				class="cursor-pointer bg-red-600 font-normal text-white hover:bg-red-700 disabled:opacity-50"
-				disabled={isDeleting}
-				onclick={confirmDelete}
-			>
-				{#if isDeleting}
-					<Loader2Icon class="mr-2 size-4 animate-spin" />
-					Deleting...
-				{:else}
-					Delete
-				{/if}
-			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+<ConfirmDeleteDialog
+	bind:open={deleteDialogOpen}
+	title="Delete"
+	itemName={documentToDelete?.name}
+	description="This action cannot be undone."
+	isDeleting={isDeleting}
+	confirmLabel="Delete"
+	onConfirm={confirmDelete}
+	onClose={() => (deleteDialogOpen = false)}
+/>
 
 <!-- Batch Delete Confirmation Modal -->
 <Dialog.Root bind:open={showBatchDeleteModal}>

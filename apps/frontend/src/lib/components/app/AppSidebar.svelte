@@ -31,7 +31,7 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
-	import DeleteConversationDialog from '$lib/components/app/DeleteConversationDialog.svelte';
+	import ConfirmDeleteDialog from '$lib/components/app/ConfirmDeleteDialog.svelte';
 	import { authLogout } from '$lib/api/auth';
 	import { getMe } from '$lib/api/me';
 	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
@@ -810,9 +810,13 @@
 	}}
 />
 
-<!-- Delete Conversation Confirmation Dialog -->
-<DeleteConversationDialog
+<!-- Delete Confirmation Dialog -->
+<ConfirmDeleteDialog
 	bind:open={isDeleteDialogOpen}
+	title="Delete"
+	itemName={deletingConversation?.title}
+	description="This will permanently delete this conversation and its history."
+	confirmLabel="Delete conversation"
 	{isDeleting}
 	onConfirm={handleDeleteConversation}
 	onClose={() => {

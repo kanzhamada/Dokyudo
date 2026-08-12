@@ -18,7 +18,7 @@ The OAuth flow uses **Supabase's built-in Server-Side PKCE** rather than manuall
 4. On success, redirects to `{FRONTEND_URL}/oauth-callback?access_token=...&refresh_token=...`.
 5. Cleans up the Redis `unverified_email:{email}` cache if present.
 
-**Tenant Provisioning**: New OAuth users get a tenant automatically via the existing Supabase database trigger `handle_verified_user`. No manual provisioning needed.
+**Tenant Provisioning**: New OAuth users get a tenant automatically via the existing Supabase database trigger `handle_verified_user`. If the trigger has not fired by the time the callback runs (or it does not support OAuth users, whose emails are confirmed at insert time), the backend retries the lookup briefly and then provisions `tenants` + `public.users` + a FREE `tenant_subscriptions` row from the app as a fallback, so the session stays usable and `auth.login` is recorded in `activity_logs`.
 
 **Error Handling**: Since this is a browser redirect flow (not an API call), errors redirect to `{FRONTEND_URL}/oauth-callback?error=...` rather than returning JSON.
 

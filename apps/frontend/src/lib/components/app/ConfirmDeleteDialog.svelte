@@ -5,6 +5,10 @@
 
 	interface Props {
 		open?: boolean;
+		title?: string;
+		itemName?: string;
+		description?: string;
+		confirmLabel?: string;
 		isDeleting?: boolean;
 		onConfirm: () => Promise<void> | void;
 		onClose?: () => void;
@@ -12,6 +16,10 @@
 
 	let {
 		open = $bindable(false),
+		title = 'Delete',
+		itemName = '',
+		description = 'This action cannot be undone.',
+		confirmLabel = 'Delete',
 		isDeleting = false,
 		onConfirm,
 		onClose
@@ -26,10 +34,14 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title class="text-lg font-semibold text-white">Delete conversation?</Dialog.Title>
-			<Dialog.Description class="text-sm text-white/45">
-				This will permanently delete this conversation and its history.
-			</Dialog.Description>
+			<Dialog.Title class="text-lg font-semibold text-white">
+				{#if itemName}
+					{title} <span class="font-bold text-white">&quot;{itemName}&quot;</span>?
+				{:else}
+					{title}?
+				{/if}
+			</Dialog.Title>
+			<Dialog.Description class="text-sm text-white/45">{description}</Dialog.Description>
 		</Dialog.Header>
 		<Dialog.Footer class="mt-1 flex gap-2 sm:justify-end">
 			<Button
@@ -49,7 +61,7 @@
 					<Spinner class="mr-2" />
 					Deleting...
 				{:else}
-					Delete conversation
+					{confirmLabel}
 				{/if}
 			</Button>
 		</Dialog.Footer>

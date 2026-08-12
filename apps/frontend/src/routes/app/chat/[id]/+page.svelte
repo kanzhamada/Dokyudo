@@ -24,7 +24,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
-	import DeleteConversationDialog from '$lib/components/app/DeleteConversationDialog.svelte';
+	import ConfirmDeleteDialog from '$lib/components/app/ConfirmDeleteDialog.svelte';
 	import ShareConversationDialog from '$lib/components/app/ShareConversationDialog.svelte';
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -3298,8 +3298,12 @@
 	onClose={() => (isTitleEditDialogOpen = false)}
 />
 
-<DeleteConversationDialog
+<ConfirmDeleteDialog
 	bind:open={isDeleteConversationDialogOpen}
+	title="Delete"
+	itemName={conversationTitle}
+	description="This will permanently delete this conversation and its history."
+	confirmLabel="Delete conversation"
 	isDeleting={isConversationDeleting}
 	onConfirm={deleteCurrentConversation}
 	onClose={() => (isDeleteConversationDialogOpen = false)}

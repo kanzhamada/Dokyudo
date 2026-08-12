@@ -23,6 +23,11 @@ docs {
   Response: { code, title, authorName, isPrivate, expiresAt, createdAt,
               conversationId, turns: [...] }
 
+  Each snapshot turn may carry `attachments: [{ "documentId": "...", "title": "laporan.pdf" }]`
+  baked at share time — id + title only. Titles are visible on the public page
+  (static cards); the documents themselves are NOT openable (preview endpoint
+  requires auth + tenant ownership).
+
   - 403 PRIVATE_SHARE when the link is invite-only and the token is missing
     or wrong.
   - 404 when the link does not exist or has expired (expired rows are

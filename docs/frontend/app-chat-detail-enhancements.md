@@ -286,3 +286,40 @@ Dialog "Configure BYOK" (tab provider Google AI/Mistral/OpenRouter, masked-key "
 ### 5. Completion Timestamp
 
 **Iteration 5 (ChatInput/ConfigureByokDialog extraction, hapus fade isMounted):** 2026-08-09
+
+## Iteration 6 — Attachment Cards di Luar Bubble (2026-08-12)
+
+### 1. Kartu attachment 1:1 di atas user pill
+
+Tampilan attachment berubah dari chip kecil di dalam bubble menjadi **kartu** yang dirender **di luar bubble, di atasnya** (rata kanan mengikuti posisi user pill):
+
+- Kotak **1:1 (`aspect-square`) rounded-xl** dengan **ikon dokumen besar** di tengah (`MxIcon document-outline`, `size-8`).
+- **Judul di bawah kotak**: di-truncate dengan ellipsis (`truncate` + tooltip nama lengkap saat hover) — base nama file tanpa ekstensi.
+- **Ekstensi file** di baris terpisah (`text-[10px] text-white/40`, mis. `.pdf`), diparse dari nama file (`lastIndexOf('.')`).
+- **Klikabel di chat privat**: klik kartu → `openCitationPreview(documentId, name, [])` → signed URL (`/api/documents/{id}/preview`, LRU-cached) → `PdfPreviewPanel` — perilaku sama dengan chip `@`-mention.
+- Kartu disembunyikan saat **edit mode** (parity dengan perilaku lama — chip lama juga hanya tampil di cabang non-edit).
+- Satu baris attachment tanpa `documentId` (upload belum selesai di sesi) dirender sebagai kartu statis.
+
+### 2. Komponen shared `AttachmentCards.svelte`
+
+Komponen baru `apps/frontend/src/lib/components/chat/AttachmentCards.svelte` mengikuti pola `SourceReferences`:
+
+- Props: `attachments: { name, documentId? }[]`, `interactive?: boolean`, `onPreview?: (documentId, name) => void`.
+- `interactive=true` (chat privat) → kartu `<button>` dengan hover affordance; `false` (default, halaman publik) → `<div>` statis tanpa handler — **tidak openable, tanpa error**.
+- Max 5 per turn sudah dijamin backend (`attachment_document_ids` max 5) + frontend (`MAX_CHAT_ATTACHMENTS`).
+
+### 3. Ekstensi tanpa perubahan backend
+
+`documents.title` = nama file asli **termasuk ekstensi** (`documents.service.ts` set `title: file.filename`), jadi ekstensi diparse dari `title` di sisi frontend — snapshot share (`attachments: [{documentId, title}]`) dan `getConversation` (`attachmentDocuments`) tidak perlu diubah.
+
+### 4. File Mapping
+
+| File | Change |
+|---|---|
+| `apps/frontend/src/lib/components/chat/AttachmentCards.svelte` | Komponen baru (kartu attachment 1:1, judul truncate + ekstensi, mode interactive/statis) |
+| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | Kartu di atas bubble (interactive, `openCitationPreview`); hapus chip attachment di dalam bubble; `attachmentsOf` memakai judul dari chips |
+| `apps/frontend/src/routes/s/[code]/+page.svelte` | Kartu statis di atas bubble (judul + ekstensi, tanpa klik) |
+
+### 5. Completion Timestamp
+
+**Iteration 6 (attachment cards di luar bubble):** 2026-08-12
