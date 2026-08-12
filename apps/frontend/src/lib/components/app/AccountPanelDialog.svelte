@@ -602,27 +602,47 @@
 	}
 
 	// ─── Loading + clock effects ─────────────────────────────────────────────
+	// Setiap tab hanya me-load endpoint SATU KALI per sesi dialog terbuka.
+	// Flag loadedTabs di-reset saat dialog ditutup, jadi membuka ulang panel
+	// akan me-refresh data tanpa menembak endpoint berulang saat pindah tab.
+	let loadedTabs = $state({
+		settings: false,
+		billing: false,
+		'shared-links': false,
+		byok: false
+	});
+
 	$effect(() => {
-		if (accountPanel.open && accountPanel.tab === 'settings') {
+		if (accountPanel.open && accountPanel.tab === 'settings' && !loadedTabs.settings) {
+			loadedTabs.settings = true;
 			untrack(() => void loadProfile());
 		}
 	});
 
 	$effect(() => {
-		if (accountPanel.open && accountPanel.tab === 'billing') {
+		if (accountPanel.open && accountPanel.tab === 'billing' && !loadedTabs.billing) {
+			loadedTabs.billing = true;
 			untrack(() => void loadUsage());
 		}
 	});
 
 	$effect(() => {
-		if (accountPanel.open && accountPanel.tab === 'shared-links') {
+		if (accountPanel.open && accountPanel.tab === 'shared-links' && !loadedTabs['shared-links']) {
+			loadedTabs['shared-links'] = true;
 			untrack(() => void loadShares());
 		}
 	});
 
 	$effect(() => {
-		if (accountPanel.open && accountPanel.tab === 'byok') {
+		if (accountPanel.open && accountPanel.tab === 'byok' && !loadedTabs.byok) {
+			loadedTabs.byok = true;
 			untrack(() => void loadKeyMasks());
+		}
+	});
+
+	$effect(() => {
+		if (!accountPanel.open) {
+			loadedTabs = { settings: false, billing: false, 'shared-links': false, byok: false };
 		}
 	});
 
