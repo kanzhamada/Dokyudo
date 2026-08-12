@@ -14,6 +14,7 @@
 	import { mxBoldName } from '$lib/components/icons/mx-icons-data';
 	import type { MxIconName } from '$lib/components/icons/mx-icons-data';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
+	import PanelLeft from '@lucide/svelte/icons/panel-left';
 	import Share from '@lucide/svelte/icons/share';
 	import Link2 from '@lucide/svelte/icons/link-2';
 
@@ -21,7 +22,6 @@
 	import favicon from '$lib/assets/favicon.svg?raw';
 
 	// App Logic
-	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -90,7 +90,7 @@
 		isLoadingConversations = true;
 
 		try {
-			const result = await getConversations({ limit: 20, cursor });
+			const result = await getConversations({ limit: 50, cursor });
 			if (result.ok) {
 				if (cursor) {
 					// Cursor pagination can return items already in the list: the backend
@@ -131,6 +131,37 @@
 			fetchConversations(nextCursor);
 		}
 	}
+
+	let scrollContainer: HTMLElement | null = null;
+	let sentinelEl: HTMLDivElement | null = null;
+	let observer: IntersectionObserver | null = null;
+
+	$effect(() => {
+		const container = scrollContainer;
+		const sentinel = sentinelEl;
+		if (!container || !sentinel || !nextCursor) {
+			observer?.disconnect();
+			observer = null;
+			return;
+		}
+
+		observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting && nextCursor && !isLoadingConversations) {
+					console.log('[Auth Conversations] Sentinel visible, fetching cursor:', nextCursor);
+					fetchConversations(nextCursor);
+				}
+			},
+			{ root: container, rootMargin: '100px' }
+		);
+
+		observer.observe(sentinel);
+
+		return () => {
+			observer?.disconnect();
+			observer = null;
+		};
+	});
 
 	function openEditModal(item: ConversationItem) {
 		editingConversation = item;
@@ -417,7 +448,7 @@
 					<Sidebar.MenuItem class="hidden group-data-[collapsible=icon]:block">
 						<Sidebar.MenuButton
 							class="h-9 px-2 font-geist text-[13px]"
-							tooltipContent="Open sidebar (Ctrl + B)"
+							tooltipContent="Expand Sidebar (Ctrl + B)"
 						>
 							{#snippet child({ props })}
 								<a
@@ -437,10 +468,8 @@
 											<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 											{@html favicon}
 										</div>
-										<!-- Clear direction cue for opening the collapsed sidebar -->
-										<ArrowRight
-											class="hidden size-4 text-sidebar-brand transition-transform group-hover/logo:block group-hover/logo:translate-x-0.5"
-										/>
+										<!-- Expand Icon (Visible on hover) -->
+										<PanelLeft class="hidden size-[18px] group-hover/logo:block" />
 									</div>
 								</a>
 							{/snippet}
@@ -467,6 +496,7 @@
 				<div
 					class="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5"
 					onscroll={handleSidebarScroll}
+					bind:this={scrollContainer}
 				>
 					<Sidebar.Menu class="gap-px">
 						{#if !hasLoadedInitialConversations && isLoadingConversations}
@@ -483,6 +513,10 @@
 							{#each conversationsStore.list.length > 0 ? conversationsStore.list : conversations as item (item.id)}
 								{@render recentChatItem(item)}
 							{/each}
+
+							{#if nextCursor}
+								<div bind:this={sentinelEl} class="h-px w-full"></div>
+							{/if}
 
 							{#if isLoadingConversations}
 								<div class="flex items-center justify-center py-1.5">
@@ -539,6 +573,9 @@
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Footer>
+
+	<!-- Exact edge trigger for opening the collapsed sidebar. -->
+	<Sidebar.Rail class="after:hidden" />
 </Sidebar.Root>
 
 {#snippet navItem(item: (typeof navItems)[0])}

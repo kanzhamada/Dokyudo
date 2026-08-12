@@ -73,10 +73,16 @@ export class ActivitiesService {
                 .offset(offset);
 
             return {
-                data: activities.map(a => ({
-                    ...a,
-                    createdAt: a.createdAt?.toISOString() ?? new Date().toISOString(),
-                })),
+                data: activities.map(a => {
+                    const activity = {
+                        ...a,
+                        createdAt: a.createdAt?.toISOString() ?? new Date().toISOString(),
+                    };
+                    if (typeof a.action === 'string' && a.action.startsWith('billing.')) {
+                        delete (activity as any).userAgent;
+                    }
+                    return activity;
+                }),
                 meta: {
                     page,
                     limit,

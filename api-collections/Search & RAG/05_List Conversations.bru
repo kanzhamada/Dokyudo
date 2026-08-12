@@ -5,16 +5,14 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/rag/conversations?limit=20
+  url: {{baseUrl}}/api/rag/conversations?limit=20&cursor={{nextCursor}}
   body: none
   auth: bearer
 }
 
 params:query {
   limit: 20
-  //   Cursor pagination: `nextCursor` dari respons sebelumnya — JSON komposit
-  //   { p: isPinned, u: updatedAt, i: id } (opaque, dilempar apa adanya).
-  //   cursor: {{nextCursor}}
+  cursor: {{nextCursor}}
 }
 
 auth:bearer {
