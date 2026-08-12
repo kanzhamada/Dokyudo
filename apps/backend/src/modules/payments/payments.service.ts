@@ -113,6 +113,7 @@ export class PaymentsService {
                 client_reference_id: externalId,
                 metadata: {
                     tenantId: tenantId,
+                    externalId: externalId,
                     tierToUnlock: body.tierToUnlock,
                 },
                 line_items: [
@@ -176,8 +177,13 @@ export class PaymentsService {
                 const session = event.data.object as Stripe.Checkout.Session;
 
                 // 1. Validate custom metadata attached during checkout session creation
+                // Fall back to client_reference_id for resilience (some test fixtures omit metadata).
                 const tenantId = session.metadata?.tenantId;
-                const externalId = session.metadata?.externalId;
+                const externalId =
+                    session.metadata?.externalId ??
+                    (typeof session.client_reference_id === "string"
+                        ? session.client_reference_id
+                        : undefined);
                 const tierToUnlock = session.metadata?.tierToUnlock;
 
                 if (!tenantId || !externalId || !tierToUnlock) {
