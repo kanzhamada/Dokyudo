@@ -36,9 +36,7 @@
 	import { getMe } from '$lib/api/me';
 	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
 	import ShareConversationDialog from '$lib/components/app/ShareConversationDialog.svelte';
-	import SharedLinksDialog from '$lib/components/app/SharedLinksDialog.svelte';
-	import ProfileSettingsDialog from '$lib/components/app/ProfileSettingsDialog.svelte';
-	import BillingDialog from '$lib/components/app/BillingDialog.svelte';
+	import AccountPanelDialog from '$lib/components/app/AccountPanelDialog.svelte';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
 	import type { UserProfileResponse } from '$lib/types/auth.types';
@@ -238,9 +236,8 @@
 
 	let isShareDialogOpen = $state(false);
 	let sharingConversation = $state<ConversationItem | null>(null);
-	let isSharedLinksDialogOpen = $state(false);
-	let isProfileSettingsDialogOpen = $state(false);
-	let isBillingDialogOpen = $state(false);
+	let isAccountPanelOpen = $state(false);
+	let accountPanelTab = $state<'settings' | 'billing' | 'shared-links'>('settings');
 
 	function openShareDialog(item: ConversationItem) {
 		sharingConversation = item;
@@ -285,7 +282,8 @@
 
 	onMount(async () => {
 		if ($page.url.searchParams.get('billing') === 'open') {
-			isBillingDialogOpen = true;
+			accountPanelTab = 'billing';
+			isAccountPanelOpen = true;
 		}
 
 		try {
@@ -666,7 +664,8 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
-				isProfileSettingsDialogOpen = true;
+				accountPanelTab = 'settings';
+				isAccountPanelOpen = true;
 			}}
 		>
 			<MxIcon name="settings-settings-outline" class="size-3.5 text-white/60" />
@@ -677,7 +676,8 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
-				isBillingDialogOpen = true;
+				accountPanelTab = 'billing';
+				isAccountPanelOpen = true;
 			}}
 		>
 			<MxIcon name="card-linear" class="size-3.5 text-white/60" />
@@ -688,7 +688,8 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
-				isSharedLinksDialogOpen = true;
+				accountPanelTab = 'shared-links';
+				isAccountPanelOpen = true;
 			}}
 		>
 			<Link2 class="size-3.5 text-white/60" />
@@ -860,19 +861,13 @@
 	/>
 {/if}
 
-<SharedLinksDialog
-	bind:open={isSharedLinksDialogOpen}
-	onClose={() => (isSharedLinksDialogOpen = false)}
-/>
-
-<ProfileSettingsDialog
-	bind:open={isProfileSettingsDialogOpen}
-	onClose={() => (isProfileSettingsDialogOpen = false)}
+<AccountPanelDialog
+	bind:open={isAccountPanelOpen}
+	bind:tab={accountPanelTab}
+	onClose={() => (isAccountPanelOpen = false)}
 	onNameUpdated={(name) => {
 		if (userProfile) {
 			userProfile = { ...userProfile, tenant: { ...userProfile.tenant, name } };
 		}
 	}}
 />
-
-<BillingDialog bind:open={isBillingDialogOpen} onClose={() => (isBillingDialogOpen = false)} />
