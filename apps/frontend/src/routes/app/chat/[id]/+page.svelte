@@ -56,6 +56,7 @@
 	import { apiRequest } from '$lib/api/client';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
+	import { accountPanel, openAccountPanel } from '$lib/state/account-panel.store.svelte';
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 	import { mergeConversationReferences, type DocReference } from '$lib/utils/doc-references';
 	import type { TurnAlternative } from '$lib/types/rag.types';
@@ -67,7 +68,6 @@
 	import AttachmentCards from '$lib/components/chat/AttachmentCards.svelte';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
-	import ConfigureByokDialog from '$lib/components/chat/ConfigureByokDialog.svelte';
 	import { renderMarkdown } from '$lib/utils/markdown';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
@@ -253,7 +253,6 @@
 	let pulseCheckpointId = $state<string | null>(null);
 	let pulseCheckpointTimeout: ReturnType<typeof setTimeout> | null = null;
 	let checkpointVisibilityTimeout: ReturnType<typeof setTimeout> | null = null;
-	let isConfigureDialogOpen = $state(false);
 
 	let conversationReferences = $derived.by(() =>
 		mergeConversationReferences(
@@ -699,8 +698,12 @@
 	}
 
 	function openConfigureDialog() {
-		isConfigureDialogOpen = true;
+		openAccountPanel('byok');
 	}
+
+	$effect(() => {
+		if (accountPanel.byokSavedAt > 0) void loadLlmOptions();
+	});
 
 	function openTitleEditDialog() {
 		titleDraft = conversationTitle === 'New Conversation' ? '' : conversationTitle;
@@ -3287,8 +3290,6 @@
 		</div>
 	</div>
 {/snippet}
-
-<ConfigureByokDialog bind:open={isConfigureDialogOpen} onSaved={loadLlmOptions} />
 
 <EditTitleDialog
 	bind:open={isTitleEditDialogOpen}

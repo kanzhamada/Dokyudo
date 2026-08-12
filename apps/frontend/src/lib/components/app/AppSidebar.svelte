@@ -37,6 +37,7 @@
 	import { getConversations, updateConversation, deleteConversation } from '$lib/api/rag';
 	import ShareConversationDialog from '$lib/components/app/ShareConversationDialog.svelte';
 	import AccountPanelDialog from '$lib/components/app/AccountPanelDialog.svelte';
+	import { openAccountPanel } from '$lib/state/account-panel.store.svelte';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
 	import type { UserProfileResponse } from '$lib/types/auth.types';
@@ -236,8 +237,6 @@
 
 	let isShareDialogOpen = $state(false);
 	let sharingConversation = $state<ConversationItem | null>(null);
-	let isAccountPanelOpen = $state(false);
-	let accountPanelTab = $state<'settings' | 'billing' | 'shared-links'>('settings');
 
 	function openShareDialog(item: ConversationItem) {
 		sharingConversation = item;
@@ -282,8 +281,7 @@
 
 	onMount(async () => {
 		if ($page.url.searchParams.get('billing') === 'open') {
-			accountPanelTab = 'billing';
-			isAccountPanelOpen = true;
+			openAccountPanel('billing');
 		}
 
 		try {
@@ -664,8 +662,7 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
-				accountPanelTab = 'settings';
-				isAccountPanelOpen = true;
+				openAccountPanel('settings');
 			}}
 		>
 			<MxIcon name="settings-settings-outline" class="size-3.5 text-white/60" />
@@ -676,8 +673,7 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
-				accountPanelTab = 'billing';
-				isAccountPanelOpen = true;
+				openAccountPanel('billing');
 			}}
 		>
 			<MxIcon name="card-linear" class="size-3.5 text-white/60" />
@@ -688,8 +684,7 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
-				accountPanelTab = 'shared-links';
-				isAccountPanelOpen = true;
+				openAccountPanel('shared-links');
 			}}
 		>
 			<Link2 class="size-3.5 text-white/60" />
@@ -862,9 +857,6 @@
 {/if}
 
 <AccountPanelDialog
-	bind:open={isAccountPanelOpen}
-	bind:tab={accountPanelTab}
-	onClose={() => (isAccountPanelOpen = false)}
 	onNameUpdated={(name) => {
 		if (userProfile) {
 			userProfile = { ...userProfile, tenant: { ...userProfile.tenant, name } };

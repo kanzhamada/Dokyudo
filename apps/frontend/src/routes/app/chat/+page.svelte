@@ -5,7 +5,6 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
-	import ConfigureByokDialog from '$lib/components/chat/ConfigureByokDialog.svelte';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
@@ -13,6 +12,7 @@
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
 	import { documentsStore } from '$lib/state/documents.store.svelte';
+	import { accountPanel, openAccountPanel } from '$lib/state/account-panel.store.svelte';
 	import { mentionStrippedLength } from '$lib/utils/doc-mentions';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 
@@ -60,7 +60,6 @@
 	/** Sparkles toggle state (menggantikan tombol attach di input landing) —
 	 * search bar ini akan terhubung dengan search bar Documents nanti. */
 	let aiSearchEnabled = $state(false);
-	let isConfigureDialogOpen = $state(false);
 
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
@@ -158,8 +157,12 @@
 	}
 
 	function openConfigureDialog() {
-		isConfigureDialogOpen = true;
+		openAccountPanel('byok');
 	}
+
+	$effect(() => {
+		if (accountPanel.byokSavedAt > 0) void loadLlmOptions();
+	});
 
 	async function handleSubmit() {
 		if (mentionStrippedLength(inputValue.trim()) === 0 || isUploading) return;
@@ -201,9 +204,7 @@
 			const query = inputValue.trim();
 			if (!query) return;
 			const mode = aiSearchEnabled ? 'semantic' : 'keyword';
-			goto(
-				`/app/documents?q=${encodeURIComponent(query)}&mode=${mode}`
-			);
+			goto(`/app/documents?q=${encodeURIComponent(query)}&mode=${mode}`);
 		}
 	}
 </script>
@@ -530,5 +531,3 @@
 		</div>
 	</div>
 </div>
-
-<ConfigureByokDialog bind:open={isConfigureDialogOpen} onSaved={loadLlmOptions} />

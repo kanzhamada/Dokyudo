@@ -18,6 +18,7 @@
 		LockKeyhole,
 		MessageCircle,
 		RefreshCw,
+		RotateCw,
 		Search,
 		Settings2,
 		UserRound
@@ -27,6 +28,7 @@
 	import { goto } from '$app/navigation';
 	import { authUpdatePassword, authUpdateTenantName } from '$lib/api/auth';
 	import { getMe, getMeUsage } from '$lib/api/me';
+	import { deleteKey, getKeys, upsertKey } from '$lib/api/keys';
 	import { createBillingPortalSession, createCheckoutSession } from '$lib/api/payments';
 	import { deleteAllShares, deleteAllTenantShares, deleteShare, listAllShares } from '$lib/api/rag';
 	import {
@@ -36,25 +38,66 @@
 		type TierType
 	} from '$lib/constants/tiers.constant';
 	import { profilePasswordSchema, tenantNameSchema } from '$lib/schemas/auth.schema';
+	import {
+		accountPanel,
+		closeAccountPanel,
+		markByokSaved,
+		type AccountPanelTab
+	} from '$lib/state/account-panel.store.svelte';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import type { UserProfileResponse, UserUsageResponse } from '$lib/types/auth.types';
 	import type { ShareListItem } from '$lib/types/rag.types';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
+	import geminiIcon from '$lib/assets/llm/gemini.svg';
+	import mistralIcon from '$lib/assets/llm/mistral.svg';
+	import openrouterIcon from '$lib/assets/llm/openrouter.svg';
+
 	interface Props {
-		open?: boolean;
-		tab?: TabId;
 		onClose?: () => void;
 		onNameUpdated?: (name: string) => void;
 	}
 
-	type TabId = 'settings' | 'billing' | 'shared-links';
+	type ByokProvider = 'gemini' | 'mistral' | 'openrouter';
+
+	interface ByokProviderOption {
+		id: ByokProvider;
+		label: string;
+		description: string;
+		icon: string;
+		placeholder: string;
+	}
+
+	const BYOK_PROVIDER_OPTIONS: ByokProviderOption[] = [
+		{
+			id: 'gemini',
+			label: 'Google AI',
+			description: 'Gemini models',
+			icon: geminiIcon,
+			placeholder: 'AIza...'
+		},
+		{
+			id: 'mistral',
+			label: 'Mistral',
+			description: 'Mistral models',
+			icon: mistralIcon,
+			placeholder: 'Mistral API key'
+		},
+		{
+			id: 'openrouter',
+			label: 'OpenRouter',
+			description: 'Access more models',
+			icon: openrouterIcon,
+			placeholder: 'sk-or-v1-...'
+		}
+	];
+
 	type Plan = TierPlan & { tier: TierType; limits: string[] };
 
 	const planOrder: TierType[] = ['FREE', 'OIL_INVESTOR', 'PRO', 'SIMULATE'];
 	const PAGE_SIZE = 10;
 
-	const tabs: { id: TabId; label: string; description: string }[] = [
+	const tabs: { id: AccountPanelTab; label: string; description: string }[] = [
 		{
 			id: 'settings',
 			label: 'Settings',
@@ -69,17 +112,17 @@
 			id: 'shared-links',
 			label: 'Shared links',
 			description: 'Manage the active links you have created.'
+		},
+		{
+			id: 'byok',
+			label: 'Configure BYOK',
+			description: 'Connect your own API key to access provider models directly.'
 		}
 	];
 
-	let {
-		open = $bindable(false),
-		tab = $bindable<TabId>('settings'),
-		onClose,
-		onNameUpdated
-	}: Props = $props();
+	let { onClose, onNameUpdated }: Props = $props();
 
-	const activeTab = $derived(tabs.find((t) => t.id === tab) ?? tabs[0]);
+	const activeTab = $derived(tabs.find((t) => t.id === accountPanel.tab) ?? tabs[0]);
 
 	// ─── Settings panel state ────────────────────────────────────────────────
 	let profile = $state<UserProfileResponse | null>(null);
@@ -347,7 +390,7 @@
 			if (result.ok) {
 				toast.success(result.data.message || 'Password updated. Please sign in again.');
 				resetPasswordForm();
-				open = false;
+				accountPanel.open = false;
 				sessionStore.clear();
 				await goto('/login');
 			} else {
@@ -466,27 +509,125 @@
 		}
 	}
 
+	// ─── BYOK panel state ────────────────────────────────────────────────────
+	let provider = $state<ByokProvider>('gemini');
+	let apiKey = $state('');
+	let isSavingKey = $state(false);
+	let isResettingKey = $state(false);
+	let byokError = $state('');
+	let keyMasks = $state<Record<ByokProvider, string>>({
+		gemini: '',
+		mistral: '',
+		openrouter: ''
+	});
+
+	const providerLabel = $derived(
+		BYOK_PROVIDER_OPTIONS.find((item) => item.id === provider)?.label ?? ''
+	);
+
+	async function loadKeyMasks() {
+		try {
+			const keysRes = await getKeys();
+			if (!keysRes.ok) return;
+			const nextMasks: Record<ByokProvider, string> = {
+				gemini: '',
+				mistral: '',
+				openrouter: ''
+			};
+			for (const item of keysRes.data.data ?? []) {
+				const p = item.provider.toLowerCase();
+				if (p === 'gemini' || p === 'mistral' || p === 'openrouter') {
+					nextMasks[p] = item.maskedKey;
+				}
+			}
+			keyMasks = nextMasks;
+		} catch (err) {
+			console.error('[AccountPanel] Failed to fetch BYOK keys:', err);
+		}
+	}
+
+	function selectConfigureProvider(next: ByokProvider) {
+		provider = next;
+		apiKey = '';
+		byokError = '';
+	}
+
+	async function saveConfigureKey() {
+		const key = apiKey.trim();
+		if (!key || isSavingKey) return;
+
+		isSavingKey = true;
+		byokError = '';
+		try {
+			const result = await upsertKey(provider, key);
+			if (!result.ok) {
+				byokError = result.error.message;
+				return;
+			}
+
+			await loadKeyMasks();
+			markByokSaved();
+			apiKey = '';
+			accountPanel.open = false;
+			toast.success(`${providerLabel} key saved`);
+		} catch (err) {
+			console.error('[AccountPanel] Failed to save BYOK key:', err);
+			byokError = 'Failed to save API key.';
+		} finally {
+			isSavingKey = false;
+		}
+	}
+
+	async function resetConfigureKey() {
+		if (isResettingKey) return;
+
+		isResettingKey = true;
+		byokError = '';
+		try {
+			const result = await deleteKey(provider);
+			if (!result.ok) {
+				byokError = result.error.message;
+				return;
+			}
+
+			await loadKeyMasks();
+			markByokSaved();
+			toast.success(`${providerLabel} key reset`);
+		} catch (err) {
+			console.error('[AccountPanel] Failed to reset BYOK key:', err);
+			byokError = 'Failed to reset API key.';
+		} finally {
+			isResettingKey = false;
+		}
+	}
+
 	// ─── Loading + clock effects ─────────────────────────────────────────────
 	$effect(() => {
-		if (open && tab === 'settings') {
+		if (accountPanel.open && accountPanel.tab === 'settings') {
 			untrack(() => void loadProfile());
 		}
 	});
 
 	$effect(() => {
-		if (open && tab === 'billing') {
+		if (accountPanel.open && accountPanel.tab === 'billing') {
 			untrack(() => void loadUsage());
 		}
 	});
 
 	$effect(() => {
-		if (open && tab === 'shared-links') {
+		if (accountPanel.open && accountPanel.tab === 'shared-links') {
 			untrack(() => void loadShares());
 		}
 	});
 
 	$effect(() => {
-		if (open && tab === 'billing') {
+		if (accountPanel.open && accountPanel.tab === 'byok') {
+			untrack(() => void loadKeyMasks());
+		}
+	});
+
+	$effect(() => {
+		if (accountPanel.open && accountPanel.tab === 'billing') {
 			currentTime = new Date();
 			clockTimer = window.setInterval(() => {
 				currentTime = new Date();
@@ -500,9 +641,12 @@
 </script>
 
 <Dialog.Root
-	bind:open
+	bind:open={accountPanel.open}
 	onOpenChange={(nextOpen) => {
-		if (!nextOpen) onClose?.();
+		if (!nextOpen) {
+			closeAccountPanel();
+			onClose?.();
+		}
 	}}
 >
 	<Dialog.Content
@@ -513,10 +657,12 @@
 			<Dialog.Title
 				class="flex items-center gap-2 text-[17px] font-medium tracking-[-0.02em] text-white"
 			>
-				{#if tab === 'settings'}
+				{#if accountPanel.tab === 'settings'}
 					<Settings2 class="size-[15px] text-white/55" strokeWidth={1.8} />
-				{:else if tab === 'billing'}
+				{:else if accountPanel.tab === 'billing'}
 					<CreditCard class="size-[15px] text-white/55" strokeWidth={1.8} />
+				{:else if accountPanel.tab === 'byok'}
+					<KeyRound class="size-[15px] text-white/55" strokeWidth={1.8} />
 				{:else}
 					<Link2 class="size-[15px] text-white/55" strokeWidth={1.8} />
 				{/if}
@@ -527,7 +673,7 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
-		<div class="flex min-h-0 flex-col sm:flex-row">
+		<div class="flex h-[70vh] min-h-0 flex-col sm:h-[600px] sm:flex-row">
 			<!-- Side tab rail -->
 			<nav
 				aria-label="Account sections"
@@ -536,17 +682,19 @@
 				{#each tabs as item (item.id)}
 					<button
 						type="button"
-						aria-current={tab === item.id ? 'page' : undefined}
-						class="flex shrink-0 cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors {tab ===
+						aria-current={accountPanel.tab === item.id ? 'page' : undefined}
+						class="flex shrink-0 cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors {accountPanel.tab ===
 						item.id
 							? 'bg-white/[0.08] text-white'
 							: 'text-white/50 hover:bg-white/[0.04] hover:text-white/80'}"
-						onclick={() => (tab = item.id)}
+						onclick={() => (accountPanel.tab = item.id)}
 					>
 						{#if item.id === 'settings'}
 							<Settings2 class="size-4 shrink-0" strokeWidth={1.8} />
 						{:else if item.id === 'billing'}
 							<CreditCard class="size-4 shrink-0" strokeWidth={1.8} />
+						{:else if item.id === 'byok'}
+							<KeyRound class="size-4 shrink-0" strokeWidth={1.8} />
 						{:else}
 							<Link2 class="size-4 shrink-0" strokeWidth={1.8} />
 						{/if}
@@ -557,7 +705,7 @@
 
 			<!-- Panel content -->
 			<div class="min-h-0 flex-1 overflow-y-auto">
-				{#if tab === 'settings'}
+				{#if accountPanel.tab === 'settings'}
 					<div class="space-y-5 p-5">
 						<section aria-labelledby="profile-details-title">
 							<div class="mb-3 flex items-start gap-2.5">
@@ -724,7 +872,7 @@
 							</form>
 						</section>
 					</div>
-				{:else if tab === 'billing'}
+				{:else if accountPanel.tab === 'billing'}
 					<div class="space-y-5 p-5">
 						<section aria-labelledby="current-plan-title">
 							<div class="mb-3 flex items-start justify-between gap-3">
@@ -986,6 +1134,88 @@
 								does not reset monthly.
 							</p>
 						</section>
+					</div>
+				{:else if accountPanel.tab === 'byok'}
+					<div class="p-5">
+						<div class="flex gap-2">
+							{#each BYOK_PROVIDER_OPTIONS as providerOption (providerOption.id)}
+								<button
+									type="button"
+									class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors {provider ===
+									providerOption.id
+										? 'border-[#DB8F5E]/60 bg-[#DB8F5E]/10 text-white'
+										: 'border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.08] hover:text-white/80'}"
+									onclick={() => selectConfigureProvider(providerOption.id)}
+								>
+									<img
+										src={providerOption.icon}
+										alt={providerOption.label}
+										class="size-4 shrink-0 opacity-70 brightness-0 invert"
+									/>
+									<span class="min-w-0 truncate text-xs font-medium">{providerOption.label}</span>
+								</button>
+							{/each}
+						</div>
+
+						<div class="mt-5 flex flex-col gap-3">
+							<div class="flex items-center justify-between gap-3">
+								<div>
+									<p class="text-sm font-medium text-white/85">{providerLabel} API key</p>
+									<p class="mt-1 text-xs text-white/40">
+										{BYOK_PROVIDER_OPTIONS.find((item) => item.id === provider)?.description}
+									</p>
+								</div>
+								<KeyRound class="size-4 text-white/35" />
+							</div>
+
+							{#if keyMasks[provider]}
+								<div
+									class="flex h-10 items-center justify-between rounded-lg border border-white/15 bg-black/20 px-3"
+								>
+									<div class="flex items-center gap-2 text-sm text-white/75">
+										<Check class="size-4 text-white/60" />
+										<span>API Key Configured</span>
+									</div>
+									<button
+										type="button"
+										class="flex cursor-pointer items-center gap-1 text-xs text-white/50 transition-colors hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+										disabled={isResettingKey}
+										onclick={resetConfigureKey}
+									>
+										<RotateCw class="size-3.5" />
+										<span>{isResettingKey ? 'Resetting...' : 'Reset Key'}</span>
+									</button>
+								</div>
+							{:else}
+								<Input
+									type="password"
+									bind:value={apiKey}
+									placeholder={BYOK_PROVIDER_OPTIONS.find((item) => item.id === provider)
+										?.placeholder}
+									class="h-10 border-white/15 bg-black/20 text-sm text-white placeholder:text-white/25 focus-visible:border-[#DB8F5E]/60 focus-visible:ring-[#DB8F5E]/20"
+									autocomplete="new-password"
+								/>
+							{/if}
+
+							{#if byokError}
+								<p class="text-xs text-red-400">{byokError}</p>
+							{/if}
+
+							<div class="flex justify-end pt-0.5">
+								<Button
+									class="h-9 cursor-pointer rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-50"
+									disabled={!apiKey.trim() || isSavingKey || isResettingKey}
+									onclick={saveConfigureKey}
+								>
+									{#if isSavingKey}
+										<Spinner class="mr-1.5 size-3.5" />
+										Saving...
+									{:else}
+										Save key
+									{/if}
+								</Button>
+							</div>
+						</div>
 					</div>
 				{:else}
 					<div class="p-5">
