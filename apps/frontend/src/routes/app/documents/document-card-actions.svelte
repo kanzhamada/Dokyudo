@@ -8,12 +8,16 @@
 		id,
 		onPreview,
 		onDownload,
-		onDelete
+		onDelete,
+		/** Preview unavailable while the file is still being processed —
+		 * only non-PDF files are disabled; PDFs render from the raw file. */
+		previewDisabled = false
 	}: {
 		id: string;
 		onPreview?: () => void;
 		onDownload?: () => void;
 		onDelete?: () => void;
+		previewDisabled?: boolean;
 	} = $props();
 
 	let menuOpen = $state(false);
@@ -85,7 +89,8 @@
 	>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
+			disabled={previewDisabled}
 			onclick={() => {
 				closeMenu();
 				onPreview?.();
@@ -93,6 +98,9 @@
 		>
 			<MxIcon name="security-eye-outline" class="size-3.5 text-white/60" />
 			<span>Preview</span>
+			{#if previewDisabled}
+				<span class="ml-auto shrink-0 text-[10px] text-white/30">Preparing…</span>
+			{/if}
 		</button>
 		<button
 			type="button"

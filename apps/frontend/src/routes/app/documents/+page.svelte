@@ -86,6 +86,15 @@
 		}
 	}
 
+	/** True while the document is still being vectorized (realtime-updated). */
+	function isVectorizing(doc: Document): boolean {
+		return doc.status === 'pending' || doc.status === 'confirmed';
+	}
+
+	function isPdfDocument(doc: Document): boolean {
+		return doc.name.toLowerCase().endsWith('.pdf');
+	}
+
 	async function handlePreview(doc: Document) {
 		if (!doc.url) {
 			console.log('[Document Preview] Fetching preview URL for:', doc.id);
@@ -1354,6 +1363,7 @@
 									{/if}
 									<DocumentCardActions
 										id={doc.id}
+										previewDisabled={isVectorizing(doc) && !isPdfDocument(doc)}
 										onPreview={() => handlePreview(doc)}
 										onDownload={() => handleDownload(doc)}
 										onDelete={() => promptDelete(doc)}
