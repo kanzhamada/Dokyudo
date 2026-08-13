@@ -11,6 +11,8 @@ class Settings:
     S3_SECRET_KEY = os.getenv('S3_SECRET_KEY')
     S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
     WORKER_TMP_DIR = os.getenv('WORKER_TMP_DIR')
+    DOCX_CONVERT_TIMEOUT_SECONDS = int(os.getenv('DOCX_CONVERT_TIMEOUT_SECONDS', '120'))
+    LIBREOFFICE_BINARY = os.getenv('LIBREOFFICE_BINARY', 'soffice')
     GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
     CF_EMBEDDING_MODEL = '@cf/baai/bge-m3'
     CLOUDFLARE_ACCOUNT_ID = os.getenv('CLOUDFLARE_ACCOUNT_ID')

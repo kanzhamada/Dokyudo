@@ -51,6 +51,20 @@ def fetch_documents_needing_ingestion(limit: int = 100) -> list[dict]:
         res.raise_for_status()
         return res.json()
 
+def fetch_document_storage_path(document_id: str) -> str:
+    """
+    Fetch the storage_path of a document (e.g. "<docId>.pdf", "<docId>.docx")
+    so the worker downloads the real object instead of assuming .pdf.
+    """
+    url = f"{settings.SUPABASE_URL}/rest/v1/documents?id=eq.{document_id}&select=storage_path"
+    with httpx.Client() as client:
+        res = client.get(url, headers=get_supabase_headers())
+        res.raise_for_status()
+        data = res.json()
+        if len(data) > 0 and data[0].get("storage_path"):
+            return data[0]["storage_path"]
+    raise RuntimeError(f"Document {document_id} has no storage_path")
+
 def get_last_processed_chunk_index(document_id: str) -> int:
     """
     Query Supabase to find the highest chunk_index already inserted for this document.

@@ -8,7 +8,8 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from core.config import settings
 from core.logger import log_event
-from services.storage import download_pdf
+from services.storage import download_document, upload_document
+from services.converter import convert_docx_to_pdf
 from services.extractor import extract_text_from_pdf, chunk_text_with_pages
 from services.embedding import generate_embedding_with_retry, TransientAPIError
 from services.llm import generate_llm_description
@@ -20,7 +21,8 @@ from services.database import (
     mark_document_queued,
     mark_document_failed,
     mark_document_failed_vectorizing,
-    get_last_processed_chunk_index
+    get_last_processed_chunk_index,
+    fetch_document_storage_path
 )
 from services.queue import ingestion_queue
 
@@ -152,15 +154,44 @@ def process_document(tenant_id: str, document_id: str):
     
     if settings.WORKER_TMP_DIR and not os.path.exists(settings.WORKER_TMP_DIR):
         os.makedirs(settings.WORKER_TMP_DIR, exist_ok=True)
-        
+
+    storage_path = fetch_document_storage_path(document_id)
+    ext = os.path.splitext(storage_path)[1].lower()
+    log_event("processor.step0_resolved", "Resolved document storage path.", document_id=document_id, tenant_id=tenant_id, storage_path=storage_path)
+
+    if ext not in (".pdf", ".docx", ".doc"):
+        log_event("processor.unsupported_type", "Unsupported document extension.", level="ERROR", document_id=document_id, tenant_id=tenant_id, storage_path=storage_path, extension=ext)
+        mark_document_failed(document_id)
+        return
+
+    temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=ext, dir=settings.WORKER_TMP_DIR)
+    temp_input.close()
     temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", dir=settings.WORKER_TMP_DIR)
     temp_pdf.close()
-    
+
     try:
-        log_event("processor.step1_downloading", "Reading PDF from disk...", document_id=document_id, tenant_id=tenant_id)
-        download_pdf(tenant_id, document_id, temp_pdf.name)
-        
-        pages = extract_text_from_pdf(temp_pdf.name)
+        log_event("processor.step1_downloading", "Downloading document from MinIO...", document_id=document_id, tenant_id=tenant_id)
+        download_document(tenant_id, storage_path, temp_input.name)
+
+        if ext in (".docx", ".doc"):
+            if ingestion_queue.is_cancelled(document_id):
+                log_event("processor.job_cancelled", "Cancellation detected before conversion.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
+                return
+
+            log_event("processor.step1_5_converting", "Converting document to PDF.", document_id=document_id, tenant_id=tenant_id, extension=ext)
+            convert_docx_to_pdf(temp_input.name, temp_pdf.name)
+
+            if ingestion_queue.is_cancelled(document_id):
+                log_event("processor.job_cancelled", "Cancellation detected after conversion.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
+                return
+
+            log_event("processor.step1_5_uploading_pdf", "Uploading converted PDF to MinIO.", document_id=document_id, tenant_id=tenant_id)
+            upload_document(temp_pdf.name, tenant_id, f"{document_id}.pdf")
+            pdf_path = temp_pdf.name
+        else:
+            pdf_path = temp_input.name
+
+        pages = extract_text_from_pdf(pdf_path)
         
         log_event("processor.step2_parsed", "PDF Parsed successfully.", document_id=document_id, tenant_id=tenant_id, total_pages=len(pages))
         
@@ -227,5 +258,6 @@ def process_document(tenant_id: str, document_id: str):
             log_event("processor.vectorizing_failed", "Failed to process document vectors.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e), traceback=tb_str)
             mark_document_failed_vectorizing(document_id, str(e))
     finally:
-        if os.path.exists(temp_pdf.name):
-            os.remove(temp_pdf.name)
+        for tmp_path in (temp_input.name, temp_pdf.name):
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)

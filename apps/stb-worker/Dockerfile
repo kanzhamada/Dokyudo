@@ -25,6 +25,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
+# LibreOffice Writer untuk konversi docx -> pdf (headless).
+# Hanya paket writer + font, bukan suite penuh, supaya image tidak membengkak.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libreoffice-writer \
+        fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy HANYA virtual environment dari stage builder (ukuran sangat menyusut)
 COPY --from=builder /opt/venv /opt/venv
 
