@@ -45,14 +45,22 @@ def chunk_text_stream(blocks: list[str], chunk_size: int = 1000, overlap: int = 
     Token-based chunking over a flat text stream. Used for DOCX documents,
     which have no fixed pages; page numbers are attached later by alignment.
 
+    Blocks are joined with a newline token so word boundaries survive into the
+    chunk text. Without a separator, "Kunci Soal: D" + "No. Soal: 4" would
+    merge into "DNo." and spurious merged tokens would break both the page
+    alignment and the embedding quality.
+
     Each chunk stores its full text plus an "_align_text" core that excludes
     the overlap tokens. The pager aligns on that core so successive chunks do
     not drift (overlap text would otherwise make every advance overshoot).
     """
     enc = tiktoken.get_encoding("cl100k_base")
+    newline_token = enc.encode("\n", allowed_special="all")[0]
 
     all_tokens = []
-    for block in blocks:
+    for i, block in enumerate(blocks):
+        if i > 0:
+            all_tokens.append(newline_token)
         all_tokens.extend(enc.encode(block, allowed_special="all"))
 
     chunks = []

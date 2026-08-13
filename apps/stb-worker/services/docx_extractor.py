@@ -132,25 +132,29 @@ def _convert_omml(el) -> str:
 def _wrap(s: str) -> str:
     return s if len(s) <= 1 else f"({s})"
 
+def _inline_text(el) -> str:
+    """Collect run text / OMML without stripping — spaces between runs must survive."""
+    if el.tag == _w("t"):
+        return el.text or ""
+    if el.tag in (_m("oMath"), _m("oMathPara")):
+        return _convert_omml(el)
+    if el.tag == _w("br"):
+        return " "
+    if el.tag == _w("tab"):
+        return " "
+    if el.tag == _w("instrText"):
+        return ""
+    if el.tag == _w("p"):
+        # Nested paragraph (e.g. inside a floating text box): every line is a
+        # separate paragraph, so join them with a space to keep word
+        # boundaries. Without this, "Kunci Soal: E" + "No. Soal: 5" would
+        # merge into "ENo." and break alignment with the PDF text layer.
+        parts = [_inline_text(c) for c in el if isinstance(c.tag, str)]
+        return " ".join(x for x in parts if x) + " "
+    return "".join(_inline_text(c) for c in el if isinstance(c.tag, str))
+
 def _paragraph_text(p_el) -> str:
-    parts = []
-    for c in p_el:
-        if not isinstance(c.tag, str):
-            continue
-        if c.tag == _w("t"):
-            parts.append(c.text or "")
-        elif c.tag in (_m("oMath"), _m("oMathPara")):
-            parts.append(_convert_omml(c))
-        elif c.tag == _w("br"):
-            parts.append(" ")
-        elif c.tag == _w("tab"):
-            parts.append(" ")
-        elif c.tag == _w("instrText"):
-            continue
-        else:
-            # Recurse into runs / hyperlinks / bookmarks.
-            parts.append(_paragraph_text(c))
-    return "".join(parts).strip()
+    return "".join(_inline_text(c) for c in p_el if isinstance(c.tag, str)).strip()
 
 def _walk_blocks(root_el):
     for child in root_el:

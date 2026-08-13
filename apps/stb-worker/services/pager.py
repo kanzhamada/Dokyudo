@@ -1,129 +1,139 @@
 import fitz
 from core.logger import log_event
 
-# Normalization: keep only letters and digits. This makes the PDF glyph layer
-# ("x2+ y2=r2" from a rendered formula) and the DOCX linear form ("x^2+y^2=r^2")
-# converge to the same stream ("x2y2r2"), which is what makes alignment work.
+_NGRAM = 25
+_SCAN_STEP = 10
+_MAX_OCCURRENCES = 3
+_MAX_CANDIDATES = 15
+
+
 def _normalize_alnum(text: str) -> str:
     return "".join(ch.lower() for ch in text if ch.isalnum())
 
+
 def _pdf_alnum_stream(pdf_path: str) -> tuple[str, list[int], int]:
-    """
-    Returns (normalized_stream, page_per_char, total_pages) for the converted
-    PDF. Formula glyphs are normalized away implicitly (operators and spacing
-    are dropped), so prose anchors dominate the matching.
-    """
     doc = fitz.open(pdf_path)
     try:
         total_pages = len(doc)
-        stream_parts = []
+        parts = []
         page_per_char = []
         for page_num, page in enumerate(doc, start=1):
             norm = _normalize_alnum(page.get_text())
-            stream_parts.append(norm)
+            parts.append(norm)
             page_per_char.extend([page_num] * len(norm))
-        return "".join(stream_parts), page_per_char, total_pages
+        return "".join(parts), page_per_char, total_pages
     finally:
         doc.close()
 
-_PREFIX_WINDOWS = (160, 80, 40, 20)
 
-def _find_window(needle: str, haystack: str, start: int, end: int) -> tuple[int, int] | None:
+def _ngram_counts(stream: str) -> dict[str, int]:
+    counts = {}
+    for i in range(0, len(stream) - _NGRAM + 1):
+        gram = stream[i:i + _NGRAM]
+        counts[gram] = counts.get(gram, 0) + 1
+    return counts
+
+
+def _rare_ngram_positions(needle: str, start: int, step: int, limit: int, counts: dict[str, int], stream: str) -> list[int]:
     """
-    Greedy forward search bounded to [start, end) with progressive prefix
-    shortening. The bound keeps matches inside the chunk's expected footprint
-    so repeated boilerplate on later pages cannot hijack the alignment.
-    Returns (pos, advance); a prefix match consumes the chunk's full text, a
-    tail match consumes only the matched tail window.
+    Positions of rare n-grams scanning from `start` (forward or backward via
+    step sign), collecting up to `limit` candidates. Semi-frequent fragments
+    (e.g. an indikator text reused across two cards) occur early too, so a
+    single candidate is unreliable — the caller takes the median.
     """
-    if len(needle) >= min(_PREFIX_WINDOWS):
-        for n in _PREFIX_WINDOWS:
-            pos = haystack.find(needle[:n], start, end)
+    positions = []
+    i = start
+    while i >= 0 and i <= len(needle) - _NGRAM and len(positions) < limit:
+        gram = needle[i:i + _NGRAM]
+        if counts.get(gram, 0) <= _MAX_OCCURRENCES:
+            pos = stream.find(gram)
             if pos != -1:
-                return pos, pos + len(needle)
-        # Fall back to the tail of the chunk — the head may be a formula whose
-        # PDF rendering order differs from the linear form.
-        for n in _PREFIX_WINDOWS:
-            tail = needle[-n:]
-            if len(tail) < n:
-                continue
-            pos = haystack.find(tail, start, end)
-            if pos != -1:
-                return pos, pos + n
-        return None
-    if len(needle) >= 6:
-        pos = haystack.find(needle, start, end)
-        if pos != -1:
-            return pos, pos + len(needle)
-    return None
+                positions.append(pos)
+        i += step
+    return positions
+
+
+def _quartile(positions: list[int], q: float, default: int) -> int:
+    """q=0.25 pulls toward the chunk start, q=0.75 toward the end; both resist
+    the few early-duplicate outliers of semi-frequent fragments."""
+    if not positions:
+        return default
+    positions.sort()
+    return positions[min(len(positions) - 1, int(len(positions) * q))]
+
 
 def assign_pages_to_chunks(chunks: list[dict], pdf_path: str) -> list[dict]:
     """
-    Attach 1-based PDF page numbers to DOCX-derived chunks by aligning chunk
-    text against the text layer of the converted PDF. The PDF layout renders
-    formulas as glyphs while the chunks carry linear math, so matching uses
-    alnum-normalized streams and short prefix windows. Chunks that cannot be
-    aligned are interpolated between their aligned neighbours.
+    Attach 1-based PDF page numbers to DOCX-derived chunks.
+
+    Each chunk is pinned by its rare n-grams: 25-character alnum windows that
+    appear at most a few times in the PDF text layer. LibreOffice repeats card
+    headers/tables on overflow pages, which inflates the PDF stream and breaks
+    position-based advances; rare n-grams sidestep that entirely because they
+    are unique content (soal text), not boilerplate. The start anchor is the
+    first rare n-gram scanning forward, the end anchor the first rare n-gram
+    scanning backward; the chunk's pages are the pages those anchors span.
+    Chunks without anchors are interpolated between aligned neighbours.
     """
     if not chunks:
         return chunks
 
     stream, page_per_char, total_pages = _pdf_alnum_stream(pdf_path)
+    counts = _ngram_counts(stream)
+
+    raw_texts = [c.get("_align_text") or c["text"] for c in chunks]
+    needles = [_normalize_alnum(t) for t in raw_texts]
 
     aligned = 0
-    search_start = 0
-    pending = []  # (index) chunks waiting for interpolation
+    pending = []
+    prev_anchor = -1
 
     for idx, chunk in enumerate(chunks):
-        # Align on the chunk's unique core (overlap tokens excluded) so
-        # advances never overshoot into the next chunk's head.
-        needle = _normalize_alnum(chunk.get("_align_text") or chunk["text"])
-        if not needle:
+        needle = needles[idx]
+        if not needle or len(needle) < _NGRAM:
             chunk["pages"] = []
             pending.append(idx)
             continue
 
-        # Bound the search to the chunk's expected footprint so repeated
-        # boilerplate on later pages cannot pull the match forward.
-        search_end = min(len(stream), search_start + len(needle) + 400)
+        # Collect candidate positions from both ends; the median resists
+        # semi-frequent fragments whose first occurrence lies before the
+        # chunk's true position (reused indikator text, repeated option cells).
+        scan_len = max(_NGRAM, len(needle) // 2)
+        start_cands = _rare_ngram_positions(needle, 0, _SCAN_STEP, _MAX_CANDIDATES, counts, stream)
+        end_cands = _rare_ngram_positions(needle, len(needle) - _NGRAM, -_SCAN_STEP, _MAX_CANDIDATES, counts, stream)
 
-        match = _find_window(needle, stream, search_start, search_end)
-        if match is None:
+        if not start_cands:
             chunk["pages"] = []
             pending.append(idx)
             continue
 
-        pos, advance = match
-        search_start = advance
+        start_pos = _quartile(start_cands, 0.25, 0)
+        end_pos = _quartile(end_cands, 0.75, start_pos)
 
-        # Tighten the span: locate the chunk's tail near its expected end
-        # position instead of assuming the whole needle length is contiguous.
-        end = advance
-        if len(needle) >= 80:
-            expected_end = pos + len(needle)
-            tail = needle[-80:]
-            tail_lo = max(pos, expected_end - 240)
-            tail_hi = min(len(stream), expected_end + 240)
-            tail_pos = stream.find(tail, tail_lo, tail_hi)
-            if tail_pos != -1:
-                end = tail_pos + 80
+        if end_pos < start_pos:
+            end_pos = start_pos
 
-        pages = sorted(set(page_per_char[pos:end]))
+        # Guard against a start anchor that jumped backwards across chunks.
+        if prev_anchor != -1 and start_pos < prev_anchor:
+            start_pos = prev_anchor
+            if end_pos < start_pos:
+                end_pos = start_pos
+
+        pages = sorted(set(page_per_char[start_pos:end_pos + _NGRAM]))
         pages = [p for p in pages if 1 <= p <= total_pages]
-        chunk["pages"] = pages or [page_per_char[pos]]
+        chunk["pages"] = pages or [page_per_char[start_pos]]
         aligned += 1
+        prev_anchor = start_pos
 
         for pend_idx in pending:
             chunks[pend_idx]["pages"] = [chunks[pend_idx - 1]["pages"][-1]] if pend_idx > 0 and chunks[pend_idx - 1]["pages"] else [1]
         pending = []
 
-    # Interpolate any trailing unaligned chunks.
     if pending:
         prev = chunks[pending[0] - 1]["pages"][-1] if pending[0] > 0 and chunks[pending[0] - 1]["pages"] else 1
         for pend_idx in pending:
             chunks[pend_idx]["pages"] = [prev]
 
-    # Enforce monotonic non-decreasing pages so citation jumps never go backwards.
     floor = 1
     for chunk in chunks:
         pages = [p for p in chunk["pages"] if p >= floor]
@@ -139,5 +149,6 @@ def assign_pages_to_chunks(chunks: list[dict], pdf_path: str) -> list[dict]:
         aligned=aligned,
         interpolated=len(chunks) - aligned,
         pdf_pages=total_pages,
+        stream_chars=len(stream),
     )
     return chunks
