@@ -12,14 +12,14 @@
 - **Toggle Sparkles** menggantikan tombol attach **hanya di mode Search** (state `aiSearchEnabled`, ikon lucide `Sparkles`, aktif = aksen `#DB8F5E`). Mode Chat tetap memakai ikon + fungsi attach seperti biasa.
 - **Transisi halaman**: View Transition (`onNavigate` di `app/+layout.svelte`) di-scope ke submit navigasi dari `/app/chat` — chat submit (`→ /app/chat/<id>`) dan search submit (`→ /app/documents` dengan param `q`). Klik sidebar Documents biasa tidak dianimasikan.
 - **Penerimaan di `/app/documents`**: `onMount` membaca `q` & `mode` dari URL → `mode=semantic` menjalankan `executeSemanticSearch()` langsung; `mode=keyword` mengisi `globalFilter` tabel.
-- **Batas attachment**: max **5 file per submit** (zod `attachment_document_ids` max 5 + cap frontend `MAX_CHAT_ATTACHMENTS`), ekstensi **PDF/TXT/DOCX** (backend contract menerima ketiganya).
+- **Batas attachment**: max **5 file per submit** (zod `attachment_document_ids` max 5 + cap frontend `MAX_CHAT_ATTACHMENTS`), ekstensi **PDF/TXT/DOCX/MD** (backend contract menerima semuanya).
 
 ## Core Logic
 The `/app/chat` route houses the core chat and semantic search interface for the Dokyudo platform. It provides a highly responsive, glassmorphic UI where users can toggle between conversing with language models ("Chat" mode) and searching their knowledge base ("Search" mode). 
 
 Key features implemented include:
 - **Glassmorphic Aesthetics**: Frosted glass capsules (`backdrop-blur-[42px]`) with transparent borders and subtle white opacities.
-- **Dynamic File Attachment**: Users can attach documents (PDF, TXT, DOCX), which render as dynamic, removable chips inside the capsule.
+- **Dynamic File Attachment**: Users can attach documents (PDF, TXT, DOCX, MD), which render as dynamic, removable chips inside the capsule.
 - **Strict Client-Side Quota Enforcement**: Real-time validation preventing users from exceeding the 5-file upload limit, 5GB storage limit, and the 25MB per-file size limit via `svelte-sonner` toast error messages.
 - **Layered Delta Usage Trackers**: Visual progress indicators (circular SVGs on desktop, linear bars on mobile) that use a 3-layer approach (Background, Amber Delta, White Base) to instantly preview how much storage/quota the currently attached files will consume before sending.
 - **Container-Query Responsiveness**: Replaced standard viewport breakpoints (`md:`) with native Tailwind v4 Container Queries (`@container`, `@3xl`), allowing the massive Desktop Usage Capsule to flawlessly downgrade to a sleek mobile dropdown strictly based on the container's available width—elegantly handling dynamic space stealing from the collapsible `AppSidebar`.
@@ -75,7 +75,7 @@ graph TD
 Kapsul input chat (file chips, attach + quota tooltip, textarea auto-resize, model dropdown, tombol send/stop) dipindah ke komponen shared `apps/frontend/src/lib/components/chat/ChatInput.svelte`, dipakai oleh **kedua** halaman (`/chat` dan `/chat/[id]`).
 
 - Props `$bindable`: `value`, `attachedFiles`, `selectedModel`; plus `llmOptions`, `placeholder`, `showModelSelector`, `isGenerating`, `transparent`, `onsend`/`onstop`, `onconfigure`, `refocusKey`, dan batas kuota (`baseUploads`, `maxUploads`, `baseStorage`, `maxStorage`, `maxFileSizeBytes`).
-- Validasi file (ekstensi PDF/TXT/DOCX, ukuran per-file, kuota upload/storage) kini di dalam komponen — dipindah dari kedua halaman (logika identik).
+- Validasi file (ekstensi PDF/TXT/DOCX/MD, ukuran per-file, kuota upload/storage) kini di dalam komponen — dipindah dari kedua halaman (logika identik).
 - `refocusKey` memicu focus ulang textarea (dipakai `/chat` saat toggle mode chat/search); focus otomatis saat mount.
 - Varian tampilan lewat prop **`transparent`**:
   - `true` (halaman `/chat`): kapsul `bg-[#232323]/[0.40]` tanpa shadow, tombol send transparan (`bg-[#B8B5B5]/[0]`), textarea `text-white/[0.40]` — mempertahankan warna asli halaman index.

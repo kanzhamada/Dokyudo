@@ -30,7 +30,9 @@ docs {
 
   The worker resolves the document's storage_path from Supabase (extension-aware), then:
   - .pdf: extracts text per page with PyMuPDF and chunks with tiktoken (1000 tokens, 150 overlap).
-  - .docx / .doc: converts to PDF headless with LibreOffice (writer + math components), uploads the converted PDF to MinIO as {tenant}/{docId}.pdf (the frontend viewer uses this), extracts text from the DOCX itself (python-docx: paragraphs, tables, text boxes) with OMML equations converted to LaTeX wrapped in $...$ / $$...$$, chunks the text, then aligns every chunk to the converted PDF pages via rare 25-char alnum n-grams.
+  - .docx / .doc: converts to PDF headless with LibreOffice (writer + math components — libreoffice-math is required or OMML equations vanish from the PDF), uploads the converted PDF to MinIO as {tenant}/{docId}.pdf (the frontend viewer uses this), extracts text from the DOCX itself (python-docx: paragraphs, tables, text boxes) with OMML equations converted to LaTeX wrapped in $...$ / $$...$$, chunks the text, then aligns every chunk to the converted PDF pages via rare 25-char alnum n-grams.
+  - .txt: converts to PDF (LibreOffice) for the viewer, reads the original text with an encoding chain (UTF-8 BOM -> UTF-16 BOM -> UTF-8 -> cp1252), rejects binary files with NUL bytes (except UTF-16), chunks and aligns pages like DOCX.
+  - .md: LibreOffice opens markdown as plain text, so it is first rendered to styled HTML (python-markdown: tables, fenced code) and that HTML is converted to PDF — the viewer shows the RENDERED markdown. Chunk text comes from the same HTML with tags stripped (no markdown syntax noise in embeddings).
   - Other extensions: marked failed.
 
   Returns 200 immediately; ingestion runs on the background queue thread.
