@@ -207,3 +207,68 @@ export const GetDocumentPreviewResponseSchema = z.object({
 });
 
 export type GetDocumentPreviewResponse = z.infer<typeof GetDocumentPreviewResponseSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rename document
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Maximum length of a document title (including the file extension).
+ */
+export const DOCUMENT_TITLE_MAX_LENGTH = 255;
+
+/**
+ * Whitelist of allowed characters in a document title.
+ *
+ * Only Unicode letters, digits, ASCII spaces, and a small set of safe
+ * punctuation are accepted. Everything that can carry or escape markup or
+ * SQL — angle brackets, quotes, backticks, semicolons, equals signs, slashes,
+ * percent, and other metacharacters — is rejected outright, so a title can
+ * never smuggle an XSS payload or a SQL fragment into storage or rendered
+ * output.
+ */
+export const DOCUMENT_TITLE_REGEX = /^[\p{L}\p{N} .\-_,&+@#:!?()]+$/u;
+
+export const DocumentTitleSchema = z
+    .string()
+    .trim()
+    .min(1, "Title cannot be empty")
+    .max(DOCUMENT_TITLE_MAX_LENGTH, `Title must be at most ${DOCUMENT_TITLE_MAX_LENGTH} characters`)
+    .regex(DOCUMENT_TITLE_REGEX, {
+        message:
+            "Title contains disallowed characters. Allowed: letters, digits, spaces, and . , - _ ( ) & + @ # : ! ?",
+    })
+    .openapi({
+        example: "Laporan Keuangan 2026.pdf",
+        description:
+            "New document title. Must include the file extension — the extension cannot be changed.",
+    });
+
+export const UpdateDocumentTitleBodySchema = z.object({
+    title: DocumentTitleSchema,
+});
+
+export type UpdateDocumentTitleBody = z.infer<typeof UpdateDocumentTitleBodySchema>;
+
+export const UpdateDocumentTitleParamsSchema = z.object({
+    documentId: z.string().uuid(),
+    tenantId: z.string(),
+    title: z.string(),
+    clientIp: z.string().optional(),
+    userAgent: z.string().optional(),
+    logContext: z.any().optional(),
+});
+
+export type UpdateDocumentTitleParams = z.infer<typeof UpdateDocumentTitleParamsSchema>;
+
+export const UpdateDocumentTitleResponseSchema = z.object({
+    success: z.boolean().openapi({ example: true }),
+    message: z.string().openapi({ example: "Document title updated" }),
+    documentId: z.string().uuid(),
+    title: z.string().openapi({
+        example: "Laporan Keuangan 2026.pdf",
+        description: "The stored title after the update, including the file extension",
+    }),
+});
+
+export type UpdateDocumentTitleResponse = z.infer<typeof UpdateDocumentTitleResponseSchema>;

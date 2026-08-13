@@ -218,6 +218,75 @@ documentsRoutes.openapi(
 
 documentsRoutes.openapi(
     createRoute({
+        method: "patch",
+        path: "/{id}",
+        tags: ["Documents"],
+        summary: "Rename a document",
+        description:
+            "Updates the title of a document. The title must include the file extension, " +
+            "and the extension must match the document's actual stored file extension — " +
+            "renaming can never change the file type. Title characters are restricted to a " +
+            "safe whitelist (letters, digits, spaces, and a small set of punctuation) to keep " +
+            "titles free of XSS/SQL-injection payloads.",
+        request: {
+            params: DocumentsSchema.DeleteDocumentParamSchema,
+            body: {
+                content: {
+                    "application/json": {
+                        schema: DocumentsSchema.UpdateDocumentTitleBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Document title updated successfully",
+                content: {
+                    "application/json": {
+                        schema: DocumentsSchema.UpdateDocumentTitleResponseSchema,
+                    },
+                },
+            },
+            400: {
+                description: "Validation error (e.g., disallowed characters or extension mismatch)",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            404: {
+                description: "Document not found",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+            500: {
+                description: "Internal server error",
+                content: {
+                    "application/json": {
+                        schema: ErrorResponseSchema,
+                    },
+                },
+            },
+        },
+    }),
+    documentsController.handleUpdateDocumentTitle as any,
+);
+
+documentsRoutes.openapi(
+    createRoute({
         method: "get",
         path: "/{id}/preview",
         tags: ["Documents"],

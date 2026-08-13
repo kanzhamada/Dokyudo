@@ -736,4 +736,102 @@ export class DocumentsService {
             expiresIn: PRESIGNED_GET_URL_EXPIRES_IN_SECONDS,
         };
     }
+
+    /**
+     * Renames a document. The file extension is immutable: it is derived from
+     * the document's stored file (storagePath) and must appear unchanged at the
+     * end of the new title. The title itself is validated against a character
+     * whitelist by the route's zod schema before reaching this method.
+     */
+    static async updateDocumentTitle(
+        params: DocumentSchema.UpdateDocumentTitleParams,
+    ): Promise<DocumentSchema.UpdateDocumentTitleResponse> {
+        let doc: any = null;
+
+        try {
+            await withAuthDb(params.tenantId, async (tx) => {
+                const results = await tx.select().from(documents).where(
+                    and(
+                        eq(documents.id, params.documentId),
+                        eq(documents.tenantId, params.tenantId)
+                    )
+                );
+                if (results.length > 0) {
+                    doc = results[0];
+                }
+            });
+        } catch (err: any) {
+            if (params.logContext) params.logContext.dbError = "Failed to fetch document for rename: " + err.message;
+            throw new AppError({
+                code: "INTERNAL_ERROR",
+                message: "Database query failed",
+                status: 500,
+            });
+        }
+
+        if (!doc) {
+            throw new AppError({
+                code: "NOT_FOUND",
+                message: "Document not found",
+                status: 404,
+            });
+        }
+
+        // Extension is a property of the stored file, not of the label. Derive it
+        // from storagePath and require it (case-insensitively) at the end of the
+        // new title so a rename can never silently change the file type.
+        const ext = doc.storagePath.split(".").pop()?.toLowerCase();
+        const newTitle = params.title.trim();
+        if (ext && !newTitle.toLowerCase().endsWith(`.${ext}`)) {
+            throw new AppError({
+                code: "VALIDATION_ERROR",
+                message: `Title must end with .${ext} — the file extension cannot be changed`,
+                status: 400,
+            });
+        }
+
+        let updatedTitle = "";
+        try {
+            await withAuthDb(params.tenantId, async (tx) => {
+                const [updatedDoc] = await tx.update(documents)
+                    .set({ title: newTitle, updatedAt: new Date() })
+                    .where(
+                        and(
+                            eq(documents.id, params.documentId),
+                            eq(documents.tenantId, params.tenantId)
+                        )
+                    )
+                    .returning({ title: documents.title });
+
+                if (updatedDoc) {
+                    updatedTitle = updatedDoc.title;
+                }
+            });
+        } catch (err: any) {
+            if (params.logContext) params.logContext.dbError = "Failed to update document title: " + err.message;
+            throw new AppError({
+                code: "INTERNAL_ERROR",
+                message: "Failed to update document title",
+                status: 500,
+            });
+        }
+
+        await logActivity({
+            tenantId: params.tenantId,
+            action: "document.renamed",
+            resourceType: "document",
+            resourceId: params.documentId,
+            metadata: { fileName: doc.title, newFileName: updatedTitle },
+            ipAddress: params.clientIp,
+            userAgent: params.userAgent,
+            requestId: params.logContext?.requestId,
+        });
+
+        return {
+            success: true,
+            message: "Document title updated",
+            documentId: params.documentId,
+            title: updatedTitle,
+        };
+    }
 }

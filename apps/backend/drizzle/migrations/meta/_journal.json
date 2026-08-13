@@ -197,6 +197,13 @@
       "when": 1786341547150,
       "tag": "0027_awaiting_indexing_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786410000000,
+      "tag": "0028_document_renamed",
+      "breakpoints": true
     }
   ]
 }

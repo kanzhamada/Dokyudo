@@ -200,6 +200,127 @@ describe("Documents Routes", () => {
         });
     });
 
+    describe("PATCH /api/documents/:id (rename title)", () => {
+        it("negative: missing authorization returns 401", async () => {
+            const res = await makeRequest(`/api/documents/${crypto.randomUUID()}`, "PATCH", {
+                title: "New Title.pdf",
+            });
+            assertEquals(res.status, 401);
+        });
+
+        it("negative: disallowed characters (XSS payload) returns 400", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(
+                `/api/documents/${crypto.randomUUID()}`,
+                "PATCH",
+                { title: `<script>alert("x")</script>.pdf` },
+                headers,
+            );
+
+            if (!validToken) return;
+            assertEquals(res.status, 400);
+            const json = await res.json();
+            assertEquals(json.error.code, "VALIDATION_ERROR");
+        });
+
+        it("negative: empty title returns 400", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(
+                `/api/documents/${crypto.randomUUID()}`,
+                "PATCH",
+                { title: "   " },
+                headers,
+            );
+
+            if (!validToken) return;
+            assertEquals(res.status, 400);
+            const json = await res.json();
+            assertEquals(json.error.code, "VALIDATION_ERROR");
+        });
+
+        it("negative: non-existent document returns 404", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+            const res = await makeRequest(
+                `/api/documents/${crypto.randomUUID()}`,
+                "PATCH",
+                { title: "New Title.pdf" },
+                headers,
+            );
+
+            if (!validToken) return;
+            assertEquals(res.status, 404);
+            const json = await res.json();
+            assertEquals(json.error.code, "NOT_FOUND");
+        });
+
+        it("positive: renames a document and keeps the extension", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+
+            // Seed a pending document via the presigned-URL endpoint.
+            const createRes = await makeRequest(
+                "/api/documents/presigned-url",
+                "POST",
+                {
+                    filename: "financial_report_2026.pdf",
+                    mimeType: "application/pdf",
+                    sizeBytes: 1024,
+                },
+                headers,
+            );
+
+            if (!validToken) return;
+            assertEquals(createRes.status, 201);
+            const created = await createRes.json();
+            const documentId = created.documentId;
+
+            const res = await makeRequest(
+                `/api/documents/${documentId}`,
+                "PATCH",
+                { title: "Laporan Keuangan 2026.pdf" },
+                headers,
+            );
+
+            assertEquals(res.status, 200);
+            const json = await res.json();
+            assertEquals(json.success, true);
+            assertEquals(json.documentId, documentId);
+            assertEquals(json.title, "Laporan Keuangan 2026.pdf");
+            assertEquals(json.title.endsWith(".pdf"), true);
+        });
+
+        it("negative: changing the extension is rejected with 400", async () => {
+            const headers: Record<string, string> = validToken ? { Authorization: `Bearer ${validToken}` } : {};
+
+            const createRes = await makeRequest(
+                "/api/documents/presigned-url",
+                "POST",
+                {
+                    filename: "notes.txt",
+                    mimeType: "text/plain",
+                    sizeBytes: 1024,
+                },
+                headers,
+            );
+
+            if (!validToken) return;
+            assertEquals(createRes.status, 201);
+            const created = await createRes.json();
+            const documentId = created.documentId;
+
+            const res = await makeRequest(
+                `/api/documents/${documentId}`,
+                "PATCH",
+                { title: "notes.pdf" },
+                headers,
+            );
+
+            assertEquals(res.status, 400);
+            const json = await res.json();
+            assertEquals(json.error.code, "VALIDATION_ERROR");
+            assertEquals(json.error.message.includes(".txt"), true);
+        });
+    });
+
     describe("GET /api/documents", () => {
         it("negative: missing authorization returns 401", async () => {
             const res = await makeRequest("/api/documents", "GET");

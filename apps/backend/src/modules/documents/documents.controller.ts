@@ -88,6 +88,27 @@ export async function handleGetDocumentPreview(c: Context) {
     return c.json(result, 200);
 }
 
+export async function handleUpdateDocumentTitle(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, logContext } = extractor.extractAuthContext();
+    const { clientIp, userAgent } = extractor.extractAuditContext();
+
+    const body = extractor.extractValidJson<DocumentSchema.UpdateDocumentTitleBody>();
+
+    const params: DocumentSchema.UpdateDocumentTitleParams = {
+        tenantId,
+        documentId: c.req.param("id"),
+        title: body.title,
+        clientIp,
+        userAgent,
+        logContext,
+    };
+
+    const result = await DocumentsService.updateDocumentTitle(params);
+
+    return c.json(result, 200);
+}
+
 export async function handleBatchDeleteDocuments(c: Context) {
     const extractor = new ContextExtractor(c);
     const { tenantId, logContext } = extractor.extractAuthContext();

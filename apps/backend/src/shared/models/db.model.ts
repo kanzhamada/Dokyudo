@@ -529,6 +529,7 @@ export const activityActionEnum = pgEnum("activity_action_enum", [
     "document.processed",
     "document.failed",
     "document.quota_exhausted",
+    "document.renamed",
     // Search & RAG
     "search.performed",
     "chat.started",
