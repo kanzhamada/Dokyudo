@@ -9,6 +9,16 @@ export async function cryptoPuzzleMiddleware(c: Context, next: Next) {
         return await next();
     }
 
+    // Public share reads are exempt from the puzzle: the share page and its
+    // OpenGraph image are rendered server-side (Cloudflare Worker -> API) and
+    // by social crawlers, neither of which can solve the browser PoW.
+    const isPublicShareRead =
+        c.req.method === "GET" &&
+        /^\/api\/rag\/shares\/[^/]+$/.test(c.req.path);
+    if (isPublicShareRead) {
+        return await next();
+    }
+
     const token = c.req.header("X-Dokyudo-Puzzle");
     const userAgent = c.req.header("User-Agent");
 

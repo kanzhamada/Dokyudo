@@ -14,8 +14,9 @@ describe("CryptoPuzzle Middleware", () => {
     const validBrowserToken = "KKIIINNNNSYYJHOO2113ATXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
 
     beforeAll(() => {
-        // Enforce test environment so puzzle is strictly verified
-        Deno.env.set("NODE_ENV", "test");
+        // Enforce puzzle verification: the middleware skips its checks in
+        // dev/test environments, so run with production semantics.
+        Deno.env.set("NODE_ENV", "production");
 
         app = new Hono();
         
@@ -30,6 +31,8 @@ describe("CryptoPuzzle Middleware", () => {
         app.use("*", cryptoPuzzleMiddleware);
         
         app.get("/protected", (c) => c.json({ success: true }));
+        app.get("/api/rag/shares/abc123", (c) => c.json({ code: "abc123" }));
+        app.get("/api/rag/shares/abc123/continue", (c) => c.json({ success: true }));
     });
 
     afterAll(() => {
@@ -98,5 +101,22 @@ describe("CryptoPuzzle Middleware", () => {
         assertEquals(res2.status, 403);
         const json = await res2.json();
         assertEquals(json.error.includes("Replay Attack Detected"), true);
+    });
+
+    it("positive: allows public share read without puzzle header", async () => {
+        const req = new Request("http://localhost/api/rag/shares/abc123");
+        const res = await app.fetch(req);
+        
+        assertEquals(res.status, 200);
+        const json = await res.json();
+        assertEquals(json.code, "abc123");
+    });
+
+    it("negative: still requires puzzle for share mutations and invite reads", async () => {
+        const continueReq = new Request("http://localhost/api/rag/shares/abc123/continue", {
+            method: "POST"
+        });
+        const continueRes = await app.fetch(continueReq);
+        assertEquals(continueRes.status, 403);
     });
 });
