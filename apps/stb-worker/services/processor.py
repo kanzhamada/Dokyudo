@@ -13,6 +13,7 @@ from services.converter import convert_to_pdf
 from services.extractor import extract_text_from_pdf, chunk_text_with_pages, chunk_text_stream
 from services.docx_extractor import extract_text_from_docx
 from services.txt_extractor import extract_text_from_txt, TxtExtractionError
+from services.markdown_extractor import render_markdown_to_html, extract_text_from_markdown_html
 from services.pager import assign_pages_to_chunks
 from services.embedding import generate_embedding_with_retry, TransientAPIError
 from services.llm import generate_llm_description
@@ -162,7 +163,7 @@ def process_document(tenant_id: str, document_id: str):
     ext = os.path.splitext(storage_path)[1].lower()
     log_event("processor.step0_resolved", "Resolved document storage path.", document_id=document_id, tenant_id=tenant_id, storage_path=storage_path)
 
-    if ext not in (".pdf", ".docx", ".doc", ".txt"):
+    if ext not in (".pdf", ".docx", ".doc", ".txt", ".md"):
         log_event("processor.unsupported_type", "Unsupported document extension.", level="ERROR", document_id=document_id, tenant_id=tenant_id, storage_path=storage_path, extension=ext)
         mark_document_failed(document_id)
         return
@@ -171,18 +172,26 @@ def process_document(tenant_id: str, document_id: str):
     temp_input.close()
     temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", dir=settings.WORKER_TMP_DIR)
     temp_pdf.close()
+    temp_html = tempfile.NamedTemporaryFile(delete=False, suffix=".html", dir=settings.WORKER_TMP_DIR)
+    temp_html.close()
 
     try:
         log_event("processor.step1_downloading", "Downloading document from MinIO...", document_id=document_id, tenant_id=tenant_id)
         download_document(tenant_id, storage_path, temp_input.name)
 
-        if ext in (".docx", ".txt"):
+        if ext in (".docx", ".txt", ".md"):
             if ingestion_queue.is_cancelled(document_id):
                 log_event("processor.job_cancelled", "Cancellation detected before conversion.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
                 return
 
             log_event("processor.step1_5_converting", "Converting document to PDF.", document_id=document_id, tenant_id=tenant_id, extension=ext)
-            convert_to_pdf(temp_input.name, temp_pdf.name)
+            if ext == ".md":
+                # LibreOffice opens .md as plain text, so render to HTML first
+                # — the same HTML also feeds chunk text extraction.
+                render_markdown_to_html(temp_input.name, temp_html.name)
+                convert_to_pdf(temp_html.name, temp_pdf.name)
+            else:
+                convert_to_pdf(temp_input.name, temp_pdf.name)
 
             if ingestion_queue.is_cancelled(document_id):
                 log_event("processor.job_cancelled", "Cancellation detected after conversion.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
@@ -191,15 +200,18 @@ def process_document(tenant_id: str, document_id: str):
             log_event("processor.step1_5_uploading_pdf", "Uploading converted PDF to MinIO.", document_id=document_id, tenant_id=tenant_id)
             upload_document(temp_pdf.name, tenant_id, f"{document_id}.pdf")
 
-            # DOCX/TXT: extract text from the source file itself (OMML becomes
-            # LaTeX, txt goes through encoding detection) and align chunks to
-            # the converted PDF for page jumps.
+            # DOCX/TXT/MD: extract text from the source (OMML -> LaTeX for
+            # docx, encoding detection for txt, tag-stripped HTML for md) and
+            # align chunks to the converted PDF for page jumps.
             if ext == ".docx":
                 blocks = extract_text_from_docx(temp_input.name)
                 log_event("processor.step2_docx_extracted", "DOCX text extracted and chunked.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(blocks))
-            else:
+            elif ext == ".txt":
                 blocks = extract_text_from_txt(temp_input.name)
                 log_event("processor.step2_txt_extracted", "TXT text extracted.", document_id=document_id, tenant_id=tenant_id, total_blocks=len(blocks))
+            else:
+                blocks = extract_text_from_markdown_html(temp_html.name)
+                log_event("processor.step2_md_extracted", "Markdown text extracted.", document_id=document_id, tenant_id=tenant_id, total_blocks=len(blocks))
             chunks = chunk_text_stream(blocks, chunk_size=1000, overlap=150)
             chunks = assign_pages_to_chunks(chunks, temp_pdf.name)
             log_event("processor.step3_pages_aligned", "Chunks aligned to PDF pages.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(chunks))
@@ -278,6 +290,6 @@ def process_document(tenant_id: str, document_id: str):
             log_event("processor.vectorizing_failed", "Failed to process document vectors.", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e), traceback=tb_str)
             mark_document_failed_vectorizing(document_id, str(e))
     finally:
-        for tmp_path in (temp_input.name, temp_pdf.name):
+        for tmp_path in (temp_input.name, temp_pdf.name, temp_html.name):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
