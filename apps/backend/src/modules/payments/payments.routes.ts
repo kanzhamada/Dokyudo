@@ -80,7 +80,58 @@ paymentsRoutes.openapi(
     paymentsController.handleWebhook,
 );
 
-// 3. POST /portal (Protected by Auth)
+// 3. POST /checkout/verify (Protected by Auth)
+paymentsRoutes.openapi(
+    createRoute({
+        method: "post",
+        path: "/checkout/verify",
+        tags: ["Payments"],
+        summary: "Verify a Stripe Checkout session",
+        description:
+            "Verifies that a Stripe Checkout session belongs to the authenticated tenant " +
+            "and returns its payment status. Used by the billing success page; never grants " +
+            "access on its own (tier provisioning stays in the signature-verified webhook).",
+        request: {
+            body: {
+                content: {
+                    "application/json": {
+                        schema: PaymentsSchema.VerifyCheckoutSessionBodySchema,
+                    },
+                },
+                required: true,
+            },
+        },
+        responses: {
+            200: {
+                description: "Session verified and owned by the tenant",
+                content: {
+                    "application/json": {
+                        schema: PaymentsSchema.VerifyCheckoutSessionResponseSchema,
+                    },
+                },
+            },
+            400: {
+                description: "Validation error",
+                content: { "application/json": { schema: ErrorResponseSchema } },
+            },
+            401: {
+                description: "Unauthorized",
+                content: { "application/json": { schema: ErrorResponseSchema } },
+            },
+            404: {
+                description: "Session not found or belongs to another tenant",
+                content: { "application/json": { schema: ErrorResponseSchema } },
+            },
+            502: {
+                description: "Payment Gateway Error",
+                content: { "application/json": { schema: ErrorResponseSchema } },
+            },
+        },
+    }),
+    paymentsController.handleVerifyCheckoutSession as any,
+);
+
+// 4. POST /portal (Protected by Auth)
 paymentsRoutes.openapi(
     createRoute({
         method: "post",

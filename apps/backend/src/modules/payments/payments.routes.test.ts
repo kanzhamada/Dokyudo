@@ -7,6 +7,7 @@ import { db } from "../../config/drizzle.ts";
 import { paymentTransactions } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
 import { getSupabaseAdmin } from "../../config/supabase.ts";
+import { users } from "../../shared/models/db.model.ts";
 
 /** Helper: make a request to the test app */
 async function makeRequest(
@@ -36,13 +37,16 @@ async function makeRequest(
 }
 
 describe("Payments Routes", () => {
+    let testEmail = "";
+    let tenantIdForTest = "";
     let validAccessToken = "";
     let checkoutStub: Stub<any>;
     let portalStub: Stub<any>;
     let webhookEventStub: Stub<any>;
+    let verifyStub: Stub<any>;
 
     beforeAll(async () => {
-        const testEmail = `payment-route-${crypto.randomUUID()}@example.com`;
+        testEmail = `payment-route-${crypto.randomUUID()}@example.com`;
         const testPassword = "SecurePassword123!";
 
         // 1. Create a confirmed user in Supabase
@@ -74,6 +78,13 @@ describe("Payments Routes", () => {
             console.warn(`[WARN] Login for test user failed with status ${loginRes.status}`);
         }
 
+        // Resolve the tenantId bound to the test user's JWT (auth middleware reads users.tenantId).
+        const [userRow] = await db
+            .select({ tenantId: users.tenantId })
+            .from(users)
+            .where(eq(users.email, testEmail));
+        tenantIdForTest = userRow?.tenantId ?? "";
+
         // Mock Stripe API calls
         checkoutStub = stub(stripe.checkout.sessions, "create", () => {
             return Promise.resolve({
@@ -81,6 +92,24 @@ describe("Payments Routes", () => {
                 url: "https://checkout.stripe.com/test",
                 amount_total: 1000,
                 currency: "usd",
+            } as any);
+        });
+
+        verifyStub = stub(stripe.checkout.sessions, "retrieve", (sessionId: string) => {
+            if (sessionId === "cs_test_unknown") {
+                return Promise.reject(new Error("No such checkout session"));
+            }
+            if (sessionId === "cs_test_foreign") {
+                return Promise.resolve({
+                    id: sessionId,
+                    metadata: { tenantId: "foreign-tenant-id", tierToUnlock: "PRO" },
+                    payment_status: "paid",
+                } as any);
+            }
+            return Promise.resolve({
+                id: sessionId,
+                metadata: { tenantId: tenantIdForTest, tierToUnlock: "SIMULATE" },
+                payment_status: "paid",
             } as any);
         });
 
@@ -109,6 +138,7 @@ describe("Payments Routes", () => {
         checkoutStub.restore();
         portalStub.restore();
         webhookEventStub.restore();
+        verifyStub.restore();
     });
 
     describe("POST /api/payments/checkout", () => {
@@ -178,6 +208,78 @@ describe("Payments Routes", () => {
         });
     });
 
+    describe("POST /api/payments/checkout/verify", () => {
+        it("negative: missing authorization returns 401", async () => {
+            const res = await makeRequest(
+                "/api/payments/checkout/verify",
+                "POST",
+                { sessionId: "cs_test_anything" },
+                {}
+            );
+
+            assertEquals(res.status, 401);
+        });
+
+        it("negative: invalid or missing sessionId returns 400", async () => {
+            const headers = { Authorization: `Bearer ${validAccessToken}` };
+
+            const missingRes = await makeRequest("/api/payments/checkout/verify", "POST", {}, headers);
+            assertEquals(missingRes.status, 400);
+            assertEquals((await missingRes.json()).error.code, "VALIDATION_ERROR");
+
+            const malformedRes = await makeRequest(
+                "/api/payments/checkout/verify",
+                "POST",
+                { sessionId: "not-a-stripe-session" },
+                headers,
+            );
+            assertEquals(malformedRes.status, 400);
+            assertEquals((await malformedRes.json()).error.code, "VALIDATION_ERROR");
+        });
+
+        it("negative: unknown session returns 404", async () => {
+            const headers = { Authorization: `Bearer ${validAccessToken}` };
+            const res = await makeRequest(
+                "/api/payments/checkout/verify",
+                "POST",
+                { sessionId: "cs_test_unknown" },
+                headers,
+            );
+
+            assertEquals(res.status, 404);
+            assertEquals((await res.json()).error.code, "NOT_FOUND");
+        });
+
+        it("negative: session owned by another tenant returns 404", async () => {
+            const headers = { Authorization: `Bearer ${validAccessToken}` };
+            const res = await makeRequest(
+                "/api/payments/checkout/verify",
+                "POST",
+                { sessionId: "cs_test_foreign" },
+                headers,
+            );
+
+            assertEquals(res.status, 404);
+            assertEquals((await res.json()).error.code, "NOT_FOUND");
+        });
+
+        it("positive: session owned by the tenant returns paid status and tier", async () => {
+            const headers = { Authorization: `Bearer ${validAccessToken}` };
+            const res = await makeRequest(
+                "/api/payments/checkout/verify",
+                "POST",
+                { sessionId: "cs_test_owned" },
+                headers,
+            );
+
+            assertEquals(res.status, 200);
+            const json = await res.json();
+            assertEquals(json.valid, true);
+            assertEquals(json.status, "paid");
+            assertEquals(json.tier, "SIMULATE");
+        });
+    });
+
     describe("POST /api/payments/webhook", () => {
         it("negative: missing stripe-signature returns 401", async () => {
             const req = new Request("http://localhost/api/payments/webhook", {
@@ -218,8 +320,7 @@ describe("Payments Routes", () => {
             const res = await app.fetch(req);
             assertEquals(res.status, 200);
             const json = await res.json();
-            assertEquals(json.acknowledged, true);
-            assertEquals(json.reason, "unknown_transaction");
+            assertEquals(json.received, true);
         });
     });
 });

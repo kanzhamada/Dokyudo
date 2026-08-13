@@ -3,7 +3,8 @@ import type { ApiResult } from '../types/api.types';
 import type {
 	BillingPortalResponse,
 	CheckoutResponse,
-	CreateCheckoutRequest
+	CreateCheckoutRequest,
+	VerifyCheckoutSessionResponse
 } from '../types/payments.types';
 
 export function createBillingPortalSession(): Promise<ApiResult<BillingPortalResponse>> {
@@ -16,5 +17,14 @@ export function createCheckoutSession(
 	return apiRequest<CheckoutResponse>('/api/payments/checkout', {
 		method: 'POST',
 		body: params
+	});
+}
+
+export function verifyCheckoutSession(
+	sessionId: string
+): Promise<ApiResult<VerifyCheckoutSessionResponse>> {
+	return apiRequest<VerifyCheckoutSessionResponse>('/api/payments/checkout/verify', {
+		method: 'POST',
+		body: { sessionId }
 	});
 }

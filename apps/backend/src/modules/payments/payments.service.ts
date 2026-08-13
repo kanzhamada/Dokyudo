@@ -7,7 +7,7 @@ import {
 import { logActivity } from "../../shared/utils/activity.util.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { stripe } from "../../config/stripe.ts";
-import { CreateCheckoutBody } from "./payments.schema.ts";
+import { CreateCheckoutBody, VerifyCheckoutSessionParams, VerifyCheckoutSessionResponse } from "./payments.schema.ts";
 import { eq, and, gte } from "drizzle-orm";
 import type Stripe from "npm:stripe@^15.5.0";
 import { getEnv } from "../../config/env.ts";
@@ -124,7 +124,7 @@ export class PaymentsService {
                 ],
                 // We do not pass payment_method_types per stripe-best-practices
                 success_url:
-                    `${getEnv("FRONTEND_URL")}/dashboard/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+                    `${getEnv("FRONTEND_URL")}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${getEnv("FRONTEND_URL")}/dashboard/billing/cancel`,
             });
         } catch (error: any) {
@@ -415,5 +415,66 @@ export class PaymentsService {
                 message: "Failed to communicate with Stripe Billing Portal",
             });
         }
+    }
+
+    /**
+     * Verifies a Stripe Checkout session for the authenticated tenant, used by
+     * the /app/billing/success page.
+     *
+     * Security contract:
+     * - The session_id in the URL is attacker-controlled, so it is never
+     *   trusted as-is. It is retrieved from Stripe with the secret key.
+     * - The session must belong to the authenticated tenant: session metadata
+     *   `tenantId` must match the tenant bound to the access token (falls back
+     *   to the paymentTransactions row for resilience).
+     * - Failures return a generic 404 and never reveal whether a session
+     *   belongs to another tenant.
+     * - This endpoint only informs UI state. Tier provisioning remains the
+     *   sole job of the signature-verified Stripe webhook.
+     */
+    static async verifyCheckoutSession(
+        params: VerifyCheckoutSessionParams,
+    ): Promise<VerifyCheckoutSessionResponse> {
+        let session: Stripe.Checkout.Session;
+        try {
+            session = await stripe.checkout.sessions.retrieve(params.sessionId);
+        } catch (err: any) {
+            if (params.logContext) params.logContext.stripeVerifyError = err.message;
+            throw new AppError({
+                code: "NOT_FOUND",
+                status: 404,
+                message: "Unable to verify payment session",
+            });
+        }
+
+        // Binding: the session must belong to the authenticated tenant.
+        const metadataTenantId = session.metadata?.tenantId;
+        let belongsToTenant =
+            typeof metadataTenantId === "string" && metadataTenantId === params.tenantId;
+
+        if (!belongsToTenant) {
+            // Fallback for sessions created without metadata (e.g. old fixtures):
+            // bind through the stored transaction row instead.
+            const [trx] = await db
+                .select({ tenantId: paymentTransactions.tenantId })
+                .from(paymentTransactions)
+                .where(eq(paymentTransactions.stripeSessionId, params.sessionId));
+
+            belongsToTenant = trx?.tenantId === params.tenantId;
+        }
+
+        if (!belongsToTenant) {
+            throw new AppError({
+                code: "NOT_FOUND",
+                status: 404,
+                message: "Unable to verify payment session",
+            });
+        }
+
+        return {
+            valid: true,
+            status: session.payment_status ?? "unpaid",
+            tier: session.metadata?.tierToUnlock ?? null,
+        };
     }
 }

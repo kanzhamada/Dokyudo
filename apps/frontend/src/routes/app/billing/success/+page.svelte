@@ -5,24 +5,31 @@
 	import { Check, CreditCard, LoaderCircle, ArrowRight, AlertCircle } from 'lucide-svelte';
 	import { getMeUsage } from '$lib/api/me';
 	import type { UserUsageResponse } from '$lib/types/auth.types';
-	import { TIER_PLANS } from '$lib/constants/tiers.constant';
+	import { verifyCheckoutSession } from '$lib/api/payments';
+	import { TIER_PLANS, type TierType } from '$lib/constants/tiers.constant';
 
-	type PaymentState = 'confirming' | 'success' | 'error';
+	type PaymentState = 'confirming' | 'success' | 'syncing' | 'error';
 
 	let paymentState = $state<PaymentState>('confirming');
 	let usage = $state<UserUsageResponse | null>(null);
+	let verifiedTier = $state<TierType | null>(null);
 	let errorMessage = $state('');
 	let redirectIn = $state(5);
 	let sessionId = $state('');
 	let redirectTimer: number | null = null;
 	let confettiCleanupTimer: number | null = null;
 
-	const planName = $derived(usage ? TIER_PLANS[usage.tier].name : TIER_PLANS.SIMULATE.name);
-	const hasActivatedTier = $derived(usage?.tier !== undefined && usage.tier !== 'FREE');
-
-	function wait(ms: number) {
-		return new Promise((resolve) => window.setTimeout(resolve, ms));
-	}
+	const planName = $derived(
+		usage
+			? TIER_PLANS[usage.tier].name
+			: verifiedTier
+				? TIER_PLANS[verifiedTier].name
+				: TIER_PLANS.SIMULATE.name
+	);
+	const hasActivatedTier = $derived(
+		(usage?.tier !== undefined && usage.tier !== 'FREE') ||
+			(verifiedTier !== null && verifiedTier !== 'FREE')
+	);
 
 	function startRedirectCountdown() {
 		redirectTimer = window.setInterval(() => {
@@ -43,23 +50,32 @@
 			return;
 		}
 
-		// Stripe webhooks can arrive just after the browser redirect. Poll briefly so
-		// the Billing dialog receives the updated tier instead of stale usage.
-		for (let attempt = 0; attempt < 5; attempt += 1) {
-			if (attempt > 0) await wait(1500);
-			const result = await getMeUsage();
-			if (result.ok) {
-				usage = result.data;
-				if (result.data.tier !== 'FREE' || attempt === 4) break;
-			} else if (attempt === 4) {
-				paymentState = 'error';
-				errorMessage = result.error.message || 'Unable to confirm the payment status.';
-				return;
-			}
+		// The session_id in the URL is attacker-controlled. Verify it server-side:
+		// Stripe retrieves the session and checks it belongs to the authenticated
+		// tenant. Only a verified, paid session reaches the success state.
+		const result = await verifyCheckoutSession(sessionId);
+		if (!result.ok) {
+			paymentState = 'error';
+			errorMessage = result.error?.message || 'Unable to confirm the payment status.';
+			return;
 		}
 
-		paymentState = 'success';
-		launchConfetti();
+		verifiedTier = (result.data.tier as TierType | null) ?? null;
+
+		// Paid or no payment required: session confirmed. Best-effort usage fetch
+		// only to show the freshest plan name; it never gates the success state.
+		if (result.data.status === 'paid' || result.data.status === 'no_payment_required') {
+			const usageResult = await getMeUsage();
+			if (usageResult.ok) usage = usageResult.data;
+
+			paymentState = 'success';
+			launchConfetti();
+			startRedirectCountdown();
+			return;
+		}
+
+		// Valid session but payment still processing (e.g. async method).
+		paymentState = 'syncing';
 		startRedirectCountdown();
 	}
 
@@ -219,6 +235,26 @@
 						<ArrowRight class="size-4" strokeWidth={1.8} />
 					</button>
 				</div>
+			{:else if paymentState === 'syncing'}
+				<div class="billing-status-icon billing-status-icon--pending">
+					<LoaderCircle class="size-6 animate-spin" strokeWidth={1.7} />
+				</div>
+				<p class="billing-kicker">Payment status</p>
+				<h1 class="billing-heading">Payment received</h1>
+				<p class="billing-copy">
+					Your payment was received. Subscription activation is still syncing and will appear in
+					Billing shortly.
+				</p>
+				<div class="billing-plan-summary">
+					<div>
+						<span>Plan purchased</span>
+						<strong>{hasActivatedTier ? planName : 'Sandbox & Evaluation'}</strong>
+					</div>
+					<div>
+						<span>Next step</span>
+						<strong>Billing opens in {redirectIn}s</strong>
+					</div>
+				</div>
 			{:else}
 				<div class="billing-status-icon billing-status-icon--error">
 					<AlertCircle class="size-7" strokeWidth={1.7} />
@@ -243,10 +279,11 @@
 
 <style>
 	.billing-page {
-		min-height: 100dvh;
-		background: #1f1e1d;
+		height: 100%;
+		width: 100%;
+		overflow-y: auto;
 		color: #f4f1ed;
-		padding: 2.5rem 1rem 4rem;
+		padding: 2.5rem 1.5rem 4rem;
 	}
 	.billing-shell {
 		width: min(100%, 760px);

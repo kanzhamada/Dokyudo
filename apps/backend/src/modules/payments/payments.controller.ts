@@ -78,3 +78,18 @@ export async function handlePortal(c: Context) {
 
     return c.json(result, 201);
 }
+
+export async function handleVerifyCheckoutSession(c: Context) {
+    const extractor = new ContextExtractor(c);
+    const { tenantId, logContext } = extractor.extractAuthContext();
+
+    const body = extractor.extractValidJson<PaymentsSchema.VerifyCheckoutSessionBody>();
+
+    const result = await PaymentsService.verifyCheckoutSession({
+        sessionId: body.sessionId,
+        tenantId,
+        logContext,
+    });
+
+    return c.json(result, 200);
+}

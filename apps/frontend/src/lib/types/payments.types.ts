@@ -14,3 +14,10 @@ export interface CheckoutResponse {
 	sessionId: string;
 	externalId: string;
 }
+
+/** Result of verifying a Stripe Checkout session on the success page */
+export interface VerifyCheckoutSessionResponse {
+	valid: boolean;
+	status: string;
+	tier: string | null;
+}
