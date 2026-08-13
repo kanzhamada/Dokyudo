@@ -82,6 +82,19 @@ async function markDocumentFailed(params: {
     }
 }
 
+/**
+ * The object key of the PDF used for viewing. Non-PDF documents (e.g. .docx)
+ * are converted to PDF by the STB worker, which stores the result as
+ * "{tenantId}/{docId}.pdf" next to the original file.
+ */
+function getPreviewPdfObjectKey(tenantId: string, doc: { id: string; storagePath: string }): string {
+    const ext = doc.storagePath.split(".").pop()?.toLowerCase();
+    if (ext === "pdf") {
+        return `${tenantId}/${doc.storagePath}`;
+    }
+    return `${tenantId}/${doc.id}.pdf`;
+}
+
 export class DocumentsService {
     /**
      * Generates presigned URLs for a batch of files and creates pending document records.
@@ -413,6 +426,16 @@ export class DocumentsService {
             // Proceed even if file doesn't exist in S3 to ensure cleanup
         }
 
+        // 2b. Also delete the converted PDF if the original is not a PDF
+        const convertedKey = getPreviewPdfObjectKey(params.tenantId, doc);
+        if (convertedKey !== objectKey) {
+            try {
+                await deleteObject(bucketName, convertedKey);
+            } catch (err: any) {
+                if (params.logContext) params.logContext.s3ConvertedDeleteError = "Failed to delete converted PDF from S3: " + err.message;
+            }
+        }
+
         // 3. Delete document from Postgres (Cascades to chunks in Postgres)
         let docName = "Unknown Document";
         try {
@@ -540,9 +563,14 @@ export class DocumentsService {
 
         // 2. Delete the softfiles from MinIO / S3 concurrently
         const bucketName = getEnv("S3_BUCKET_NAME");
-        await Promise.allSettled(docsToDelete.map(doc => {
+        await Promise.allSettled(docsToDelete.flatMap(doc => {
             const objectKey = `${params.tenantId}/${doc.storagePath}`;
-            return deleteObject(bucketName, objectKey);
+            const convertedKey = getPreviewPdfObjectKey(params.tenantId, doc);
+            const keys = [objectKey];
+            if (convertedKey !== objectKey) {
+                keys.push(convertedKey);
+            }
+            return keys.map(key => deleteObject(bucketName, key));
         }));
 
         // 3. Delete documents from Postgres and refund quota & storage
@@ -673,7 +701,10 @@ export class DocumentsService {
         }
 
         const bucketName = getEnv("S3_BUCKET_NAME");
-        const objectKey = `${params.tenantId}/${doc.storagePath}`;
+        const originalObjectKey = `${params.tenantId}/${doc.storagePath}`;
+        const objectKey = params.download
+            ? originalObjectKey
+            : getPreviewPdfObjectKey(params.tenantId, doc);
 
         let url: string | null = null;
         try {

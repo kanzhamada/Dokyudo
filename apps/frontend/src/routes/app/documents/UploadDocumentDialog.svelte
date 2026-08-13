@@ -26,7 +26,10 @@
 		name: string;
 		sizeBytes: number;
 		sizeFormatted: string;
-		mimeType: 'application/pdf' | 'text/plain';
+		mimeType:
+			| 'application/pdf'
+			| 'text/plain'
+			| 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 		status: 'staged' | 'requesting' | 'uploading' | 'confirming' | 'success' | 'failed';
 		progress: number;
 		errorMessage: string | null;
@@ -65,9 +68,12 @@
 		return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 	}
 
-	function getMimeType(filename: string): 'application/pdf' | 'text/plain' {
+	function getMimeType(
+		filename: string
+	): 'application/pdf' | 'text/plain' | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' {
 		const ext = filename.split('.').pop()?.toLowerCase();
 		if (ext === 'txt') return 'text/plain';
+		if (ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 		return 'application/pdf';
 	}
 
@@ -77,8 +83,8 @@
 
 		for (const file of Array.from(files)) {
 			const ext = file.name.split('.').pop()?.toLowerCase();
-			if (ext !== 'pdf' && ext !== 'txt') {
-				invalidFiles.push(`${file.name} (only .pdf and .txt allowed)`);
+			if (ext !== 'pdf' && ext !== 'txt' && ext !== 'docx') {
+				invalidFiles.push(`${file.name} (only .pdf, .txt and .docx allowed)`);
 				continue;
 			}
 
@@ -336,7 +342,7 @@
 <input
 	type="file"
 	bind:this={fileInputEl}
-	accept=".pdf,.txt"
+	accept=".pdf,.txt,.docx"
 	multiple
 	class="hidden"
 	onchange={(e) => e.currentTarget.files && handleFilesSelected(e.currentTarget.files)}

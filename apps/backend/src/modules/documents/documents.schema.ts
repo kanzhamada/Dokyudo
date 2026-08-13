@@ -4,12 +4,16 @@ import { MAX_DOCUMENT_SIZE_BYTES } from "../../shared/constants/documents.consta
 export const FileRequestSchema = z.object({
     filename: z.string().min(1).refine((name) => {
         const ext = name.split('.').pop()?.toLowerCase();
-        return ext === "pdf" || ext === "txt";
-    }, { message: "Unsupported file extension. Only .pdf and .txt files are allowed." }).openapi({
+        return ext === "pdf" || ext === "txt" || ext === "docx";
+    }, { message: "Unsupported file extension. Only .pdf, .txt and .docx files are allowed." }).openapi({
         example: "financial_report_2023.pdf",
     }),
-    mimeType: z.enum(["application/pdf", "text/plain"] as const, {
-        message: "Unsupported MIME type. Only application/pdf and text/plain are allowed."
+    mimeType: z.enum([
+        "application/pdf",
+        "text/plain",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ] as const, {
+        message: "Unsupported MIME type. Only application/pdf, text/plain and Word documents are allowed."
     }).openapi({
         example: "application/pdf",
     }),

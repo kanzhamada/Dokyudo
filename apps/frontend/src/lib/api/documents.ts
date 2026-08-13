@@ -35,9 +35,16 @@ export type UploadAttachmentsResult =
 	| { ok: true; attachments: ChatAttachment[] }
 	| { ok: false; error: string };
 
-function mimeTypeFor(filename: string): 'application/pdf' | 'text/plain' {
+function mimeTypeFor(
+	filename: string
+):
+	| 'application/pdf'
+	| 'text/plain'
+	| 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' {
 	const ext = filename.split('.').pop()?.toLowerCase();
-	return ext === 'txt' ? 'text/plain' : 'application/pdf';
+	if (ext === 'txt') return 'text/plain';
+	if (ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+	return 'application/pdf';
 }
 
 /**

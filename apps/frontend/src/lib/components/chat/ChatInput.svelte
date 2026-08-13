@@ -231,10 +231,10 @@
 			for (let i = 0; i < target.files.length; i++) {
 				const file = target.files[i];
 
-				const allowedExtensions = ['.pdf', '.txt'];
+				const allowedExtensions = ['.pdf', '.txt', '.docx'];
 				const lowerName = file.name.toLowerCase();
 				if (!allowedExtensions.some((ext) => lowerName.endsWith(ext))) {
-					showError(`File "${file.name}" has an invalid extension. Only PDF and TXT are allowed.`);
+					showError(`File "${file.name}" has an invalid extension. Only PDF, TXT and DOCX are allowed.`);
 					continue;
 				}
 
@@ -566,7 +566,7 @@
 				type="file"
 				bind:ref={fileInput}
 				id="file-upload"
-				accept=".pdf,.txt"
+				accept=".pdf,.txt,.docx"
 				class="hidden"
 				multiple
 				onchange={handleFileChange}
