@@ -119,6 +119,51 @@ describe("DocumentsService Isolated Tests", () => {
             assertEquals(docs[0].status, "pending");
             assertEquals(docs[0].title, "test.pdf");
         });
+
+        it("positive: renames duplicate titles with a (n) suffix", async () => {
+            // Seed an existing document that shares the title being uploaded
+            const existingId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: existingId,
+                tenantId: TEST_TENANT_ID,
+                title: "dup.pdf",
+                storagePath: `${existingId}.pdf`,
+                sizeBytes: 100,
+                description: "",
+                status: "processed",
+            });
+
+            await db.update(tenantSubscriptions)
+                .set({ uploadsCount: 0 })
+                .where(eq(tenantSubscriptions.tenantId, TEST_TENANT_ID));
+
+            try {
+                const res = await DocumentsService.createPresignedUrlBatch({
+                    tenantId: TEST_TENANT_ID,
+                    files: [
+                        { filename: "dup.pdf", mimeType: "application/pdf", sizeBytes: 1024 },
+                        { filename: "dup.pdf", mimeType: "application/pdf", sizeBytes: 1024 },
+                        { filename: "laporan.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", sizeBytes: 1024 },
+                    ],
+                });
+
+                const titles = res.results.map((r) => r.filename);
+                assertEquals(titles[0], "dup (1).pdf");
+                assertEquals(titles[1], "dup (2).pdf");
+                assertEquals(titles[2], "laporan.docx");
+
+                const rows = await db.select().from(documents).where(
+                    eq(documents.tenantId, TEST_TENANT_ID)
+                );
+                const dbTitles = rows
+                    .filter((r) => res.results.some((x) => x.documentId === r.id))
+                    .map((r) => r.title)
+                    .sort();
+                assertEquals(dbTitles, ["dup (1).pdf", "dup (2).pdf", "laporan.docx"]);
+            } finally {
+                await db.delete(documents).where(eq(documents.id, existingId));
+            }
+        });
     });
 
     describe("confirmUpload", () => {

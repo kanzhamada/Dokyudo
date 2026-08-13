@@ -95,6 +95,29 @@ function getPreviewPdfObjectKey(tenantId: string, doc: { id: string; storagePath
     return `${tenantId}/${doc.id}.pdf`;
 }
 
+/**
+ * Resolves a document title that does not collide with an existing one.
+ * If the title already exists (case-insensitive), a " (n)" suffix is appended
+ * before the extension, e.g. "Laporan.pdf" -> "Laporan (1).pdf" -> "Laporan (2).pdf".
+ * The chosen title is added to `existingTitles` so duplicates within one batch
+ * are also disambiguated.
+ */
+function resolveUniqueTitle(filename: string, existingTitles: Set<string>): string {
+    if (!existingTitles.has(filename.toLowerCase())) {
+        return filename;
+    }
+    const lastDot = filename.lastIndexOf(".");
+    const base = lastDot > 0 ? filename.slice(0, lastDot) : filename;
+    const ext = lastDot > 0 ? filename.slice(lastDot) : "";
+    let n = 1;
+    let candidate = `${base} (${n})${ext}`;
+    while (existingTitles.has(candidate.toLowerCase())) {
+        n += 1;
+        candidate = `${base} (${n})${ext}`;
+    }
+    return candidate;
+}
+
 export class DocumentsService {
     /**
      * Generates presigned URLs for a batch of files and creates pending document records.
@@ -120,16 +143,33 @@ export class DocumentsService {
 
         const bucketName = getEnv("S3_BUCKET_NAME");
         const results: DocumentSchema.PresignedUrlResponseItem[] = [];
-        
+
+        // Load the tenant's existing titles so duplicate uploads get a
+        // " (n)" suffix instead of sharing a title (case-insensitive).
+        let existingTitles = new Set<string>();
+        try {
+            await withAuthDb(params.tenantId, async (tx) => {
+                const rows = await tx
+                    .select({ title: documents.title })
+                    .from(documents)
+                    .where(eq(documents.tenantId, params.tenantId));
+                existingTitles = new Set(rows.map((r) => r.title.toLowerCase()));
+            });
+        } catch (err: any) {
+            if (params.logContext) params.logContext.titleLookupError = "Failed to fetch existing titles: " + err.message;
+        }
+
         // Generate UUIDs and keys first
         const docsToInsert = params.files.map(file => {
             const docId = crypto.randomUUID();
             const ext = file.filename.includes(".") ? file.filename.split(".").pop() : "bin";
             const objectKey = `${params.tenantId}/${docId}.${ext}`;
+            const title = resolveUniqueTitle(file.filename, existingTitles);
+            existingTitles.add(title.toLowerCase());
             return {
                 id: docId,
                 tenantId: params.tenantId,
-                title: file.filename,
+                title: title,
                 sizeBytes: file.sizeBytes,
                 status: "pending" as const,
                 storagePath: `${docId}.${ext}`,

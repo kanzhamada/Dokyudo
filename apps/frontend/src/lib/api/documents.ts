@@ -121,7 +121,9 @@ export async function uploadFilesAsDocuments(files: File[]): Promise<UploadAttac
 
 			attachments.push({
 				documentId: result.documentId,
-				name: file.name,
+				// Backend may rename duplicates ("Laporan (1).pdf") — use the
+				// stored title so mentions match the document list.
+				name: result.filename || file.name,
 				size: file.size
 			});
 		}

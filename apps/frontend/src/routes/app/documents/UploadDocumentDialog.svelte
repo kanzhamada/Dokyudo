@@ -174,6 +174,9 @@
 			if (!item) return;
 
 			item.documentId = result.documentId;
+			// Backend may have renamed duplicates ("Laporan (1).pdf") — reflect
+			// the stored title so the staged list matches the document list.
+			if (result.filename) item.name = result.filename;
 			uploadSingleFileToS3(item, result.url);
 		});
 	}
