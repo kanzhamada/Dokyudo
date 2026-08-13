@@ -29,7 +29,8 @@
 		mimeType:
 			| 'application/pdf'
 			| 'text/plain'
-			| 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+			| 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+			| 'text/markdown';
 		status: 'staged' | 'requesting' | 'uploading' | 'confirming' | 'success' | 'failed';
 		progress: number;
 		errorMessage: string | null;
@@ -70,10 +71,15 @@
 
 	function getMimeType(
 		filename: string
-	): 'application/pdf' | 'text/plain' | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' {
+	):
+		| 'application/pdf'
+		| 'text/plain'
+		| 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+		| 'text/markdown' {
 		const ext = filename.split('.').pop()?.toLowerCase();
 		if (ext === 'txt') return 'text/plain';
 		if (ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+		if (ext === 'md') return 'text/markdown';
 		return 'application/pdf';
 	}
 
@@ -83,8 +89,8 @@
 
 		for (const file of Array.from(files)) {
 			const ext = file.name.split('.').pop()?.toLowerCase();
-			if (ext !== 'pdf' && ext !== 'txt' && ext !== 'docx') {
-				invalidFiles.push(`${file.name} (only .pdf, .txt and .docx allowed)`);
+			if (ext !== 'pdf' && ext !== 'txt' && ext !== 'docx' && ext !== 'md') {
+				invalidFiles.push(`${file.name} (only .pdf, .txt, .docx and .md allowed)`);
 				continue;
 			}
 
@@ -345,7 +351,7 @@
 <input
 	type="file"
 	bind:this={fileInputEl}
-	accept=".pdf,.txt,.docx"
+	accept=".pdf,.txt,.docx,.md"
 	multiple
 	class="hidden"
 	onchange={(e) => e.currentTarget.files && handleFilesSelected(e.currentTarget.files)}
@@ -362,7 +368,7 @@
 					Upload Documents
 				</Dialog.Title>
 				<Dialog.Description class="text-sm font-normal text-[#767676] md:text-base">
-					Add important project documents. Supported types: PDF, TXT. (keep files under 25MB)
+					Add important project documents. Supported types: PDF, TXT, DOCX, and MD. (keep files under 25MB)
 				</Dialog.Description>
 			</div>
 

@@ -31,6 +31,11 @@ body:json {
         "filename": "catatan.txt",
         "mimeType": "text/plain",
         "sizeBytes": 512000
+      },
+      {
+        "filename": "laporan.md",
+        "mimeType": "text/markdown",
+        "sizeBytes": 256000
       }
     ]
   }
@@ -39,7 +44,7 @@ body:json {
 docs {
   Generates presigned PUT URLs directly to the self-hosted MinIO STB storage for multiple files, bypassing backend bandwidth for large uploads (max 25MB per file, max 10 files per batch). Creates pending document records and atomically deducts the quota.
 
-  Supported types: .pdf (application/pdf), .txt (text/plain), .docx (Word mime type).
+  Supported types: .pdf (application/pdf), .txt (text/plain), .docx (Word mime type), .md (text/markdown).
 
   Duplicate titles are auto-renamed with a " (n)" suffix before the extension (case-insensitive, including duplicates within the same batch): "laporan.pdf" → "laporan (1).pdf". The response `filename` carries the final stored title.
 }

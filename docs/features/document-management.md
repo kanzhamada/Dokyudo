@@ -13,10 +13,11 @@
 
 ## UPDATE (2026-08-13) — DOCX support, title dedup, dual-file storage
 
-- **DOCX upload**: Backend contract menerima `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`) selain `.pdf`/`.txt`. Frontend upload dialog dan chat attachment sama-sama menerima `.docx` (batas 25MB/file, 10 file/batch).
+- **Format didukung**: `.pdf`, `.txt`, `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`), dan `.md` (`text/markdown`). Frontend upload dialog dan chat attachment menerima semuanya (batas 25MB/file, 10 file/batch).
+- **Markdown ter-render di viewer**: `.md` tidak bisa dikonversi langsung oleh LibreOffice (dibuka sebagai teks polos), jadi worker merender markdown ke HTML ber-CSS (`python-markdown`) lalu HTML tersebut dikonversi ke PDF — heading, tabel, bold, code block, dan blockquote tampil rapi di EmbedPDF. Teks untuk chunk diekstrak dari HTML yang sama (strip tag), sehingga embedding bersih dari noise markdown.
 - **TXT kini benar-benar diproses**: `.txt` sudah diterima sejak awal, tetapi worker gagal memprosesnya (diekstrak sebagai PDF). Sekarang `.txt` melewati jalur yang sama dengan DOCX: dikonversi LibreOffice → PDF untuk viewer, teks asli dibaca dengan deteksi encoding (UTF-8 BOM → UTF-16 BOM → UTF-8 → cp1252; file biner ber-NUL ditolak), chunk di-align ke halaman PDF konversi. Preview dan kutipan halaman bekerja seperti PDF.
 - **Title dedup "(n)"**: `POST /presigned-url/batch` memuat judul dokumen milik tenant, dan judul duplikat (case-insensitive) otomatis di-rename sebelum ekstensi — `laporan.pdf` → `laporan (1).pdf`, dst. Berlaku juga untuk duplikat dalam satu batch. Response `filename` membawa judul final; dialog upload & attachment chat menampilkan judul tersimpan agar konsisten dengan daftar dokumen. `storage_path` tetap dari ekstensi file asli — rename judul tidak mengubah penyimpanan.
-- **Dual-file storage untuk non-PDF**: STB Worker mengonversi `.docx`/`.txt` → PDF dan menyimpannya sebagai `{tenant}/{docId}.pdf` di MinIO (untuk viewer EmbedPDF). Jadi satu dokumen non-PDF menyimpan **dua objek**: file asli + PDF konversi.
+- **Dual-file storage untuk non-PDF**: STB Worker mengonversi `.docx`/`.txt`/`.md` → PDF dan menyimpannya sebagai `{tenant}/{docId}.pdf` di MinIO (untuk viewer EmbedPDF). Jadi satu dokumen non-PDF menyimpan **dua objek**: file asli + PDF konversi.
 - **Preview**: `GET /{id}/preview` — mode view mengarah ke PDF hasil konversi (non-PDF) atau file asli (PDF); `download=true` selalu mengembalikan file asli user.
 - **Delete**: single & batch menghapus kedua objek (asli + PDF konversi) — tidak ada orphan; best-effort bila salah satu tidak ada.
 

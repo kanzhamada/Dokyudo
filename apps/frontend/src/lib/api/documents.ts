@@ -40,10 +40,12 @@ function mimeTypeFor(
 ):
 	| 'application/pdf'
 	| 'text/plain'
-	| 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' {
+	| 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+	| 'text/markdown' {
 	const ext = filename.split('.').pop()?.toLowerCase();
 	if (ext === 'txt') return 'text/plain';
 	if (ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+	if (ext === 'md') return 'text/markdown';
 	return 'application/pdf';
 }
 
