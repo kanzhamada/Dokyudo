@@ -10,7 +10,9 @@ from core.config import settings
 from core.logger import log_event
 from services.storage import download_document, upload_document
 from services.converter import convert_docx_to_pdf
-from services.extractor import extract_text_from_pdf, chunk_text_with_pages
+from services.extractor import extract_text_from_pdf, chunk_text_with_pages, chunk_text_stream
+from services.docx_extractor import extract_text_from_docx
+from services.pager import assign_pages_to_chunks
 from services.embedding import generate_embedding_with_retry, TransientAPIError
 from services.llm import generate_llm_description
 from services.database import (
@@ -173,7 +175,7 @@ def process_document(tenant_id: str, document_id: str):
         log_event("processor.step1_downloading", "Downloading document from MinIO...", document_id=document_id, tenant_id=tenant_id)
         download_document(tenant_id, storage_path, temp_input.name)
 
-        if ext in (".docx", ".doc"):
+        if ext == ".docx":
             if ingestion_queue.is_cancelled(document_id):
                 log_event("processor.job_cancelled", "Cancellation detected before conversion.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
                 return
@@ -187,16 +189,26 @@ def process_document(tenant_id: str, document_id: str):
 
             log_event("processor.step1_5_uploading_pdf", "Uploading converted PDF to MinIO.", document_id=document_id, tenant_id=tenant_id)
             upload_document(temp_pdf.name, tenant_id, f"{document_id}.pdf")
-            pdf_path = temp_pdf.name
-        else:
-            pdf_path = temp_input.name
 
-        pages = extract_text_from_pdf(pdf_path)
-        
-        log_event("processor.step2_parsed", "PDF Parsed successfully.", document_id=document_id, tenant_id=tenant_id, total_pages=len(pages))
-        
-        chunks = chunk_text_with_pages(pages, chunk_size=1000, overlap=150)
-        log_event("processor.step3_chunking", "Chunking complete.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(chunks))
+            # DOCX: extract text from the document itself (OMML becomes readable
+            # linear math) and align chunks to the converted PDF for page jumps.
+            blocks = extract_text_from_docx(temp_input.name)
+            chunks = chunk_text_stream(blocks, chunk_size=1000, overlap=150)
+            log_event("processor.step2_docx_extracted", "DOCX text extracted and chunked.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(chunks))
+            chunks = assign_pages_to_chunks(chunks, temp_pdf.name)
+            log_event("processor.step3_pages_aligned", "Chunks aligned to PDF pages.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(chunks))
+            full_text = "\n".join(blocks)
+        else:
+            # .pdf and legacy .doc both flow through PDF text extraction
+            # (python-docx cannot read .doc, and .doc is not an accepted upload).
+            pdf_path = temp_input.name
+            pages = extract_text_from_pdf(pdf_path)
+
+            log_event("processor.step2_parsed", "PDF Parsed successfully.", document_id=document_id, tenant_id=tenant_id, total_pages=len(pages))
+
+            chunks = chunk_text_with_pages(pages, chunk_size=1000, overlap=150)
+            log_event("processor.step3_chunking", "Chunking complete.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(chunks))
+            full_text = " ".join([p["text"] for p in pages])
         
         # Check cancellation before starting expensive embedding loop
         if ingestion_queue.is_cancelled(document_id):
@@ -216,8 +228,7 @@ def process_document(tenant_id: str, document_id: str):
         else:
             log_event("processor.step5_gatekeeper", "Initialized Upstash Redis SDK. Starting Gatekeeper Loop.", document_id=document_id, tenant_id=tenant_id)
         
-        # Get the first 3000 characters from the pages for description generation
-        full_text = " ".join([p["text"] for p in pages])
+        # Get the first 3000 characters from the full text for description generation
         head_text = full_text[:3000]
         
         # Run chunk processing and LLM description in parallel using threads
