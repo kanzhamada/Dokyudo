@@ -462,10 +462,12 @@ export class RagService {
                     answer: "",
                     modelUsed: null,
                     status: needsAwaiting ? "awaiting_indexing" : "processing",
-                    // Persist the merged scope (files + `@`-mention ids) so the
-                    // background sweep re-scopes retrieval to the mentions too.
-                    attachmentDocumentIds: hasAttachments
-                        ? attachmentDocuments.map((d) => d.id)
+                    // Persist only real FILE attachments here. `@`-mention ids
+                    // live in the question text and are re-parsed at answer
+                    // time (interactive and sweep paths) — a mention-only turn
+                    // must not be stored as an attachment.
+                    attachmentDocumentIds: (attachmentDocumentIds?.length ?? 0) > 0
+                        ? attachmentDocumentIds
                         : null,
                     modelRequest: hasAttachments && useByok
                         ? { provider, model }
@@ -493,7 +495,12 @@ export class RagService {
         // completes in the background.
         if (isAwaitingTurn) {
             if (signal?.aborted) return createClosedStream();
-            return createAwaitingStream(turnId, attachmentDocumentIds ?? []);
+            // Report the full awaited scope (files + mentions) — the client
+            // uses it to keep the waiting state alive until the sweep lands.
+            return createAwaitingStream(
+                turnId,
+                attachmentDocuments.map((d) => d.id),
+            );
         }
 
         // The effective question for the whole pipeline: the turn's own question
@@ -2091,8 +2098,19 @@ Always include the document references ([Doc N: Page X]) in your answer.
         }
         if (turns.length === 0) return result;
 
-        // Load the status of every attached document once, across all turns.
-        const docIds = [...new Set(turns.flatMap((t) => t.attachmentDocumentIds ?? []))];
+        // A turn's scope = persisted FILE attachments + `@`-mention ids parsed
+        // from its question. Mentions are never persisted as attachments, so
+        // the sweep re-derives them here — otherwise a mention-only turn
+        // would wait on an empty list and answer without its scope.
+        const scopeByTurn = new Map(
+            turns.map((t) => [
+                t.id,
+                [...new Set([...(t.attachmentDocumentIds ?? []), ...mentionTokenIds(t.question)])],
+            ]),
+        );
+
+        // Load the status of every scoped document once, across all turns.
+        const docIds = [...new Set([...scopeByTurn.values()].flat())];
         const docStatus = new Map<string, string>();
         if (docIds.length > 0) {
             try {
@@ -2108,7 +2126,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
         }
 
         for (const turn of turns) {
-            const ids = turn.attachmentDocumentIds ?? [];
+            const ids = scopeByTurn.get(turn.id) ?? [];
             const statuses = ids.map((id) => docStatus.get(id));
 
             const hasFailure = statuses.some(

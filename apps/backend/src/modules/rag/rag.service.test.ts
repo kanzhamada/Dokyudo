@@ -520,11 +520,9 @@ describe("RagService Isolated Tests", () => {
                 const completedTurn = turns.find((t) => t.question === question);
                 assertExists(completedTurn);
                 assertEquals(completedTurn.status, "complete");
-                // Merged scope persisted so the sweep re-scopes mentions too.
-                assertEquals(
-                    [...(completedTurn.attachmentDocumentIds ?? [])].sort(),
-                    [...docIds].sort(),
-                );
+                // Mentions are never persisted as attachments — the scope
+                // stays in the question text, re-derived at answer time.
+                assertEquals(completedTurn.attachmentDocumentIds ?? null, null);
             } finally {
                 await db.delete(documents).where(inArray(documents.id, docIds));
             }
@@ -682,6 +680,77 @@ describe("RagService Isolated Tests", () => {
             } finally {
                 await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId));
                 await db.delete(documents).where(eq(documents.id, pendingDocId));
+            }
+        });
+
+        it("positive: sweep scopes a mention-only awaiting turn via the question", async () => {
+            // A mention-only turn has NO attachment_document_ids — the sweep
+            // re-derives the scope from the question's `@[title](id)` tokens.
+            const mentionedDocId = crypto.randomUUID();
+            await db.insert(documents).values({
+                id: mentionedDocId,
+                tenantId: TEST_TENANT_ID,
+                title: "Mentioned Doc",
+                storagePath: "mentioned.pdf",
+                sizeBytes: 100,
+                status: "processed",
+            }).onConflictDoNothing();
+
+            const question = `sweep mention @[Mentioned Doc](${mentionedDocId}) ${crypto.randomUUID()}`;
+            const turnId = crypto.randomUUID();
+            await db.insert(conversationTurns).values({
+                id: turnId,
+                tenantId: TEST_TENANT_ID,
+                conversationId: TEST_CONVERSATION_ID,
+                question,
+                answer: "",
+                modelUsed: null,
+                status: "awaiting_indexing",
+                attachmentDocumentIds: null,
+            });
+
+            let searchParams: any = null;
+            using geminiStub = stub(gemini, "generateText", (prompt: string) =>
+                Promise.resolve({
+                    text: prompt.includes("security gatekeeper") ? "SAFE" : "rewritten",
+                }) as any,
+            );
+            using searchStub = stub(SearchService, "executeHybridSearch", (params: any) => {
+                searchParams = params;
+                return Promise.resolve([{
+                    id: crypto.randomUUID(),
+                    documentId: mentionedDocId,
+                    documentTitle: "Mentioned Doc",
+                    metadata: { pages: [1] },
+                    content: "Konten dokumen yang disebut",
+                    score: 0.9,
+                }]);
+            });
+            const fakeStream: AsyncIterable<{ text: string }> = (async function* () {
+                yield { text: "Jawaban dari dokumen yang disebut [Doc 1: Page 1]." };
+            })();
+            using fallbackStub = stub(FallbackLlmService, "generateStream", () =>
+                Promise.resolve({ modelId: "test-model", stream: fakeStream }) as any,
+            );
+
+            try {
+                const result = await RagService.sweepAwaitingTurns();
+                assertEquals(result.completed >= 1, true);
+
+                const [turn] = await db
+                    .select()
+                    .from(conversationTurns)
+                    .where(eq(conversationTurns.id, turnId));
+                assertExists(turn);
+                assertEquals(turn.status, "complete");
+
+                // Retrieval was scoped to the mentioned document — the scope
+                // survived the awaiting path without being persisted.
+                assertExists(searchParams);
+                assertEquals(searchParams.documentIds, [mentionedDocId]);
+            } finally {
+                await db.delete(conversationTurns).where(eq(conversationTurns.id, turnId));
+                await db.delete(documents).where(eq(documents.id, mentionedDocId));
             }
         });
 
