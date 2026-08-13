@@ -27,9 +27,14 @@ WORKDIR /app
 
 # LibreOffice Writer untuk konversi docx -> pdf (headless).
 # Hanya paket writer + font, bukan suite penuh, supaya image tidak membengkak.
+# libreoffice-math WAJIB: tanpa komponen ini, rumus matematika OMML (insert
+# equation di Word) diimpor sebagai objek kosong dan hilang dari PDF hasil
+# konversi. Paket ini adalah Recommends dari libreoffice-writer yang terbuang
+# oleh --no-install-recommends.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libreoffice-writer \
+        libreoffice-math \
         fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
