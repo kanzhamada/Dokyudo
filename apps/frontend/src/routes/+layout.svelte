@@ -1,7 +1,8 @@
 <script lang="ts">
 	import './layout.css';
+	import 'katex/dist/katex.min.css';
 	import favicon from '$lib/assets/favicon.svg';
-	import { Toaster } from "$lib/components/ui/sonner";
+	import { Toaster } from '$lib/components/ui/sonner';
 
 	let { children } = $props();
 </script>

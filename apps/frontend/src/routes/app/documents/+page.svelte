@@ -314,6 +314,7 @@
 					day: 'numeric',
 					year: 'numeric'
 				}),
+				createdAt: doc.createdAt,
 				size: sizeStr,
 				status: doc.status as Document['status'],
 				url: undefined
@@ -728,6 +729,7 @@
 					name: originalDoc?.name || 'Unknown Document',
 					description: originalDoc?.description || 'No description provided.',
 					uploadedAt: originalDoc?.uploadedAt || 'Unknown Date',
+					createdAt: originalDoc?.createdAt || '',
 					size: originalDoc?.size || '0 KB',
 					status: (originalDoc?.status || 'processed') as Document['status'],
 					url: undefined,

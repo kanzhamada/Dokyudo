@@ -15,6 +15,7 @@
 	let redirectIn = $state(5);
 	let sessionId = $state('');
 	let redirectTimer: number | null = null;
+	let confettiCleanupTimer: number | null = null;
 
 	const planName = $derived(usage ? TIER_PLANS[usage.tier].name : TIER_PLANS.SIMULATE.name);
 	const hasActivatedTier = $derived(usage?.tier !== undefined && usage.tier !== 'FREE');
@@ -58,13 +59,87 @@
 		}
 
 		paymentState = 'success';
+		launchConfetti();
 		startRedirectCountdown();
+	}
+
+	function launchConfetti() {
+		if (
+			typeof window === 'undefined' ||
+			window.matchMedia('(prefers-reduced-motion: reduce)').matches
+		) {
+			return;
+		}
+
+		const canvas = document.createElement('canvas');
+		canvas.className = 'billing-confetti';
+		canvas.setAttribute('aria-hidden', 'true');
+		document.body.appendChild(canvas);
+		const context = canvas.getContext('2d');
+		if (!context) {
+			canvas.remove();
+			return;
+		}
+
+		const dpr = Math.min(window.devicePixelRatio || 1, 2);
+		const resize = () => {
+			canvas.width = window.innerWidth * dpr;
+			canvas.height = window.innerHeight * dpr;
+			canvas.style.width = `${window.innerWidth}px`;
+			canvas.style.height = `${window.innerHeight}px`;
+			context.setTransform(dpr, 0, 0, dpr, 0, 0);
+		};
+		resize();
+		window.addEventListener('resize', resize);
+
+		const colors = ['#DB8F5E', '#F0D9C7', '#FFFFFF', '#8C6250'];
+		const pieces = Array.from({ length: 72 }, (_, index) => ({
+			x: window.innerWidth / 2 + (Math.random() - 0.5) * 180,
+			y: window.innerHeight * 0.32,
+			vx: (Math.random() - 0.5) * 8,
+			vy: -Math.random() * 8 - 3,
+			rotation: Math.random() * Math.PI,
+			spin: (Math.random() - 0.5) * 0.25,
+			width: 4 + (index % 3) * 2,
+			height: 7 + (index % 4) * 2,
+			color: colors[index % colors.length]
+		}));
+
+		const startedAt = performance.now();
+		const draw = (now: number) => {
+			const elapsed = now - startedAt;
+			context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+			for (const piece of pieces) {
+				piece.x += piece.vx;
+				piece.vy += 0.18;
+				piece.y += piece.vy;
+				piece.rotation += piece.spin;
+				context.save();
+				context.translate(piece.x, piece.y);
+				context.rotate(piece.rotation);
+				context.fillStyle = piece.color;
+				context.fillRect(-piece.width / 2, -piece.height / 2, piece.width, piece.height);
+				context.restore();
+			}
+			if (elapsed < 2600) {
+				requestAnimationFrame(draw);
+			}
+		};
+		requestAnimationFrame(draw);
+
+		confettiCleanupTimer = window.setTimeout(() => {
+			window.removeEventListener('resize', resize);
+			canvas.remove();
+			confettiCleanupTimer = null;
+		}, 2800);
 	}
 
 	onMount(() => {
 		void confirmPayment();
 		return () => {
 			if (redirectTimer !== null) window.clearInterval(redirectTimer);
+			if (confettiCleanupTimer !== null) window.clearTimeout(confettiCleanupTimer);
+			document.querySelector('.billing-confetti')?.remove();
 		};
 	});
 </script>
@@ -74,87 +149,309 @@
 	<meta name="description" content="Your Dokyudo payment status and subscription activation." />
 </svelte:head>
 
-<main class="flex min-h-screen items-center justify-center bg-[#1F1E1D] px-4 py-10 text-white">
-	<div class="w-full max-w-[480px]">
-		<div
-			class="mb-8 flex items-center justify-center gap-2 text-sm font-medium tracking-tight text-white/70"
-		>
-			<CreditCard class="size-4 text-white/50" strokeWidth={1.8} />
-			Dokyudo billing
-		</div>
+<main class="billing-page">
+	<div class="billing-shell">
+		<header class="billing-brand">
+			<CreditCard class="size-4" strokeWidth={1.8} />
+			<span>Dokyudo billing</span>
+		</header>
 
-		<section
-			class="rounded-[18px] border border-white/[0.1] bg-[#242322]/[0.9] p-6 text-center shadow-2xl shadow-black/30 backdrop-blur-[42px] sm:p-8"
-		>
+		<section class="billing-summary" aria-live="polite">
 			{#if paymentState === 'confirming'}
-				<div
-					class="mx-auto flex size-14 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06]"
-				>
-					<LoaderCircle class="size-6 animate-spin text-white/70" strokeWidth={1.7} />
+				<div class="billing-status-icon billing-status-icon--pending">
+					<LoaderCircle class="size-6 animate-spin" strokeWidth={1.7} />
 				</div>
-				<h1 class="mt-5 text-2xl font-medium tracking-[-0.03em] text-white">
-					Confirming your payment
-				</h1>
-				<p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/45">
+				<p class="billing-kicker">Payment status</p>
+				<h1 class="billing-heading">Confirming your payment</h1>
+				<p class="billing-copy">
 					Stripe has returned successfully. We are syncing your Sandbox access before opening your
 					billing details.
 				</p>
-				<div class="mx-auto mt-6 h-1.5 max-w-[240px] overflow-hidden rounded-full bg-white/[0.08]">
-					<div class="h-full w-2/3 animate-pulse rounded-full bg-white/50"></div>
+				<div class="billing-progress" aria-label="Payment confirmation in progress">
+					<span></span>
 				</div>
 			{:else if paymentState === 'success'}
-				<div
-					class="mx-auto flex size-14 items-center justify-center rounded-full border border-white/[0.18] bg-white/[0.1]"
-				>
-					<Check class="size-7 text-white" strokeWidth={1.8} />
+				<div class="billing-status-icon billing-status-icon--success">
+					<Check class="size-7" strokeWidth={1.8} />
 				</div>
-				<h1 class="mt-5 text-2xl font-medium tracking-[-0.03em] text-white">Payment successful</h1>
-				<p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/45">
+				<p class="billing-kicker">Payment status</p>
+				<h1 class="billing-heading">Payment successful</h1>
+				<p class="billing-copy">
 					{#if hasActivatedTier}
-						Your <span class="text-white/75">{planName}</span> access is active. Your Billing panel is
-						ready with the latest usage.
+						Your <strong>{planName}</strong> access is active. Your Billing panel is ready with the latest
+						usage.
 					{:else}
 						Your payment was received. Subscription activation is still syncing and will appear in
 						Billing shortly.
 					{/if}
 				</p>
-				<div class="mt-6 rounded-lg border border-white/[0.1] bg-white/[0.035] px-4 py-3 text-left">
-					<div class="flex items-center justify-between gap-3">
-						<span class="text-[11px] text-white/40">Plan purchased</span>
-						<span class="text-sm font-medium text-white/80"
-							>{hasActivatedTier ? planName : 'Sandbox & Evaluation'}</span
-						>
+				<div class="billing-plan-summary">
+					<div>
+						<span>Plan purchased</span>
+						<strong>{hasActivatedTier ? planName : 'Sandbox & Evaluation'}</strong>
 					</div>
-					<div class="mt-2 flex items-center justify-between gap-3">
-						<span class="text-[11px] text-white/40">Next step</span>
-						<span class="text-[11px] text-white/60">Billing opens in {redirectIn}s</span>
+					<div>
+						<span>Next step</span>
+						<strong>Billing opens in {redirectIn}s</strong>
 					</div>
+				</div>
+
+				{#if sessionId}
+					<div class="billing-metadata">
+						<div class="billing-metadata-item">
+							<span>Session</span>
+							<strong>{sessionId.slice(0, 14)}...{sessionId.slice(-6)}</strong>
+						</div>
+						<div class="billing-metadata-item">
+							<span>Access</span>
+							<strong>{hasActivatedTier ? 'Active' : 'Syncing'}</strong>
+						</div>
+					</div>
+				{/if}
+
+				<div class="billing-actions">
+					<button
+						type="button"
+						class="billing-primary-action"
+						onclick={() => goto('/app?billing=open')}
+					>
+						Open billing
+						<ArrowRight class="size-4" strokeWidth={1.8} />
+					</button>
 				</div>
 			{:else}
-				<div
-					class="mx-auto flex size-14 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.05]"
-				>
-					<AlertCircle class="size-7 text-white/70" strokeWidth={1.7} />
+				<div class="billing-status-icon billing-status-icon--error">
+					<AlertCircle class="size-7" strokeWidth={1.7} />
 				</div>
-				<h1 class="mt-5 text-2xl font-medium tracking-[-0.03em] text-white">
-					We could not confirm the payment
-				</h1>
-				<p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/45">{errorMessage}</p>
-				<button
-					type="button"
-					class="mt-6 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-medium text-[#1B1B1B] transition-colors hover:bg-white/85"
-					onclick={() => goto('/app?billing=open')}
-				>
-					Open app
-					<ArrowRight class="size-4" strokeWidth={1.8} />
-				</button>
+				<p class="billing-kicker">Payment status</p>
+				<h1 class="billing-heading">We could not confirm the payment</h1>
+				<p class="billing-copy">{errorMessage}</p>
+				<div class="billing-actions">
+					<button
+						type="button"
+						class="billing-primary-action"
+						onclick={() => goto('/app?billing=open')}
+					>
+						Open app
+						<ArrowRight class="size-4" strokeWidth={1.8} />
+					</button>
+				</div>
 			{/if}
 		</section>
-
-		{#if paymentState === 'success' && sessionId}
-			<p class="mt-4 text-center font-mono text-[10px] text-white/25">
-				Session {sessionId.slice(0, 14)}...{sessionId.slice(-6)}
-			</p>
-		{/if}
 	</div>
 </main>
+
+<style>
+	.billing-page {
+		min-height: 100dvh;
+		background: #1f1e1d;
+		color: #f4f1ed;
+		padding: 2.5rem 1rem 4rem;
+	}
+	.billing-shell {
+		width: min(100%, 760px);
+		margin: 0 auto;
+	}
+	.billing-brand {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		margin-bottom: 3.5rem;
+		color: #c9c2bb;
+		font-size: 0.875rem;
+		font-weight: 600;
+	}
+	.billing-brand :global(svg) {
+		color: #db8f5e;
+	}
+	.billing-summary {
+		border-top: 1px solid #514a45;
+		border-bottom: 1px solid #514a45;
+		padding: 2.25rem 0 2rem;
+		text-align: left;
+		animation: billing-enter 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+	.billing-status-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 3.5rem;
+		height: 3.5rem;
+		margin-bottom: 1.5rem;
+		border: 1px solid #756052;
+		border-radius: 0.75rem;
+	}
+	.billing-status-icon--success {
+		background: #db8f5e;
+		border-color: #db8f5e;
+		color: #1f1e1d;
+	}
+	.billing-status-icon--pending {
+		color: #db8f5e;
+	}
+	.billing-status-icon--error {
+		color: #e0a48a;
+		border-color: #8f5d4d;
+	}
+	.billing-kicker {
+		margin: 0 0 0.5rem;
+		color: #a59b93;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+	}
+	.billing-heading {
+		max-width: 12ch;
+		margin: 0;
+		color: #f4f1ed;
+		font-size: clamp(2.5rem, 7vw, 4.75rem);
+		font-weight: 600;
+		letter-spacing: -0.065em;
+		line-height: 0.98;
+	}
+	.billing-copy {
+		max-width: 42rem;
+		margin: 1.25rem 0 0;
+		color: #b8afa8;
+		font-size: 0.9375rem;
+		line-height: 1.7;
+	}
+	.billing-copy strong {
+		color: #f4f1ed;
+		font-weight: 600;
+	}
+	.billing-progress {
+		height: 0.25rem;
+		max-width: 18rem;
+		margin-top: 2rem;
+		overflow: hidden;
+		background: #3a3532;
+	}
+	.billing-progress span {
+		display: block;
+		width: 62%;
+		height: 100%;
+		background: #db8f5e;
+		animation: billing-progress 1.4s ease-in-out infinite alternate;
+	}
+	.billing-plan-summary {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1.5rem;
+		margin-top: 2.5rem;
+		padding: 1.5rem 0;
+		border-top: 1px solid #514a45;
+		border-bottom: 1px solid #514a45;
+	}
+	.billing-plan-summary > div,
+	.billing-metadata-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+	}
+	.billing-plan-summary span,
+	.billing-metadata-item span {
+		color: #918880;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+	.billing-plan-summary strong,
+	.billing-metadata-item strong {
+		color: #f4f1ed;
+		font-size: 0.9375rem;
+		font-weight: 600;
+		line-height: 1.4;
+	}
+	.billing-metadata {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1.5rem;
+		padding: 1.5rem 0;
+	}
+	.billing-actions {
+		display: flex;
+		margin-top: 1.5rem;
+	}
+	.billing-primary-action {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		min-height: 2.75rem;
+		padding: 0.75rem 1.25rem;
+		border: 1px solid #db8f5e;
+		border-radius: 0.625rem;
+		background: #db8f5e;
+		color: #1f1e1d;
+		font-size: 0.8125rem;
+		font-weight: 700;
+		cursor: pointer;
+		transition:
+			background-color 180ms ease,
+			transform 180ms ease;
+	}
+	.billing-primary-action:hover {
+		background: #e5a06f;
+	}
+	.billing-primary-action:active {
+		transform: translateY(1px);
+	}
+	.billing-primary-action:focus-visible {
+		outline: 2px solid #f0d9c7;
+		outline-offset: 3px;
+	}
+	@keyframes billing-enter {
+		from {
+			opacity: 0;
+			transform: translateY(0.75rem);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+	@keyframes billing-progress {
+		from {
+			transform: translateX(-35%);
+		}
+		to {
+			transform: translateX(55%);
+		}
+	}
+	:global(.billing-confetti) {
+		position: fixed;
+		inset: 0;
+		z-index: 20;
+		width: 100%;
+		height: 100%;
+		pointer-events: none;
+	}
+	@media (max-width: 640px) {
+		.billing-page {
+			padding: 1.5rem 1rem 3rem;
+		}
+		.billing-brand {
+			margin-bottom: 2.5rem;
+		}
+		.billing-summary {
+			padding-top: 1.75rem;
+		}
+		.billing-plan-summary,
+		.billing-metadata {
+			grid-template-columns: 1fr;
+			gap: 1.25rem;
+		}
+		.billing-primary-action {
+			width: 100%;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.billing-summary,
+		.billing-progress span {
+			animation: none;
+		}
+	}
+</style>

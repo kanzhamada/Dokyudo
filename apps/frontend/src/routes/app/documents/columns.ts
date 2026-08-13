@@ -34,7 +34,14 @@ export const columns: ColumnDef<Document>[] = [
 		accessorKey: 'uploadedAt',
 		header: 'Uploaded',
 		enableSorting: true,
-		enableColumnFilter: false
+		enableColumnFilter: false,
+		// `uploadedAt` is a display string ("Aug 13, 2026") — string sorting
+		// would misorder dates. Sort on the raw ISO timestamp instead.
+		sortingFn: (rowA, rowB) => {
+			const a = rowA.original.createdAt ?? '';
+			const b = rowB.original.createdAt ?? '';
+			return a > b ? 1 : a < b ? -1 : 0;
+		}
 	},
 	{
 		accessorKey: 'size',

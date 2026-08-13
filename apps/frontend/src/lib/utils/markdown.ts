@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import { renderMathHtml } from './math';
 
 /**
  * Shared markdown rendering for chat messages — used by both the private
@@ -132,7 +133,10 @@ export function renderMarkdown(
 ): string {
 	if (!text) return '';
 	try {
-		const rawHtml = marked.parse(text) as string;
+		// Render LaTeX math ($...$ / $$...$$) to KaTeX HTML first so the math
+		// is never parsed as markdown; the surrounding text is parsed normally.
+		const mathRendered = renderMathHtml(text);
+		const rawHtml = marked.parse(mathRendered) as string;
 		return transformCitationTags(rawHtml, references, interactive);
 	} catch {
 		return text;

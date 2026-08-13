@@ -38,6 +38,7 @@ export const load: PageLoad = async () => {
 					day: 'numeric',
 					year: 'numeric'
 				}),
+				createdAt: doc.createdAt,
 				size: sizeStr,
 				status: doc.status as Document['status'],
 				url: undefined
