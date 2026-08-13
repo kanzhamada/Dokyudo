@@ -1,9 +1,11 @@
 import { assert, assertEquals } from "@std/assert";
-import { describe, it, beforeEach } from "jsr:@std/testing/bdd";
+import { describe, it, beforeAll, afterAll, beforeEach } from "jsr:@std/testing/bdd";
 import { Hono } from "hono";
 import { rateLimiterMiddleware } from "./rate_limiter.middleware.ts";
 import { AppError } from "../utils/errors.util.ts";
 import { redis } from "../../config/redis.ts";
+
+const originalEnv = Deno.env.get("NODE_ENV");
 
 const app = new Hono();
 
@@ -17,6 +19,7 @@ app.onError((err: any, c: any) => {
 app.use("/*", rateLimiterMiddleware);
 
 app.get("/ok", (c: any) => c.text("OK"));
+app.get("/api/rag/shares/abc123", (c: any) => c.json({ code: "abc123" }));
 app.get("/error-401", (c: any) => {
     throw new AppError({
         code: "UNAUTHORIZED",
@@ -26,6 +29,16 @@ app.get("/error-401", (c: any) => {
 });
 
 describe("RateLimiter Middleware", () => {
+    beforeAll(() => {
+        // The middleware skips its checks outside prod — enforce prod semantics.
+        Deno.env.set("NODE_ENV", "prod");
+    });
+
+    afterAll(() => {
+        if (originalEnv) Deno.env.set("NODE_ENV", originalEnv);
+        else Deno.env.delete("NODE_ENV");
+    });
+
     beforeEach(async () => {
         // Clear potential penalties for IP addresses used in the tests
         await redis.del("penalty:1.1.1.1");
@@ -66,6 +79,24 @@ describe("RateLimiter Middleware", () => {
             remaining < 10 && remaining >= 0,
             "Strict limit should be applied",
         );
+    });
+
+    it("Public share reads are exempt from rate limiting", async () => {
+        // Hammer a share read from one IP with a suspicious UA — no 429, no
+        // rate-limit headers, because public share reads skip the limiter.
+        for (let i = 0; i < 15; i++) {
+            const res = await app.request("/api/rag/shares/abc123", {
+                headers: {
+                    "X-Forwarded-For": "9.9.9.9",
+                    "User-Agent": "curl/8.0",
+                },
+            });
+            assertEquals(res.status, 200);
+        }
+        const json = await (await app.request("/api/rag/shares/abc123", {
+            headers: { "X-Forwarded-For": "9.9.9.9", "User-Agent": "curl/8.0" },
+        })).json();
+        assertEquals(json.code, "abc123");
     });
 
     it("Penalizes IP on 401 errors", async () => {

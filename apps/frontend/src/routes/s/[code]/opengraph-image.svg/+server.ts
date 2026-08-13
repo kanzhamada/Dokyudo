@@ -95,6 +95,22 @@ function renderImage(metadata: ShareMetadata): string {
 </svg>`;
 }
 
+function renderFallbackImage(upstreamStatus: number): Response {
+	const metadata: ShareMetadata = {
+		title: 'Shared conversation',
+		authorName: null,
+		createdAt: new Date().toISOString()
+	};
+	return new Response(renderImage(metadata), {
+		status: 200,
+		headers: {
+			'Content-Type': 'image/svg+xml; charset=utf-8',
+			'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
+			'X-Upstream-Status': String(upstreamStatus)
+		}
+	});
+}
+
 export async function GET({ params, fetch, url }): Promise<Response> {
 	const code = params.code;
 	if (!code) return new Response('Not found', { status: 404 });
@@ -105,7 +121,15 @@ export async function GET({ params, fetch, url }): Promise<Response> {
 		const response = await fetch(
 			`${PUBLIC_API_URL}/api/rag/shares/${encodeURIComponent(code)}${query}`
 		);
-		if (!response.ok) return new Response('Not found', { status: 404 });
+		// A 404 means the share genuinely does not exist or has expired — keep
+		// the 404 so crawlers treat the link as dead. Any other upstream failure
+		// (rate limit, Deno 5xx, network) degrades to a branded card instead of
+		// breaking the social preview; the upstream status is exposed via header
+		// for debugging.
+		if (!response.ok) {
+			if (response.status === 404) return new Response('Not found', { status: 404 });
+			return renderFallbackImage(response.status);
+		}
 
 		const metadata = (await response.json()) as ShareMetadata;
 		return new Response(renderImage(metadata), {
@@ -115,6 +139,6 @@ export async function GET({ params, fetch, url }): Promise<Response> {
 			}
 		});
 	} catch {
-		return new Response('Unable to generate image', { status: 502 });
+		return renderFallbackImage(0);
 	}
 }

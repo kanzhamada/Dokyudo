@@ -31,6 +31,17 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
         return next();
     }
 
+    // Public share reads are exempt from rate limiting: share pages are public
+    // URLs opened by social crawlers and rendered server-side by the frontend
+    // worker, whose shared egress IP would otherwise accumulate penalties and
+    // get blocked (breaking every share page + OpenGraph image for all users).
+    const isPublicShareRead =
+        c.req.method === "GET" &&
+        /^\/api\/rag\/shares\/[^/]+$/.test(c.req.path);
+    if (isPublicShareRead) {
+        return next();
+    }
+
     // Load Test Bypass
     if (c.req.header("x-load-test-bypass") === "rahasia123") {
         return next();
