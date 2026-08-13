@@ -8,6 +8,7 @@
 		id,
 		onPreview,
 		onDownload,
+		onRename,
 		onDelete,
 		/** Preview unavailable while the file is still being processed —
 		 * only non-PDF files are disabled; PDFs render from the raw file. */
@@ -16,6 +17,7 @@
 		id: string;
 		onPreview?: () => void;
 		onDownload?: () => void;
+		onRename?: () => void;
 		onDelete?: () => void;
 		previewDisabled?: boolean;
 	} = $props();
@@ -112,6 +114,17 @@
 		>
 			<MxIcon name="arrows-action-import-outline" class="size-3.5 text-white/60" />
 			<span>Download</span>
+		</button>
+		<button
+			type="button"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			onclick={() => {
+				closeMenu();
+				onRename?.();
+			}}
+		>
+			<MxIcon name="edit2-outline" class="size-3.5 text-white/60" />
+			<span>Rename</span>
 		</button>
 		<div class="my-1 h-px bg-white/10"></div>
 		<button

@@ -188,6 +188,88 @@
 		return `${Number((bytes / (1024 * 1024)).toFixed(1))} MB`;
 	}
 
+	/* ── Rename (Edit Title) State & Handler ── */
+	/* Mirror of the backend whitelist (documents.schema.ts DOCUMENT_TITLE_REGEX):
+	   Unicode letters, digits, spaces, and a small set of safe punctuation.
+	   The backend zod schema is the source of truth; this only gives instant
+	   feedback before hitting the API. */
+	const TITLE_ALLOWED_REGEX = /^[\p{L}\p{N} .\-_,&+@#:!?()]+$/u;
+
+	let renameDialogOpen = $state(false);
+	let documentToRename = $state<Document | null>(null);
+	let renameBaseValue = $state('');
+	let renameError = $state('');
+	let isRenaming = $state(false);
+
+	function getDocumentExtension(name: string): string {
+		const lastDot = name.lastIndexOf('.');
+		return lastDot > 0 ? name.slice(lastDot) : '';
+	}
+
+	function promptRename(doc: Document) {
+		documentToRename = doc;
+		renameBaseValue = getDocumentExtension(doc.name)
+			? doc.name.slice(0, doc.name.lastIndexOf('.'))
+			: doc.name;
+		renameError = '';
+		renameDialogOpen = true;
+	}
+
+	async function confirmRename() {
+		if (!documentToRename || isRenaming) return;
+
+		const ext = getDocumentExtension(documentToRename.name);
+		const base = renameBaseValue.trim();
+		const newTitle = base + ext;
+
+		if (!base) {
+			renameError = 'Title cannot be empty.';
+			return;
+		}
+		if (newTitle.length > 255) {
+			renameError = 'Title must be at most 255 characters.';
+			return;
+		}
+		if (!TITLE_ALLOWED_REGEX.test(base)) {
+			renameError =
+				'Title contains disallowed characters. Allowed: letters, digits, spaces, and . , - _ ( ) & + @ # : ! ?';
+			return;
+		}
+
+		isRenaming = true;
+		renameError = '';
+		const target = documentToRename;
+
+		try {
+			const res = await apiRequest<{ success: boolean; title: string; message?: string }>(
+				`/api/documents/${target.id}`,
+				{ method: 'PATCH', body: { title: newTitle } }
+			);
+			console.log('[Document Rename] Backend Response:', res);
+
+			if (res.ok) {
+				const idx = documentsList.findIndex((d) => d.id === target.id);
+				if (idx !== -1) {
+					// url reset: invalidates any cached presigned URL so a later
+					// download/preview refetches one carrying the new filename.
+					documentsList[idx] = { ...documentsList[idx], name: res.data.title, url: undefined };
+					documentsList = [...documentsList];
+				}
+				renameDialogOpen = false;
+				documentToRename = null;
+				showSuccess('Document renamed', res.data.title);
+			} else {
+				console.error('[Document Rename] Catch Error:', res.error);
+				renameError = res.error?.message || 'Failed to rename document.';
+			}
+		} catch (err) {
+			console.error('[Document Rename] Unexpected Error:', err);
+			renameError = 'Failed to rename document.';
+		} finally {
+			isRenaming = false;
+		}
+	}
+
 	async function loadUsage(): Promise<boolean> {
 		try {
 			const res = await getMeUsageCached();
@@ -288,7 +370,8 @@
 					if (updated && updated.id) {
 						const idx = documentsList.findIndex((d) => d.id === updated.id);
 						if (idx !== -1) {
-							if (updated.status) {
+							const prevStatus = documentsList[idx].status;
+							if (updated.status && updated.status !== prevStatus) {
 								documentsList[idx].status = updated.status;
 							}
 							if (updated.description) {
@@ -296,10 +379,15 @@
 							}
 							documentsList = [...documentsList];
 
-							if (updated.status === 'processed') {
-								showSuccess('Document processed', documentsList[idx].name);
-							} else if (updated.status === 'failed') {
-								showError(`Processing failed for ${documentsList[idx].name}`);
+							// Toast only on a real status transition. Updates that touch
+							// other columns (e.g. a title rename) re-broadcast the same
+							// status and must not re-fire "Document processed".
+							if (updated.status && updated.status !== prevStatus) {
+								if (updated.status === 'processed') {
+									showSuccess('Document processed', documentsList[idx].name);
+								} else if (updated.status === 'failed') {
+									showError(`Processing failed for ${documentsList[idx].name}`);
+								}
 							}
 						} else {
 							// New document inserted, refresh list
@@ -1366,6 +1454,7 @@
 										previewDisabled={isVectorizing(doc) && !isPdfDocument(doc)}
 										onPreview={() => handlePreview(doc)}
 										onDownload={() => handleDownload(doc)}
+										onRename={() => promptRename(doc)}
 										onDelete={() => promptDelete(doc)}
 									/>
 								</div>
@@ -1649,6 +1738,73 @@
 	onConfirm={confirmDelete}
 	onClose={() => (deleteDialogOpen = false)}
 />
+
+<!-- Rename Document Dialog -->
+<Dialog.Root bind:open={renameDialogOpen}>
+	<Dialog.Content
+		class="border-[#302F2F] bg-[#191919]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md sm:rounded-[22px]"
+	>
+		<Dialog.Header class="gap-2">
+			<Dialog.Title class="text-xl font-semibold text-white">Rename Document</Dialog.Title>
+			<Dialog.Description class="text-sm text-[#767676]">
+				{#if documentToRename}
+					Current title: <span class="break-all text-white/80">{documentToRename.name}</span>
+					<br />The file extension is fixed — only the name part can be edited.
+				{/if}
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<div class="mt-4">
+			<div class="flex items-stretch gap-2">
+				<Input
+					value={renameBaseValue}
+					oninput={(e) => (renameBaseValue = e.currentTarget.value)}
+					onkeydown={(e) => {
+						if (e.key === 'Enter' && !isRenaming) confirmRename();
+					}}
+					placeholder="New document title"
+					maxlength={255}
+					class="h-10 rounded-lg border border-white/[0.16] bg-transparent font-normal text-white transition-[border-color,box-shadow] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] placeholder:text-white/40 focus-visible:border-white/35 focus-visible:ring-white/20"
+				/>
+				{#if documentToRename}
+					<span
+						class="inline-flex shrink-0 items-center rounded-lg border border-white/[0.16] bg-white/[0.06] px-2.5 text-sm text-white/60 select-none"
+					>
+						{getDocumentExtension(documentToRename.name)}
+					</span>
+				{/if}
+			</div>
+			{#if renameError}
+				<p class="mt-2 text-xs text-red-400">{renameError}</p>
+			{/if}
+		</div>
+
+		<Dialog.Footer class="mt-4 flex flex-row justify-end gap-3">
+			<Button
+				type="button"
+				variant="ghost"
+				onclick={() => (renameDialogOpen = false)}
+				disabled={isRenaming}
+				class="cursor-pointer text-sm text-white hover:bg-white/10"
+			>
+				Cancel
+			</Button>
+			<Button
+				type="button"
+				onclick={confirmRename}
+				disabled={isRenaming}
+				class="cursor-pointer bg-[#DB8F5E] text-white hover:bg-[#C47D4E] disabled:opacity-50"
+			>
+				{#if isRenaming}
+					<Loader2Icon class="mr-2 size-4 animate-spin" />
+					Saving...
+				{:else}
+					Save
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
 
 <!-- Batch Delete Confirmation Modal -->
 <Dialog.Root bind:open={showBatchDeleteModal}>
