@@ -8,6 +8,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { apiRequest } from '$lib/api/client.js';
+	import { seo } from '$lib/seo';
 	import DataTable from './data-table.svelte';
 	import type { ActivityLog } from './columns.js';
 
@@ -109,6 +110,10 @@
 		fetchActivities(initialPage);
 	});
 </script>
+
+<svelte:head>
+	{@html seo({ title: 'Activity Log | Dokyudo', description: 'Activity log for your Dokyudo workspace.', noindex: true })}
+</svelte:head>
 
 <div class="flex h-full w-full flex-col gap-6 overflow-y-auto px-6 py-6 font-sans md:px-10 md:py-8">
 	<!-- Breadcrumb -->

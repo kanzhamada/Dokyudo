@@ -14,6 +14,7 @@
 	} from '@tanstack/table-core';
 	import { createSvelteTable } from '$lib/components/ui/data-table/index.js';
 	import type { PageData } from './$types.js';
+	import { seo } from '$lib/seo';
 
 	/* ── shadcn-svelte Components ── */
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
@@ -874,6 +875,10 @@
 		});
 	}
 </script>
+
+<svelte:head>
+	{@html seo({ title: 'Documents | Dokyudo', description: 'Manage and search your documents in Dokyudo.', noindex: true })}
+</svelte:head>
 
 {#snippet mainList()}
 	<Tooltip.Provider delayDuration={100}>

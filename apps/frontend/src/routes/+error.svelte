@@ -3,16 +3,16 @@
 	import '@fontsource/geist-mono/500.css';
 	import favicon from '$lib/assets/favicon.svg?raw';
 	import { page } from '$app/state';
+	import { seo } from '$lib/seo';
 
 	const is404 = $derived(page.status === 404);
 </script>
 
 <svelte:head>
-	<title>{is404 ? '404 - Page not found - Dokyudo' : 'Error - Dokyudo'}</title>
-	<meta
-		name="description"
-		content="The page you aimed for is not here. Head back to Dokyudo and search your documents."
-	/>
+	{@html seo({
+		title: is404 ? '404 - Page not found - Dokyudo' : 'Error - Dokyudo',
+		description: 'The page you aimed for is not here. Head back to Dokyudo and search your documents.'
+	})}
 	<link rel="preload" as="image" href="/images/404.webp" />
 </svelte:head>
 

@@ -1,3 +1,11 @@
+<script lang="ts">
+	import { seo } from '$lib/seo';
+</script>
+
+<svelte:head>
+	{@html seo({ title: 'Dashboard | Dokyudo', description: 'Your workspace overview.', noindex: true })}
+</svelte:head>
+
 <div class="flex h-full w-full items-start px-6 py-8 font-sans md:px-10 md:py-10">
 	<div>
 		<h1 class="text-3xl font-semibold text-white md:text-4xl">Dashboard</h1>

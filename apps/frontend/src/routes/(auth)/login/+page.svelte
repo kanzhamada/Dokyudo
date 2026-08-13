@@ -2,6 +2,7 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client as zodClient } from 'sveltekit-superforms/adapters';
 	import { loginSchema } from '$lib/schemas/auth.schema';
+	import { seo } from '$lib/seo';
 	import { authLogin } from '$lib/api/auth';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { loadRecaptcha, executeRecaptcha } from '$lib/utils/recaptcha.util';
@@ -115,8 +116,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.title} | Dokyudo</title>
-	<meta name="description" content={data.description} />
+	{@html seo({ title: `${data.title} | Dokyudo`, description: data.description })}
 </svelte:head>
 
 <!-- Back button -->

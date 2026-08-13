@@ -9,6 +9,7 @@
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { getMeUsageCached } from '$lib/state/me-cache.store.svelte';
+	import { seo } from '$lib/seo';
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
 	import { documentsStore } from '$lib/state/documents.store.svelte';
@@ -208,6 +209,10 @@
 		}
 	}
 </script>
+
+<svelte:head>
+	{@html seo({ title: 'Chat | Dokyudo', description: 'Ask questions and get answers powered by your documents.', noindex: true })}
+</svelte:head>
 
 <div class="relative flex h-full w-full items-center justify-center overflow-hidden p-4">
 	<!-- Reusable Svelte 5 Snippets for Usage Metrics -->

@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import { seo } from '$lib/seo';
 
 	let errorMessage = $state('');
 	let dots = $state('');
@@ -104,7 +105,7 @@
 </script>
 
 <svelte:head>
-	<title>Authenticating | Dokyudo</title>
+	{@html seo({ title: 'Authenticating | Dokyudo', description: 'Signing you in to Dokyudo with your external account.' })}
 </svelte:head>
 
 <div class="flex flex-col items-center justify-center py-12">

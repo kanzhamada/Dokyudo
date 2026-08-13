@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { Check, CreditCard, LoaderCircle, ArrowRight, AlertCircle } from 'lucide-svelte';
 	import { getMeUsage } from '$lib/api/me';
+	import { seo } from '$lib/seo';
 	import type { UserUsageResponse } from '$lib/types/auth.types';
 	import { verifyCheckoutSession } from '$lib/api/payments';
 	import { TIER_PLANS, type TierType } from '$lib/constants/tiers.constant';
@@ -161,8 +162,7 @@
 </script>
 
 <svelte:head>
-	<title>Payment status | Dokyudo</title>
-	<meta name="description" content="Your Dokyudo payment status and subscription activation." />
+	{@html seo({ title: 'Payment status | Dokyudo', description: 'Your Dokyudo payment status and subscription activation.', noindex: true })}
 </svelte:head>
 
 <main class="billing-page">

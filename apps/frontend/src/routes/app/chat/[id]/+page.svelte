@@ -38,6 +38,7 @@
 	import { toast } from 'svelte-sonner';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsageCached } from '$lib/state/me-cache.store.svelte';
+	import { seo } from '$lib/seo';
 	import { conversationCache } from '$lib/state/conversation-cache.store.svelte';
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
@@ -2063,6 +2064,17 @@
 		}
 	}
 </script>
+
+<svelte:head>
+	{@html seo({
+		title:
+			conversationTitle && conversationTitle !== 'New Conversation'
+				? `${conversationTitle} | Dokyudo`
+				: 'Chat | Dokyudo',
+		description: 'Ask questions and get answers powered by your documents.',
+		noindex: true
+	})}
+</svelte:head>
 
 <div class="relative flex h-full w-full overflow-hidden bg-[#1F1E1D] font-sans text-white">
 	{#if citationPreview}

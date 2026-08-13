@@ -3,6 +3,7 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client as zodClient } from 'sveltekit-superforms/adapters';
 	import { updatePasswordSchema } from '$lib/schemas/auth.schema';
+	import { seo } from '$lib/seo';
 	import { authResetPassword } from '$lib/api/auth';
 	import * as Form from '$lib/components/ui/form';
 	import * as InputOTP from '$lib/components/ui/input-otp';
@@ -85,8 +86,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.title} | Dokyudo</title>
-	<meta name="description" content={data.description} />
+	{@html seo({ title: `${data.title} | Dokyudo`, description: data.description })}
 </svelte:head>
 
 <!-- Back button (hidden during success state) -->

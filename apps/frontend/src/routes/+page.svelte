@@ -3,6 +3,9 @@
 	import { gsap } from 'gsap';
 	import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
+	import { seo } from '$lib/seo';
+	import { page } from '$app/state';
+
 	import LandingNav from '$lib/components/landing/LandingNav.svelte';
 	import HeroSection from '$lib/components/landing/HeroSection.svelte';
 	import AboutSection from '$lib/components/landing/AboutSection.svelte';
@@ -45,11 +48,13 @@
 </script>
 
 <svelte:head>
-	<title>Dokyudo — Semantic Document Search & AI-Powered Q&A</title>
-	<meta
-		name="description"
-		content="Upload documents, search semantically, and ask contextual questions powered by RAG. Enterprise-grade multi-tenant SaaS with hybrid cloud architecture."
-	/>
+	{@html seo({
+		title: 'Dokyudo — Semantic Document Search & AI-Powered Q&A',
+		description:
+			'Upload documents, search semantically, and ask contextual questions powered by RAG. Enterprise-grade multi-tenant SaaS with hybrid cloud architecture.',
+		canonical: `${page.url.origin}${page.url.pathname}`,
+		ogImage: `${page.url.origin}/landing/hero-dashboard.jpg`
+	})}
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link

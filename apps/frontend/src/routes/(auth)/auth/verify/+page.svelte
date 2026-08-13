@@ -6,6 +6,7 @@
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import AuthBackButton from '$lib/components/auth/AuthBackButton.svelte';
+	import { seo } from '$lib/seo';
 
 	let isVerifying = $state(true);
 	let errorMessage = $state('');
@@ -43,7 +44,7 @@
 </script>
 
 <svelte:head>
-	<title>Verifying Email | Dokyudo</title>
+	{@html seo({ title: 'Verifying Email | Dokyudo', description: 'Confirming your email address to activate your Dokyudo account.' })}
 </svelte:head>
 
 <AuthBackButton href="/login" tooltipText="Back to Sign In" />
