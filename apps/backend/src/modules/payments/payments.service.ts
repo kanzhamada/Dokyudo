@@ -125,7 +125,7 @@ export class PaymentsService {
                 // We do not pass payment_method_types per stripe-best-practices
                 success_url:
                     `${getEnv("FRONTEND_URL")}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${getEnv("FRONTEND_URL")}/dashboard/billing/cancel`,
+                cancel_url: `${getEnv("FRONTEND_URL")}/app?billing=open`,
             });
         } catch (error: any) {
             if (logContext) logContext.stripeError = error.message;
