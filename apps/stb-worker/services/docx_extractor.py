@@ -45,99 +45,226 @@ def _find(el, tag):
             return c
     return None
 
+# Unicode math characters commonly found inside OMML text runs, mapped to
+# LaTeX so the output renders correctly in KaTeX.
+_UNICODE_TO_LATEX = {
+    "\u2192": r"\to ",
+    "\u2190": r"\gets ",
+    "\u00d7": r"\times ",
+    "\u00f7": r"\div ",
+    "\u00b1": r"\pm ",
+    "\u221e": r"\infty ",
+    "\u2264": r"\leq ",
+    "\u2265": r"\geq ",
+    "\u2260": r"\neq ",
+    "\u2248": r"\approx ",
+    "\u2208": r"\in ",
+    "\u2209": r"\notin ",
+    "\u2282": r"\subset ",
+    "\u2286": r"\subseteq ",
+    "\u222a": r"\cup ",
+    "\u2229": r"\cap ",
+    "\u22c5": r"\cdot ",
+    "\u2212": "-",
+    "\u2218": r"\circ ",
+    "\u221a": r"\surd ",
+    "\u2234": r"\therefore ",
+    "\u2235": r"\because ",
+}
+
+# Characters that must be escaped inside LaTeX math text.
+_LATEX_ESCAPES = {
+    "\\": r"\textbackslash{}",
+    "{": r"\{",
+    "}": r"\}",
+    "$": r"\$",
+    "&": r"\&",
+    "#": r"\#",
+    "%": r"\%",
+    "_": r"\_",
+    "^": r"\textasciicircum{}",
+    "~": r"\textasciitilde{}",
+}
+
+# OMML nary operator characters -> LaTeX commands.
+_NARY_COMMANDS = {
+    "\u222b": r"\int",
+    "\u222c": r"\iint",
+    "\u222d": r"\iiint",
+    "\u2211": r"\sum",
+    "\u220f": r"\prod",
+    "\u22c3": r"\bigcup",
+    "\u22c2": r"\bigcap",
+    "\u2a01": r"\bigoplus",
+    "\u2a02": r"\bigotimes",
+}
+
+# OMML accent characters -> LaTeX accent commands.
+_ACCENT_COMMANDS = {
+    "\u2192": r"\vec",
+    "\u02c6": r"\hat",
+    "\u203e": r"\bar",
+    "\u0303": r"\tilde",
+    "\u0307": r"\dot",
+    "\u0308": r"\ddot",
+}
+
+# Plain-text operator names (typically the base of m:limLow / m:limUpp) that
+# must become LaTeX commands to render upright with correct spacing.
+_OPERATOR_NAMES = {
+    "lim": r"\lim",
+    "max": r"\max",
+    "min": r"\min",
+    "sup": r"\sup",
+    "inf": r"\inf",
+    "arg": r"\arg",
+    "det": r"\det",
+    "gcd": r"\gcd",
+    "lg": r"\lg",
+    "ln": r"\ln",
+    "log": r"\log",
+    "exp": r"\exp",
+    "sin": r"\sin",
+    "cos": r"\cos",
+    "tan": r"\tan",
+    "cot": r"\cot",
+    "sec": r"\sec",
+    "csc": r"\csc",
+    "sinh": r"\sinh",
+    "cosh": r"\cosh",
+    "tanh": r"\tanh",
+    "arcsin": r"\arcsin",
+    "arccos": r"\arccos",
+    "arctan": r"\arctan",
+    "mod": r"\bmod",
+}
+
+def _tex_escape(text: str) -> str:
+    out = []
+    for ch in text:
+        if ch in _UNICODE_TO_LATEX:
+            out.append(_UNICODE_TO_LATEX[ch])
+        elif ch in _LATEX_ESCAPES:
+            out.append(_LATEX_ESCAPES[ch])
+        else:
+            out.append(ch)
+    return "".join(out)
+
 def _text(el):
     return "".join(_convert_omml(c) for c in el if isinstance(c.tag, str))
 
+def _child(el, name: str) -> str:
+    found = _find(el, name)
+    return _convert_omml(found) if found is not None else ""
+
 def _convert_omml(el) -> str:
+    """Convert an OMML element to LaTeX math. Called on the math body; the
+    `$...$` / `$$...$$` delimiters are added by the paragraph collector."""
     tag = el.tag
     if tag == _m("t"):
-        return el.text or ""
+        return _tex_escape(el.text or "")
     if tag == _m("r"):
         return _text(el)
     if tag in _PASSTHROUGH_TAGS:
         return _text(el)
 
     if tag == _m("sSup"):
-        base = _convert_omml(_find(el, "e")) if _find(el, "e") is not None else ""
-        sup = _convert_omml(_find(el, "sup")) if _find(el, "sup") is not None else ""
-        return f"{_wrap(base)}^{sup}"
+        return f"{_child(el, 'e')}^{{{_child(el, 'sup')}}}"
     if tag == _m("sSub"):
-        base = _convert_omml(_find(el, "e")) if _find(el, "e") is not None else ""
-        sub = _convert_omml(_find(el, "sub")) if _find(el, "sub") is not None else ""
-        return f"{_wrap(base)}_{sub}"
+        return f"{_child(el, 'e')}_{{{_child(el, 'sub')}}}"
     if tag == _m("sSubSup"):
-        base = _convert_omml(_find(el, "e")) if _find(el, "e") is not None else ""
-        sub = _convert_omml(_find(el, "sub")) if _find(el, "sub") is not None else ""
-        sup = _convert_omml(_find(el, "sup")) if _find(el, "sup") is not None else ""
-        return f"{_wrap(base)}_{sub}^{sup}"
+        return f"{_child(el, 'e')}_{{{_child(el, 'sub')}}}^{{{_child(el, 'sup')}}}"
     if tag == _m("f"):
-        num = _convert_omml(_find(el, "num")) if _find(el, "num") is not None else ""
-        den = _convert_omml(_find(el, "den")) if _find(el, "den") is not None else ""
-        return f"({num})/({den})"
+        return f"\\frac{{{_child(el, 'num')}}}{{{_child(el, 'den')}}}"
     if tag == _m("rad"):
-        deg = _convert_omml(_find(el, "deg")) if _find(el, "deg") is not None else ""
-        base = _convert_omml(_find(el, "e")) if _find(el, "e") is not None else ""
-        return f"[{deg}]√({base})" if deg else f"√({base})"
+        deg = _child(el, "deg")
+        base = _child(el, "e")
+        return f"\\sqrt[{deg}]{{{base}}}" if deg else f"\\sqrt{{{base}}}"
     if tag == _m("limLow"):
-        base = _convert_omml(_find(el, "e")) if _find(el, "e") is not None else ""
-        lim = _convert_omml(_find(el, "lim")) if _find(el, "lim") is not None else ""
-        return f"{base}_{{{lim}}}"
+        base = _child(el, "e")
+        lim = _child(el, "lim")
+        op = _OPERATOR_NAMES.get(base.strip())
+        return f"{op or base}_{{{lim}}}"
     if tag == _m("limUpp"):
-        base = _convert_omml(_find(el, "e")) if _find(el, "e") is not None else ""
-        lim = _convert_omml(_find(el, "lim")) if _find(el, "lim") is not None else ""
-        return f"{base}^{{{lim}}}"
+        base = _child(el, "e")
+        lim = _child(el, "lim")
+        op = _OPERATOR_NAMES.get(base.strip())
+        return f"{op or base}^{{{lim}}}"
     if tag == _m("nary"):
         props = _find(el, "naryPr")
         chr_ = _mval(_find(props, "chr")) if props is not None else "\u222b"
-        sub = _convert_omml(_find(props, "sub")) if props is not None and _find(props, "sub") is not None else ""
-        sup = _convert_omml(_find(props, "sup")) if props is not None and _find(props, "sup") is not None else ""
-        e = _convert_omml(_find(el, "e")) if _find(el, "e") is not None else ""
-        out = chr_ or "\u222b"
+        cmd = _NARY_COMMANDS.get(chr_, chr_ or r"\int")
+        sub = _child(props, "sub") if props is not None else ""
+        sup = _child(props, "sup") if props is not None else ""
+        e = _child(el, "e")
+        out = cmd
         if sub:
             out += f"_{{{sub}}}"
         if sup:
             out += f"^{{{sup}}}"
         if e:
-            out += f"({e})"
+            out += f" {e}"
         return out
     if tag == _m("d"):
         props = _find(el, "dPr")
         beg = _mval(_find(props, "begChr")) if props is not None else "("
         end = _mval(_find(props, "endChr")) if props is not None else ")"
-        return f"{beg}{_text(el)}{end}"
+        body = _text(el)
+        if beg in ("(", "[", "|", "\\{") and end in (")", "]", "|", "\\}"):
+            return f"\\left{beg}{body}\\right{end}"
+        return f"{beg}{body}{end}"
     if tag == _m("func"):
-        name = _convert_omml(_find(el, "fName")) if _find(el, "fName") is not None else ""
-        arg = _convert_omml(_find(el, "e")) if _find(el, "e") is not None else ""
-        return f"{name}({arg})"
+        name = _child(el, "fName")
+        arg = _child(el, "e")
+        return f"\\operatorname{{{name}}}({arg})" if name else f"({arg})"
     if tag == _m("eqArr"):
         rows = [_convert_omml(e) for e in el if isinstance(e.tag, str) and e.tag == _m("e")]
-        return " | ".join(rows)
+        return " \\qquad ".join(rows)
+    if tag == _m("m"):
+        rows = []
+        for mr in el:
+            if isinstance(mr.tag, str) and mr.tag == _m("mr"):
+                cells = [_convert_omml(e) for e in mr if isinstance(e.tag, str) and e.tag == _m("e")]
+                rows.append(" & ".join(cells))
+        if rows:
+            return "\\begin{matrix} " + " \\\\ ".join(rows) + " \\end{matrix}"
+        return ""
     if tag == _m("acc"):
         props = _find(el, "accPr")
         chr_ = _mval(_find(props, "chr")) if props is not None else ""
-        return f"{_text(el)}{chr_}"
+        body = _text(el)
+        cmd = _ACCENT_COMMANDS.get(chr_)
+        if cmd:
+            return f"{cmd}{{{body}}}"
+        return f"{body}{chr_}" if chr_ else body
     if tag == _m("bar"):
         props = _find(el, "barPr")
         pos = _mval(_find(props, "pos")) if props is not None else "top"
         body = _text(el)
-        return f"\u203e{body}" if pos != "bot" else f"{body}\u203e"
+        return f"\\overline{{{body}}}" if pos != "bot" else f"\\underline{{{body}}}"
     if tag == _m("groupChr"):
         props = _find(el, "groupChrPr")
         chr_ = _mval(_find(props, "chr")) if props is not None else "("
-        return f"{chr_}{_text(el)}{chr_}"
+        body = _text(el)
+        if chr_ == "\u23de":
+            return f"\\overbrace{{{body}}}"
+        if chr_ == "\u23df":
+            return f"\\underbrace{{{body}}}"
+        return f"{chr_}{body}{chr_}"
 
     # Unknown construct: recurse and keep whatever text survives.
     return _text(el)
-
-def _wrap(s: str) -> str:
-    return s if len(s) <= 1 else f"({s})"
 
 def _inline_text(el) -> str:
     """Collect run text / OMML without stripping — spaces between runs must survive."""
     if el.tag == _w("t"):
         return el.text or ""
-    if el.tag in (_m("oMath"), _m("oMathPara")):
-        return _convert_omml(el)
+    if el.tag == _m("oMathPara"):
+        # Display equation — KaTeX display mode.
+        return "$$" + _convert_omml(el) + "$$"
+    if el.tag == _m("oMath"):
+        # Inline equation — KaTeX inline mode.
+        return "$" + _convert_omml(el) + "$"
     if el.tag == _w("br"):
         return " "
     if el.tag == _w("tab"):
@@ -177,8 +304,10 @@ def extract_text_from_docx(file_path: str) -> list[str]:
     """
     Extract readable text blocks from a .docx in document order (paragraphs
     and table cells, depth-first). Word equations (OMML) are converted to
-    linear notation such as "lim_{x->3}(x^2-5x+6)/(x^2-3x+2)" so formulas stay
-    searchable instead of arriving as garbled glyph text from a PDF layer.
+    LaTeX wrapped in $...$ / $$...$$ delimiters, e.g.
+    "$\\lim_{x \\to 3} \\frac{x^{2}-5x+6}{x^{2}-3x+2}$", so formulas stay
+    searchable and render with KaTeX instead of arriving as garbled glyph
+    text from a PDF layer.
     """
     log_event("docx_extractor.start", "Extracting text from DOCX.", file_path=file_path)
     document = docx.Document(file_path)
