@@ -4,10 +4,11 @@
 Fitur ini (`apps/stb-worker`) adalah layanan asinkron berbasis Python (FastAPI) dengan pola **Clean Architecture** yang berjalan secara fisik di dalam STB (Set Top Box).
 Ketika Supabase Trigger mengirimkan sinyal melalui Webhook `/api/ingest`, worker ini akan:
 1. **Resolve & Download**: Mengambil `storage_path` dokumen dari Supabase (key asli seperti `{docId}.pdf` / `{docId}.docx` — tidak di-hardcode `.pdf`), lalu mengunduh file dari instans MinIO lokal ke penyimpanan *temporary*.
-2. **Konversi DOCX → PDF (jika diperlukan)**: Untuk `.docx`/`.doc`, worker menjalankan LibreOffice headless (`soffice --headless --convert-to pdf`) dengan timeout 120 detik dan profil terisolasi per job. PDF hasil konversi di-*upload* kembali ke MinIO sebagai `{tenant}/{docId}.pdf` — inilah yang dipakai frontend untuk viewer. **`libreoffice-math` wajib terpasang**: tanpa komponen ini rumus OMML (insert equation di Word) diimpor sebagai objek kosong dan hilang dari PDF.
+2. **Konversi DOCX/TXT → PDF (jika diperlukan)**: Untuk `.docx`/`.doc`/`.txt`, worker menjalankan LibreOffice headless (`soffice --headless --convert-to pdf`) dengan timeout 120 detik dan profil terisolasi per job. PDF hasil konversi di-*upload* kembali ke MinIO sebagai `{tenant}/{docId}.pdf` — inilah yang dipakai frontend untuk viewer. **`libreoffice-math` wajib terpasang**: tanpa komponen ini rumus OMML (insert equation di Word) diimpor sebagai objek kosong dan hilang dari PDF.
 3. **Extraction & Chunking**:
    - **PDF**: teks per halaman via `PyMuPDF`, dipecah menjadi *chunks* dengan *tokenizer* `tiktoken` (cl100k_base, 1000 token, overlap 150) — mapping token→halaman melekat pada metadata.
    - **DOCX**: teks diekstrak dari dokumen itu sendiri via `python-docx` (paragraf, sel tabel, textbox secara berurutan), dengan rumus OMML dikonversi menjadi **LaTeX** yang dibungkus delimiter `$...$` (inline) / `$$...$$` (display) — lihat §3. Chunking memakai blok yang digabung *newline* (mencegah kata menyatu lintas blok).
+   - **TXT**: dibaca via `services/txt_extractor.py` dengan deteksi encoding berantai (UTF-8 BOM → UTF-16 BOM → UTF-8 → cp1252 sebagai fallback yang tidak pernah gagal untuk teks Windows lawas). File biner yang diklaim `.txt` (NUL bytes, selain UTF-16) ditolak dengan status `failed`.
 4. **Page Alignment (khusus DOCX)**: chunk hasil ekstraksi docx tidak punya halaman — pager mencocokkan setiap chunk ke halaman PDF hasil konversi memakai **rare n-gram** (jendela alnum 25 karakter yang muncul ≤3× di teks PDF). Alasan utama: LibreOffice **mengulang header + tabel kartu** di halaman berikutnya saat kartu melewati batas halaman, sehingga stream PDF lebih panjang dari teks docx dan pendekatan advance berbasis posisi selalu meleset — n-gram langka menembusnya karena yang dicocokkan adalah konten unik, bukan boilerplate. Lihat §5.
 5. **Rate Limiting (Gatekeeper)**: Memeriksa kuota token harian (**TPD**) ke Upstash Redis menggunakan *script Lua* sebelum menembak API eksternal.
 6. **Embedding & LLM Description (Parallel)**: Menerjemahkan potongan teks menjadi vektor **1024-dimensi** secara sekuensial menggunakan **Cloudflare Workers AI (`@cf/baai/bge-m3`)**. Bersamaan dengan ini, di *thread* lain, potongan awal teks sepanjang 3000 karakter diproses oleh LLM (`gemini-3.1-flash-lite`) untuk menghasilkan deskripsi/rangkuman dokumen. Menyertakan `document_id` pada seluruh event log LLM metadata (`llm.generation_started`, `llm.generation_success`).
@@ -33,10 +34,14 @@ sequenceDiagram
     API->>PostgREST: GET /rest/v1/documents (idempotency + storage_path)
     API->>Disk: Download file asli ({docId}.{ext}) dari MinIO
 
-    alt Ekstensi .docx / .doc
+    alt Ekstensi .docx / .doc / .txt
         API->>Disk: soffice --headless --convert-to pdf (timeout 120s)
         API->>Disk: Upload PDF hasil konversi -> MinIO {docId}.pdf
-        API->>Disk: Ekstrak teks docx (python-docx + OMML->LaTeX)
+        alt Ekstensi .docx
+            API->>Disk: Ekstrak teks docx (python-docx + OMML->LaTeX)
+        else Ekstensi .txt
+            API->>Disk: Baca teks (deteksi encoding: utf-8/utf-16/cp1252)
+        end
         API->>Disk: Align chunk -> halaman PDF (rare n-gram)
     else Ekstensi .pdf
         API->>Disk: Ekstrak teks per halaman (PyMuPDF)
@@ -135,7 +140,8 @@ Saat pengguna menghentikan unggahan di tengah jalan:
 | `apps/stb-worker/services/docx_extractor.py` | Ekstraksi docx (paragraf + tabel + textbox), konverter OMML → LaTeX `$...$`/`$$...$$` |
 | `apps/stb-worker/services/pager.py` | Alignment chunk → halaman PDF via rare n-gram (kuartil anchor, interpolasi, jaminan monoton) |
 | `apps/stb-worker/services/extractor.py` | Chunker stream dengan separator newline antar blok + `_align_text` |
-| `apps/stb-worker/services/converter.py` | Subprocess LibreOffice headless dengan timeout & profil terisolasi |
+| `apps/stb-worker/services/converter.py` | Subprocess LibreOffice headless dengan timeout & profil terisolasi (`convert_to_pdf` — generik untuk docx/txt) |
+| `apps/stb-worker/services/txt_extractor.py` | Baca .txt dengan deteksi encoding (utf-8-sig, utf-16, utf-8, cp1252) + tolak file biner |
 | `apps/stb-worker/services/storage.py` | `download_document` berbasis storage_path, `upload_document` (PDF konversi) |
 | `apps/stb-worker/services/database.py` | `fetch_document_storage_path` |
 | `apps/stb-worker/Dockerfile` | `libreoffice-writer` + `libreoffice-math` + `fonts-liberation` |

@@ -9,9 +9,10 @@ from concurrent.futures import ThreadPoolExecutor
 from core.config import settings
 from core.logger import log_event
 from services.storage import download_document, upload_document
-from services.converter import convert_docx_to_pdf
+from services.converter import convert_to_pdf
 from services.extractor import extract_text_from_pdf, chunk_text_with_pages, chunk_text_stream
 from services.docx_extractor import extract_text_from_docx
+from services.txt_extractor import extract_text_from_txt, TxtExtractionError
 from services.pager import assign_pages_to_chunks
 from services.embedding import generate_embedding_with_retry, TransientAPIError
 from services.llm import generate_llm_description
@@ -161,7 +162,7 @@ def process_document(tenant_id: str, document_id: str):
     ext = os.path.splitext(storage_path)[1].lower()
     log_event("processor.step0_resolved", "Resolved document storage path.", document_id=document_id, tenant_id=tenant_id, storage_path=storage_path)
 
-    if ext not in (".pdf", ".docx", ".doc"):
+    if ext not in (".pdf", ".docx", ".doc", ".txt"):
         log_event("processor.unsupported_type", "Unsupported document extension.", level="ERROR", document_id=document_id, tenant_id=tenant_id, storage_path=storage_path, extension=ext)
         mark_document_failed(document_id)
         return
@@ -175,13 +176,13 @@ def process_document(tenant_id: str, document_id: str):
         log_event("processor.step1_downloading", "Downloading document from MinIO...", document_id=document_id, tenant_id=tenant_id)
         download_document(tenant_id, storage_path, temp_input.name)
 
-        if ext == ".docx":
+        if ext in (".docx", ".txt"):
             if ingestion_queue.is_cancelled(document_id):
                 log_event("processor.job_cancelled", "Cancellation detected before conversion.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
                 return
 
             log_event("processor.step1_5_converting", "Converting document to PDF.", document_id=document_id, tenant_id=tenant_id, extension=ext)
-            convert_docx_to_pdf(temp_input.name, temp_pdf.name)
+            convert_to_pdf(temp_input.name, temp_pdf.name)
 
             if ingestion_queue.is_cancelled(document_id):
                 log_event("processor.job_cancelled", "Cancellation detected after conversion.", level="WARNING", document_id=document_id, tenant_id=tenant_id)
@@ -190,11 +191,16 @@ def process_document(tenant_id: str, document_id: str):
             log_event("processor.step1_5_uploading_pdf", "Uploading converted PDF to MinIO.", document_id=document_id, tenant_id=tenant_id)
             upload_document(temp_pdf.name, tenant_id, f"{document_id}.pdf")
 
-            # DOCX: extract text from the document itself (OMML becomes readable
-            # linear math) and align chunks to the converted PDF for page jumps.
-            blocks = extract_text_from_docx(temp_input.name)
+            # DOCX/TXT: extract text from the source file itself (OMML becomes
+            # LaTeX, txt goes through encoding detection) and align chunks to
+            # the converted PDF for page jumps.
+            if ext == ".docx":
+                blocks = extract_text_from_docx(temp_input.name)
+                log_event("processor.step2_docx_extracted", "DOCX text extracted and chunked.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(blocks))
+            else:
+                blocks = extract_text_from_txt(temp_input.name)
+                log_event("processor.step2_txt_extracted", "TXT text extracted.", document_id=document_id, tenant_id=tenant_id, total_blocks=len(blocks))
             chunks = chunk_text_stream(blocks, chunk_size=1000, overlap=150)
-            log_event("processor.step2_docx_extracted", "DOCX text extracted and chunked.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(chunks))
             chunks = assign_pages_to_chunks(chunks, temp_pdf.name)
             log_event("processor.step3_pages_aligned", "Chunks aligned to PDF pages.", document_id=document_id, tenant_id=tenant_id, total_chunks=len(chunks))
             full_text = "\n".join(blocks)
@@ -248,6 +254,9 @@ def process_document(tenant_id: str, document_id: str):
         mark_document_processed(document_id, description)
         log_event("processor.step7_completed", "All chunks processed and upserted successfully.", document_id=document_id, tenant_id=tenant_id)
         
+    except TxtExtractionError as e:
+        log_event("processor.txt_extraction_failed", "TXT extraction failed (binary or undecodable file).", level="ERROR", document_id=document_id, tenant_id=tenant_id, error=str(e))
+        mark_document_failed(document_id)
     except TransientAPIError as e:
         log_event("processor.transient_api_failure", "Embedding API transient failure after retries. Progress checkpointed & re-queueing document for retry.", level="WARNING", document_id=document_id, tenant_id=tenant_id, error=str(e))
         mark_document_queued(document_id)

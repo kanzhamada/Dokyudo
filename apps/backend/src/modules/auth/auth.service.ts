@@ -14,6 +14,7 @@ import { verifyRecaptcha } from "../../shared/utils/recaptcha.util.ts";
 import {
     sendVerificationEmail,
     sendRecoveryEmail,
+    sendWelcomeEmailOnce,
 } from "../../shared/utils/email.util.ts";
 import * as AuthParams from "./auth.schema.ts";
 import { AuthConstants } from "../../shared/constants/auth.constant.ts";
@@ -209,6 +210,22 @@ export class AuthService {
                     "Registration failed during email generation, please try again later",
                 status: 500,
             });
+        }
+
+        // Step G: Welcome notification — purely informational, never blocks
+        // registration (the Redis NX claim guarantees one welcome per user).
+        try {
+            await sendWelcomeEmailOnce({
+                email: params.email,
+                userId: linkData.user.id,
+                requestId: params.requestId,
+                provider: "email",
+            });
+        } catch (welcomeErr: any) {
+            if (params.logContext) {
+                params.logContext.authWarning =
+                    "Welcome email failed (non-fatal): " + welcomeErr.message;
+            }
         }
 
         if (params.logContext) {

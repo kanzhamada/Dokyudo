@@ -5,9 +5,10 @@ import tempfile
 from core.config import settings
 from core.logger import log_event
 
-def convert_docx_to_pdf(input_path: str, output_pdf_path: str):
+def convert_to_pdf(input_path: str, output_pdf_path: str):
     """
-    Convert a .docx (or .doc) file to PDF using headless LibreOffice.
+    Convert a document (.docx, .doc, .txt, ...) to PDF using headless
+    LibreOffice Writer.
 
     Runs as a subprocess with a hard timeout so a corrupt document can never
     block the ingestion queue. Each job gets an isolated LibreOffice profile

@@ -3,8 +3,10 @@ import {
     paymentTransactions,
     tenantSubscriptions,
     tenants,
+    users,
 } from "../../shared/models/db.model.ts";
 import { logActivity } from "../../shared/utils/activity.util.ts";
+import { sendPaymentSuccessEmail } from "../../shared/utils/email.util.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import { stripe } from "../../config/stripe.ts";
 import { CreateCheckoutBody, VerifyCheckoutSessionParams, VerifyCheckoutSessionResponse } from "./payments.schema.ts";
@@ -266,6 +268,19 @@ export class PaymentsService {
                     userAgent: params.userAgent,
                     requestId: logContext?.requestId,
                 });
+
+                // 5. Send the payment confirmation email with the summary.
+                // Best-effort: a delivery failure must never break the webhook
+                // acknowledgement (Stripe would retry the whole event).
+                await PaymentsService.sendPaymentSuccessNotification({
+                    tenantId: trx.tenantId,
+                    tier: tierToUnlock,
+                    amountMinor: session.amount_total ?? trx.amount ?? 0,
+                    currency: session.currency ?? trx.currency ?? "USD",
+                    paidAt: new Date(),
+                    externalId: trx.externalId,
+                    logContext,
+                });
                 break;
             }
             case "customer.subscription.created":
@@ -476,5 +491,56 @@ export class PaymentsService {
             status: session.payment_status ?? "unpaid",
             tier: session.metadata?.tierToUnlock ?? null,
         };
+    }
+
+    /** Human-readable tier labels for receipts (mirrors the billing UI). */
+    static readonly TIER_LABELS: Record<string, string> = {
+        SIMULATE: "Sandbox & Evaluation",
+        OIL_INVESTOR: "Pro Investor",
+        PRO: "Pro Real",
+    };
+
+    /**
+     * Sends the payment success notification email for a completed checkout.
+     * Best-effort by design: the email is a receipt, not provisioning — failures
+     * are logged and swallowed so the webhook can always acknowledge Stripe.
+     */
+    private static async sendPaymentSuccessNotification(params: {
+        tenantId: string;
+        tier: string;
+        amountMinor: number;
+        currency: string;
+        paidAt: Date;
+        externalId: string;
+        logContext?: Record<string, any>;
+    }): Promise<void> {
+        try {
+            // Pick the tenant's first (owner) user as the recipient.
+            const [userRow] = await db
+                .select({ email: users.email })
+                .from(users)
+                .where(eq(users.tenantId, params.tenantId))
+                .orderBy(users.createdAt)
+                .limit(1);
+
+            if (!userRow) {
+                if (params.logContext) params.logContext.emailWarning = "No user found for tenant";
+                return;
+            }
+
+            await sendPaymentSuccessEmail({
+                email: userRow.email,
+                planName: PaymentsService.TIER_LABELS[params.tier] ?? params.tier,
+                amountMinor: params.amountMinor,
+                currency: params.currency,
+                paidAt: params.paidAt,
+                dashboardUrl: `${getEnv("FRONTEND_URL")}/app?billing=open`,
+                externalId: params.externalId,
+            });
+        } catch (err: any) {
+            // Never propagate: the webhook response is independent of email delivery.
+            if (params.logContext) params.logContext.emailError = err.message;
+            console.error("[Payments] Failed to send payment success email:", err.message);
+        }
     }
 }

@@ -2,6 +2,7 @@ import { getSupabaseAnon, getSupabaseAdmin } from "../../../config/supabase.ts";
 import { getEnv } from "../../../config/env.ts";
 import { redis } from "../../../config/redis.ts";
 import { AppError } from "../../../shared/utils/errors.util.ts";
+import { sendWelcomeEmailOnce } from "../../../shared/utils/email.util.ts";
 import * as OAuthSchema from "./oauth.schema.ts";
 import { db } from "../../../config/drizzle.ts";
 import {
@@ -204,6 +205,35 @@ export class OAuthService {
         });
 
         if (tenantId) {
+            // First-time OAuth login = account registration: send the one-time
+            // welcome email. Checked BEFORE this login is written to
+            // activity_logs below — any prior "auth.login" row means the
+            // account already exists. Best-effort: a failure never breaks the
+            // login, and the Redis NX claim dedupes concurrent first logins.
+            try {
+                const [priorLogins] = await db
+                    .select({ total: count() })
+                    .from(activityLogs)
+                    .where(
+                        and(
+                            eq(activityLogs.userId, user.id),
+                            eq(activityLogs.action, "auth.login"),
+                        ),
+                    );
+                if (priorLogins.total === 0) {
+                    await sendWelcomeEmailOnce({
+                        email: user.email!,
+                        userId: user.id,
+                        requestId: params.requestId,
+                        provider: params.provider,
+                    });
+                }
+            } catch (welcomeErr: any) {
+                if (params.logContext) {
+                    params.logContext.welcomeEmailError = welcomeErr.message;
+                }
+            }
+
             this.debugLog("activity_logging", {
                 tenantId,
                 userId: user.id,

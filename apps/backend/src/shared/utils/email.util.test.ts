@@ -1,7 +1,13 @@
 import { describe, it, beforeAll, afterAll } from "jsr:@std/testing/bdd";
 import { assertEquals, assertRejects } from "jsr:@std/assert";
-import { sendVerificationEmail, sendRecoveryEmail } from "./email.util.ts";
+import {
+    sendVerificationEmail,
+    sendRecoveryEmail,
+    sendPaymentSuccessEmail,
+    sendWelcomeEmailOnce,
+} from "./email.util.ts";
 import { resend } from "../../config/resend.ts";
+import { redis } from "../../config/redis.ts";
 import { AppError } from "./errors.util.ts";
 
 describe("Email Utility", () => {
@@ -26,6 +32,17 @@ describe("Email Utility", () => {
         resend.emails.send = originalResendSend;
     });
 
+    async function withProductionEnv(fn: () => Promise<void>) {
+        const previous = Deno.env.get("NODE_ENV");
+        Deno.env.set("NODE_ENV", "production");
+        try {
+            await fn();
+        } finally {
+            if (previous === undefined) Deno.env.delete("NODE_ENV");
+            else Deno.env.set("NODE_ENV", previous);
+        }
+    }
+
     describe("sendVerificationEmail", () => {
         it("positive: calls resend with correct parameters", async () => {
             mockError = null;
@@ -42,11 +59,13 @@ describe("Email Utility", () => {
         it("negative: throws AppError when resend fails", async () => {
             mockError = new Error("Resend API down");
             
-            await assertRejects(
-                () => sendVerificationEmail("test@example.com", "https://verify.me", "user-123", "req-123"),
-                AppError,
-                "Failed to send verification email"
-            );
+            await withProductionEnv(async () => {
+                await assertRejects(
+                    () => sendVerificationEmail("test@example.com", "https://verify.me", "user-123", "req-123"),
+                    AppError,
+                    "Failed to send verification email"
+                );
+            });
         });
     });
 
@@ -67,11 +86,165 @@ describe("Email Utility", () => {
         it("negative: throws AppError when resend fails", async () => {
             mockError = new Error("Resend rate limited");
             
-            await assertRejects(
-                () => sendRecoveryEmail("recover@example.com", "https://recover.me", "123456", "req-456"),
-                AppError,
-                "Failed to send recovery email"
+            await withProductionEnv(async () => {
+                await assertRejects(
+                    () => sendRecoveryEmail("recover@example.com", "https://recover.me", "123456", "req-456"),
+                    AppError,
+                    "Failed to send recovery email"
+                );
+            });
+        });
+    });
+
+    describe("sendPaymentSuccessEmail", () => {
+        it("positive: includes plan, formatted amount, date and idempotency key", async () => {
+            mockError = null;
+            lastSendPayload = null;
+
+            await sendPaymentSuccessEmail({
+                email: "buyer@example.com",
+                planName: "Pro Real",
+                amountMinor: 58000,
+                currency: "IDR",
+                paidAt: new Date("2026-08-13T07:00:00.000Z"),
+                dashboardUrl: "https://dokyudo.my.id/app?billing=open",
+                externalId: "dokyudo-tenant-123-1750000000000",
+            });
+
+            const html = lastSendPayload.payload.html.replace(/\u00A0/g, " ");
+            assertEquals(lastSendPayload.payload.to, ["buyer@example.com"]);
+            assertEquals(lastSendPayload.payload.subject.includes("Pro Real"), true);
+            assertEquals(html.includes("Payment successful"), true);
+            assertEquals(html.includes("Pro Real"), true);
+            assertEquals(html.includes("Rp 58.000,00"), true);
+            assertEquals(html.includes("Aug 13, 2026"), true);
+            assertEquals(html.includes("https://dokyudo.my.id/app?billing=open"), true);
+            assertEquals(
+                lastSendPayload.options.idempotencyKey,
+                "payment-success/dokyudo-tenant-123-1750000000000"
             );
+        });
+
+        it("positive: escapes user-controlled plan name in the email body", async () => {
+            mockError = null;
+            lastSendPayload = null;
+
+            await sendPaymentSuccessEmail({
+                email: "buyer@example.com",
+                planName: "Pro <script>alert(1)</script>",
+                amountMinor: 1000,
+                currency: "USD",
+                paidAt: new Date(),
+                dashboardUrl: "https://dokyudo.my.id/app?billing=open",
+                externalId: "escape-test-1",
+            });
+
+            const html = lastSendPayload.payload.html.replace(/\u00A0/g, " ");
+            assertEquals(html.includes("<script>"), false);
+            assertEquals(html.includes("&lt;script&gt;"), true);
+            // USD is a two-decimal currency: 1000 minor units = US$10.00.
+            assertEquals(html.includes("US$10,00"), true);
+        });
+
+        it("negative: throws AppError when resend fails", async () => {
+            mockError = new Error("Resend API down");
+
+            await withProductionEnv(async () => {
+                await assertRejects(
+                    () =>
+                        sendPaymentSuccessEmail({
+                            email: "buyer@example.com",
+                            planName: "Pro Real",
+                            amountMinor: 58000,
+                            currency: "IDR",
+                            paidAt: new Date(),
+                            dashboardUrl: "https://dokyudo.my.id/app?billing=open",
+                            externalId: "fail-test-1",
+                        }),
+                    AppError,
+                    "Failed to send payment success email"
+                );
+            });
+        });
+    });
+
+    describe("sendWelcomeEmailOnce", () => {
+        const userId = `welcome-test-${crypto.randomUUID()}`;
+        const markerKey = `welcome_email:${userId}`;
+
+        afterAll(async () => {
+            await redis.del(markerKey);
+        });
+
+        it("positive: sends the welcome email with correct payload and idempotency key", async () => {
+            mockError = null;
+            lastSendPayload = null;
+
+            const sent = await sendWelcomeEmailOnce({
+                email: "newbie@example.com",
+                userId,
+                requestId: "req-welcome",
+                provider: "google",
+            });
+
+            assertEquals(sent, true);
+            assertEquals(lastSendPayload.payload.to, ["newbie@example.com"]);
+            assertEquals(lastSendPayload.payload.subject.includes("Welcome"), true);
+            assertEquals(lastSendPayload.payload.html.includes("google"), true);
+            assertEquals(lastSendPayload.payload.html.includes("Get Started"), true);
+            assertEquals(
+                lastSendPayload.options.idempotencyKey,
+                `welcome-email/${userId}`
+            );
+        });
+
+        it("positive: skips the second welcome for the same user (marker claimed)", async () => {
+            mockError = null;
+            lastSendPayload = null;
+
+            const sent = await sendWelcomeEmailOnce({
+                email: "newbie@example.com",
+                userId,
+                requestId: "req-welcome-2",
+            });
+
+            assertEquals(sent, false);
+            assertEquals(lastSendPayload, null);
+        });
+
+        it("negative: throws AppError when resend fails and releases the marker", async () => {
+            mockError = new Error("Resend API down");
+            const failUserId = `welcome-fail-${crypto.randomUUID()}`;
+            const failMarkerKey = `welcome_email:${failUserId}`;
+
+            try {
+                await withProductionEnv(async () => {
+                    await assertRejects(
+                        () =>
+                            sendWelcomeEmailOnce({
+                                email: "fail@example.com",
+                                userId: failUserId,
+                                requestId: "req-welcome-fail",
+                            }),
+                        AppError,
+                        "Failed to send welcome email"
+                    );
+                });
+            } finally {
+                await redis.del(failMarkerKey);
+            }
+
+            // Marker released on failure — a retry can re-claim it.
+            mockError = null;
+            lastSendPayload = null;
+            const retried = await sendWelcomeEmailOnce({
+                email: "fail@example.com",
+                userId: failUserId,
+                requestId: "req-welcome-fail-2",
+            });
+            assertEquals(retried, true);
+            assertEquals(lastSendPayload.payload.to, ["fail@example.com"]);
+            await redis.del(failMarkerKey);
         });
     });
 });

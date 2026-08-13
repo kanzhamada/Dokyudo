@@ -3,6 +3,7 @@ import { describe, it, beforeAll, afterAll } from "jsr:@std/testing/bdd";
 import { stub, type Stub } from "jsr:@std/testing/mock";
 import app from "../../main.ts";
 import { stripe } from "../../config/stripe.ts";
+import { resend } from "../../config/resend.ts";
 import { db } from "../../config/drizzle.ts";
 import { paymentTransactions } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
@@ -41,6 +42,7 @@ describe("Payments Routes", () => {
     let tenantIdForTest = "";
     let validAccessToken = "";
     let checkoutStub: Stub<any>;
+    let webhookEventOverride: any = null;
     let portalStub: Stub<any>;
     let webhookEventStub: Stub<any>;
     let verifyStub: Stub<any>;
@@ -121,7 +123,13 @@ describe("Payments Routes", () => {
 
         webhookEventStub = stub(stripe.webhooks, "constructEventAsync", (body, signature, secret) => {
             if (signature === "invalid") return Promise.reject(new Error("Invalid signature"));
-            
+
+            // Nested describes may override the parsed event (e.g. the email
+            // flow test seeds a full checkout.session.completed object).
+            if (webhookEventOverride !== null) {
+                return Promise.resolve(webhookEventOverride);
+            }
+
             // Mock a parsed Stripe Event
             return Promise.resolve({
                 type: "checkout.session.completed",
@@ -321,6 +329,79 @@ describe("Payments Routes", () => {
             assertEquals(res.status, 200);
             const json = await res.json();
             assertEquals(json.received, true);
+        });
+    });
+
+    describe("webhook triggers payment success email", () => {
+        let originalEmailSend: any;
+        let lastEmailPayload: any;
+        const externalId = `email-test-${crypto.randomUUID()}`;
+
+        beforeAll(async () => {
+            // Seed a pending transaction for the test tenant.
+            await db.insert(paymentTransactions).values({
+                tenantId: tenantIdForTest,
+                externalId,
+                stripeSessionId: "cs_test_email_flow",
+                tierToUnlock: "PRO",
+                amount: 58000,
+                currency: "IDR",
+                status: "PENDING",
+            });
+
+            // Mock Resend so no real email leaves the test environment.
+            // Direct assignment (not stub()): resend.emails.send is an instance
+            // method that stub() refuses to wrap.
+            originalEmailSend = resend.emails.send;
+            // @ts-ignore - Bypass strict Resend types for mocking
+            resend.emails.send = async (payload: any) => {
+                lastEmailPayload = payload;
+                return { data: { id: "test-id" }, error: null };
+            };
+
+            // Point the webhook signature verifier at a completed session owned by the tenant.
+            webhookEventOverride = {
+                type: "checkout.session.completed",
+                data: {
+                    object: {
+                        id: "cs_test_email_flow",
+                        amount_total: 58000,
+                        currency: "idr",
+                        customer: "cus_test_email",
+                        metadata: {
+                            tenantId: tenantIdForTest,
+                            externalId,
+                            tierToUnlock: "PRO",
+                        },
+                    },
+                },
+            };
+        });
+
+        afterAll(async () => {
+            webhookEventOverride = null;
+            resend.emails.send = originalEmailSend;
+            await db.delete(paymentTransactions).where(eq(paymentTransactions.externalId, externalId));
+        });
+
+        it("positive: sends a summary email to the tenant's user with the right payload", async () => {
+            const req = new Request("http://localhost/api/payments/webhook", {
+                method: "POST",
+                headers: {
+                    "stripe-signature": "valid-signature"
+                },
+                body: "raw body data",
+            });
+
+            const res = await app.fetch(req);
+            assertEquals(res.status, 200);
+
+            assertEquals(typeof lastEmailPayload, "object");
+            assertEquals(lastEmailPayload.from, "Dokyudo <team@dokyudo.my.id>");
+            assertEquals(lastEmailPayload.subject.includes("Pro Real"), true);
+            const html = lastEmailPayload.html.replace(/\u00A0/g, " ");
+            assertEquals(html.includes("Rp 58.000,00"), true);
+            assertEquals(html.includes("Open Dokyudo"), true);
         });
     });
 });
