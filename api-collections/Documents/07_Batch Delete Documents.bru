@@ -25,6 +25,6 @@ body:json {
 
 docs {
   Deletes multiple documents in a single request.
-  This endpoint cancels any active ingestion on the STB Worker, deletes embeddings from Upstash Vector, removes physical files from MinIO S3, deletes records from Postgres, and refunds the upload quota atomically.
+  This endpoint cancels any active ingestion on the STB Worker, deletes embeddings from Upstash Vector, removes physical files from MinIO S3 (including the worker-converted PDF for non-PDF documents), deletes records from Postgres, and refunds the upload quota atomically.
   Ideal for partial or full upload cancellation from the frontend.
 }

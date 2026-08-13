@@ -15,5 +15,5 @@ headers {
 }
 
 docs {
-  Deletes a document from the database, removes its chunks from Upstash Vector, and deletes the associated file from S3 (MinIO).
+  Deletes a document from the database, removes its chunks from Upstash Vector, and deletes the associated file from S3 (MinIO). For non-PDF documents the worker-converted PDF ({tenant}/{docId}.pdf) is also deleted, so no orphaned files remain. Storage quota is refunded atomically.
 }

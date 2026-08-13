@@ -1,5 +1,9 @@
 # Document Library: PDF Viewer & Dynamic Architecture
 
+## UPDATE (2026-08-13) — DOCX preview via converted PDF
+
+Dokumen non-PDF (`.docx`) kini dirender di `PdfPreviewPanel` yang sama: STB Worker mengonversi file ke PDF saat ingestion (LibreOffice headless) dan menyimpannya sebagai `{tenant}/{docId}.pdf`; `GET /{id}/preview` (mode view) mengembalikan presigned URL PDF konversi tersebut. Viewer (EmbedPDF/PDFium) tidak berubah sama sekali. `download=true` tetap mengunduh file asli `.docx`. Kutipan chat dengan lompat halaman bekerja pada PDF konversi (metadata `pages` chunk dihasilkan dari PDF yang sama).
+
 ## Core Logic
 This feature refactors the Document Library dashboard (`/app/documents`) to transition from hardcoded dummy data to a dynamic file-loading architecture. It also vastly improves the UI/UX by implementing a split-pane layout using `shadcn-svelte/resizable`, seamlessly embedding `@embedpdf/svelte-pdf-viewer` matched to the Dokyudo design system, and providing a specialized mobile full-screen view. Additionally, it implements a custom sorting algorithm for the TanStack Table "Size" column, ensuring strings like "333 KB" and "1.5 MB" sort correctly by their true byte size.
 

@@ -23,5 +23,8 @@ headers {
 }
 
 docs {
-  Generates a presigned GET URL (12 hours) that can be used directly in an iframe, PDF viewer, or downloaded. Pass download=true to set Content-Disposition attachment header.
+  Generates a presigned GET URL (12 hours) that can be used directly in an iframe, PDF viewer, or downloaded.
+
+  - View mode (default): .pdf documents return the original file. Non-PDF documents (.docx/.txt) return the worker-converted PDF stored at {tenant}/{docId}.pdf — this is what the frontend EmbedPDF viewer renders.
+  - Download mode (download=true): always returns the ORIGINAL uploaded file with Content-Disposition: attachment, so users download the .docx they uploaded, not the converted PDF.
 }

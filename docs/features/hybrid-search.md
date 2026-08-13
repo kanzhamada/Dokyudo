@@ -6,7 +6,7 @@
 ## Core Logic
 The Search endpoint (`/api/search`) receives a plain text query from the user. It splits the work into two parallel paths:
 1. **FTS (Full Text Search)**: Queries Postgres `documentChunks` table directly.
-2. **Semantic Search**: Calls the Cloudflare Workers AI (`@cf/qwen/qwen3-embedding-0.6b`) to convert the query into a 1024-dimensional vector, then queries Upstash Vector.
+2. **Semantic Search**: Calls the Cloudflare Workers AI (`@cf/baai/bge-m3`) to convert the query into a 1024-dimensional vector, then queries Upstash Vector.
 
 Before executing the search, the system validates the tenant's tier subscription. If the tenant's `searchesCount` exceeds their monthly tier limit (`maxSearchesPerMonth`), the request is rejected with a 400 validation error. If valid, the counter is atomically incremented.
 

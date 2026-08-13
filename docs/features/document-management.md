@@ -1,5 +1,13 @@
 # Document Upload & Management
 
+## UPDATE (2026-08-13) — DOCX support, title dedup, dual-file storage
+
+- **DOCX upload**: Backend contract menerima `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`) selain `.pdf`/`.txt`. Frontend upload dialog dan chat attachment sama-sama menerima `.docx` (batas 25MB/file, 10 file/batch).
+- **Title dedup "(n)"**: `POST /presigned-url/batch` memuat judul dokumen milik tenant, dan judul duplikat (case-insensitive) otomatis di-rename sebelum ekstensi — `laporan.pdf` → `laporan (1).pdf`, dst. Berlaku juga untuk duplikat dalam satu batch. Response `filename` membawa judul final; dialog upload & attachment chat menampilkan judul tersimpan agar konsisten dengan daftar dokumen. `storage_path` tetap dari ekstensi file asli — rename judul tidak mengubah penyimpanan.
+- **Dual-file storage untuk non-PDF**: STB Worker mengonversi `.docx` → PDF dan menyimpannya sebagai `{tenant}/{docId}.pdf` di MinIO (untuk viewer EmbedPDF). Jadi satu dokumen non-PDF menyimpan **dua objek**: file asli + PDF konversi.
+- **Preview**: `GET /{id}/preview` — mode view mengarah ke PDF hasil konversi (non-PDF) atau file asli (PDF); `download=true` selalu mengembalikan file asli user.
+- **Delete**: single & batch menghapus kedua objek (asli + PDF konversi) — tidak ada orphan; best-effort bila salah satu tidak ada.
+
 ## Core Logic
 This feature encompasses the entire lifecycle of a knowledge document within the RAG pipeline. It facilitates direct client-to-storage file uploads to bypass server memory limits, guarantees database consistency upon upload confirmation, provides safe, cascading deletion to purge data across the relational database, object storage, and vector index, tracks storage consumption per tenant, and handles document previews, direct browser downloads, and real-time status updates via Supabase Realtime.
 

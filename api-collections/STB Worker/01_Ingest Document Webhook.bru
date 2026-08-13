@@ -10,6 +10,10 @@ post {
   auth: none
 }
 
+headers {
+  X-Worker-Secret: {{workerSecret}}
+}
+
 body:json {
   {
     "document_id": "1436c851-886a-4796-986a-5fab9c250433",
@@ -19,4 +23,15 @@ body:json {
 
 vars:pre-request {
   stb_worker_host: https://worker.dokyudo.my.id
+}
+
+docs {
+  Webhook receiver for the Supabase pg_net trigger, fired when a document status becomes 'confirmed'. Requires the X-Worker-Secret header (401 without it).
+
+  The worker resolves the document's storage_path from Supabase (extension-aware), then:
+  - .pdf: extracts text per page with PyMuPDF and chunks with tiktoken (1000 tokens, 150 overlap).
+  - .docx / .doc: converts to PDF headless with LibreOffice (writer + math components), uploads the converted PDF to MinIO as {tenant}/{docId}.pdf (the frontend viewer uses this), extracts text from the DOCX itself (python-docx: paragraphs, tables, text boxes) with OMML equations converted to LaTeX wrapped in $...$ / $$...$$, chunks the text, then aligns every chunk to the converted PDF pages via rare 25-char alnum n-grams.
+  - Other extensions: marked failed.
+
+  Returns 200 immediately; ingestion runs on the background queue thread.
 }

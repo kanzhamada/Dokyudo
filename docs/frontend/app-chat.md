@@ -1,12 +1,18 @@
 # Chat Assistant Interface (`/app/chat`)
 
+## UPDATE (2026-08-13) — KaTeX math rendering & DOCX chat attachments
+
+- **LaTeX math dirender KaTeX**: jawaban chat dan halaman share melalui `renderMarkdown` (lib/utils/markdown.ts) memanggil `renderMathHtml` (lib/utils/math.ts) sebelum `marked.parse`. Pemindai menangani `$$...$$` (display) dan `$...$` (inline), melewati fenced code block, dan menolak pola harga ("$ 5.000", "$5–$10"). LaTeX invalid di-render sebagai fallback teks (throwOnError: false), tidak merusak pesan. CSS KaTeX di-root layout.
+- **Rumus dari dokumen ikut ter-render**: konten chunk hasil ingestion sekarang menyimpan LaTeX ber-delimiter (`$...$`, `$$...$$`) — snippet kutipan dan konteks jawaban yang menampilkan rumus dokumen tampil ter-render, bukan teks mentah.
+- **Attachment DOCX diterima**: batas attachment (5 file/submit) kini juga menerima `.docx` — lihat catatan 2026-08-10 di bawah (telah diperbarui).
+
 ## UPDATE (2026-08-10) — Search terhubung ke `/app/documents`
 
 - **Submit search** (mode Search + Enter/send) → `goto('/app/documents?q=<query>&mode=<semantic|keyword>')`. `mode` ditentukan toggle Sparkles di input: **ON = `semantic`** (AI hybrid search), **OFF = `keyword`**.
 - **Toggle Sparkles** menggantikan tombol attach **hanya di mode Search** (state `aiSearchEnabled`, ikon lucide `Sparkles`, aktif = aksen `#DB8F5E`). Mode Chat tetap memakai ikon + fungsi attach seperti biasa.
 - **Transisi halaman**: View Transition (`onNavigate` di `app/+layout.svelte`) di-scope ke submit navigasi dari `/app/chat` — chat submit (`→ /app/chat/<id>`) dan search submit (`→ /app/documents` dengan param `q`). Klik sidebar Documents biasa tidak dianimasikan.
 - **Penerimaan di `/app/documents`**: `onMount` membaca `q` & `mode` dari URL → `mode=semantic` menjalankan `executeSemanticSearch()` langsung; `mode=keyword` mengisi `globalFilter` tabel.
-- **Batas attachment**: max **5 file per submit** (zod `attachment_document_ids` max 5 + cap frontend `MAX_CHAT_ATTACHMENTS`), ekstensi **PDF/TXT** saja (backend contract — DOCX ditolak).
+- **Batas attachment**: max **5 file per submit** (zod `attachment_document_ids` max 5 + cap frontend `MAX_CHAT_ATTACHMENTS`), ekstensi **PDF/TXT/DOCX** (backend contract menerima ketiganya).
 
 ## Core Logic
 The `/app/chat` route houses the core chat and semantic search interface for the Dokyudo platform. It provides a highly responsive, glassmorphic UI where users can toggle between conversing with language models ("Chat" mode) and searching their knowledge base ("Search" mode). 
