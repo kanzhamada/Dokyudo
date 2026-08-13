@@ -1,0 +1,29 @@
+meta {
+  name: Test API Key
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/keys/test
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "provider": "gemini",
+    "apiKey": {{llmApiKey}}
+  }
+}
+
+docs {
+  Validates a BYOK API key by making a minimal test call to the provider.
+  Supported providers: gemini, mistral, openrouter.
+  Returns whether the key is valid for the provider.
+}

@@ -46,12 +46,24 @@ sequenceDiagram
         Backend->>DB: Update payment_transactions status to SUCCEEDED
         Backend->>DB: Upsert tenant_subscriptions (New Tier)
         Backend->>DB: INSERT INTO activity_logs (billing.payment_completed)
+        Backend->>Resend: Send payment success email (summary)
     else Payment Failed / Expired
         Backend->>DB: Update payment_transactions status to FAILED
         Backend->>DB: INSERT INTO activity_logs (billing.payment_failed)
     end
     
     Backend-->>Stripe: 200 OK
+
+    Note over User,Backend: Browser lands on /app/billing/success?session_id=...
+    User->>Backend: POST /api/payments/checkout/verify { sessionId }
+    Backend->>Stripe: GET /v1/checkout/sessions/{id}
+    alt Session owned by tenant AND paid
+        Backend-->>Frontend: { valid: true, status: "paid", tier }
+        Frontend-->>User: Success state + confetti + countdown
+    else Foreign / unknown session
+        Backend-->>Frontend: 404 (generic, no tenant leak)
+        Frontend-->>User: Error state
+    end
 ```
 
 ---
@@ -64,10 +76,11 @@ sequenceDiagram
   - `apps/backend/src/config/stripe.ts` (Stripe instance initialization).
   - `apps/backend/src/config/env.ts` (`STRIPE_SECRET_KEY` & `STRIPE_WEBHOOK_SECRET` validation).
 - **Payments Module** (`apps/backend/src/modules/payments/`):
-  - `payments.schema.ts` (Zod schemas for checkout and portal requests).
-  - `payments.service.ts` (Dynamic checkout sessions, webhook handlers for `checkout.session.completed`, `checkout.session.async_payment_failed`, `invoice.payment_failed`, and audit log emissions).
-  - `payments.controller.ts` (Context extraction via `ContextExtractor.extractAuditContext()`, JWT validation, and Stripe signature verification).
-  - `payments.routes.ts` (OpenAPI endpoint definitions).
+  - `payments.schema.ts` (Zod schemas untuk checkout, portal, dan verifikasi session).
+  - `payments.service.ts` (Dynamic checkout sessions, webhook handlers untuk `checkout.session.completed`, `checkout.session.async_payment_failed`, `invoice.payment_failed`, verifikasi session `verifyCheckoutSession`, notifikasi email `sendPaymentSuccessNotification`, dan audit log emissions).
+  - `payments.controller.ts` (Context extraction via `ContextExtractor.extractAuditContext()`, JWT validation, dan Stripe signature verification).
+  - `payments.routes.ts` (OpenAPI endpoint definitions: `/checkout`, `/webhook`, `/portal`, `/checkout/verify`).
+- **Email Notifications** (`apps/backend/src/shared/utils/email.util.ts`): `sendVerificationEmail`, `sendRecoveryEmail`, `sendShareInviteEmail`, `sendPaymentSuccessEmail`.
 
 ---
 
@@ -80,7 +93,7 @@ sequenceDiagram
 2. Handler webhook punya fallback `session.metadata?.externalId ?? session.client_reference_id` untuk resiliensi (mis. fixture test tanpa metadata).
 3. Catatan: event dari `stripe trigger checkout.session.completed` (fixture) memang tanpa metadata maupun `client_reference_id`, jadi warning "Missing metadata" tetap wajar muncul untuk fixture — uji E2E pakai checkout asli lewat dashboard.
 
-**Alur halaman sukses** (`apps/frontend/src/routes/dashboard/billing/success/+page.svelte`):
+**Alur halaman sukses** (`apps/frontend/src/routes/dashboard/billing/success/+page.svelte` — sebelum dipindah ke `/app` pada 2026-08-13):
 1. Membaca `session_id` dari URL, menampilkan state `Confirming payment`.
 2. Polling `GET /api/me/usage` (maks 5× dengan jeda) sampai webhook Stripe sempat meng-update tier.
 3. Menampilkan `Payment successful` + tier aktif, countdown redirect ~5 detik.
@@ -90,6 +103,41 @@ sequenceDiagram
 - `return_url` portal Stripe diubah dari `/dashboard/billing` → **`/app/dashboard`** (rute app yang benar).
 - Frontend: `lib/api/payments.ts` menambah `createCheckoutSession({ tierToUnlock })` dan `createBillingPortalSession()`; tipe `CheckoutResponse`/`BillingPortalResponse` di `lib/types/payments.types.ts`.
 - UI Billing ada di `AccountPanelDialog.svelte` (tab `billing`): usage dengan limit (`TIER_LIMITS`), countdown reset bulanan (FREE), `expiresAt` (non-FREE) + `Manage billing`, pricing plans (`TIER_PLANS`), tombol `Access Sandbox` → `POST /api/payments/checkout { tierToUnlock: "SIMULATE" }` lalu redirect ke Stripe Checkout.
+
+---
+
+## Update 2026-08-13 — Session Verification & Payment Success Email
+
+**Keamanan halaman success** (tiga lapis):
+1. **Route guard**: halaman dipindah ke `apps/frontend/src/routes/app/billing/success/` — guard existing `/app/+layout.ts` (cek `dokyudo_session` di localStorage) memblokir akses tanpa login. Direktori `routes/dashboard/` dihapus.
+2. **Verifikasi session server-side**: endpoint baru `POST /api/payments/checkout/verify` (`apps/backend/src/modules/payments/`):
+   - Zod: `sessionId` wajib berformat `cs_*`.
+   - `stripe.checkout.sessions.retrieve(sessionId)` dengan secret key; error apa pun → 404 generik "Unable to verify payment session" (tidak membocorkan apakah session milik tenant lain).
+   - Binding: `session.metadata.tenantId` harus sama dengan `tenantId` dari JWT; fallback ke baris `payment_transactions` (by `stripe_session_id`) untuk session lama tanpa metadata.
+   - Response `{ valid, status, tier }`; hanya menentukan state UI — **provisioning tier tetap satu-satunya tugas webhook** yang signature-verified.
+3. **Hapus fallback palsu**: loop polling `getMeUsage` 5× yang menetapkan `success` tanpa syarat dihapus. User login mana pun tidak bisa lagi memalsukan halaman sukses dengan `session_id` acak.
+
+**Email notifikasi pembayaran** (`apps/backend/src/shared/utils/email.util.ts` → `sendPaymentSuccessEmail`):
+- Dipicu dari webhook `checkout.session.completed` (jalur provisioning terverifikasi), satu email per session (`idempotencyKey: payment-success/{externalId}`).
+- Dari `Dokyudo <team@dokyudo.my.id>`, subject `Payment successful - {Plan} - Dokyudo`.
+- Isi: heading + summary box (Plan purchased / Amount paid / Date / Status Active) + CTA "Open Dokyudo" → `/app?billing=open`.
+- Amount mengikuti aturan minor unit Stripe: currency zero-decimal (IDR, JPY, VND, ...) tidak dibagi 100; sisanya dibagi 100; fallback aman untuk currency tak dikenal. Plan name di-escape HTML.
+- Penerima: email user pemilik tenant (user pertama `users` by `tenantId`).
+- **Best-effort by design**: kegagalan email hanya di-log (`emailError` di logContext), tidak pernah menggagalkan ack webhook.
+
+**Kontrak API baru**:
+- `POST /api/payments/checkout/verify` — body `{ sessionId }`, response `{ valid, status, tier }`, error 400/401/404.
+- `success_url` checkout diubah ke `${FRONTEND_URL}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`; `cancel_url` diselaraskan ke `/app?billing=open` (sebelumnya menunjuk route yang tidak pernah ada).
+
+**File Mapping tambahan**:
+- `apps/backend/src/modules/payments/payments.schema.ts` — `VerifyCheckoutSessionBodySchema` + response/params schemas.
+- `apps/backend/src/modules/payments/payments.service.ts` — `verifyCheckoutSession`, `sendPaymentSuccessNotification`, `TIER_LABELS`.
+- `apps/backend/src/modules/payments/payments.controller.ts` — `handleVerifyCheckoutSession`.
+- `apps/backend/src/modules/payments/payments.routes.ts` — `POST /checkout/verify`.
+- `apps/backend/src/shared/utils/email.util.ts` — `sendPaymentSuccessEmail`.
+- `apps/frontend/src/lib/api/payments.ts` + `lib/types/payments.types.ts` — `verifyCheckoutSession`.
+- `apps/frontend/src/routes/app/billing/success/+page.svelte` — alur verify-first (confirming → success / syncing / error).
+- Koleksi Bruno: `api-collections/Payments & Subscriptions/04_Verify Checkout Session.bru`.
 
 ---
 

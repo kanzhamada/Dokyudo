@@ -76,7 +76,7 @@ sequenceDiagram
 | `apps/backend/src/modules/activities/activities.service.ts` | Updated `getActivities` to construct dynamic Drizzle SQL `WHERE` clauses (`and()`, `like()`, `gte()`, `lte()`, `sql`) for category, date range, and text search while respecting tenant isolation. |
 | `apps/backend/src/modules/documents/documents.schema.ts` | Added optional `clientIp` and `userAgent` fields to `ConfirmUploadParamsSchema`, `DeleteDocumentParamsSchema`, and `BatchDeleteDocumentsParamsSchema`. |
 | `apps/backend/src/modules/documents/documents.controller.ts` | Extracted audit context via `extractor.extractAuditContext()` in `handleConfirmUpload`, `handleDeleteDocument`, and `handleBatchDeleteDocuments`. |
-| `apps/backend/src/modules/documents/documents.service.ts` | Passed `clientIp` and `userAgent` into `logActivity()` calls for `document.uploaded` and `document.deleted`. Added `logActivity` for `document.failed` inside `markDocumentFailed()`. |
+| `apps/backend/src/modules/documents/documents.service.ts` | Passed `clientIp` and `userAgent` into `logActivity()` calls for `document.uploaded` and `document.deleted`. Added `logActivity` for `document.failed` inside `markDocumentFailed()`. Added `document.renamed` logging in `updateDocumentTitle` (PATCH /{id}). |
 | `apps/backend/src/modules/auth/auth.schema.ts` | Added `clientIp` and `userAgent` to `UpdateTenantNameParamsSchema`. |
 | `apps/backend/src/modules/auth/auth.controller.ts` | Extracted audit context in `handleUpdateTenantName`. |
 | `apps/backend/src/modules/auth/auth.service.ts` | Passed `clientIp` and `userAgent` to `logActivity()` for `tenant.name_updated`. Updated `updateTenantName` signature to use `AuthParams.UpdateTenantNameParams`. |

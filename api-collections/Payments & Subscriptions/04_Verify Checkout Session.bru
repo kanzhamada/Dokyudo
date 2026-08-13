@@ -1,0 +1,31 @@
+meta {
+  name: Verify Checkout Session
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/payments/checkout/verify
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "sessionId": "cs_test_..."
+  }
+}
+
+docs {
+  Verifies a Stripe Checkout session on the billing success page. The server retrieves the session from Stripe and checks that its metadata.tenantId matches the authenticated tenant, so a session_id from the URL can never be used to fake a successful payment.
+  Returns { valid, status, tier }. status: paid | no_payment_required | processing | unpaid.
+  Requires a valid JWT. Only informs UI state - tier provisioning stays in the signature-verified webhook.
+}

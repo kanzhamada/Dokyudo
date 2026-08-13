@@ -1,5 +1,16 @@
 # Document Upload & Management
 
+## UPDATE (2026-08-13) — Title rename (PATCH /{id})
+
+- **Endpoint baru**: `PATCH /api/documents/{id}` — memperbarui judul dokumen. Auth JWT wajib; body `{ title }` divalidasi zod (`documents.schema.ts` → `DocumentTitleSchema`).
+- **Whitelist karakter anti-XSS/SQLi**: hanya huruf Unicode, digit, spasi, dan `.-_,&+@#:!?()` (max 255 karakter, di-trim). `< > " ' \` ; = / %` dst. ditolak 400 — title tidak bisa membawa payload script atau fragmen SQL. Drizzle parameterized query (bukan string concatenation).
+- **Extension immutable**: extension diturunkan dari `storage_path` file asli (`{docId}.{ext}`) dan wajib muncul di akhir title baru (case-insensitive). Ganti extension → 400 `VALIDATION_ERROR` (`Title must end with .{ext}`). Rename hanya label; penyimpanan, preview, dan download tetap memakai file asli.
+- **Aktivitas**: log `document.renamed` (metadata `fileName` → `newFileName`) — enum baru `activity_action_enum` + migrasi `0028_document_renamed.sql` (idempotent).
+- **Frontend** (`apps/frontend/src/routes/app/documents/`):
+  - `document-card-actions.svelte` — item menu "Rename" (ikon `edit2-outline`).
+  - `+page.svelte` — dialog rename: input nama dengan **extension dikunci** sebagai suffix terpisah; validasi klien mirror regex backend untuk feedback instan; setelah sukses nama di daftar ter-update dan `url` preview cache di-reset (unduhan berikutnya memakai nama baru).
+- **Perbaikan terkait**: toast realtime `Document processed` kini hanya muncul saat `status` benar-benar berubah (bandingkan `prevStatus`), bukan setiap UPDATE payload — rename tidak lagi memicu toast ganda.
+
 ## UPDATE (2026-08-13) — DOCX support, title dedup, dual-file storage
 
 - **DOCX upload**: Backend contract menerima `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`) selain `.pdf`/`.txt`. Frontend upload dialog dan chat attachment sama-sama menerima `.docx` (batas 25MB/file, 10 file/batch).
@@ -88,10 +99,11 @@ sequenceDiagram
 - `apps/frontend/src/routes/app/documents/+page.ts`: Client-side loader fetching tenant documents and mapping `status` property.
 - `apps/frontend/src/routes/app/documents/+page.svelte`: Main document library page with Supabase Realtime listener (`postgres_changes`), smart 4s polling backup, monochrome gray AI sparkle "Vectorizing..." badge, and "Generating summary with AI..." placeholder.
 - `apps/frontend/src/routes/app/documents/UploadDocumentDialog.svelte`: Two-phase staged batch upload modal with real-time XHR progress, queue file & size summary status bar, red "Cancel All" danger button, and "Retry Failed (N)" action.
-- `apps/frontend/src/routes/app/documents/document-card-actions.svelte`: Dropdown menu for document preview, download, and deletion.
+- `apps/frontend/src/routes/app/documents/document-card-actions.svelte`: Dropdown menu for document preview, download, rename, and deletion.
 - `apps/stb-worker/services/processor.py`: Added pre-flush cancellation guard `ingestion_queue.is_cancelled(document_id)` and graceful HTTP 409/404 conflict handling for deleted documents.
 - `apps/stb-worker/services/llm.py`: Added `document_id` parameter to `generate_llm_description` and included `document_id` in log event metadata.
 - `api-collections/Documents/06_Get Document Preview.bru`: Updated Bruno API collection with `download` query param.
+- `api-collections/Documents/04_Rename Document.bru`: Bruno request for `PATCH /api/documents/{id}` (title rename with immutable extension).
 
 ## Connections
 - **Client (Frontend):** Manages local staging, streams uploads to MinIO with real-time percentage feedback, listens to Supabase Realtime WebSocket events for instant status and description updates, previews PDFs inline using `@embedpdf/svelte-pdf-viewer`, and triggers direct attachment downloads.
