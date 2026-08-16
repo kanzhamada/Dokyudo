@@ -6,13 +6,13 @@ import { AppError } from "../utils/errors.util.ts";
 
 const standardLimiter = new Ratelimit({
     redis: redis as any,
-    limiter: Ratelimit.slidingWindow(100, "1 m"),
+    limiter: Ratelimit.slidingWindow(300, "1 m"),
     prefix: "rate_limit:std",
 });
 
 const strictLimiter = new Ratelimit({
     redis: redis as any,
-    limiter: Ratelimit.slidingWindow(10, "1 m"),
+    limiter: Ratelimit.slidingWindow(20, "1 m"),
     prefix: "rate_limit:strict",
 });
 
@@ -68,10 +68,20 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
         console.error("Redis penalty check failed:", err);
     }
 
+    // Penalties (and the strict/block escalation they unlock) only apply to
+    // auth-sensitive paths. An ordinary 4xx elsewhere — e.g. a 401 from an
+    // expired session token on /api/me — must never downgrade the whole IP:
+    // that used to snowball a routine SPA page load into a 1-hour block.
+    const isAuthPath = /^\/api\/auth\//.test(c.req.path);
+
     let limiter = standardLimiter;
-    if (penaltyScore >= 10) {
-        limiter = blockLimiter;
-    } else if (penaltyScore >= 5 || isSuspicious) {
+    if (isAuthPath) {
+        if (penaltyScore >= 10) {
+            limiter = blockLimiter;
+        } else if (penaltyScore >= 5 || isSuspicious) {
+            limiter = strictLimiter;
+        }
+    } else if (isSuspicious) {
         limiter = strictLimiter;
     }
 
@@ -109,10 +119,11 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
         }
 
         if (
-            status === 400 ||
-            status === 401 ||
-            status === 403 ||
-            status === 429
+            isAuthPath &&
+            (status === 400 ||
+                status === 401 ||
+                status === 403 ||
+                status === 429)
         ) {
             try {
                 await redis.incr(penaltyKey);
@@ -126,7 +137,10 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
 
     // Process non-thrown errors (e.g. c.json({}, 400))
     const status = c.res.status;
-    if (status === 400 || status === 401 || status === 403 || status === 429) {
+    if (
+        isAuthPath &&
+        (status === 400 || status === 401 || status === 403 || status === 429)
+    ) {
         try {
             await redis.incr(penaltyKey);
             await redis.expire(penaltyKey, 3600);

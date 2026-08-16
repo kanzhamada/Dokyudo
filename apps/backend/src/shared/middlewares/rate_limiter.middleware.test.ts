@@ -20,7 +20,7 @@ app.use("/*", rateLimiterMiddleware);
 
 app.get("/ok", (c: any) => c.text("OK"));
 app.get("/api/rag/shares/abc123", (c: any) => c.json({ code: "abc123" }));
-app.get("/error-401", (c: any) => {
+app.get("/api/auth/login", (c: any) => {
     throw new AppError({
         code: "UNAUTHORIZED",
         message: "Bad pass",
@@ -76,7 +76,7 @@ describe("RateLimiter Middleware", () => {
             10,
         );
         assert(
-            remaining < 10 && remaining >= 0,
+            remaining < 20 && remaining >= 0,
             "Strict limit should be applied",
         );
     });
@@ -99,34 +99,34 @@ describe("RateLimiter Middleware", () => {
         assertEquals(json.code, "abc123");
     });
 
-    it("Penalizes IP on 401 errors", async () => {
-        // 1st request, throws 401
-        const res1 = await app.request("/error-401", {
-            headers: {
-                "X-Forwarded-For": "3.3.3.3",
-                "User-Agent": "Mozilla/5.0",
-            },
-        });
-        assertEquals(res1.status, 401);
-
-        const penalty = await redis.get("penalty:3.3.3.3");
-        assertEquals(Number(penalty), 1);
-
-        for (let i = 0; i < 4; i++) {
-            await app.request("/error-401", {
+    it("Penalizes IP on auth-path 4xx but keeps normal traffic flowing", async () => {
+        // 5 × 401 on an auth route → penalty reaches the strict threshold.
+        for (let i = 0; i < 5; i++) {
+            const res = await app.request("/api/auth/login", {
                 headers: {
                     "X-Forwarded-For": "3.3.3.3",
                     "User-Agent": "Mozilla/5.0",
                 },
             });
+            assertEquals(res.status, 401);
         }
 
-        const newPenalty = await redis.get("penalty:3.3.3.3");
-        assertEquals(Number(newPenalty), 5);
+        const penalty = await redis.get("penalty:3.3.3.3");
+        assertEquals(Number(penalty), 5);
 
-        // Consume the strict limit
-        for (let i = 0; i < 11; i++) {
-            const blockRes = await app.request("/ok", {
+        // Escalation stays scoped to auth paths: a normal request from the
+        // same IP must keep flowing (regression for the SPA page-load bug).
+        const okRes = await app.request("/ok", {
+            headers: {
+                "X-Forwarded-For": "3.3.3.3",
+                "User-Agent": "Mozilla/5.0",
+            },
+        });
+        assertEquals(okRes.status, 200);
+
+        // Hammer the auth path — strict (20/min) escalation must kick in.
+        for (let i = 0; i < 21; i++) {
+            const blockRes = await app.request("/api/auth/login", {
                 headers: {
                     "X-Forwarded-For": "3.3.3.3",
                     "User-Agent": "Mozilla/5.0",
@@ -137,6 +137,6 @@ describe("RateLimiter Middleware", () => {
                 return;
             }
         }
-        assert(false, "Should have been rate limited by strictLimiter");
+        assert(false, "Should have been rate limited on the auth path");
     });
 });
