@@ -102,11 +102,11 @@ async function deliverInviteEmails(params: {
                             eq(shareInvitees.email, email),
                         ),
                     );
-            } catch (err: any) {
-                console.error("[Share] Failed to stamp notified_at:", err.message);
+            } catch {
+                // Non-fatal — stamping notified_at is best-effort; the email already went out.
             }
-        } catch (err: any) {
-            console.error(`[Share] Invite email to ${email} failed:`, err.message);
+        } catch {
+            // Non-fatal — a failed invite email must not break the share flow.
         }
     }
 }
@@ -130,9 +130,8 @@ async function lookupShareAuthorName(code: string): Promise<string | null> {
             .where(eq(chatShares.code, code))
             .limit(1);
         return author?.authorName ?? null;
-    } catch (err: any) {
+    } catch {
         // Author metadata is useful for previews, but must not break a valid share.
-        console.error("[Share] Author metadata lookup failed:", err.message);
         return null;
     }
 }
@@ -560,9 +559,8 @@ export class ShareService {
                     isPrivate,
                 };
             }
-        } catch (err: any) {
+        } catch {
             // Cache failures must never break the public read — fall through.
-            console.error("[Share] Cache read error:", err.message);
         }
 
         // 2. Cache miss — read as the anon role (column-level grant limits the
@@ -629,8 +627,8 @@ export class ShareService {
             await redis.set(cacheKey, JSON.stringify(payload), {
                 ex: shareCacheTtlSeconds(row.expiresAt),
             });
-        } catch (err: any) {
-            console.error("[Share] Cache write error:", err.message);
+        } catch {
+            // Non-fatal — the DB remains the source of truth.
         }
 
         return payload;
