@@ -4,7 +4,7 @@ import { AppError } from "./shared/utils/errors.util.ts";
 import { requestIdMiddleware } from "./shared/middlewares/request_id.middleware.ts";
 import { loggerMiddleware } from "./shared/middlewares/logger.middleware.ts";
 import { rateLimiterMiddleware } from "./shared/middlewares/rate_limiter.middleware.ts";
-import { validateEnvironment } from "./config/env.ts";
+import { getEnv, validateEnvironment } from "./config/env.ts";
 import rootRouter from "./api/router.ts";
 import { cryptoPuzzleMiddleware } from "./shared/middlewares/crypto_puzzle.middleware.ts";
 import { createApp } from "./config/hono.ts";
@@ -64,6 +64,9 @@ app.get("/health", (c) => {
 app.use("/api/*", cryptoPuzzleMiddleware);
 app.route("/api", rootRouter);
 
+const PORT = parseInt(getEnv("PORT") || "8000", 10);
+const API_URL = getEnv("API_URL") || `http://localhost:${PORT}`;
+
 // OpenAPI Documentation
 app.doc("/doc", {
     openapi: "3.1.0",
@@ -75,11 +78,7 @@ app.doc("/doc", {
     },
     servers: [
         {
-            url:
-                Deno.env.get("API_URL") ??
-                `http://${Deno.env.get("HOSTNAME") ?? "localhost"}:${
-                    Deno.env.get("PORT") ?? "8000"
-                }`,
+            url: API_URL,
             description: "API Environment",
         },
     ],
@@ -102,21 +101,11 @@ app.get(
 );
 
 // Server Startup
-const PORT = parseInt(Deno.env.get("PORT") ?? "8000", 10);
-const HOSTNAME = Deno.env.get("HOSTNAME") ?? "localhost";
-const API_URL = Deno.env.get("API_URL") ?? `http://${HOSTNAME}:${PORT}`;
-
 if (import.meta.main) {
     validateEnvironment();
     Deno.serve({ port: PORT }, app.fetch);
 
     // Background sweep for chat turns awaiting document ingestion
-    // (attachment_document_ids + status awaiting_indexing). The turn request
-    // returns immediately; this cron completes the turn once the STB worker
-    // finishes ingesting every attached document, or marks it failed when a
-    // document fails. At-least-once semantics are safe: the final write gates
-    // on status = awaiting_indexing, so a duplicate run is a no-op.
-    // Requires --unstable-cron in local dev; Deno Deploy runs it natively.
     Deno.cron("sweep-awaiting-turns", "* * * * *", async () => {
         await RagService.sweepAwaitingTurns();
     });
