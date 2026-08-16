@@ -1,0 +1,6 @@
+.env*
+!*.example
+.git
+node_modules
+benchmark
+*.test.ts
