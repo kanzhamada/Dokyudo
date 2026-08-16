@@ -1,6 +1,7 @@
 import { Resend } from "resend";
+import { getEnv } from "./env.ts";
 
-const apiKey = Deno.env.get("RESEND_API_KEY");
+const apiKey = getEnv("RESEND_API_KEY");
 
 if (!apiKey) {
     console.warn("RESEND_API_KEY is missing. Email sending will fail.");

@@ -32,6 +32,41 @@ const OPTIONAL_ENV_VARS_WITH_DEFAULTS: Record<string, string> = {
     SAMBANOVA_API_KEY: "",
     COHERE_API_KEY: "",
 };
+
+/**
+ * Strips surrounding quotes (single or double) from environment variable values.
+ * Useful when values are passed via Docker --env-file or shell quotes.
+ */
+function cleanEnvValue(raw: string): string {
+    let trimmed = raw.trim();
+    while (
+        (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) ||
+        (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2)
+    ) {
+        trimmed = trimmed.slice(1, -1).trim();
+    }
+    return trimmed;
+}
+
+/**
+ * Gets an environment variable with optional fallback.
+ * Automatically cleans leading/trailing whitespace and surrounding quotation marks.
+ */
+export function getEnv(key: string): string {
+    let val = "";
+    if (typeof Deno !== "undefined" && typeof Deno.env?.get === "function") {
+        val = Deno.env.get(key) || "";
+    } else if (typeof process !== "undefined" && process.env?.[key]) {
+        val = process.env[key] || "";
+    }
+
+    if (!val) {
+        val = OPTIONAL_ENV_VARS_WITH_DEFAULTS[key] || "";
+    }
+
+    return cleanEnvValue(val);
+}
+
 /**
  * Validates that all required environment variables are present and non-empty.
  * Called at server startup (not during test imports).
@@ -39,7 +74,7 @@ const OPTIONAL_ENV_VARS_WITH_DEFAULTS: Record<string, string> = {
 export function validateEnvironment(): void {
     const missingVars: string[] = [];
     for (const varName of REQUIRED_ENV_VARS) {
-        const value = Deno.env.get(varName);
+        const value = getEnv(varName);
         if (!value || value.trim() === "") {
             missingVars.push(varName);
         }
@@ -47,31 +82,27 @@ export function validateEnvironment(): void {
 
     if (missingVars.length > 0) {
         console.error(
-            `\n🛑 ERROR: Missing required ENV variables. Halting execution.\n` +
+            `\nMissing required ENV variables. Halting execution.\n` +
                 `   Missing: ${missingVars.join(", ")}\n` +
                 `   Ensure these are set in your .env file or environment.\n`,
         );
-        Deno.exit(1);
+        if (typeof Deno !== "undefined" && typeof Deno.exit === "function") {
+            Deno.exit(1);
+        } else {
+            throw new Error(`Missing required ENV variables: ${missingVars.join(", ")}`);
+        }
     }
 
     // Warn about optional vars using defaults
     for (const [varName, defaultValue] of Object.entries(
         OPTIONAL_ENV_VARS_WITH_DEFAULTS,
     )) {
-        if (!Deno.env.get(varName)) {
+        if (!getEnv(varName)) {
             console.warn(
-                `⚠️  ${varName} not set, using default: ${defaultValue}`,
+                `${varName} not set, using default: ${defaultValue}`,
             );
         }
     }
 
-    console.log("✅ All required environment variables are present.");
-}
-
-/**
- * Gets an environment variable with optional fallback.
- * For optional vars, uses the configured default from OPTIONAL_ENV_VARS_WITH_DEFAULTS.
- */
-export function getEnv(key: string): string {
-    return Deno.env.get(key) || OPTIONAL_ENV_VARS_WITH_DEFAULTS[key] || "";
+    console.log("All required environment variables are present.");
 }

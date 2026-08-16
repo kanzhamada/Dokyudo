@@ -1,12 +1,13 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getEnv } from "./env.ts";
 
 let adminClient: SupabaseClient | null = null;
 let anonClient: SupabaseClient | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient {
     if (!adminClient) {
-        const url = Deno.env.get("SUPABASE_URL")!;
-        const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const url = getEnv("SUPABASE_URL");
+        const key = getEnv("SUPABASE_SERVICE_ROLE_KEY");
 
         adminClient = createClient(url, key, {
             auth: {
@@ -20,8 +21,8 @@ export function getSupabaseAdmin(): SupabaseClient {
 
 export function getSupabaseAnon(): SupabaseClient {
     if (!anonClient) {
-        const url = Deno.env.get("SUPABASE_URL")!;
-        const key = Deno.env.get("SUPABASE_ANON_KEY")!;
+        const url = getEnv("SUPABASE_URL");
+        const key = getEnv("SUPABASE_ANON_KEY");
 
         anonClient = createClient(url, key, {
             auth: {

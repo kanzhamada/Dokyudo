@@ -1,7 +1,8 @@
 import Stripe from "npm:stripe@^15.5.0";
+import { getEnv } from "./env.ts";
 
-const apiKey = Deno.env.get("STRIPE_SECRET_KEY");
-const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+const apiKey = getEnv("STRIPE_SECRET_KEY");
+const webhookSecret = getEnv("STRIPE_WEBHOOK_SECRET");
 
 if (!apiKey) {
     console.warn("STRIPE_SECRET_KEY is missing. Payment features will fail.");

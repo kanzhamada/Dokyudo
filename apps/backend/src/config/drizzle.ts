@@ -2,12 +2,13 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { sql } from "drizzle-orm";
 import * as schema from "../shared/models/db.model.ts";
+import { getEnv } from "./env.ts";
 
 /**
  * Super User Connection.
  * Bypasses RLS. Use for admin operations, background jobs, and migrations.
  */
-const queryClient = postgres(Deno.env.get("DATABASE_URL") as string, {
+const queryClient = postgres(getEnv("DATABASE_URL"), {
     max: 10,
     idle_timeout: 20,
     max_lifetime: 60 * 30,

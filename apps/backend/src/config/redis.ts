@@ -1,6 +1,7 @@
 import { Redis } from "@upstash/redis";
+import { getEnv } from "./env.ts";
 
 export const redis = new Redis({
-    url: Deno.env.get("UPSTASH_REDIS_REST_URL") || "",
-    token: Deno.env.get("UPSTASH_REDIS_REST_TOKEN") || "",
+    url: getEnv("UPSTASH_REDIS_REST_URL"),
+    token: getEnv("UPSTASH_REDIS_REST_TOKEN"),
 });
