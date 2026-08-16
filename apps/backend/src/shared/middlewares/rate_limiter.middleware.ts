@@ -42,8 +42,11 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
         return next();
     }
 
-    // Load Test Bypass
-    if (c.req.header("x-load-test-bypass") === "rahasia123") {
+    // Load-test bypass: honored only when the deployment explicitly sets
+    // LOAD_TEST_BYPASS_TOKEN (e.g. a staging box or an authorized load-test
+    // run). Off by default; the source contains no hardcoded secret.
+    const loadTestToken = Deno.env.get("LOAD_TEST_BYPASS_TOKEN");
+    if (loadTestToken && c.req.header("x-load-test-bypass") === loadTestToken) {
         return next();
     }
 
