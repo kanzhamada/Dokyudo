@@ -16,8 +16,11 @@ docs {
   Supabase handles state/PKCE verification internally — no manual Redis state management needed.
   The authorization URL's redirect_to points to the BACKEND callback ({API_URL}/api/auth/oauth/google/callback),
   so the auth code (and the auth.login activity log + tenant provisioning) stays server-side.
+  After the callback completes, the backend sets the session cookies and redirects to {FRONTEND_URL}/app/chat
+  — no tokens ever appear in the URL.
   Google/GitHub OAuth client credentials are configured in the Supabase Dashboard, not in backend env vars.
   NOTE: {API_URL}/api/auth/oauth/google/callback must be registered in Supabase Dashboard
   (Authentication > URL Configuration > Redirect URLs).
+  Best executed in a real browser — Bruno shows the 302 Location header.
   Internal classification: PUBLIC (no auth token required).
 }

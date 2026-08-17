@@ -28,5 +28,12 @@ vars:pre-request {
 }
 
 docs {
-  Logs in a tenant via Supabase Auth after reCAPTCHA v3 validation, lockout check, and anti-bruteforce rate limiting (Per-IP + Per-Email Password Spraying + User-Agent Anomaly Detection). Returns short-lived access JWT and refresh token. Failed attempts are logged to public.login_attempts. After 5 failures (same email in 15 min), account locks for 15 minutes. On success, also clears the Redis `unverified_email:{email}` registration cache. Tokens are auto-captured as runtime variables.
+  Logs in a tenant via Supabase Auth after reCAPTCHA v3 validation, lockout check, and anti-bruteforce rate limiting (Per-IP + Per-Email Password Spraying + User-Agent Anomaly Detection). Failed attempts are logged to public.login_attempts. After 5 failures (same email in 15 min), account locks for 15 minutes. On success, also clears the Redis `unverified_email:{email}` registration cache.
+
+  AUTH IS COOKIE-BASED: the response sets two httpOnly cookies
+    - `dokyudo_access_token`  (1h, HttpOnly, Secure, SameSite=Lax, Domain=dokyudo.my.id in prod)
+    - `dokyudo_refresh_token` (30d, same attributes)
+  The response body ONLY contains the user object — tokens are NOT returned in the JSON body and must never be handled by client JS.
+
+  Bruno: enable the Cookie Jar (Settings > Cookies) so cookies from this response are stored and automatically sent to {{baseUrl}} on subsequent requests. No Authorization header is needed anywhere in the collection.
 }

@@ -20,7 +20,8 @@ docs {
     5. Resolves the user's tenant: DB trigger `handle_verified_user` first, brief retry, then app-side fallback provisioning
        (tenants + public.users + FREE tenant_subscriptions) if the trigger never fired for OAuth users.
     6. Records `auth.login` in activity_logs (provider metadata).
-    7. Redirects to {FRONTEND_URL}/oauth-callback with access_token and refresh_token as query params.
-  Returns: HTTP 302 to frontend on success, or 302 with error param if failed.
-  Internal classification: PUBLIC (no auth token required).
+    7. Sets the session cookies (dokyudo_access_token + dokyudo_refresh_token, Domain=dokyudo.my.id in prod)
+       and redirects 302 to {FRONTEND_URL}/app/chat. NO tokens are ever placed in the URL.
+  Errors redirect to {FRONTEND_URL}/login?oauth_error=<message>.
+  Internal classification: PUBLIC (no auth token required). Best executed in a real browser — Bruno shows the 302 Location header.
 }

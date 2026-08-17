@@ -1,0 +1,21 @@
+meta {
+  name: Get Session
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/api/auth/session
+  body: none
+  auth: none
+}
+
+docs {
+  Lightweight session check used by the SPA to hydrate its auth state from the httpOnly cookies.
+  The session cookie is sent automatically by the Cookie Jar.
+  Returns 200 (not 401) with:
+    { "authenticated": true,  "user": { "id": "...", "email": "..." } }
+    { "authenticated": false, "user": null }
+  The backend performs a silent refresh here: if the access token is expired but the refresh
+  token is still valid, it mints a new session and re-issues both cookies transparently.
+}

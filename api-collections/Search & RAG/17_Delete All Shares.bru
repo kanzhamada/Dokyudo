@@ -10,10 +10,6 @@ delete {
   auth: none
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 docs {
   Revokes EVERY share link owned by the caller's tenant (account-level
   cleanup — "Delete all" in the Shared Links dialog). Cascades to

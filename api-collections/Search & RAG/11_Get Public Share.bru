@@ -10,10 +10,6 @@ get {
   auth: none
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 docs {
   PUBLIC read of a share link — no authentication required (the backend
   ignores the Authorization header when present). Private shares REQUIRE the

@@ -7,15 +7,11 @@ meta {
 post {
   url: {{baseUrl}}/api/payments/checkout/verify
   body: json
-  auth: bearer
+  auth: none
 }
 
 headers {
   Content-Type: application/json
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 body:json {

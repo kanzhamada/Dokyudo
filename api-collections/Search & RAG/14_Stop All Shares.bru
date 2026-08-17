@@ -10,10 +10,6 @@ delete {
   auth: none
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 docs {
   Revokes EVERY share of a conversation (conversation-level stop sharing).
   Cascades to share_invitees and purges all related Redis caches.

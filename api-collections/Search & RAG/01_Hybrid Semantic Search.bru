@@ -15,10 +15,6 @@ params:query {
   limit: 10
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 docs {
   Performs tenant-safe hybrid search using Upstash Vector + Postgres FTS, merged via RRF (Reciprocal Rank Fusion).
 }

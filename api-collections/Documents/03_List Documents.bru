@@ -10,10 +10,6 @@ get {
   auth: none
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 docs {
   Lists all documents uploaded by the authenticated tenant with their current ingestion status (pending, confirmed, processed, quota_exhausted, failed, failed_vectorizing).
 }

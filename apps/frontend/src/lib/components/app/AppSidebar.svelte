@@ -76,6 +76,74 @@
 		};
 	}
 
+	let longPressTimeout: ReturnType<typeof setTimeout> | null = null;
+	let longPressTriggered = $state(false);
+	let touchStartX = 0;
+	let touchStartY = 0;
+
+	function handleItemTouchStart(e: TouchEvent, item: ConversationItem) {
+		const touch = e.touches[0];
+		if (!touch) return;
+		touchStartX = touch.clientX;
+		touchStartY = touch.clientY;
+		longPressTriggered = false;
+
+		const currentTarget = e.currentTarget as HTMLElement;
+
+		longPressTimeout = setTimeout(() => {
+			longPressTriggered = true;
+			// Provide tactile haptic feedback if supported on the device
+			if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+				try {
+					navigator.vibrate(40);
+				} catch {
+					// Vibration API may be unsupported or restricted
+				}
+			}
+
+			const rect = currentTarget.getBoundingClientRect();
+			activeConversationMenu = {
+				item,
+				x: Math.min(touch.clientX, rect.right - 40),
+				y: rect.bottom
+			};
+		}, 500);
+	}
+
+	function handleItemTouchMove(e: TouchEvent) {
+		if (!longPressTimeout) return;
+		const touch = e.touches[0];
+		if (!touch) return;
+		const deltaX = Math.abs(touch.clientX - touchStartX);
+		const deltaY = Math.abs(touch.clientY - touchStartY);
+		// If scrolled more than 8px, cancel long-press so scrolling is uninterrupted
+		if (deltaX > 8 || deltaY > 8) {
+			clearTimeout(longPressTimeout);
+			longPressTimeout = null;
+		}
+	}
+
+	function handleItemTouchEnd(e: TouchEvent) {
+		if (longPressTimeout) {
+			clearTimeout(longPressTimeout);
+			longPressTimeout = null;
+		}
+		// If long-press fired, prevent navigation on finger release
+		if (longPressTriggered) {
+			e.preventDefault();
+			e.stopPropagation();
+			setTimeout(() => {
+				longPressTriggered = false;
+			}, 150);
+		}
+	}
+
+	function handleItemContextMenu(e: MouseEvent) {
+		if (sidebar.isMobile) {
+			e.preventDefault();
+		}
+	}
+
 	function sortConversations(list: ConversationItem[]): ConversationItem[] {
 		return [...list].sort((a, b) => {
 			if (a.isPinned !== b.isPinned) {
@@ -160,6 +228,49 @@
 		return () => {
 			observer?.disconnect();
 			observer = null;
+		};
+	});
+
+	// Dismiss floating menus when clicking or tapping any empty area
+	$effect(() => {
+		if (!isUserMenuOpen && !activeConversationMenu) return;
+
+		const handleGlobalPointerDown = (event: PointerEvent | MouseEvent) => {
+			const target = event.target as HTMLElement | null;
+			if (!target) return;
+
+			// If clicking inside the active conversation menu container, keep open
+			const conversationMenuEl = document.getElementById('floating-conversation-menu');
+			if (conversationMenuEl && conversationMenuEl.contains(target)) {
+				return;
+			}
+
+			// If clicking inside the active user account menu container, keep open
+			const userMenuEl = document.getElementById('floating-user-menu');
+			if (userMenuEl && userMenuEl.contains(target)) {
+				return;
+			}
+
+			// If clicking the button that triggers the user menu, let the button handler manage toggle
+			const userMenuTrigger = document.getElementById('user-menu-trigger');
+			if (userMenuTrigger && userMenuTrigger.contains(target)) {
+				return;
+			}
+
+			// If clicking any action button that triggers conversation menu, let its handler manage it
+			if (target.closest('[data-conversation-menu-trigger]')) {
+				return;
+			}
+
+			// Dismiss floating menus on any empty space click or tap
+			if (isUserMenuOpen) isUserMenuOpen = false;
+			if (activeConversationMenu) activeConversationMenu = null;
+		};
+
+		window.addEventListener('pointerdown', handleGlobalPointerDown, true);
+
+		return () => {
+			window.removeEventListener('pointerdown', handleGlobalPointerDown, true);
 		};
 	});
 
@@ -536,6 +647,7 @@
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton
+					id="user-menu-trigger"
 					size="lg"
 					tooltipContent="Profile"
 					class="h-14! md:h-12! w-full cursor-pointer p-2 md:p-1.5 transition-all duration-150 hover:bg-sidebar-accent active:scale-[0.98] active:bg-sidebar-accent active:brightness-110"
@@ -619,14 +731,25 @@
 	<Sidebar.MenuItem>
 		<Sidebar.MenuButton
 			isActive={$page.url.pathname === `/app/chat/${item.id}`}
-			class="h-9.5 md:h-7 cursor-pointer px-3 md:px-2 font-geist text-[13.5px] md:text-xs text-sidebar-muted-foreground transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white"
+			class="h-9.5 md:h-7 cursor-pointer px-3 md:px-2 font-geist text-[13.5px] md:text-xs text-sidebar-muted-foreground transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white select-none"
 		>
 			{#snippet child({ props })}
 				<a
 					href="/app/chat/{item.id}"
 					{...props}
-					class={(props.class as string) + ' w-full overflow-hidden text-left transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent'}
-					onclick={() => {
+					class={(props.class as string) + ' w-full overflow-hidden text-left transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent select-none'}
+					ontouchstart={(e) => handleItemTouchStart(e, item)}
+					ontouchmove={handleItemTouchMove}
+					ontouchend={handleItemTouchEnd}
+					ontouchcancel={handleItemTouchEnd}
+					oncontextmenu={handleItemContextMenu}
+					onclick={(e) => {
+						if (longPressTriggered) {
+							e.preventDefault();
+							e.stopPropagation();
+							longPressTriggered = false;
+							return;
+						}
 						if (sidebar.isMobile) sidebar.setOpenMobile(false);
 					}}
 					onmouseenter={() => conversationCache.prefetch(item.id)}
@@ -654,6 +777,7 @@
 		{#if item.isPinned}
 			<Sidebar.MenuAction
 				showOnHover={false}
+				data-conversation-menu-trigger="true"
 				class="top-2 md:top-1 cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80 size-6 md:size-5 flex items-center justify-center"
 				onclick={(e) => openConversationMenu(e, item)}
 			>
@@ -673,6 +797,7 @@
 		{:else}
 			<Sidebar.MenuAction
 				showOnHover={true}
+				data-conversation-menu-trigger="true"
 				class="top-2 md:top-1 cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80 size-6 md:size-5 flex items-center justify-center"
 				onclick={(e) => openConversationMenu(e, item)}
 			>
@@ -688,12 +813,17 @@
 	<div
 		role="presentation"
 		class="fixed inset-0 z-[60] bg-transparent"
+		onpointerdown={(e) => {
+			e.stopPropagation();
+			isUserMenuOpen = false;
+		}}
 		onclick={() => (isUserMenuOpen = false)}
 		onkeydown={() => (isUserMenuOpen = false)}
 	></div>
 
 	<!-- Positioned Floating User Account Menu -->
 	<div
+		id="floating-user-menu"
 		transition:scale={{ duration: 150, start: 0.95 }}
 		class="fixed bottom-16 left-3 z-[60] w-56 min-w-56 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 	>
@@ -757,12 +887,17 @@
 	<div
 		role="presentation"
 		class="fixed inset-0 z-[60] bg-transparent"
+		onpointerdown={(e) => {
+			e.stopPropagation();
+			activeConversationMenu = null;
+		}}
 		onclick={() => (activeConversationMenu = null)}
 		onkeydown={() => (activeConversationMenu = null)}
 	></div>
 
 	<!-- Positioned Floating Menu -->
 	<div
+		id="floating-conversation-menu"
 		transition:scale={{ duration: 150, start: 0.95 }}
 		style={`position: fixed; top: ${Math.min(activeConversationMenu.y + 4, window.innerHeight - 170)}px; left: ${Math.min(Math.max(16, activeConversationMenu.x - 140), window.innerWidth - 200)}px;`}
 		class="z-[60] w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
@@ -919,6 +1054,8 @@
 	:global([data-slot="sidebar"] [data-slot="sidebar-menu-button"]),
 	:global([data-slot="sidebar"] [data-slot="sidebar-menu-action"]) {
 		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		user-select: none;
 		touch-action: manipulation;
 	}
 </style>

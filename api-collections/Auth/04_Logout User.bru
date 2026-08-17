@@ -10,10 +10,6 @@ post {
   auth: none
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 docs {
-  Invalidates the user's session globally using the Supabase Admin API.
+  Invalidates the user's session globally using the Supabase Admin API (idempotent — always succeeds) and clears the session cookies (`dokyudo_access_token` + `dokyudo_refresh_token`) via `Set-Cookie: Max-Age=0`. The session cookie is sent automatically by the Cookie Jar. No Authorization header needed.
 }

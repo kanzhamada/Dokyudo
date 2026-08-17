@@ -10,10 +10,6 @@ get {
   auth: none
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 docs {
   Lists EVERY active (non-expired) share link owned by the caller's tenant,
   newest first (max 100) — powers the account-level "Shared Links" dialog.

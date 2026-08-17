@@ -7,15 +7,11 @@ meta {
 patch {
   url: {{baseUrl}}/api/auth/tenant/name
   body: json
-  auth: bearer
+  auth: none
 }
 
 headers {
   Content-Type: application/json
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 body:json {
@@ -25,5 +21,5 @@ body:json {
 }
 
 docs {
-  Updates the display name of the authenticated user's tenant workspace. Requires a valid Bearer token. Name must be between 2 and 255 characters.
+  Updates the display name of the authenticated user's tenant workspace. The session cookie is sent automatically by the Cookie Jar — no Authorization header needed. Name must be between 2 and 255 characters.
 }

@@ -10,10 +10,6 @@ post {
   auth: none
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 docs {
   Authenticated: creates a new conversation owned by the caller, rebuilt from
   the share's SNAPSHOT (not from the original conversation — stays correct for
