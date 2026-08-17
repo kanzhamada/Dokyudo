@@ -1,0 +1,1491 @@
+/* ==========================================================
+   Dokyudo landing page interactive wiring.
+
+   This module powers the landing page's simulations and
+   interactions: the retrieval console demo, the architecture
+   flow routing + inspector, the model-fallback cylinder, the
+   tier-unlock flow, the testimonial switcher, the FAQ
+   accordion, and the scroll reveals.
+
+   Notes:
+   - All queries are scoped to `.landing-root` so the hero
+     section and app chrome are never touched.
+   - Header state, mobile menu, nav-spy, and the old hero
+     visualizer were dropped (the page keeps LandingNav +
+     HeroSection from the app, not the static design's).
+   - Every listener / observer / timer / rAF is tracked so the
+     returned cleanup function can tear everything down on
+     unmount.
+   All simulations run locally: no network calls are made.
+   ========================================================== */
+
+type ObserverLike = { disconnect: () => void };
+
+type FlowConn = [string, string, string, string, { glyph?: boolean }];
+
+const FLOW_CONNS: Record<string, FlowConn[]> = {
+	'flow-read': [
+		['client', 'gateway', 'right', 'left', {}],
+		['gateway', 'redis', 'right', 'left', {}],
+		['redis', 'vector', 'right', 'left', {}],
+		['redis', 'postgres', 'right', 'left', {}],
+		['vector', 'fusion', 'right', 'left', { glyph: true }],
+		['postgres', 'fusion', 'right', 'left', {}],
+		['fusion', 'router', 'right', 'left', {}],
+		['router', 'stream', 'right', 'left', {}]
+	],
+	'flow-ingest': [
+		['client', 'gateway', 'right', 'left', {}],
+		['gateway', 'redis', 'right', 'left', {}],
+		['gateway', 'minio', 'right', 'left', {}],
+		['gateway', 'postgres', 'right', 'left', {}],
+		['redis', 'worker', 'right', 'left', {}],
+		['minio', 'worker', 'right', 'left', {}],
+		['postgres', 'worker', 'right', 'left', {}],
+		['worker', 'vector', 'right', 'left', {}],
+		['worker', 'stream', 'right', 'left', {}]
+	]
+};
+
+interface ArchNode {
+	zone: string;
+	zoneColor: string;
+	title: string;
+	bullets: string[];
+	deps: string[];
+	budgetLabel: string;
+	budget: string;
+}
+
+const NODES: Record<string, ArchNode> = {
+	client: {
+		zone: 'Browser client',
+		zoneColor: 'var(--c-periwinkle)',
+		title: 'Browser Client',
+		bullets: [
+			'SvelteKit sends Bearer JWT requests to the Deno gateway and keeps the session in the frontend store.',
+			'Uploads go straight to private MinIO through 15-minute presigned PUT URLs; the API never proxies file bytes.',
+			'Chat consumes SSE events, while Supabase Realtime and four-second polling keep document status current.'
+		],
+		deps: ['SvelteKit', 'Supabase Auth', 'SSE', 'Realtime'],
+		budgetLabel: 'Client transport',
+		budget: 'SSE + Realtime'
+	},
+	gateway: {
+		zone: 'API boundary',
+		zoneColor: 'var(--color-terracotta)',
+		title: 'Deno + Hono Gateway',
+		bullets: [
+			'Validates Supabase HS256 JWTs, resolves tenant context, and applies explicit tenant predicates across the stack.',
+			'Orchestrates presigned uploads, confirmation, hybrid search, RAG turns, fallback routing, and SSE streaming.',
+			'Runs in Docker on the ARM64 STB and is reached through a Cloudflare Tunnel.'
+		],
+		deps: ['Deno', 'Hono', 'Drizzle ORM', 'Cloudflare Tunnel'],
+		budgetLabel: 'Request boundary',
+		budget: 'JWT + tenant + quota'
+	},
+	redis: {
+		zone: 'Control plane',
+		zoneColor: 'var(--c-amber)',
+		title: 'Redis Gatekeeper',
+		bullets: [
+			'Applies global standard, strict, and block-tier rate limits before protected work proceeds.',
+			'Caches tenant mapping, quotas, circuit-breaker state, prompt-injection decisions, embeddings, and share payloads.',
+			'Worker Lua gates protect Cloudflare token allowance; failures do not silently become an unbounded queue.'
+		],
+		deps: ['Upstash Redis', 'Lua gates', 'Rate limits', 'Circuit breakers'],
+		budgetLabel: 'Standard limit',
+		budget: '300 requests / minute'
+	},
+	vector: {
+		zone: 'Semantic data plane',
+		zoneColor: 'var(--c-lavender)',
+		title: 'Semantic Index',
+		bullets: [
+			'Current production embeddings use Cloudflare Workers AI BGE-M3 at 1024 dimensions.',
+			'Upstash Vector stores tenant-filtered chunk vectors with document, chunk, page, and content metadata.',
+			'Read search returns ranked IDs before the Deno layer hydrates the matching chunk records.'
+		],
+		deps: ['Cloudflare Workers AI', 'BGE-M3', 'Upstash Vector'],
+		budgetLabel: 'Vector width',
+		budget: '1024 dimensions'
+	},
+	postgres: {
+		zone: 'Relational data plane',
+		zoneColor: 'var(--c-olive)',
+		title: 'Relational Core',
+		bullets: [
+			'Source of truth for tenants, documents, chunks, conversations, subscriptions, activity, and turn state.',
+			'Postgres FTS supplies the keyword branch; Deno performs RRF fusion and later hydrates chunk content.',
+			'Committed document status changes trigger pg_net; pg_cron reopens quota-exhausted documents for retry.'
+		],
+		deps: ['Supabase PostgreSQL', 'Drizzle', 'pg_net', 'pg_cron'],
+		budgetLabel: 'Isolation rule',
+		budget: 'tenant_id predicates'
+	},
+	fusion: {
+		zone: 'Search orchestration',
+		zoneColor: 'var(--c-purple)',
+		title: 'Hybrid Ranker',
+		bullets: [
+			'Runs Postgres FTS and semantic Vector search in parallel, then fuses ranked IDs in the Deno application layer.',
+			'Uses RRF with the documented FTS-heavy weighting of 2:1 over vector results.',
+			'Filters, deduplicates, groups by document, and hydrates page-aware context for the answer.'
+		],
+		deps: ['Deno', 'Postgres FTS', 'Upstash Vector', 'RRF'],
+		budgetLabel: 'Fusion weighting',
+		budget: 'FTS 2 : vector 1'
+	},
+	router: {
+		zone: 'Model orchestration',
+		zoneColor: 'var(--c-purple)',
+		title: 'Model Router',
+		bullets: [
+			'Classifies history depth, question length, and context complexity before the answer stream begins.',
+			'Rotates through Light, Medium, and Heavy provider pools when a provider is unavailable or limited.',
+			'BYOK can route supported requests to Gemini, Mistral, or OpenRouter without exposing the key to the client.'
+		],
+		deps: ['Gemini', 'Mistral', 'Groq', 'SambaNova', 'Cohere', 'BYOK'],
+		budgetLabel: 'Routing tiers',
+		budget: 'Light / Medium / Heavy'
+	},
+	minio: {
+		zone: 'Private storage',
+		zoneColor: 'var(--c-navy)',
+		title: 'Private MinIO Store',
+		bullets: [
+			'Private S3-compatible storage on the STB holds originals and worker-generated preview PDFs.',
+			'Browsers receive short-lived presigned URLs: 15 minutes for PUT and 12 hours for preview GET.',
+			'Deletion removes both storage objects, vectors, database rows, and any active worker job.'
+		],
+		deps: ['MinIO', 'S3 API', 'ARM64 STB', 'Cloudflare Tunnel'],
+		budgetLabel: 'Browser upload',
+		budget: 'Direct, never proxied'
+	},
+	worker: {
+		zone: 'On-premise worker',
+		zoneColor: 'var(--c-purple)',
+		title: 'FastAPI Ingestion Worker',
+		bullets: [
+			'FastAPI receives the pg_net webhook, downloads the confirmed object, and converts DOCX, TXT, or Markdown for preview.',
+			'Extracts text into 1,000-token chunks with 150-token overlap, aligns chunks to pages, and checkpoints progress.',
+			'Generates BGE-M3 embeddings in batches up to 32, summarizes in parallel, and resumes after quota exhaustion.'
+		],
+		deps: ['Python FastAPI', 'PyMuPDF', 'LibreOffice', 'Workers AI', 'Redis'],
+		budgetLabel: 'Chunk policy',
+		budget: '1,000 + 150 overlap'
+	},
+	stream: {
+		zone: 'Response and sync plane',
+		zoneColor: 'var(--c-lime)',
+		title: 'Response and Progress Stream',
+		bullets: [
+			'RAG responses emit turn status, references, tokens, titles, and a final done event over SSE.',
+			'The backend filters citations and finalizes the turn; the frontend drains tokens through its typewriter buffer.',
+			'Document status reaches the UI through Supabase Realtime with a four-second polling fallback.'
+		],
+		deps: ['SSE', 'Supabase Realtime', 'Polling', 'Turn state'],
+		budgetLabel: 'Citation contract',
+		budget: '[Doc N: Page X]'
+	}
+};
+
+export function initLanding(): () => void {
+	const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	const root = document.querySelector<HTMLElement>('.landing-root');
+	if (!root) return () => {};
+	const $ = <T extends Element = HTMLElement>(
+		sel: string,
+		ctx: ParentNode | null = root
+	): T | null => ctx?.querySelector<T>(sel) ?? null;
+	const $$ = <T extends Element = HTMLElement>(sel: string, ctx: ParentNode | null = root): T[] =>
+		ctx ? Array.from(ctx.querySelectorAll<T>(sel)) : [];
+
+	/* ---------- cleanup registry ---------- */
+	const disposers: Array<() => void> = [];
+	const timeouts = new Set<number>();
+	const intervals = new Set<number>();
+	const rafs = new Set<number>();
+	const observers: ObserverLike[] = [];
+
+	const on = (
+		target: EventTarget | null | undefined,
+		event: string,
+		fn: EventListenerOrEventListenerObject,
+		opts?: AddEventListenerOptions | boolean
+	) => {
+		if (!target) return;
+		target.addEventListener(event, fn, opts);
+		disposers.push(() => target.removeEventListener(event, fn, opts));
+	};
+	const later = (fn: () => void, ms?: number) => {
+		const id = window.setTimeout(fn, ms);
+		timeouts.add(id);
+		return id;
+	};
+	const every = (fn: () => void, ms: number) => {
+		const id = window.setInterval(fn, ms);
+		intervals.add(id);
+		return id;
+	};
+	const clearLater = (id: number) => {
+		timeouts.delete(id);
+		clearTimeout(id);
+	};
+	const clearEvery = (id: number) => {
+		intervals.delete(id);
+		clearInterval(id);
+	};
+	const nextFrame = (fn: FrameRequestCallback) => {
+		const id = requestAnimationFrame(fn);
+		rafs.add(id);
+		return id;
+	};
+	const cancelFrame = (id: number | null | undefined) => {
+		if (id == null) return;
+		rafs.delete(id);
+		cancelAnimationFrame(id);
+	};
+	const observe = <T extends ObserverLike>(o: T): T => {
+		observers.push(o);
+		return o;
+	};
+
+	/* ---------- scroll reveals (Emil Kowalski Design Eng) ---------- */
+	const autoRevealSelectors = [
+		'section h1',
+		'section h2',
+		'section h3',
+		'section .t-b1',
+		'section .t-b2',
+		'section .btn',
+		'section .card',
+		'section .scard',
+		'section .tcard',
+		'section .arch-node',
+		'section .chunkcard',
+		'section .cap-item',
+		'section .fb-stage',
+		'section .console',
+		'section img',
+		'section figure'
+	];
+
+	autoRevealSelectors.forEach((sel) => {
+		$$(sel).forEach((el) => {
+			if (!el.hasAttribute('data-reveal')) {
+				el.setAttribute('data-reveal', '');
+			}
+		});
+	});
+
+	const revealEls = $$('[data-reveal]');
+
+	const revealContainers = $$(
+		'.hero__copy, .cap-list, .cap-stage, .console__side, .console__main, .arch__row, .arch__data, .fb-toolbar, .tier-grid, .faq-grid, .cta-grid'
+	);
+	revealContainers.forEach((container) => {
+		const items = $$('[data-reveal]', container);
+		items.forEach((item, idx) => {
+			if (!item.style.getPropertyValue('--rd')) {
+				item.style.setProperty('--rd', `${idx * 75}ms`);
+			}
+		});
+	});
+
+	if (REDUCED || !('IntersectionObserver' in window)) {
+		revealEls.forEach((el) => el.classList.add('is-in'));
+	} else {
+		const io = observe(
+			new IntersectionObserver(
+				(entries) => {
+					entries.forEach((entry) => {
+						if (entry.isIntersecting) {
+							entry.target.classList.add('is-in');
+							io.unobserve(entry.target);
+						}
+					});
+				},
+				{ threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+			)
+		);
+		revealEls.forEach((el) => io.observe(el));
+	}
+
+	/* ---------- simulated RAG demo ---------- */
+	const consoleEl = $('#console');
+	const answerText = $('#answerText');
+	const answerSummary = $('#answerSummary');
+	const stPill = $('#stPill');
+	const stText = $('#stText');
+	const runBtn = $('#runBtn');
+	const runLabel = $('#runLabel');
+	const byokSwitch = $('#byokSwitch');
+	const routeLine = $('#routeLine');
+	const chunkCards = $$('.chunkcard', consoleEl);
+
+	const ANSWER =
+		'Q3 EBITDA totaled $48.2M, up 12.4% year over year. Operating income ' +
+		'contributed $41.7M, with depreciation and amortization adding $6.5M. ' +
+		'Per Section 4.2, North America delivered $29.1M and EMEA $19.1M, ' +
+		'partially offset by $2.9M in unallocated corporate costs.';
+
+	const CHUNK_REVEAL_AT = [10, 26, 42]; // word indices
+	let streamTimers: number[] = [];
+
+	function clearStream() {
+		streamTimers.forEach((t) => clearLater(t));
+		streamTimers = [];
+	}
+
+	function setStatus(mode: 'stream' | 'done', text: string) {
+		stPill?.classList.remove('st--stream', 'st--done');
+		if (mode === 'stream') stPill?.classList.add('st--stream');
+		if (mode === 'done') stPill?.classList.add('st--done');
+		if (stText) stText.textContent = text;
+	}
+
+	function resetDemo() {
+		clearStream();
+		if (answerText) answerText.textContent = '';
+		if (answerSummary) answerSummary.textContent = '';
+		consoleEl?.classList.remove('done');
+		chunkCards.forEach((c) => c.classList.remove('show'));
+	}
+
+	function finishDemo() {
+		consoleEl?.classList.add('done');
+		setStatus('done', 'complete / 3 sources cited');
+		if (runLabel) runLabel.textContent = 'Run Query';
+		runBtn?.setAttribute('aria-busy', 'false');
+		if (answerSummary) answerSummary.textContent = 'Answer complete. ' + ANSWER;
+	}
+
+	function runDemo() {
+		resetDemo();
+		if (REDUCED) {
+			if (answerText) answerText.textContent = ANSWER;
+			chunkCards.forEach((c) => c.classList.add('show'));
+			finishDemo();
+			return;
+		}
+
+		setStatus('stream', 'streaming / sse');
+		if (runLabel) runLabel.textContent = 'Streaming…';
+		runBtn?.setAttribute('aria-busy', 'true');
+
+		const words = ANSWER.split(' ');
+		let i = 0;
+		const step = () => {
+			if (i < words.length) {
+				if (answerText) answerText.textContent += (i === 0 ? '' : ' ') + words[i];
+				const revealIdx = CHUNK_REVEAL_AT.indexOf(i);
+				if (revealIdx > -1 && chunkCards[revealIdx]) {
+					chunkCards[revealIdx].classList.add('show');
+				}
+				i += 1;
+				streamTimers.push(later(step, 26 + Math.random() * 30));
+			} else {
+				chunkCards.forEach((c) => c.classList.add('show'));
+				streamTimers.push(later(finishDemo, 220));
+			}
+		};
+		streamTimers.push(later(step, 420)); // simulated scatter-gather latency
+	}
+
+	if (runBtn) {
+		on(runBtn, 'click', runDemo);
+		// run once when the console scrolls into view
+		if ('IntersectionObserver' in window && consoleEl) {
+			const dio = observe(
+				new IntersectionObserver(
+					(entries) => {
+						if (entries[0].isIntersecting) {
+							runDemo();
+							dio.disconnect();
+						}
+					},
+					{ threshold: 0.35 }
+				)
+			);
+			dio.observe(consoleEl);
+		}
+	}
+
+	if (byokSwitch) {
+		on(byokSwitch, 'click', () => {
+			const state = byokSwitch.getAttribute('aria-checked') !== 'true';
+			byokSwitch.setAttribute('aria-checked', String(state));
+			consoleEl?.classList.toggle('byok-on', state);
+			if (routeLine) {
+				routeLine.textContent = state
+					? 'your key / openai gpt-4o-mini / decrypted in-memory only'
+					: 'platform gateway / groq → gemini → cohere fallback';
+			}
+		});
+	}
+
+	/* ---------- architecture topology flow routing & inspector ---------- */
+	function routeFlow(flow: HTMLElement) {
+		const canvas = $('.flow__canvas', flow);
+		const svg = $<SVGSVGElement>('.flow-svg', flow);
+		if (!canvas || !svg) return;
+		while (svg.firstChild) svg.removeChild(svg.firstChild);
+		$$('.conn-glyph', canvas).forEach((e) => e.remove());
+
+		const cr = canvas.getBoundingClientRect();
+		const W = canvas.offsetWidth,
+			H = canvas.offsetHeight;
+		svg.setAttribute('width', String(W));
+		svg.setAttribute('height', String(H));
+		svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+		const anchor = (key: string, side: string): { x: number; y: number } => {
+			const fn = $<HTMLElement>(`.fn[data-node="${key}"]`, flow);
+			if (!fn) return { x: 0, y: 0 };
+			const fr = $<HTMLElement>('.fn-frame', fn);
+			if (!fr) return { x: 0, y: 0 };
+			const r = fr.getBoundingClientRect();
+			const x = r.left - cr.left,
+				y = r.top - cr.top;
+			if (side === 'right') return { x: x + r.width, y: y + r.height / 2 };
+			if (side === 'left') return { x: x, y: y + r.height / 2 };
+			if (side === 'top') return { x: x + r.width / 2, y: y };
+			return { x: x + r.width / 2, y: y + r.height };
+		};
+
+		(FLOW_CONNS[flow.id] || []).forEach((c, i) => {
+			const [from, to, fs, ts, opt] = c;
+			const p0 = anchor(from, fs),
+				p1 = anchor(to, ts);
+			let pts: { x: number; y: number }[];
+			if (fs === 'right' && ts === 'left') {
+				pts =
+					Math.abs(p0.y - p1.y) < 2
+						? [p0, p1]
+						: (() => {
+								const mx = (p0.x + p1.x) / 2;
+								return [p0, { x: mx, y: p0.y }, { x: mx, y: p1.y }, p1];
+							})();
+			} else {
+				pts =
+					Math.abs(p0.x - p1.x) < 2
+						? [p0, p1]
+						: (() => {
+								const my = (p0.y + p1.y) / 2;
+								return [p0, { x: p0.x, y: my }, { x: p1.x, y: my }, p1];
+							})();
+			}
+
+			const SVGNS = 'http://www.w3.org/2000/svg';
+			const ns = (t: string) => document.createElementNS(SVGNS, t);
+			const d = pts
+				.map((p, j) => (j ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1))
+				.join(' ');
+
+			const g = ns('g');
+			g.setAttribute('class', 'conn-group');
+			g.dataset.link = from + ' ' + to;
+			const line = ns('path');
+			line.setAttribute('class', 'conn-line');
+			line.setAttribute('d', d);
+			g.appendChild(line);
+			const pulse = ns('path');
+			pulse.setAttribute('class', 'conn-pulse');
+			pulse.setAttribute('d', d);
+			pulse.setAttribute('pathLength', '100');
+			pulse.style.setProperty('--d', i * 0.32 + 's');
+			g.appendChild(pulse);
+
+			const a = pts[pts.length - 1],
+				b = pts[pts.length - 2];
+			let dx = a.x - b.x,
+				dy = a.y - b.y;
+			const len = Math.hypot(dx, dy) || 1;
+			dx /= len;
+			dy /= len;
+			const bx = a.x - dx * 7,
+				by = a.y - dy * 7,
+				px = -dy,
+				py = dx,
+				w = 4;
+			const ar = ns('path');
+			ar.setAttribute('class', 'conn-arrow');
+			ar.setAttribute(
+				'd',
+				'M' +
+					a.x +
+					' ' +
+					a.y +
+					' L' +
+					(bx + px * w) +
+					' ' +
+					(by + py * w) +
+					' L' +
+					(bx - px * w) +
+					' ' +
+					(by - py * w) +
+					' Z'
+			);
+			g.appendChild(ar);
+			svg.appendChild(g);
+
+			if (opt && opt.glyph) {
+				const mx = pts.length === 2 ? (p0.x + p1.x) / 2 : (p0.x + pts[1].x) / 2;
+				const gl = document.createElement('div');
+				gl.className = 'conn-glyph';
+				gl.dataset.link = from + ' ' + to;
+				gl.style.left = mx + 'px';
+				gl.style.top = p0.y + 'px';
+				gl.innerHTML =
+					'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>';
+				canvas.appendChild(gl);
+			}
+		});
+	}
+
+	function routeAll() {
+		$$('.flow').forEach(routeFlow);
+		$$('.fblock').forEach((fb) => {
+			const flow = $('.flow', fb),
+				canvas = $('.flow__canvas', fb);
+			if (flow && canvas) {
+				fb.classList.toggle('can-scroll', canvas.offsetWidth > flow.clientWidth + 2);
+			}
+		});
+	}
+
+	/* ---------- selection / highlight ---------- */
+	let activeKey = 'gateway';
+	const detailEl = $('#archDetail');
+
+	function applySel(key: string, render?: boolean) {
+		activeKey = key;
+		$$('.flow').forEach((f) => f.classList.add('has-sel'));
+		$$('.fn').forEach((n) => n.classList.toggle('is-active', n.dataset.node === key));
+		$$('[data-link]').forEach((el) => {
+			const lk = (el.dataset.link || '').split(' ');
+			el.classList.toggle('hot', lk.indexOf(key) > -1);
+		});
+		if (render === false) return;
+		const n = NODES[key];
+		if (!n || !detailEl) return;
+		const paint = () => {
+			detailEl.innerHTML =
+				'<div class="ad-head"><span class="ad-zone" style="color:' +
+				n.zoneColor +
+				'">' +
+				n.zone +
+				'</span>' +
+				'<h3 class="ad-title">' +
+				n.title +
+				'</h3></div>' +
+				'<div class="ad-grid"><ul class="ad-bullets">' +
+				n.bullets.map((b) => '<li>' + b + '</li>').join('') +
+				'</ul><div class="ad-side"><h4>Dependencies</h4><div class="ad-deps">' +
+				n.deps.map((d) => '<span>' + d + '</span>').join('') +
+				'</div><div class="ad-budget"><h4>' +
+				n.budgetLabel +
+				'</h4><b>' +
+				n.budget +
+				'</b></div></div></div>';
+		};
+		if (REDUCED) {
+			paint();
+			return;
+		}
+		detailEl.classList.add('swap');
+		later(() => {
+			paint();
+			detailEl.classList.remove('swap');
+		}, 170);
+	}
+
+	/* ---------- wire up ---------- */
+	$$('.fn').forEach((btn) => on(btn, 'click', () => applySel(btn.dataset.node || '')));
+
+	let rt: number | undefined;
+	on(window, 'resize', () => {
+		clearLater(rt as number);
+		rt = later(() => {
+			routeAll();
+			applySel(activeKey, false);
+		}, 120);
+	});
+	if (document.fonts && document.fonts.ready) {
+		document.fonts.ready.then(() => {
+			routeAll();
+			applySel(activeKey, false);
+		});
+	}
+
+	nextFrame(() => {
+		routeAll();
+		applySel(activeKey);
+	});
+	on(window, 'load', () => {
+		routeAll();
+		applySel(activeKey, false);
+	});
+
+	/* ---------- architecture flow tabs toggle ---------- */
+	const archTabs = $$('.arch-tab');
+	const fblocks = $$('.fblock');
+
+	function switchArchTab(flowKey: string) {
+		archTabs.forEach((tab) => {
+			const active = tab.dataset.flow === flowKey;
+			tab.classList.toggle('is-active', active);
+			tab.setAttribute('aria-selected', String(active));
+		});
+
+		fblocks.forEach((fb) => {
+			const active = fb.id === `flowblock-${flowKey}`;
+			fb.classList.toggle('is-active', active);
+		});
+
+		later(() => {
+			routeAll();
+			applySel(activeKey, false);
+		}, 60);
+	}
+
+	archTabs.forEach((tab) => on(tab, 'click', () => switchArchTab(tab.dataset.flow || '')));
+
+	/* ---------- tier unlock simulation (PRD: global event trigger) ---------- */
+	const flagLine = $('.flag-line');
+	const flagVal = $('#flagVal');
+	const realCard = $('#realCard');
+	const realBtn = $<HTMLButtonElement>('#realBtn');
+	const realBtnLabel = $('#realBtnLabel');
+	const toast = $('#toast');
+	let unlocked = false;
+	let toastTimer: number | undefined;
+
+	function showToast() {
+		if (!toast) return;
+		toast.classList.add('show');
+		if (toastTimer) clearLater(toastTimer);
+		toastTimer = later(() => toast.classList.remove('show'), 4200);
+	}
+
+	function doUnlock() {
+		if (unlocked) {
+			const tiers = $('#tiers');
+			if (tiers) tiers.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth' });
+			return;
+		}
+		unlocked = true;
+
+		$$('.js-investor').forEach((btn) => {
+			const label = $('.js-investor-label', btn);
+			if (label) label.textContent = 'Processing sandbox invoice…';
+			btn.setAttribute('aria-busy', 'true');
+		});
+
+		later(
+			() => {
+				$$('.js-investor').forEach((btn) => {
+					const label = $('.js-investor-label', btn);
+					if (label) label.textContent = 'Investor Tier Unlocked';
+					btn.setAttribute('aria-busy', 'false');
+					btn.classList.remove('btn--primary', 'btn--ghost-dark', 'btn--investor');
+					btn.classList.add('btn--ghost');
+				});
+
+				if (flagVal) {
+					flagVal.textContent = 'true';
+					flagVal.classList.add('on');
+				}
+				if (flagLine) flagLine.classList.add('unlocked');
+
+				if (realCard) realCard.classList.add('unlocked');
+				if (realBtn) {
+					realBtn.disabled = false;
+					const ic = realBtn.querySelector('.ic');
+					if (ic) (ic as HTMLElement).style.display = 'none';
+					if (realBtnLabel) realBtnLabel.textContent = 'Start Subscription';
+				}
+				showToast();
+			},
+			REDUCED ? 50 : 750
+		);
+	}
+
+	$$('.js-investor').forEach((btn) => on(btn, 'click', doUnlock));
+	if (realBtn) {
+		on(realBtn, 'click', () => {
+			if (!realBtn.disabled) showToast();
+		});
+	}
+
+	/* ---------- FAQ accordion ---------- */
+	const accs = $$('.acc');
+	accs.forEach((acc) => {
+		const btn = $('.acc-btn', acc);
+		const panel = $('.acc-panel', acc);
+		if (!btn || !panel) return;
+		on(btn, 'click', () => {
+			const isOpen = acc.classList.contains('open');
+			// close others for a tidy rhythm
+			accs.forEach((other) => {
+				if (other !== acc && other.classList.contains('open')) {
+					other.classList.remove('open');
+					const ob = $('.acc-btn', other);
+					const op = $('.acc-panel', other);
+					ob?.setAttribute('aria-expanded', 'false');
+					if (op) op.style.maxHeight = '0px';
+				}
+			});
+			acc.classList.toggle('open', !isOpen);
+			btn.setAttribute('aria-expanded', String(!isOpen));
+			panel.style.maxHeight = !isOpen ? panel.scrollHeight + 'px' : '0px';
+		});
+	});
+
+	// keep open panels sized correctly on resize
+	on(
+		window,
+		'resize',
+		() => {
+			$$('.acc.open .acc-panel').forEach((p) => {
+				p.style.maxHeight = p.scrollHeight + 'px';
+			});
+		},
+		{ passive: true }
+	);
+
+	/* ---------- sandbox evaluation code (simulated, local only) ---------- */
+	const simBtn = $<HTMLButtonElement>('#simBtn');
+	const simCode = $('#simCode');
+	if (simBtn && simCode) {
+		on(simBtn, 'click', () => {
+			const bytes = new Uint8Array(4);
+			crypto.getRandomValues(bytes);
+			const code =
+				'SIM-' +
+				Array.from(bytes)
+					.map((b) => b.toString(16).padStart(2, '0').toUpperCase())
+					.join('');
+			const chip = simCode.querySelector('b');
+			if (chip) chip.textContent = code;
+			simCode.hidden = false;
+			simBtn.textContent = 'Code generated';
+			simBtn.disabled = true;
+			simBtn.classList.remove('btn--ink');
+			simBtn.classList.add('btn--ghost');
+		});
+	}
+
+	/* ---------- testimonial switcher (rail -> portrait + quote) ---------- */
+	const vGrid = $('#voicesGrid');
+	if (vGrid) {
+		const gridEl = vGrid;
+		const persons = $$('.vp-person', vGrid);
+		const photo = $('#voicesPhoto');
+		const photoImg = <HTMLImageElement | null>$('#voicesImg');
+		const photoMono = $('#voicesMono');
+		const phName = $('#voicesPhName');
+		const phRole = $('#voicesPhRole');
+		const swap = $('#voicesSwap');
+		const qBody = $('#voicesBody');
+		const qCite = $('#voicesCite');
+		const qCo = $('#voicesCo');
+		const qRate = $('#voicesRate');
+
+		const firstRoleLine = (s: string) => (s || '').split('/')[0].trim();
+		let current = persons.findIndex((p) => p.classList.contains('is-active'));
+		if (current < 0) current = 0;
+		let autoTimer: number | undefined;
+		const AUTO = 6000;
+
+		function paintPhoto(btn: HTMLElement) {
+			const img = (btn.dataset.img || '').trim();
+			const name = $<HTMLElement>('.vp-person__name', btn)?.textContent?.trim() || '';
+			const role = $<HTMLElement>('.vp-person__role', btn)?.textContent?.trim() || '';
+			if (img && photoImg) {
+				photoImg.src = img;
+				photoImg.alt = 'Portrait of ' + name;
+				photoImg.hidden = false;
+				photo?.classList.add('has-img');
+			} else {
+				if (photoImg) {
+					photoImg.hidden = true;
+					photoImg.removeAttribute('src');
+				}
+				photo?.classList.remove('has-img');
+				if (photoMono) photoMono.textContent = btn.dataset.mono || name.slice(0, 2).toUpperCase();
+				if (phName) phName.textContent = name;
+				if (phRole) phRole.textContent = firstRoleLine(role);
+			}
+		}
+
+		function paintQuote(btn: HTMLElement) {
+			const name = $<HTMLElement>('.vp-person__name', btn)?.textContent?.trim() || '';
+			const role = $<HTMLElement>('.vp-person__role', btn)?.textContent?.trim() || '';
+			const quote = ($<HTMLElement>('.vp-person__quote', btn)?.textContent || '').trim();
+			const rate = (btn.dataset.rate || '5.0').trim();
+			if (qBody) qBody.textContent = quote;
+			if (qCite) qCite.textContent = name;
+			if (qCo) qCo.textContent = role;
+			qRate?.setAttribute('aria-label', 'Rated ' + rate + ' out of 5');
+			const b = qRate?.querySelector('b');
+			if (b) b.textContent = rate;
+
+			const brand = (btn.dataset.brand || '').trim();
+			const brandUse = gridEl.querySelector('.voices-quote__brand use');
+			if (brandUse && brand) {
+				brandUse.setAttribute('href', '#i-brand-' + brand);
+			}
+		}
+
+		function select(idx: number) {
+			idx = ((idx % persons.length) + persons.length) % persons.length;
+			current = idx;
+			const btn = persons[idx];
+			persons.forEach((p, i) => {
+				const onNow = i === idx;
+				p.classList.toggle('is-active', onNow);
+				p.setAttribute('aria-pressed', String(onNow));
+			});
+			// optional per-person rail avatar photo
+			persons.forEach((p) => {
+				const a = $<HTMLElement>('.vp-person__avatar', p);
+				const src = (p.dataset.avatar || '').trim();
+				if (a && src) {
+					a.style.backgroundImage = 'url(' + src + ')';
+					a.textContent = '';
+				}
+			});
+
+			if (REDUCED) {
+				paintPhoto(btn);
+				paintQuote(btn);
+				return;
+			}
+			swap?.classList.add('swap');
+			photo?.classList.add('swap');
+			later(() => {
+				paintPhoto(btn);
+				paintQuote(btn);
+				swap?.classList.remove('swap');
+				photo?.classList.remove('swap');
+			}, 200);
+		}
+
+		function startAuto() {
+			if (REDUCED) return;
+			stopAuto();
+			autoTimer = every(() => select(current + 1), AUTO);
+		}
+		function stopAuto() {
+			if (autoTimer) {
+				clearEvery(autoTimer);
+				autoTimer = undefined;
+			}
+		}
+
+		persons.forEach((btn, i) => {
+			on(btn, 'click', () => {
+				select(i);
+				startAuto();
+			});
+		});
+
+		// pause auto-advance while the user is hovering or tabbing through the grid
+		on(vGrid, 'mouseenter', stopAuto);
+		on(vGrid, 'mouseleave', startAuto);
+		on(vGrid, 'focusin', stopAuto);
+		on(vGrid, 'focusout', startAuto);
+
+		// initial paint + go
+		paintPhoto(persons[current]);
+		paintQuote(persons[current]);
+		startAuto();
+	}
+
+	/* ---------- capabilities switcher (list -> diagram, auto-advancing) ---------- */
+	(function capSwitcher() {
+		const grid = $('#capGrid');
+		const list = $('#capList');
+		const section = $('#features');
+		if (!grid || !list || !section) return;
+
+		const items = $$('.cap-item', list);
+		const stages = $$('.cap-stage', $('#capPanel') || root);
+		const fills = items.map((it) => $('.cap-bar__fill', it));
+		const DURATION = 5200;
+
+		let idx = 0;
+		let raf = 0;
+		let t0 = 0;
+		let acc = 0;
+		let hover = false;
+		let inView = false;
+
+		const setBar = (i: number, p: number) => {
+			if (fills[i]) fills[i].style.transform = 'scaleX(' + p + ')';
+		};
+		const show = (i: number) => {
+			items.forEach((it, k) => {
+				const onNow = k === i;
+				it.classList.toggle('is-on', onNow);
+				it.setAttribute('aria-expanded', String(onNow));
+			});
+			stages.forEach((st, k) => st.classList.toggle('is-on', k === i));
+		};
+		const tick = (now: number) => {
+			const p = Math.min((acc + (now - t0)) / DURATION, 1);
+			setBar(idx, p);
+			if (p >= 1) {
+				advance();
+				return;
+			}
+			raf = nextFrame(tick);
+		};
+		const run = () => {
+			cancelFrame(raf);
+			t0 = performance.now();
+			raf = nextFrame(tick);
+		};
+		const freeze = () => {
+			cancelFrame(raf);
+			acc += performance.now() - t0;
+		};
+		const recompute = () => {
+			if (REDUCED) return;
+			if (inView && !hover) run();
+			else freeze();
+		};
+		const advance = () => {
+			setBar(idx, 0);
+			idx = (idx + 1) % items.length;
+			show(idx);
+			acc = 0;
+			recompute();
+		};
+		const select = (i: number) => {
+			if (i === idx) return;
+			setBar(idx, 0);
+			idx = i;
+			show(idx);
+			acc = 0;
+			if (!hover && !REDUCED) run();
+			else setBar(idx, 0);
+		};
+
+		items.forEach((it, i) => on(it, 'click', () => select(i)));
+
+		// pause while the user is looking at / tabbing through the panel or list
+		on(grid, 'mouseenter', () => {
+			hover = true;
+			freeze();
+		});
+		on(grid, 'mouseleave', () => {
+			hover = false;
+			recompute();
+		});
+		on(grid, 'focusin', () => {
+			hover = true;
+			freeze();
+		});
+		on(grid, 'focusout', () => {
+			hover = false;
+			recompute();
+		});
+
+		// only run the auto-advance while the section is on screen
+		if ('IntersectionObserver' in window && !REDUCED) {
+			const cio = observe(
+				new IntersectionObserver(
+					(entries) => {
+						inView = entries[0].isIntersecting;
+						if (inView && !hover) {
+							acc = 0;
+							run();
+						} else freeze();
+					},
+					{ threshold: 0.3 }
+				)
+			);
+			cio.observe(section);
+		} else {
+			inView = true;
+		}
+
+		show(0);
+		setBar(0, 0);
+		if (!REDUCED && inView && !hover) run();
+	})();
+
+	/* ---------- footer email capture (local-only confirmation) ---------- */
+	(function footerCapture() {
+		const wrap = $('.ft-capture-wrap');
+		if (!wrap) return;
+		const form = $('.ft-capture', wrap);
+		const input = $('.ft-capture__input', wrap);
+		const btn = $('.ft-capture__btn', wrap);
+		const field = $('.ft-capture__field', wrap);
+		const ok = $('.ft-capture__ok', wrap);
+		if (!form || !input || !btn) return;
+
+		const RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+		on(input, 'input', () => {
+			if (field) field.style.borderColor = '';
+		});
+
+		on(form, 'submit', (e) => {
+			e.preventDefault();
+			if (wrap.classList.contains('is-sent')) return;
+			const val = (input as HTMLInputElement).value.trim();
+			if (!RE.test(val)) {
+				if (field) field.style.borderColor = 'var(--color-orange)';
+				input.focus();
+				return;
+			}
+			wrap.classList.add('is-sent');
+			btn.setAttribute('aria-label', 'Subscribed');
+			btn.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>';
+			input.setAttribute('readonly', 'readonly');
+			if (ok) ok.textContent = "You're on the list - we'll be in touch.";
+		});
+	})();
+
+	/* ---------- model fallback chain / revolver cylinder ---------- */
+	(function fbCylinder() {
+		const section = $('#fallback');
+		const drum = $('#fbDrum');
+		const sparkEl = $('.fb-spark', section);
+		const routeLine = $('#fbRouteLine');
+		const eventLine = $('#fbEventLine');
+		const live = $('#fbLive');
+		const manifest = $('#fbManifest');
+		const autoSwitch = $('#fbAutoSwitch');
+		if (!section || !drum || !manifest) return;
+		const drm = drum;
+
+		/* Kalkulasi path SVG untuk lekukan luar silinder logam */
+		const drumBody = $('#fbDrumBody');
+		if (drumBody) {
+			const CENTER = 180,
+				BASE_R = 150,
+				DEPTH = 18,
+				SIGMA = 10.5;
+			let pathData = '';
+			for (let i = 0; i <= 288; i++) {
+				const theta = (i / 288) * 360;
+				let r = BASE_R;
+				for (let j = 0; j < 7; j++) {
+					const fluteAngle = j * (360 / 7) - 90 + 360 / 14;
+					const diff = ((((theta - fluteAngle + 180) % 360) + 360) % 360) - 180;
+					r -= DEPTH * Math.exp(-(diff * diff) / (2 * SIGMA * SIGMA));
+				}
+				const rad = (theta * Math.PI) / 180;
+				pathData +=
+					(i === 0 ? 'M' : 'L') +
+					(CENTER + r * Math.cos(rad)).toFixed(2) +
+					',' +
+					(CENTER + r * Math.sin(rad)).toFixed(2) +
+					' ';
+			}
+			drumBody.setAttribute('d', pathData + 'Z');
+		}
+
+		const chambers = $$('.fb-ch', section);
+		const labels = chambers.map((c) => $('.fb-ch-label', c));
+		const dots = chambers.map((c) => $('.fb-ch-dot', c));
+
+		/* chamber -> provider map baru */
+		const P = [
+			{ code: 'MS', name: 'Mistral', model: 'Ministral', id: '#f97316' },
+			{ code: 'QW', name: 'Qwen', model: 'Qwen 2.5', id: '#6366f1' },
+			{ code: 'LL', name: 'Meta', model: 'Llama 3', id: '#06b6d4' },
+			{ code: 'GM', name: 'Google', model: 'Gemini', id: '#8b5cf6' },
+			{ code: 'CO', name: 'Cohere', model: 'Command', id: '#10b981' },
+			{ code: 'OA', name: 'OpenAI', model: 'GPT-4o', id: '#14b8a6' },
+			{ code: 'DS', name: 'Deepseek', model: 'Coder', id: '#3b82f6' }
+		];
+		const N = P.length;
+		const STEP = 360 / N;
+		const status = P.map(() => 'ready'); // ready | limited | open
+		let active = 0;
+		let rot = 0;
+
+		const word = (s: string) => (s === 'limited' ? '429' : s);
+
+		/* bangun menu manifest */
+		manifest.innerHTML = P.map(
+			(p, i) =>
+				'<button class="fb-mchip" type="button" data-i="' +
+				i +
+				'" style="--id:' +
+				p.id +
+				'">' +
+				'<span class="fb-mchip__top">' +
+				'<span class="fb-mchip__sw" aria-hidden="true"></span>' +
+				'<span class="fb-mchip__code">' +
+				p.code +
+				'</span>' +
+				'<span class="fb-mchip__st st-ready" data-st>ready</span>' +
+				'</span>' +
+				'<span class="fb-mchip__name">' +
+				p.name +
+				'</span>' +
+				'<span class="fb-mchip__model">' +
+				p.model +
+				'</span>' +
+				'<span class="fb-mchip__live" aria-hidden="true">live</span>' +
+				'</button>'
+		).join('');
+		const chips = $$('.fb-mchip', manifest);
+		const chipSt = chips.map((c) => c.querySelector('[data-st]'));
+
+		/* rotasi mekanis dan mekanika spring */
+		function apply(x: number) {
+			drm.setAttribute('transform', 'rotate(' + x + ' 180 180)');
+			for (let i = 0; i < labels.length; i++)
+				labels[i]?.setAttribute('transform', 'rotate(' + -x + ')');
+		}
+
+		function makeSpring(initial: number) {
+			let cur = initial,
+				vel = 0,
+				target = initial,
+				last = 0,
+				on = false;
+			const K = 260,
+				D = 24,
+				M = 1,
+				PREC = 0.05;
+			function frame(now: number) {
+				if (!last) last = now;
+				let dt = (now - last) / 1000;
+				last = now;
+				if (dt > 0.032) dt = 0.032;
+				const f = -K * (cur - target) - D * vel;
+				vel += (f / M) * dt;
+				cur += vel * dt;
+				apply(cur);
+				if (Math.abs(target - cur) < PREC && Math.abs(vel) < PREC) {
+					cur = target;
+					vel = 0;
+					on = false;
+					last = 0;
+					apply(cur);
+					return;
+				}
+				nextFrame(frame);
+			}
+			return {
+				set(t: number) {
+					target = t;
+					if (REDUCED) {
+						cur = t;
+						vel = 0;
+						apply(t);
+						return;
+					}
+					if (!on) {
+						on = true;
+						last = 0;
+						nextFrame(frame);
+					}
+				}
+			};
+		}
+		const spin = makeSpring(0);
+
+		function spark() {
+			if (REDUCED || !sparkEl) return;
+			sparkEl.classList.remove('flash');
+			void sparkEl.getBoundingClientRect();
+			sparkEl.classList.add('flash');
+			later(() => sparkEl.classList.remove('flash'), 460);
+		}
+
+		function render(ev?: { text: string; kind?: string }) {
+			const p = P[active];
+			for (let i = 0; i < N; i++) {
+				chambers[i].classList.toggle('is-active', i === active);
+				chips[i].classList.toggle('is-active', i === active);
+				dots[i]?.setAttribute('class', 'fb-ch-dot is-' + status[i]);
+				const st = chipSt[i];
+				if (st) {
+					st.setAttribute('class', 'fb-mchip__st st-' + status[i]);
+					st.textContent = word(status[i]);
+				}
+			}
+			if (routeLine) {
+				routeLine.textContent =
+					'route → ' +
+					p.name +
+					' / ' +
+					p.model +
+					' / ' +
+					word(status[active]) +
+					' / circuit ' +
+					(status[active] === 'open' ? 'open' : 'closed');
+			}
+			if (ev) {
+				if (eventLine) {
+					eventLine.textContent = ev.text;
+					eventLine.setAttribute('class', 'fb-readout__event t-tag hit-' + (ev.kind || 'info'));
+				}
+			}
+			if (live)
+				live.textContent =
+					'Active route: ' + p.name + ' / ' + p.model + ' / ' + word(status[active]);
+		}
+
+		function select(i: number, opts?: { full?: boolean; ev?: { text: string; kind?: string } }) {
+			opts = opts || {};
+			i = ((i % N) + N) % N;
+			const desired = -(i * STEP);
+			let delta = (((desired - rot) % 360) + 360) % 360;
+			if (delta > 0) delta -= 360;
+			if (delta === 0 && opts.full) delta = -360;
+			rot += delta;
+			active = i;
+			spin.set(rot);
+			spark();
+			render(opts.ev);
+		}
+
+		function nextReady(after: number) {
+			for (let k = 1; k <= N; k++) {
+				const idx = (after + k) % N;
+				if (status[idx] === 'ready') return idx;
+			}
+			return -1;
+		}
+
+		function indexNext() {
+			const nx = nextReady(active);
+			if (nx < 0) {
+				render({ text: 'no live chamber / chain held', kind: 'info' });
+				return;
+			}
+			if (nx === active) {
+				select(active, {
+					full: true,
+					ev: { text: 'cylinder indexed / ' + P[active].name + ' still live', kind: 'info' }
+				});
+				return;
+			}
+			select(nx, { ev: { text: 'cylinder indexed to ' + P[nx].name, kind: 'info' } });
+		}
+
+		function sim429() {
+			const a = active;
+			if (status[a] !== 'open') status[a] = 'limited';
+			const nx = nextReady(a);
+			if (nx >= 0) {
+				select(nx, {
+					ev: { text: P[a].name + ' 429 / rate limit  →  indexed to ' + P[nx].name, kind: 'warn' }
+				});
+			} else {
+				render({ text: P[a].name + ' 429 / rate limit  →  no live chamber', kind: 'warn' });
+			}
+		}
+
+		function trip() {
+			const a = active;
+			if (status[a] === 'open') {
+				status[a] = 'ready';
+				render({ text: 'circuit closed on ' + P[a].name + ' / probe ok', kind: 'ok' });
+			} else {
+				status[a] = 'open';
+				const nx = nextReady(a);
+				if (nx >= 0) {
+					select(nx, {
+						ev: {
+							text: 'circuit open on ' + P[a].name + '  →  indexed to ' + P[nx].name,
+							kind: 'warn'
+						}
+					});
+				} else {
+					render({ text: 'circuit open on ' + P[a].name + ' / no live chamber', kind: 'warn' });
+				}
+			}
+		}
+
+		function resetAll() {
+			for (let i = 0; i < N; i++) status[i] = 'ready';
+			active = 0;
+			let delta = (((0 - rot) % 360) + 360) % 360;
+			if (delta > 180) delta -= 360;
+			rot += delta;
+			spin.set(rot);
+			spark();
+			render({ text: 'chain reset / all chambers ready', kind: 'ok' });
+		}
+
+		const fbIndex = $('#fbBtnIndex');
+		const fb429 = $('#fbBtn429');
+		const fbTrip = $('#fbBtnTrip');
+		const fbReset = $('#fbBtnReset');
+		if (fbIndex) on(fbIndex, 'click', indexNext);
+		if (fb429) on(fb429, 'click', sim429);
+		if (fbTrip) on(fbTrip, 'click', trip);
+		if (fbReset) on(fbReset, 'click', resetAll);
+		if (autoSwitch) {
+			on(autoSwitch, 'click', () => setAuto(autoSwitch.getAttribute('aria-checked') !== 'true'));
+		}
+
+		chambers.forEach((c, i) =>
+			on(c, 'click', () => {
+				select(i, { ev: { text: 'manual route / ' + P[i].name + ' armed', kind: 'info' } });
+			})
+		);
+		chips.forEach((c, i) =>
+			on(c, 'click', () => {
+				select(i, { ev: { text: 'manual route / ' + P[i].name + ' armed', kind: 'info' } });
+			})
+		);
+
+		let autoOn = false;
+		let autoTimer: number | undefined;
+		let inView = false;
+		let interact = false;
+		const readyCount = () => status.filter((s) => s === 'ready').length;
+		function recoverOne() {
+			let idx = status.indexOf('limited');
+			if (idx < 0) idx = status.indexOf('open');
+			if (idx >= 0) status[idx] = 'ready';
+		}
+		function autoTick() {
+			if (readyCount() < 2) recoverOne();
+			sim429();
+		}
+		function startAuto() {
+			if (REDUCED) return;
+			stopAuto();
+			autoTimer = every(autoTick, 2600);
+		}
+		function stopAuto() {
+			if (autoTimer) {
+				clearEvery(autoTimer);
+				autoTimer = undefined;
+			}
+		}
+		function setAuto(on: boolean) {
+			autoOn = on;
+			autoSwitch?.setAttribute('aria-checked', String(on));
+			syncAuto();
+		}
+		function syncAuto() {
+			if (autoOn && inView && !interact) startAuto();
+			else stopAuto();
+		}
+
+		const stage = $('.fb-stage', section);
+		[stage, manifest, $('.fb-toolbar', section)].forEach((el) => {
+			if (!el) return;
+			on(el, 'mouseenter', () => {
+				interact = true;
+				syncAuto();
+			});
+			on(el, 'mouseleave', () => {
+				interact = false;
+				syncAuto();
+			});
+			on(el, 'focusin', () => {
+				interact = true;
+				syncAuto();
+			});
+			on(el, 'focusout', () => {
+				interact = false;
+				syncAuto();
+			});
+		});
+
+		if ('IntersectionObserver' in window) {
+			const io = observe(
+				new IntersectionObserver(
+					(entries) => {
+						inView = entries[0].isIntersecting;
+						syncAuto();
+					},
+					{ threshold: 0.3 }
+				)
+			);
+			io.observe(section);
+		} else {
+			inView = true;
+		}
+
+		apply(0);
+		render({ text: 'standby / chain armed / 7 chambers ready', kind: 'info' });
+	})();
+
+	/* ---------- pricing comparison matrix (sticky shadows + REAL sync) ---------- */
+	(function cmpMatrix() {
+		const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const wrap = $('.cmp-wrap');
+		const scroller = $('.cmp-scroll');
+		if (wrap && scroller) {
+			const onScroll = () => {
+				const x = scroller.scrollLeft;
+				wrap.classList.toggle('is-x', x > 2);
+				wrap.classList.toggle('at-end', x + scroller.clientWidth >= scroller.scrollWidth - 2);
+			};
+			on(scroller, 'scroll', onScroll, { passive: true });
+			on(window, 'resize', onScroll, { passive: true });
+			onScroll();
+		}
+
+		// keep the PRO REAL row CTA in step with the global investor unlock
+		const flag = $('#flagVal');
+		const realBtns = $$('.cmp-wrap .js-real');
+		const toast = $('#toast');
+		let toastT: number | undefined;
+		function fireToast() {
+			if (!toast) return;
+			toast.classList.add('show');
+			if (toastT) clearLater(toastT);
+			toastT = later(() => toast.classList.remove('show'), 4200);
+		}
+		function setReal(on: boolean) {
+			realBtns.forEach((b) => {
+				b.classList.toggle('is-live', on);
+				b.classList.toggle('is-locked', !on);
+				b.setAttribute('aria-disabled', String(!on));
+				const ic = b.querySelector('.ic');
+				if (ic) (ic as HTMLElement).style.display = on ? 'none' : '';
+				const lbl = b.querySelector('.js-real-label');
+				if (lbl) lbl.textContent = on ? 'Start Subscription' : 'Locked';
+			});
+		}
+		if (realBtns.length) {
+			setReal(!!(flag && flag.textContent.trim() === 'true'));
+			if (flag) {
+				const mo = observe(new MutationObserver(() => setReal(flag.textContent.trim() === 'true')));
+				mo.observe(flag, { childList: true, characterData: true, subtree: true });
+			}
+			realBtns.forEach((b) =>
+				on(b, 'click', () => {
+					if (b.classList.contains('is-live')) {
+						fireToast();
+						return;
+					}
+					const tiers = $('#tiers');
+					if (tiers) tiers.scrollIntoView({ behavior: RM ? 'auto' : 'smooth' });
+				})
+			);
+		}
+	})();
+
+	/* ---------- teardown ---------- */
+	return () => {
+		timeouts.forEach((id) => clearTimeout(id));
+		timeouts.clear();
+		intervals.forEach((id) => clearInterval(id));
+		intervals.clear();
+		rafs.forEach((id) => cancelAnimationFrame(id));
+		rafs.clear();
+		observers.forEach((o) => o.disconnect());
+		disposers.forEach((d) => d());
+	};
+}

@@ -194,14 +194,14 @@
 					<div class="hero-ctas">
 						<a href="/register" class="btn-primary">
 							Start Free
-							<ArrowUpRight size={15} strokeWidth={2.5} />
+							<ArrowUpRight size={17} strokeWidth={2.5} />
 						</a>
 						<a href="#features" class="btn-outline">
 							See Features
-							<ArrowUpRight size={15} strokeWidth={2} />
+							<ArrowUpRight size={17} strokeWidth={2} />
 						</a>
 					</div>
-					<div style="margin-top: 48px; width: 100%;">
+					<div style="margin-top: 24px; width: 100%;">
 						<LogoWall />
 					</div>
 				</div>
@@ -226,61 +226,70 @@
 		flex: 1;
 	}
 
-	/* ── Buttons (Shared) ── */
+	/* ── Buttons (POC theme: DESIGN.md button contract) ──
+	   Font: Instrument Sans (--font-body) · 0.95rem/500 · radius 8px (--r-ctl)
+	   Primary: terracotta (#--color-terracotta) on black text · 200ms ease. */
 	.btn-primary {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
+		justify-content: center;
+		gap: 9px;
 		text-decoration: none;
-		color: var(--dk-bg);
-		font-size: 14px;
-		font-weight: 600;
-		padding: 10px 22px;
-		border-radius: var(--dk-radius-sm);
-		background: var(--dk-copper);
-		border: none;
+		font-family: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+		font-size: 0.95rem;
+		font-weight: 500;
+		letter-spacing: -0.01em;
+		padding: 14px 22px;
+		border-radius: 8px;
+		color: #0e0e0e; /* --color-black */
+		background: oklch(67.4% 0.15 52); /* --color-terracotta */
+		border: 1px solid transparent;
 		cursor: pointer;
 		transition:
 			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
+			color 200ms cubic-bezier(0.37, 0, 0.63, 1),
 			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
-		letter-spacing: -0.02em;
 	}
 
 	.btn-primary:hover {
-		background: var(--color-dk-copper-hover);
+		background: oklch(53.2% 0.134 48); /* --color-terracotta-deep */
+		color: #fafafa; /* --color-offwhite */
 	}
 
 	.btn-primary:active {
-		transform: scale(0.98);
+		transform: scale(0.97);
 	}
 
+	/* Secondary: ghost on dark — transparent, hairline border, offwhite text */
 	.btn-outline {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
+		justify-content: center;
+		gap: 9px;
 		text-decoration: none;
-		color: var(--dk-cream);
-		font-size: 14px;
+		font-family: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+		font-size: 0.95rem;
 		font-weight: 500;
-		padding: 10px 22px;
-		border-radius: var(--dk-radius-sm);
+		letter-spacing: -0.01em;
+		padding: 14px 22px;
+		border-radius: 8px;
+		color: oklch(94.5% 0.014 85); /* --color-offwhite */
 		background: transparent;
-		border: 1px solid var(--dk-border-strong);
+		border: 1px solid oklch(from oklch(94.5% 0.014 85) l c h / 0.14); /* --border-dark */
 		cursor: pointer;
 		transition:
 			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1),
 			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
 			transform 200ms cubic-bezier(0.37, 0, 0.63, 1);
-		letter-spacing: -0.02em;
 	}
 
 	.btn-outline:hover {
-		border-color: var(--dk-copper);
-		background: var(--dk-accent-glow);
+		border-color: oklch(94.5% 0.014 85); /* --color-offwhite */
+		background: oklch(94.5% 0.014 85 / 0.06);
 	}
 
 	.btn-outline:active {
-		transform: scale(0.98);
+		transform: scale(0.97);
 	}
 
 	/* ── Hero Section ── */
@@ -291,7 +300,12 @@
 	}
 
 	.hero-section {
-		background: var(--dk-bg);
+		/* Flat dark surface matching `.section--dark` (Value Proposition):
+		   background: var(--color-offblack) from landing.css, plus the same
+		   dot-grid pattern as `.sec-cap`. */
+		background-color: oklch(26% 0.02 68);
+		background-image: radial-gradient(circle, rgba(250, 250, 250, 0.089) 1px, transparent 1px);
+		background-size: 24px 24px;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -307,35 +321,6 @@
 		width: 100%;
 		height: 760px;
 		max-width: var(--dk-max-width);
-	}
-
-	.hero-section::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		background-image:
-			linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)), url('$lib/assets/images/hero_section.webp');
-		background-size: cover;
-		background-position: center;
-		z-index: 0;
-		pointer-events: none;
-		filter: blur(0px);
-		transform: scale(1);
-	}
-
-	.hero-section::after {
-		content: '';
-		position: absolute;
-		bottom: 0;
-		left: 0;
-		width: 100%;
-		height: 666px;
-		background: linear-gradient(to bottom, rgba(28, 27, 27, 0) 0%, var(--color-dk-bg) 69%);
-		z-index: 50;
-		pointer-events: none;
 	}
 
 	.hero-bg-elements {
@@ -533,22 +518,23 @@
 		pointer-events: auto;
 	}
 
+	/* ── Hero Headline (POC display: t-h-1 token, DESIGN.md typography) ──
+	   Newsreader (Reckless Standard fallback) · weight 400 · lh 1 · -0.02em */
 	.hero-headline {
-		font-family: var(--font-display);
+		font-family: 'Newsreader', Georgia, 'Times New Roman', serif;
 		font-weight: 400;
-		font-size: clamp(2.25rem, 5vw, var(--t-h-1));
-		color: var(--color-dk-cream);
+		font-size: clamp(2.5rem, 1.5rem + 2.8vw, 3.5rem); /* t-h-1 */
+		color: oklch(94.5% 0.014 85); /* --color-offwhite */
 		line-height: 1;
 		letter-spacing: -0.02em;
 		text-align: center;
-		margin: 0 0 40px 0;
+		margin: 0 0 24px 0; /* keeps headline + CTAs + LogoWall inside the 950px hero */
 	}
 
 	.highlight-meaning {
-		font-family: var(--font-display);
-		font-weight: 500;
-		font-style: italic;
-		color: var(--color-dk-copper);
+		font-family: 'Newsreader', Georgia, 'Times New Roman', serif;
+		font-weight: 400;
+		color: oklch(67.4% 0.15 52); /* --color-terracotta */
 	}
 
 	.hero-ctas {
@@ -558,9 +544,7 @@
 
 	.btn-primary:focus-visible,
 	.btn-outline:focus-visible {
-		outline: 2px solid var(--dk-copper);
+		outline: 2px solid oklch(67.4% 0.15 52); /* --color-terracotta */
 		outline-offset: 2px;
 	}
-
-
 </style>

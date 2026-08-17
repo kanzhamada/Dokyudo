@@ -1,334 +1,102 @@
 <script lang="ts">
-	import { Star } from '@lucide/svelte';
-
-	let activeTestimonial = $state(0);
-
-	const testimonials = [
-		{
-			avatar: 'AS',
-			name: 'Arif Setiawan',
-			role: 'Financial Analyst',
-			rating: '4.9 Rating',
-			quote:
-				'Dokyudo cut our quarterly report analysis time from days to minutes. The semantic search finds exactly what we need across hundreds of pages, and the RAG answers are accurate with proper citations.'
-		},
-		{
-			avatar: 'DR',
-			name: 'Diana Rahmawati',
-			role: 'Research Lead',
-			rating: '5.0 Rating',
-			quote:
-				'The hybrid search capability is incredible. Combining keyword and vector search gives us complete confidence when auditing financial research documents.'
-		},
-		{
-			avatar: 'BW',
-			name: 'Budi Wicaksono',
-			role: 'Portfolio Manager',
-			rating: '4.8 Rating',
-			quote:
-				'The streaming RAG Q&A with multi-provider fallback guarantees zero downtime. We rely on Dokyudo daily for deep portfolio due diligence.'
-		},
-		{
-			avatar: 'SP',
-			name: 'Sari Putri',
-			role: 'Compliance Officer',
-			rating: '4.9 Rating',
-			quote:
-				'Tenant data isolation and BYOK encryption were mandatory for our enterprise compliance. Dokyudo delivers security without sacrificing speed.'
-		}
-	];
 </script>
 
-<section class="testimonials-section" id="testimonials">
-	<div class="testimonials-header">
-		<span class="section-label">Testimonials</span>
-		<div class="testimonials-headline-wrap">
-			<div class="features-line"></div>
-			<h2 class="section-headline testimonial-headline">What teams are saying.</h2>
-			<div class="features-line"></div>
-		</div>
-	</div>
+<!-- ============ 7. TECHNICAL REVIEWS & SOCIAL PROOF ============ -->
+<section class="section section--dark sec-voices" id="voices">
+	<span id="testimonials" aria-hidden="true" style="display:block;height:0;scroll-margin-top:88px"></span>
+	<div class="container">
 
-	<div class="testimonials-grid">
-		<!-- Left: Names List -->
-		<div class="testimonial-names">
-			{#each testimonials as item, i}
-				<button
-					type="button"
-					class="testimonial-name-card"
-					class:active={activeTestimonial === i}
-					onclick={() => (activeTestimonial = i)}
-				>
-					<div class="testimonial-avatar">{item.avatar}</div>
-					<div>
-						<strong>{item.name}</strong>
-						<span>{item.role}</span>
-					</div>
+		<div class="shead" data-reveal>
+			<h2 class="t-h2">Read by analysts. Audited by engineers.</h2>
+		</div>
+
+		<!--
+			TESTIMONIAL SWITCHER
+			Each .vp-person button is the source of truth for one quote.
+			Edit name/role in the visible <strong>/<em>, the quote in the
+			hidden .vp-person__quote span, and the rating in data-rate.
+			To drop a real portrait into the center slot, set data-img to a
+			path (and data-avatar for the small rail photo). Leave them empty
+			to keep the monogram placeholders.
+		-->
+		<div class="voices-grid" id="voicesGrid" data-reveal style="--rd:120ms">
+
+			<!-- LEFT: selectable rail -->
+			<div class="voices-rail" role="group" aria-label="Choose a reviewer">
+
+				<button class="vp-person is-active" type="button" aria-pressed="true"
+						data-rate="4.9" data-mono="PR" data-img="/landing/review/mina.webp" data-avatar="/landing/review/mina.webp" data-brand="mina">
+					<span class="vp-person__top">
+						<span class="vp-person__avatar" aria-hidden="true">MM</span>
+						<span class="vp-person__mark"><svg class="ic" aria-hidden="true"><use href="#i-brand-mina"/></svg></span>
+					</span>
+					<strong class="vp-person__name">Myoui Mina</strong>
+					<em class="vp-person__role">Senior Credit Analyst</em>
+					<span class="vp-person__quote" hidden>I asked for the Q3 EBITDA bridge and got the exact footnote, cited to page 47. Forty minutes of Ctrl+F became a single query.</span>
 				</button>
-			{/each}
-		</div>
 
-		<!-- Center: Featured Image Placeholder -->
-		<div class="testimonial-center-image-placeholder">
-			<span class="placeholder-label">Team Workspace Image</span>
-		</div>
+				<button class="vp-person" type="button" aria-pressed="false"
+						data-rate="5.0" data-mono="TW" data-img="/landing/review/kendrick.webp" data-avatar="/landing/review/kendrick.webp" data-brand="kendrick">
+					<span class="vp-person__top">
+						<span class="vp-person__avatar" aria-hidden="true">KL</span>
+						<span class="vp-person__mark"><svg class="ic" aria-hidden="true"><use href="#i-brand-kendrick"/></svg></span>
+					</span>
+					<strong class="vp-person__name">Kendrick Lamar</strong>
+					<em class="vp-person__role">Staff Systems Engineer</em>
+					<span class="vp-person__quote" hidden>The scatter-gather RRF path is the cleanest retrieval I have audited. ID-only fetch, lazy hydration, and a circuit breaker on every external call.</span>
+				</button>
 
-		<!-- Right: Quote Card -->
-		<div class="testimonial-quote-card">
-			<div class="quote-badge">
-				<Star size={14} fill="var(--color-dk-copper)" stroke="var(--color-dk-copper)" />
-				<span>{testimonials[activeTestimonial].rating}</span>
+				<button class="vp-person" type="button" aria-pressed="false"
+						data-rate="4.8" data-mono="IH" data-img="/landing/review/sabrina.webp" data-avatar="/landing/review/sabrina.webp" data-brand="sabrina">
+					<span class="vp-person__top">
+						<span class="vp-person__avatar" aria-hidden="true">SC</span>
+						<span class="vp-person__mark"><svg class="ic" aria-hidden="true"><use href="#i-brand-sabrina"/></svg></span>
+					</span>
+					<strong class="vp-person__name">Sabrina Carpenter</strong>
+					<em class="vp-person__role">Portfolio Operations Lead</em>
+					<span class="vp-person__quote" hidden>Our keys never sit in plaintext, and the teardown cron wipes the sandbox on schedule. The first zero-dollar demo that behaved like production.</span>
+				</button>
+
+				<button class="vp-person" type="button" aria-pressed="false"
+						data-rate="4.9" data-mono="DO" data-img="/landing/review/richy.webp" data-avatar="/landing/review/richy.webp" data-brand="richy">
+					<span class="vp-person__top">
+						<span class="vp-person__avatar" aria-hidden="true">RA</span>
+						<span class="vp-person__mark"><svg class="ic" aria-hidden="true"><use href="#i-brand-richy"/></svg></span>
+					</span>
+					<strong class="vp-person__name">Richarlison de Andrade</strong>
+					<em class="vp-person__role">Quantitative Researcher</em>
+					<span class="vp-person__quote" hidden>Dense balance sheets stay whole through the chunker, so the model never hallucinates a split row. The citations are trustworthy enough to drop into a memo.</span>
+				</button>
+
 			</div>
-			<div class="quote-marks">"</div>
-			<p class="quote-text">
-				"{testimonials[activeTestimonial].quote}"
-			</p>
-			<div class="quote-author-mark">
-				<svg width="40" height="28" viewBox="0 0 40 28" fill="none">
-					<rect width="40" height="28" rx="6" fill="var(--color-dk-bg-deep)" />
-					<text
-						x="8"
-						y="19"
-						font-family="var(--font-subhead)"
-						font-size="11"
-						fill="var(--color-dk-copper)"
-						font-weight="600">{testimonials[activeTestimonial].avatar}</text
-					>
-				</svg>
-			</div>
+
+			<!-- CENTER: portrait slot (your image template) -->
+			<figure class="voices-photo" id="voicesPhoto" aria-label="Portrait of the selected reviewer">
+				<img class="voices-photo__img" id="voicesImg" src="" alt="" hidden />
+				<div class="voices-photo__ph" id="voicesPh" aria-hidden="true">
+					<span class="voices-photo__glow"></span>
+					<span class="voices-photo__tag t-tag"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg>portrait slot / 4:5</span>
+					<span class="voices-photo__mono" id="voicesMono">MM</span>
+					<span class="voices-photo__who"><b id="voicesPhName">Myoui Mina</b><em id="voicesPhRole">Senior Credit Analyst</em></span>
+				</div>
+			</figure>
+
+			<!-- RIGHT: quote card -->
+			<blockquote class="voices-quote" id="voicesQuote" role="group" aria-roledescription="testimonial">
+				<div class="voices-quote__swap" id="voicesSwap">
+					<span class="voices-quote__mark" aria-hidden="true">&ldquo;</span>
+					<span class="voices-quote__rate t-tag" id="voicesRate" aria-label="Rated 4.9 out of 5">
+						<svg class="ic" aria-hidden="true"><use href="#i-star"/></svg><b>4.9</b>
+					</span>
+					<p class="voices-quote__body t-b1" id="voicesBody">I asked for the Q3 EBITDA bridge and got the exact footnote, cited to page 47. Forty minutes of Ctrl+F became a single query.</p>
+					<footer class="voices-quote__foot">
+						<span class="voices-quote__brand" aria-hidden="true"><svg class="ic"><use href="#i-brand-mina"/></svg></span>
+						<cite id="voicesCite">Myoui Mina</cite>
+						<span class="t-tag" id="voicesCo">Senior Credit Analyst</span>
+					</footer>
+				</div>
+			</blockquote>
+
 		</div>
 	</div>
 </section>
-
-<style>
-	section {
-		font-family: var(--font-body);
-		color: var(--dk-light);
-	}
-
-	.section-label {
-		display: block;
-		font-family: var(--font-subhead);
-		font-size: var(--t-b-3);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--dk-text-muted);
-		margin-bottom: 16px;
-	}
-
-	.section-headline {
-		font-family: var(--font-display);
-		font-size: clamp(var(--t-h-4), 4.5vw, var(--t-h-1));
-		font-weight: 400;
-		color: var(--dk-cream);
-		line-height: 1;
-		letter-spacing: -0.02em;
-		margin: 0;
-	}
-
-	.features-line {
-		height: 1px;
-		background: linear-gradient(
-			90deg,
-			transparent,
-			var(--dk-border-strong) 20%,
-			var(--dk-border-strong) 80%,
-			transparent
-		);
-		max-width: var(--dk-max-width);
-		width: 100%;
-		margin: 0 auto;
-	}
-
-	.testimonials-section {
-		background: var(--dk-bg);
-		padding: var(--dk-section-py) var(--dk-section-px);
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-	}
-
-	.testimonials-header {
-		max-width: var(--dk-max-width);
-		margin: 0 auto 48px;
-		text-align: center;
-		width: 100%;
-	}
-
-	.testimonials-headline-wrap {
-		max-width: var(--dk-max-width);
-		margin: 0 auto;
-		width: 100%;
-	}
-
-	.testimonial-headline {
-		padding: 24px 0;
-	}
-
-	.testimonials-grid {
-		max-width: var(--dk-max-width);
-		margin: 0 auto;
-		display: grid;
-		grid-template-columns: 200px 1fr 1.2fr;
-		gap: 20px;
-		align-items: stretch;
-		width: 100%;
-	}
-
-	.testimonial-names {
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-	}
-
-	.testimonial-name-card {
-		padding: 15px;
-		border-radius: 0px;
-		border: 1px solid var(--brand-guideline-border-color);
-		background: transparent;
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		transition:
-			background 200ms cubic-bezier(0.37, 0, 0.63, 1),
-			border-color 200ms cubic-bezier(0.37, 0, 0.63, 1);
-		cursor: pointer;
-		text-align: left;
-		font-family: var(--font-subhead);
-		width: 100%;
-	}
-
-	.testimonial-name-card:hover,
-	.testimonial-name-card.active {
-		background: var(--dk-bg-card);
-		border-color: var(--dk-border-strong);
-	}
-
-	.testimonial-name-card:focus-visible {
-		outline: 2px solid var(--dk-copper);
-		outline-offset: 2px;
-	}
-
-	.testimonial-avatar {
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
-		background: var(--dk-bg-deep);
-		border: 1px solid var(--dk-border-strong);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--dk-copper);
-		flex-shrink: 0;
-	}
-
-	.testimonial-name-card strong {
-		font-family: var(--font-subhead);
-		font-size: 14px;
-		color: var(--dk-cream);
-		display: block;
-		letter-spacing: -0.01em;
-	}
-
-	.testimonial-name-card span {
-		font-family: var(--font-body);
-		font-size: 12px;
-		color: var(--dk-text-muted);
-	}
-
-	.testimonial-center-image-placeholder {
-		border-radius: 0px;
-		border: 1px dashed var(--dk-border-strong);
-		background: var(--dk-bg-card);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		min-height: 360px;
-	}
-
-	.placeholder-label {
-		font-family: var(--font-subhead);
-		font-size: var(--t-b-3);
-		color: var(--dk-text-muted);
-		opacity: 0.6;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.testimonial-quote-card {
-		background: rgba(232, 222, 200, 0.06);
-		border: 1px solid var(--brand-guideline-border-color);
-		border-radius: 0px;
-		padding: 15px;
-		display: flex;
-		flex-direction: column;
-		position: relative;
-	}
-
-	.quote-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		background: var(--dk-bg-card);
-		border: 1px solid var(--dk-border-strong);
-		border-radius: var(--dk-radius-pill);
-		padding: 6px 14px;
-		font-family: var(--font-subhead);
-		font-size: 12px;
-		color: var(--dk-copper);
-		font-weight: 500;
-		align-self: flex-end;
-		margin-bottom: 16px;
-	}
-
-	.quote-marks {
-		font-size: 56px;
-		color: var(--dk-copper);
-		line-height: 0.8;
-		opacity: 0.4;
-		font-family: var(--font-display);
-		margin-bottom: 5px;
-	}
-
-	.quote-text {
-		font-family: var(--font-body);
-		font-size: var(--t-b-1);
-		color: var(--dk-cream);
-		line-height: 1.4;
-		letter-spacing: -0.04em;
-		margin: 0;
-		flex: 1;
-		font-style: normal;
-	}
-
-	.quote-author-mark {
-		margin-top: 24px;
-	}
-
-	@media (max-width: 1024px) {
-		.testimonials-grid {
-			grid-template-columns: 1fr;
-			gap: 20px;
-		}
-
-		.testimonial-names {
-			flex-direction: row;
-			overflow-x: auto;
-			gap: 8px;
-			padding-bottom: 8px;
-		}
-
-		.testimonial-name-card {
-			min-width: 180px;
-		}
-	}
-
-	@media (max-width: 768px) {
-		.testimonial-center-image-placeholder {
-			min-height: 240px;
-		}
-	}
-</style>
