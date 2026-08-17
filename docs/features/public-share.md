@@ -21,6 +21,7 @@ Key capabilities:
 - **Redis sebagai cache baca, bukan source of truth:** key `share:v1:{code}` berisi payload respons publik; TTL = sisa waktu sampai `expires_at`, dan **maksimal 1 bulan** untuk semua kasus (termasuk no-expiry). **Sliding renewal:** setiap GET sukses hitung ulang TTL lalu `redis.expire`. Cache di-purge pada delete share / stop-all / delete conversation. Verifikasi token private dilakukan **setiap request** (payload cache tidak berisi token).
 - **Continue Chat berbasis snapshot:** `POST /api/rag/shares/{code}/continue` membangun conversation baru dari `snapshot` (bukan dari conversation asli) — `boundary_turn_id` sudah **dihapus** karena tidak pernah dipakai; snapshot array adalah satu-satunya sumber kebenaran. Conversation hasil continue memakai judul asli tanpa prefix `Branched - ` dan **tanpa** `branchOfId`/`branchedFromTurnId`.
 - **UI publik identik dengan chat page:** user pill, prose assistant, status pills, Source References, inline citation chips, code block preview — dengan komponen shared (`renderMarkdown`, `TurnStatusBadge`, `SourceReferences`). Copy response **menghapus citation tags** (`/\s*\[Doc [^\]]+\]/gi`).
+- **Document Mention Rendering:** Mention token `@[title](doc_id)` dalam user question di-render secara visual sebagai badge pill title-only (`splitMentionSegments`) dengan ikon dokumen tanpa menampilkan UUID ke publik. Saat user menyalin pertanyaan via tombol copy clipboard, mention token otomatis di-strip (`stripMentionTokens`) menghasilkan plain text bersih.
 - **Attachment dokumen di snapshot (judul saja):** turn yang punya attachment membawa `attachmentDocumentIds` + `attachments: [{documentId, title}]` di snapshot — judul dibekukan saat share dibuat (anon role tidak bisa membaca tabel `documents`). Halaman publik menampilkan kartu judul **statis** (tidak bisa diklik); dokumen tidak bisa dibuka karena endpoint preview butuh auth + kepemilikan tenant. `continueShare` me-restore `attachmentDocumentIds` agar turn hasil continue mempertahankan scoping RAG yang sama.
 - **Open Graph + preview:** halaman `s/[code]` di-SSR (`+page.server.ts`) agar crawler mendapat `og:title`/`og:image`; OG image SVG (1200×630) di-render server-side di `/s/{code}/opengraph-image.svg` memakai background + ornament tema Dokyudo, judul dinamis, author (tenant name), dan tanggal publish. Untuk private share, token `?invite=` diteruskan ke backend agar preview tetap bisa dirender.
 - **Header responsive:** mobile = capsule (logo "okyudo" kiri + title tengah + tombol share-copy link); desktop = gradient bar. Floating bottom bar ala composer berisi info share + tombol "Continue chat".
@@ -139,6 +140,9 @@ const isPublicShareRead =
 
 ## Frontend
 
+### Gating tombol share di chat detail (`/app/chat/[id]`)
+- Tombol **Share Conversation** (mobile & desktop header) `disabled` hingga percakapan memiliki setidaknya satu jawaban berstatus terminal (`complete`/`stopped`/`failed`/`blocked`) dan tidak ada turn in-flight (streaming, retry, `processing`, `awaiting_indexing`, atau upload attachment) — derived `isShareDisabled` di `+page.svelte`. Detail: `docs/frontend/app-chat-detail-enhancements.md` § Iteration 9.
+
 ### Dialog share — `ShareConversationDialog.svelte`
 - Toggle **Public / Private**; default expiry **No expiry** (keduanya).
 - Input custom link + preview; hint amber in-memory jika kode pernah ditolak 409.
@@ -174,7 +178,7 @@ const isPublicShareRead =
 - Crypto puzzle + rate limiter global tetap berlaku untuk endpoint publik.
 
 ## Completion Timestamp
-**Date:** 2026-08-09 (diperbarui: private share, invitees, email, OG preview, boundary_turn_id removal; UI: tombol socmed → `<a href>` + Reddit SVG flat, toast copy link)
+**Date:** 2026-08-09 (diperbarui 2026-08-17: document mention title-only rendering & clipboard token stripping)
 
 ## File Mapping
 

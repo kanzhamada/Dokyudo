@@ -12,6 +12,7 @@
 	import SourceReferences from '$lib/components/chat/SourceReferences.svelte';
 	import AttachmentCards from '$lib/components/chat/AttachmentCards.svelte';
 	import { renderMarkdown } from '$lib/utils/markdown';
+	import { splitMentionSegments, stripMentionTokens } from '$lib/utils/doc-mentions';
 	import { continueShare, getPublicShare } from '$lib/api/rag';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { toast } from 'svelte-sonner';
@@ -116,9 +117,9 @@
 	});
 
 	async function copyToClipboard(text: string, id: string) {
-		// Strip inline citation tags ([Doc N: Page X]) — same as the chat page,
-		// so copied answers don't carry the source reference markers.
-		const cleanText = text.replace(/\s*\[Doc [^\]]+\]/gi, '').trim();
+		// Strip inline citation tags ([Doc N: Page X]) and document mention tokens (e.g. @[title](id))
+		// so copied questions or answers don't carry source reference markers or mention tokens.
+		const cleanText = stripMentionTokens(text.replace(/\s*\[Doc [^\]]+\]/gi, '')).trim();
 		try {
 			await navigator.clipboard.writeText(cleanText);
 			copiedMessageId = id;
@@ -401,7 +402,20 @@
 							<div
 								class="w-fit rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md"
 							>
-								<p class="leading-relaxed whitespace-pre-wrap">{turn.question}</p>
+								<p class="leading-relaxed whitespace-pre-wrap">
+									{#each splitMentionSegments(turn.question) as seg}
+										{#if seg.type === 'mention'}
+											<span
+												class="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 align-baseline text-[11px] leading-none font-medium text-white/80"
+											>
+												<MxIcon name="document-outline" class="size-3 text-white/60" />
+												{seg.title}
+											</span>
+										{:else}
+											<span>{seg.text}</span>
+										{/if}
+									{/each}
+								</p>
 							</div>
 
 							<!-- Action Toolbar (Copy only — no edit on a shared chat) -->

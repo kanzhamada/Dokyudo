@@ -346,3 +346,52 @@ Navigasi antar `/chat/[id]` kini memakai cache client-side (`$lib/state/conversa
 - **Revalidate on focus**: `visibilitychange` → SWR refresh conversation aktif (aman dari `isGenerating`).
 - **Prefetch hover sidebar**: `AppSidebar` memanggil `conversationCache.prefetch(id)` saat hover item recent chat (dilewati jika sudah fresh).
 - Pendukung: `$lib/state/me-cache.store.svelte.ts` — cache TTL 30s untuk `/api/me` & `/api/me/usage` (dipakai sidebar, chat, documents, billing) agar navigasi `/app/*` tidak menembak endpoint yang sama berulang.
+
+## Iteration 9 — Share Button Gating (2026-08-17)
+
+Tombol **Share Conversation** (mobile floating header & desktop header) kini hanya bisa diklik saat percakapan **sudah memiliki setidaknya satu jawaban** — sukses **atau** gagal — dan **tidak sedang memproses** jawaban apa pun.
+
+### 1. Derived `isShareDisabled`
+
+Ganti `disabled={isGenerating}` (yang hanya menutup fase streaming) dengan derived `isShareDisabled` yang mencakup seluruh fase in-flight:
+
+```ts
+const isShareDisabled = $derived(
+    isGenerating ||
+        isUploadingAttachments ||
+        !messages.some((m) => m.role === 'assistant') ||
+        messages.some(
+            (m) =>
+                m.role === 'assistant' &&
+                (m.isStreaming ||
+                    m.isRetrying ||
+                    m.status === 'processing' ||
+                    m.status === 'awaiting_indexing')
+        )
+);
+```
+
+Kondisi `disabled`:
+
+1. **`isGenerating`** — stream sedang berjalan (termasuk fase typewriter drain, karena `isGenerating` baru `false` setelah buffer ter-flush penuh).
+2. **`isUploadingAttachments`** — menutup celah fase upload: saat follow-up turn dengan file, upload terjadi *sebelum* user/assistant message baru di-push, sehingga `isGenerating` masih `false` dan tombol share sempat aktif padahal turn sedang disiapkan.
+3. **Belum ada assistant message** — percakapan kosong / baru memuat, belum pernah menerima jawaban apa pun.
+4. **Ada turn assistant in-flight**: `isStreaming` (streaming normal), `isRetrying` (streaming varian retry), `status === 'processing'`, atau `status === 'awaiting_indexing'` (turn attachment menunggu STB worker menyelesaikan indexing di background — fase ini `isGenerating` sudah `false`, sehingga wajib dicek eksplisit).
+
+### 2. Guard dobel di handler
+
+`shareConversation()` juga memakai `if (isShareDisabled) return;` — melindungi alur non-tombol (mis. shortcut) agar dialog share tidak pernah membuka snapshot turn in-flight.
+
+### 3. Terminal status yang mengaktifkan share
+
+Share baru aktif kembali saat ada jawaban berstatus terminal: `complete`, `stopped` (di-cancel parsial), `failed` (gagal/gagal stream), atau `blocked` (terblokir security filter) — sesuai prinsip "bisa di-share meski jawabannya gagal, selama tidak sedang diproses".
+
+### 4. File Mapping
+
+| File | Change |
+|---|---|
+| `apps/frontend/src/routes/app/chat/[id]/+page.svelte` | Derived `isShareDisabled`, `disabled={isShareDisabled}` di tombol share mobile (header capsule) & desktop, guard `if (isShareDisabled)` di `shareConversation()` |
+
+### 5. Completion Timestamp
+
+**Iteration 9 (share gating — answer terminal & tidak in-flight, termasuk fase upload + awaiting_indexing):** 2026-08-17

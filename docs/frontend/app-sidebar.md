@@ -1,7 +1,15 @@
-# App Sidebar UI Architecture
+# App Sidebar & Mobile Navigation Architecture
 
 ## Core Logic
-The App Sidebar feature provides the primary navigation structure for the Dokyudo application. It features a responsive, collapsible sidebar built with Svelte 5 and shadcn-svelte. The sidebar intelligently switches to a hidden state on mobile devices, relying on a dedicated `MobileHeader` with a hamburger menu to trigger its visibility. It includes interactive elements like truncated tooltips for long chat titles, icon-only collapsible modes, and hover-triggered dropdown actions.
+The App Sidebar and Mobile Navigation feature provides the primary navigation structure and mobile app chrome for Dokyudo. It features a responsive, collapsible sidebar built with Svelte 5 and shadcn-svelte primitives. On mobile devices, the sidebar switches to a drawer state triggered by a reusable floating `MobileHeader` capsule.
+
+Recent enhancements introduce high-ergonomics mobile touch interactions:
+- **Mobile Hold / Long-Press**: Holding a recent chat item for 500ms triggers tactile haptic feedback and displays the floating conversation action dropdown menu (Share, Edit, Pin, Delete). Moving finger > 8px cancels the timer to allow natural scrolling.
+- **Auto-Dismiss Mobile Drawer**: Selecting any navigation item or recent chat immediately closes the mobile Sheet drawer.
+- **Outside Tap / Empty Area Dismissal**: A global capture-phase `pointerdown` listener and full-screen backdrop immediately dismiss user profile and conversation action dropdown menus when tapping anywhere outside.
+- **Ergonomic Touch Targets**: Expanded mobile button heights (`h-10` for nav, `h-9.5` for recent chats) and touch spacing (`gap-1.5`).
+- **Tactile Touch Feedback**: `-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08)`, `-webkit-touch-callout: none`, `user-select: none`, and `active:scale` micro-press animations.
+- **Unified Reusable MobileHeader**: Refactored `MobileHeader.svelte` with Svelte 5 snippet slots (`leading`, `center`, `trailing`, `bottom`), providing an identical floating shell (`fixed inset-x-4 top-4 z-50`, `rounded-[24px]`, `backdrop-blur-[42px]`) across `/app/chat`, `/app/chat/[id]`, and other views.
 
 ## Flow Diagram
 
@@ -11,57 +19,41 @@ graph TD
     B --> C[AppSidebar `AppSidebar.svelte`]
     B --> D[MobileHeader `MobileHeader.svelte`]
     
-    D -->|md:hidden| E[Hamburger Button]
-    E -->|onClick| F[useSidebar.toggle]
-    F --> C
-    
-    C --> G[Desktop View]
-    G -->|Collapsible| H[Icon Only Mode]
-    H -->|Hover over Logo| I[Expand Sidebar]
-    
-    C --> J[Svelte 5 Snippets]
-    J --> K[navItem]
-    J --> L[recentChatItem]
+    subgraph Mobile Gesture Pipeline
+        E[Recent Chat Item] -->|TouchStart| F[Start 500ms Timer]
+        F -->|TouchMove > 8px| G[Cancel Timer -> Scroll]
+        F -->|TouchEnd < 500ms| H[Cancel Timer -> Navigate to Chat]
+        F -->|500ms Elapsed| I[Haptic Vibrate -> Open Dropdown Menu]
+        I -->|Tap Empty Area| J[Window PointerDown -> Dismiss Menu]
+    end
+
+    subgraph Mobile Header Architecture
+        D -->|Default Mode /chat| K[Leading: Hamburger | Trailing: Brand Logo]
+        D -->|Room Mode /chat/:id| L[Leading: Hamburger + New Chat | Center: Title | Trailing: Share + Refs | Bottom: Drawers]
+    end
 ```
 
-## Account Panel Dialog (Unified)
-
-Sejak 2026-08-12, Settings, Billing, Shared Links, dan Configure BYOK digabung menjadi **satu dialog panel** dengan side tab.
-
-- **`apps/frontend/src/lib/components/app/AccountPanelDialog.svelte`**: dialog tunggal (glassy `#242322/85`, `sm:max-w-[880px] lg:max-w-[940px]`) dengan tab rail di kiri (`w-52`) dan panel konten di kanan. Di mobile rail berubah jadi bar horizontal scroll di atas konten.
-- **Tinggi konsisten & scrollable**: area panel memakai tinggi tetap `h-[70vh]` (mobile) / `h-[600px]` (desktop); header + rail statis, konten tiap tab scroll sendiri (`overflow-y-auto`). Semua tab punya tinggi yang sama.
-- **Tab yang tersedia**:
-  - `settings` — display name (`PATCH /api/auth/tenant/name`) + ganti password (`PUT /api/auth/update-password`, schema `profilePasswordSchema`).
-  - `billing` — usage (`GET /api/me/usage`) dengan limit dari `TIER_LIMITS`, countdown reset bulanan realtime (FREE) atau `expiresAt` + tombol `Manage billing` (`POST /api/payments/portal`), pricing plans dari `TIER_PLANS`, checkout Sandbox (`POST /api/payments/checkout`).
-  - `shared-links` — daftar link aktif (`GET /api/rag/shares`), search, group by conversation, delete/revoke/copy.
-  - `byok` — Configure BYOK (Google AI / Mistral / OpenRouter), save/reset key (`upsertKey`/`deleteKey`), masked key state.
-- **State bersama**: `apps/frontend/src/lib/state/account-panel.store.svelte.ts` mengekspos `accountPanel` (`$state` berisi `open`, `tab`, `byokSavedAt`) + helper `openAccountPanel(tab)`, `closeAccountPanel()`, `markByokSaved()`. Halaman mana pun (mis. `/app/chat` tombol *configure*) bisa membuka panel dengan tab aktif tertentu.
-- **Refresh BYOK**: setelah key disave/reset, `markByokSaved()` menaikkan `byokSavedAt`; halaman chat me-refresh `llmOptions` via `$effect` yang mengamati nilai tersebut.
-- **Auto-open**: redirect dari payment success ke `/app?billing=open` membuka panel langsung di tab `billing`.
-- Menu profile footer (Settings / Billing / Shared links / Log out) kini memanggil `openAccountPanel(...)` alih-alih tiga dialog terpisah.
-
 ## Completion Timestamp
-**Completed At:** 2026-06-21T21:25:35+07:00 (diperbarui 2026-08-12: unified Account Panel)
+**Completed At:** 2026-08-17T22:20:00+07:00
 
 ## File Mapping
-* **`apps/frontend/src/routes/app/+layout.svelte`**
-  * Serves as the main layout wrapper, rendering the `Sidebar.Provider`, the `AppSidebar`, and the new `MobileHeader`.
-* **`apps/frontend/src/lib/components/app/AppSidebar.svelte`**
-  * The core navigation component. Extensively refactored to use Svelte 5 snippets (`#snippet navItem`, `#snippet recentChatItem`) for DRY architecture. Uses Tailwind classes mapped to central CSS variables. Menu profile membuka `AccountPanelDialog` via `account-panel.store`.
-* **`apps/frontend/src/lib/components/app/AccountPanelDialog.svelte`**
-  * [NEW] Unified account panel (Settings / Billing / Shared links / BYOK) dengan side tab dan tinggi konsisten scrollable.
-* **`apps/frontend/src/lib/state/account-panel.store.svelte.ts`**
-  * [NEW] Shared state untuk membuka panel dari komponen/page mana pun.
 * **`apps/frontend/src/lib/components/app/MobileHeader.svelte`**
-  * [NEW] A mobile-exclusive (`md:hidden`) top navigation bar that contains a hamburger menu (triggering `sidebar.toggle()`) and the Dokyudo logo.
-* **`apps/frontend/src/routes/layout.css`**
-  * Modified to include global design tokens for the sidebar: `--sidebar-muted`, `--sidebar-muted-foreground`, and `--sidebar-avatar`, ensuring cohesive theming.
+  * Refactored into a reusable floating header component with Svelte 5 snippets (`leading`, `center`, `trailing`, `bottom`, `children`), glassmorphism styling, and touch feedback rules.
+* **`apps/frontend/src/lib/components/app/AppSidebar.svelte`**
+  * Implemented mobile long-press detection (`handleItemTouchStart`/`handleItemTouchMove`/`handleItemTouchEnd`), global window `pointerdown` click-outside dismissal, auto-drawer closing on navigation, ergonomic sizing, and tap highlights.
+* **`apps/frontend/src/routes/app/chat/[id]/+page.svelte`**
+  * Replaced custom inlined header container with `<MobileHeader>` and snippet slots, applying active touch animations across all navbar buttons.
+* **`apps/frontend/src/routes/app/+layout.svelte`**
+  * Wraps the application shell, rendering the global `MobileHeader` on non-chat-room routes.
+* **`apps/frontend/src/lib/components/app/AccountPanelDialog.svelte`**
+  * Unified account panel dialog (Settings / Billing / Shared links / BYOK).
 
 ## Connections
-This feature is entirely isolated to the SvelteKit **Frontend Layer**. It acts as the presentation shell for the application routes. Currently, the data (e.g., `recentChats`, `navItems`) is mocked locally within the component, but it is architected to eventually accept state from a backend store or SvelteKit `load()` function.
+* **Client UI Layer (`AppSidebar.svelte`, `MobileHeader.svelte`)**: Consumes `useSidebar` context to coordinate mobile drawer visibility.
+* **Navigation State (`$page.url.pathname`, `goto`)**: Synchronizes active states, URL updates, and auto-dismisses mobile drawers upon navigation.
+* **Cache & Optimistic Store (`conversationsStore`, `me-cache.store`)**: Powers instant list manipulation, pin toggles, and profile initials.
 
 ## Architectural Decisions
-1. **Svelte 5 Snippets (`#snippet`)**: To resolve repetition in rendering navigation links and recent chats, Svelte 5 snippets were used instead of creating multiple small file components. This keeps the logic co-located while maintaining a clean, readable main HTML template.
-2. **Tailwind v4 Design Tokens**: Arbitrary hex colors (e.g., `#1C1B1B`, `#C5937B`) were completely stripped from the markup. They were promoted to `--sidebar-*` custom CSS properties in `layout.css` and mapped via `@theme inline`. This enforces design consistency and allows for seamless dark/light mode scaling.
-3. **Responsive Strategy**: Instead of forcing the `Sidebar.Trigger` into the main content slot, a dedicated `MobileHeader` component was created. This allows the mobile navbar to maintain a distinct layout (hamburger on left, logo on right) without cluttering desktop UI components.
-4. **Strict Type-Safety**: The Svelte snippets were explicitly typed (e.g., `item: typeof navItems[0]`) to ensure the strict `svelte-check` compiler passed without implicit `any` errors.
+1. **Svelte 5 Snippets for Reusable Header**: Using snippet slots (`leading`, `center`, `trailing`, `bottom`) allowed `MobileHeader.svelte` to remain the single source of truth for floating geometry while accommodating room-specific action sets.
+2. **Global Window Pointerdown Capture**: Instead of relying exclusively on transparent backdrop overlays (which can be trapped in CSS transform stacking contexts of mobile drawers), a window-level capture listener guarantees that clicking empty space or outside buttons dismisses open dropdowns reliably.
+3. **Threshold-Based Long-Press Gesture**: A 500ms timeout coupled with an 8px touch delta check prevents conflict between vertical scrolling and hold gestures on touchscreens.

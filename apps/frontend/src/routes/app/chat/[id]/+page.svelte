@@ -527,9 +527,11 @@
 	let currentCheckpointId = $derived(activeCheckpointId ?? lastUserMsgId);
 
 	// Share is only allowed once the conversation has at least one answer —
-	// success or failure — and no turn is being processed.
+	// success or failure — and no turn is being processed (including the
+	// attachment upload and awaiting-indexing phases of an attachment turn).
 	const isShareDisabled = $derived(
 		isGenerating ||
+			isUploadingAttachments ||
 			!messages.some((m) => m.role === 'assistant') ||
 			messages.some(
 				(m) =>
