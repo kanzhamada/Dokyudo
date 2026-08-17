@@ -161,7 +161,7 @@
 			<!-- Parallax wrapper for background -->
 			<div class="hero-scroll-parallax">
 				<div class="hero-bg-elements">
-					<img src={book} class="bg-el book" alt="" aria-hidden="true" />
+					<img src={book} class="bg-el book" alt="" aria-hidden="true" fetchpriority="high" />
 					<img src={paper1} class="bg-el paper1" alt="" aria-hidden="true" />
 					<img src={paper2} class="bg-el paper2" alt="" aria-hidden="true" />
 					<img src={paper3} class="bg-el paper3" alt="" aria-hidden="true" />

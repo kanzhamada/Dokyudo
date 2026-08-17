@@ -2213,7 +2213,7 @@
 			rgba(14, 14, 14, 0.9) 50%,
 			rgba(14, 14, 14, 1) 100%
 		),
-		url('/landing/arch-texture.png');
+		url('/landing/arch-texture.webp');
 	background-size: cover;
 	background-position: center;
 	background-repeat: no-repeat;
