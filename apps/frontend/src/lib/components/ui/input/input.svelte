@@ -6,7 +6,7 @@
 		variants: {
 			variant: {
 				default: '',
-				auth: 'border-none bg-auth-input text-white placeholder:text-auth-placeholder focus-visible:ring-1 focus-visible:ring-auth-primary/40'
+				auth: 'border border-white/20 bg-auth-input text-white placeholder:text-auth-placeholder focus-visible:border-auth-primary focus-visible:ring-1 focus-visible:ring-auth-primary/40'
 			}
 		},
 		defaultVariants: {

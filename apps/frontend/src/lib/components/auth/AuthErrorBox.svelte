@@ -39,8 +39,8 @@
 {#if apiError || lockoutEndTime !== null}
 	<div class="auth-error-box flex flex-col items-center justify-center text-center">
 		{#if lockoutEndTime !== null}
-			<span class="font-semibold text-[#FB6363]">Temporarily Locked</span>
-			<span class="mt-1 text-sm text-white/80">
+			<span class="font-semibold">Temporarily locked</span>
+			<span class="mt-1 text-sm text-white/70">
 				{lockoutMessage} <span class="font-mono font-bold text-white">{countdownText}</span>
 			</span>
 		{:else}

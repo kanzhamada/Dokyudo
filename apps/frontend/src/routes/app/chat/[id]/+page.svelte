@@ -23,6 +23,7 @@
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import MobileHeader from '$lib/components/app/MobileHeader.svelte';
 	import EditTitleDialog from '$lib/components/app/EditTitleDialog.svelte';
 	import ConfirmDeleteDialog from '$lib/components/app/ConfirmDeleteDialog.svelte';
 	import ShareConversationDialog from '$lib/components/app/ShareConversationDialog.svelte';
@@ -525,6 +526,21 @@
 	let activeCheckpointId = $state<string | null>(null);
 	let currentCheckpointId = $derived(activeCheckpointId ?? lastUserMsgId);
 
+	// Share is only allowed once the conversation has at least one answer —
+	// success or failure — and no turn is being processed.
+	const isShareDisabled = $derived(
+		isGenerating ||
+			!messages.some((m) => m.role === 'assistant') ||
+			messages.some(
+				(m) =>
+					m.role === 'assistant' &&
+					(m.isStreaming ||
+						m.isRetrying ||
+						m.status === 'processing' ||
+						m.status === 'awaiting_indexing')
+			)
+	);
+
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
 	let maxUploads = $state(10);
@@ -813,9 +829,10 @@
 	}
 
 	async function shareConversation() {
-		// Disabled while a turn is still streaming — a share must never snapshot
-		// an in-flight ("processing") turn.
-		if (isGenerating) return;
+		// A share must never snapshot an in-flight ("processing") turn, and only
+		// makes sense once the conversation has at least one answer — success
+		// or failure.
+		if (isShareDisabled) return;
 		isShareDialogOpen = true;
 	}
 
@@ -2114,62 +2131,60 @@
 			style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
 		></div>
 
-		<!-- Mobile Floating Conversation Capsule -->
-		<div
-			class="pointer-events-auto absolute top-3 right-3 left-3 z-30 overflow-hidden rounded-[24px] border border-white/15 bg-[#232323]/90 shadow-2xl backdrop-blur-[42px] md:hidden"
-		>
-			<div class="flex h-14 items-center justify-between px-3">
-				<div class="flex items-center gap-1">
-					<Tooltip.Provider delayDuration={100}>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<button
-										{...props}
-										type="button"
-										class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-										onclick={() => sidebar.toggle()}
-										aria-label="Open navigation"
-									>
-										<MxIcon name="hamburger-menu-outline" class="size-5" />
-									</button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content
-								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
-							>
-								<p>Toggle Menu</p>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
+		<!-- Reusable Mobile Floating Header Capsule -->
+		<MobileHeader>
+			{#snippet leading()}
+				<Tooltip.Provider delayDuration={100}>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									type="button"
+									class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/70 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 active:bg-white/20 active:text-white"
+									onclick={() => sidebar.toggle()}
+									aria-label="Open navigation"
+								>
+									<MxIcon name="hamburger-menu-outline" class="size-5" />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content
+							class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+						>
+							<p>Toggle Menu</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
 
-					<Tooltip.Provider delayDuration={100}>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<button
-										{...props}
-										type="button"
-										class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-										onclick={() => goto('/app/chat')}
-										aria-label="New chat"
-									>
-										<Plus class="size-4" />
-									</button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content
-								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
-							>
-								<p>New Chat</p>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
-				</div>
+				<Tooltip.Provider delayDuration={100}>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									type="button"
+									class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 active:bg-white/20 active:text-white"
+									onclick={() => goto('/app/chat')}
+									aria-label="New chat"
+								>
+									<Plus class="size-4" />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content
+							class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+						>
+							<p>New Chat</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
+			{/snippet}
 
+			{#snippet center()}
 				<button
 					type="button"
-					class="flex max-w-[45%] min-w-0 cursor-pointer items-center justify-center gap-1.5 truncate px-2 text-xs font-medium text-white/75 transition-colors hover:text-white"
+					class="flex max-w-[45%] min-w-0 cursor-pointer items-center justify-center gap-1.5 truncate rounded-lg px-2 py-1 text-xs font-medium text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-95 active:bg-white/15 active:text-white"
 					onclick={toggleMobileTitleActions}
 					aria-label="Conversation actions"
 				>
@@ -2180,134 +2195,136 @@
 						{isTitleLoading ? 'Generating title...' : conversationTitle || 'New Conversation'}
 					</span>
 				</button>
+			{/snippet}
 
-				<div class="flex items-center gap-1">
-					<Tooltip.Provider delayDuration={100}>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<button
-										{...props}
-										type="button"
-										class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-										onclick={shareConversation}
-										disabled={isGenerating}
-										aria-label="Share conversation"
-									>
-										<MxIcon name="share-outline" class="size-4" />
-									</button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content
-								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
-							>
-								<p>Share Conversation</p>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
+			{#snippet trailing()}
+				<Tooltip.Provider delayDuration={100}>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									type="button"
+									class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 active:bg-white/20 active:text-white disabled:cursor-not-allowed disabled:opacity-40"
+									onclick={shareConversation}
+									disabled={isShareDisabled}
+									aria-label="Share conversation"
+								>
+									<MxIcon name="share-outline" class="size-4" />
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content
+							class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+						>
+							<p>Share Conversation</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
 
-					<Tooltip.Provider delayDuration={100}>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<button
-										{...props}
-										type="button"
-										class="relative flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-										onclick={toggleMobileReferences}
-										aria-label="Conversation references"
-									>
-										<MxIcon name="document-outline" class="size-4" />
-										{#if conversationReferences.length > 0}
-											<span
-												class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
-											>
-												{conversationReferences.length}
-											</span>
-										{/if}
-									</button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content
-								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
-							>
-								<p>References ({conversationReferences.length})</p>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
-				</div>
-			</div>
+				<Tooltip.Provider delayDuration={100}>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									type="button"
+									class="relative flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 active:bg-white/20 active:text-white"
+									onclick={toggleMobileReferences}
+									aria-label="Conversation references"
+								>
+									<MxIcon name="document-outline" class="size-4" />
+									{#if conversationReferences.length > 0}
+										<span
+											class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
+										>
+											{conversationReferences.length}
+										</span>
+									{/if}
+								</button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content
+							class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+						>
+							<p>References ({conversationReferences.length})</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
+			{/snippet}
 
-			{#if isMobileTitleActionsOpen}
-				<div
-					transition:slide={{ duration: 300, easing: backOut }}
-					class="flex items-center justify-center gap-3 border-t border-white/10 px-3 py-3"
-				>
-					<button
-						type="button"
-						class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-						onclick={() => {
-							isMobileTitleActionsOpen = false;
-							openTitleEditDialog();
-						}}
-						aria-label="Edit conversation title"
+			{#snippet bottom()}
+				{#if isMobileTitleActionsOpen}
+					<div
+						transition:slide={{ duration: 300, easing: backOut }}
+						class="flex items-center justify-center gap-3 border-t border-white/10 px-3 py-3"
 					>
-						<MxIcon name="edit2-outline" class="size-4" />
-					</button>
-					<button
-						type="button"
-						class="flex size-10 cursor-pointer items-center justify-center rounded-full border {isPinned
-							? 'border-amber-400/40 bg-amber-400/10 text-amber-400'
-							: 'border-white/10 bg-white/5 text-white/65'} transition-colors hover:bg-white/10 hover:text-white"
-						onclick={() => {
-							isMobileTitleActionsOpen = false;
-							togglePinConversation();
-						}}
-						aria-label={isPinned ? 'Unpin conversation' : 'Pin conversation'}
+						<button
+							type="button"
+							class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/65 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 active:bg-white/20 active:text-white"
+							onclick={() => {
+								isMobileTitleActionsOpen = false;
+								openTitleEditDialog();
+							}}
+							aria-label="Edit conversation title"
+						>
+							<MxIcon name="edit2-outline" class="size-4" />
+						</button>
+						<button
+							type="button"
+							class="flex size-10 cursor-pointer items-center justify-center rounded-full border {isPinned
+								? 'border-amber-400/40 bg-amber-400/10 text-amber-400 active:bg-amber-400/25'
+								: 'border-white/10 bg-white/5 text-white/65 active:bg-white/20'} transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 active:text-white"
+							onclick={() => {
+								isMobileTitleActionsOpen = false;
+								togglePinConversation();
+							}}
+							aria-label={isPinned ? 'Unpin conversation' : 'Pin conversation'}
+						>
+							{#if isPinned}
+								<MxIcon name="pin-bold" class="size-4" />
+							{:else}
+								<MxIcon name="pin-outline" class="size-4 rotate-45" />
+							{/if}
+						</button>
+						<button
+							type="button"
+							class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-red-400/20 bg-red-400/10 text-red-300 transition-all duration-150 hover:bg-red-400/20 hover:text-red-200 active:scale-90 active:bg-red-400/30 active:text-white"
+							onclick={() => {
+								isMobileTitleActionsOpen = false;
+								isDeleteConversationDialogOpen = true;
+							}}
+							aria-label="Delete conversation"
+						>
+							<MxIcon name="trash-bin-minimalistic-outline" class="size-4" />
+						</button>
+					</div>
+				{/if}
+
+				{#if isMobileReferencesOpen}
+					<div
+						transition:slide={{ duration: 420, easing: backOut }}
+						class="max-h-56 overflow-y-auto border-t border-white/10 px-2 py-2"
 					>
-						{#if isPinned}
-							<MxIcon name="pin-bold" class="size-4" />
+						{#if conversationReferences.length === 0}
+							<div class="px-2 py-2 text-xs text-white/35">No references in this conversation.</div>
 						{:else}
-							<MxIcon name="pin-outline" class="size-4 rotate-45" />
+							{#each conversationReferences as reference (reference.id)}
+								<button
+									type="button"
+									class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-white/70 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
+									onclick={() =>
+										openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
+								>
+									<MxIcon name="document-outline" class="size-3.5 shrink-0 text-white/50" />
+									<span class="min-w-0 truncate">{reference.name}</span>
+								</button>
+							{/each}
 						{/if}
-					</button>
-					<button
-						type="button"
-						class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-red-400/20 bg-red-400/10 text-red-300 transition-colors hover:bg-red-400/20 hover:text-red-200"
-						onclick={() => {
-							isMobileTitleActionsOpen = false;
-							isDeleteConversationDialogOpen = true;
-						}}
-						aria-label="Delete conversation"
-					>
-						<MxIcon name="trash-bin-minimalistic-outline" class="size-4" />
-					</button>
-				</div>
-			{/if}
-
-			{#if isMobileReferencesOpen}
-				<div
-					transition:slide={{ duration: 420, easing: backOut }}
-					class="max-h-56 overflow-y-auto border-t border-white/10 px-2 py-2"
-				>
-					{#if conversationReferences.length === 0}
-						<div class="px-2 py-2 text-xs text-white/35">No references in this conversation.</div>
-					{:else}
-						{#each conversationReferences as reference (reference.id)}
-							<button
-								type="button"
-								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-								onclick={() =>
-									openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
-							>
-								<MxIcon name="document-outline" class="size-3.5 shrink-0 text-white/50" />
-								<span class="min-w-0 truncate">{reference.name}</span>
-							</button>
-						{/each}
-					{/if}
-				</div>
-			{/if}
-		</div>
+					</div>
+				{/if}
+			{/snippet}
+		</MobileHeader>
 
 		<!-- Desktop Conversation Header -->
 		<div
@@ -2397,7 +2414,7 @@
 										type="button"
 										class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
 										onclick={shareConversation}
-										disabled={isGenerating}
+										disabled={isShareDisabled}
 										aria-label="Share conversation"
 									>
 										<MxIcon name="share-outline" class="size-4" />

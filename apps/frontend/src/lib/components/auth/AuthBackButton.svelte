@@ -8,12 +8,7 @@
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				<a
-					{...props}
-					{href}
-					class="absolute top-6 left-6 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-white transition-colors hover:bg-white/10 md:top-8 md:left-8"
-					aria-label={tooltipText}
-				>
+				<a {...props} {href} class="auth-back-button" aria-label={tooltipText}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						width="22"
@@ -32,8 +27,8 @@
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content
-			class="border-white/[0.16] bg-[#232323] text-white"
-			arrowClasses="bg-[#232323] border-none"
+			class="border-white/[0.16] bg-[#3E3E3E] text-white"
+			arrowClasses="bg-[#3E3E3E] border-none"
 		>
 			{tooltipText}</Tooltip.Content
 		>

@@ -9,7 +9,6 @@
 	import { PUBLIC_RECAPTCHA_SITE_KEY } from '$env/static/public';
 	import * as Form from '$lib/components/ui/form';
 	import { Input } from '$lib/components/ui/input';
-	import { Separator } from '$lib/components/ui/separator';
 	import { Button } from '$lib/components/ui/button';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -56,12 +55,6 @@
 			isSubmitting = true;
 			apiError = '';
 
-			// Debug Log: Frontend State BEFORE hitting backend
-			console.log('[Auth Login] Form Submitted:', {
-				email: f.data.email,
-				password: f.data.password
-			});
-
 			try {
 				const token = await executeRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY, 'login');
 
@@ -70,9 +63,6 @@
 					password: f.data.password,
 					recaptchaToken: token
 				});
-
-				// Debug Log: Raw response AFTER hitting backend
-				console.log('[Auth Login] Backend Response (POST /api/auth/login):', result);
 
 				if (result.ok) {
 					sessionStore.set(result.data.user);
@@ -87,9 +77,8 @@
 						apiError = result.error.message;
 					}
 				}
-			} catch (err: any) {
+			} catch {
 				apiError = 'Something went wrong. Please try again.';
-				console.error('[Auth Login] Catch Error:', err);
 			} finally {
 				isSubmitting = false;
 				f.data.password = '';
@@ -126,105 +115,95 @@
 	{@html seo({ title: `${data.title} | Dokyudo`, description: data.description })}
 </svelte:head>
 
-<!-- Back button -->
 <AuthBackButton href="/" tooltipText="Back to Home" />
 
-<!-- Header -->
-<div class="mt-4 mb-8 md:mt-0">
-	<h1 class="auth-heading">Welcome Back.</h1>
-	<p class="auth-subheading">Let's get you signed in.</p>
-</div>
+<div class="auth-page-content">
+	<header class="auth-page-header">
+		<h1 class="auth-heading">Welcome back.</h1>
+	</header>
 
-<!-- Form -->
-<form method="POST" use:enhance class="flex flex-col gap-3">
-	<!-- Email -->
-	<Form.Field {form} name="email">
-		<Form.Control>
-			{#snippet children({ props })}
-				<Input
-					{...props}
-					type="email"
-					placeholder="Email"
-					autofocus={lockoutEndTime === null}
-					disabled={isSubmitting || lockoutEndTime !== null}
-					bind:value={$formData.email}
-					variant="auth"
-					class="auth-input"
-				/>
-			{/snippet}
-		</Form.Control>
-		<Form.FieldErrors class="text-xs text-[#FB6363]" />
-	</Form.Field>
-
-	<!-- Password -->
-	<Form.Field {form} name="password">
-		<Form.Control>
-			{#snippet children({ props })}
-				<AuthPasswordInput
-					{...props}
-					bind:value={$formData.password}
-					disabled={isSubmitting || lockoutEndTime !== null}
-				/>
-			{/snippet}
-		</Form.Control>
-		<Form.FieldErrors class="text-xs text-[#FB6363]" />
-	</Form.Field>
-
-	<!-- Submit button -->
-	<Button
-		type="submit"
-		disabled={isSubmitting || lockoutEndTime !== null}
-		variant="authPrimary"
-		class="auth-btn-primary"
-	>
-		{#if isSubmitting}
-			<Spinner class="mr-2 size-4" />
-			Signing in...
-		{:else}
-			Sign In
-		{/if}
-	</Button>
-
-	<!-- Forgot Password Link -->
-	<div class="mt-1 mb-2 flex justify-end">
-		<a
-			href="/forget-password"
-			class="cursor-pointer text-xs text-white/70 transition-colors hover:text-white"
-		>
-			Forgot Password?
-		</a>
-	</div>
-
-	<!-- Error box -->
-	<AuthErrorBox
-		{apiError}
-		bind:lockoutEndTime
-		localStorageKey="dokyudo_login_lockout"
-		lockoutMessage="Too many failed attempts. Try again in"
-	/>
-</form>
-
-<AuthOAuthGroup />
-
-<!-- Footer link -->
-<p class="mt-6 text-center text-sm text-white" style="font-family: 'Inter Variable', sans-serif;">
-	Don't have an account?
-	<Tooltip.Provider>
-		<Tooltip.Root>
-			<Tooltip.Trigger>
-				{#snippet child({ props })}
-					<a
+	<form method="POST" use:enhance class="auth-form">
+		<Form.Field {form} name="email" class="auth-field">
+			<label class="auth-field-label" for="email">Email address</label>
+			<Form.Control>
+				{#snippet children({ props })}
+					<Input
 						{...props}
-						href="/register"
-						class="cursor-pointer font-semibold text-white underline underline-offset-2 transition-colors hover:text-[#E8DEC8]"
-					>
-						Register
-					</a>
+						id="email"
+						type="email"
+						placeholder="you@company.com"
+						autofocus={lockoutEndTime === null}
+						disabled={isSubmitting || lockoutEndTime !== null}
+						bind:value={$formData.email}
+						variant="auth"
+						class="auth-input"
+					/>
 				{/snippet}
-			</Tooltip.Trigger>
-			<Tooltip.Content class="bg-[#232323]" arrowClasses="bg-[#232323]"
-				>Create a new account</Tooltip.Content
+			</Form.Control>
+			<Form.FieldErrors class="auth-field-error" />
+		</Form.Field>
+
+		<Form.Field {form} name="password" class="auth-field">
+			<label class="auth-field-label" for="password">Password</label>
+			<Form.Control>
+				{#snippet children({ props })}
+					<AuthPasswordInput
+						{...props}
+						id="password"
+						bind:value={$formData.password}
+						disabled={isSubmitting || lockoutEndTime !== null}
+					/>
+				{/snippet}
+			</Form.Control>
+			<Form.FieldErrors class="auth-field-error" />
+		</Form.Field>
+
+		<Button
+			type="submit"
+			disabled={isSubmitting || lockoutEndTime !== null}
+			variant="authPrimary"
+			class="auth-btn-primary"
+		>
+			{#if isSubmitting}
+				<Spinner class="mr-2 size-4" />
+				Signing in...
+			{:else}
+				Sign in
+			{/if}
+		</Button>
+
+		<div class="flex justify-end">
+			<a
+				href="/forget-password"
+				class="font-geist text-xs text-[#B9B9B9] underline-offset-3 hover:text-white"
 			>
-		</Tooltip.Root>
-	</Tooltip.Provider>
-</p>
+				Forgot password?
+			</a>
+		</div>
+
+		<AuthErrorBox
+			{apiError}
+			bind:lockoutEndTime
+			localStorageKey="dokyudo_login_lockout"
+			lockoutMessage="Too many failed attempts. Try again in"
+		/>
+	</form>
+
+	<AuthOAuthGroup />
+
+	<p class="auth-footer">
+		Don't have an account?
+		<Tooltip.Provider>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<a {...props} href="/register">Register</a>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content class="bg-[#3E3E3E]" arrowClasses="bg-[#3E3E3E]"
+					>Create a new account</Tooltip.Content
+				>
+			</Tooltip.Root>
+		</Tooltip.Provider>
+	</p>
+</div>

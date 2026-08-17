@@ -31,19 +31,12 @@
 			isSubmitting = true;
 			apiError = '';
 
-			console.log('[Auth Update Password] Form Submitted:', {
-				email: f.data.email,
-				otp: f.data.otp
-			});
-
 			try {
 				const result = await authResetPassword({
 					email: f.data.email,
 					otp: f.data.otp,
 					newPassword: f.data.password
 				});
-
-				console.log('[Auth Update Password] Backend Response:', result);
 
 				if (result.ok) {
 					successMessage = 'Your password has been successfully updated.';
@@ -54,9 +47,8 @@
 				} else {
 					apiError = result.error.message;
 				}
-			} catch (err: any) {
+			} catch {
 				apiError = 'Something went wrong. Please try again.';
-				console.error('[Auth Update Password] Catch Error:', err);
 			} finally {
 				isSubmitting = false;
 				// NOTE: Do NOT clear inputs on error per user design requirement!
@@ -73,8 +65,7 @@
 			urlParams.get('token') ||
 			urlParams.get('code') ||
 			urlParams.get('otp');
-		const emailParam =
-			urlParams.get('email') || localStorage.getItem('dokyudo_reset_email') || '';
+		const emailParam = urlParams.get('email') || localStorage.getItem('dokyudo_reset_email') || '';
 
 		if (tokenHash) {
 			$formData.otp = tokenHash;
@@ -89,146 +80,124 @@
 	{@html seo({ title: `${data.title} | Dokyudo`, description: data.description })}
 </svelte:head>
 
-<!-- Back button (hidden during success state) -->
 {#if !successMessage}
 	<AuthBackButton href="/login" tooltipText="Back to Sign In" />
 {/if}
 
-{#if successMessage}
-	<!-- Success state -->
-	<AuthSuccessState
-		heading="Password Updated."
-		description={successMessage}
-		buttonHref="/login"
-		buttonText="Continue to Sign In"
-	/>
-{:else}
-	<!-- Header -->
-	<div class="mb-8 mt-4 md:mt-0">
-		<h1 class="auth-heading">New Password.</h1>
-		<p class="auth-subheading">Enter the 8-digit OTP from your email and your new password.</p>
-	</div>
+<div class="auth-page-content">
+	{#if successMessage}
+		<AuthSuccessState
+			heading="Password updated."
+			buttonHref="/login"
+			buttonText="Continue to sign in"
+		/>
+	{:else}
+		<header class="auth-page-header">
+			<h1 class="auth-heading">Choose a new password.</h1>
+		</header>
 
-	<!-- Form -->
-	<form method="POST" use:enhance class="flex flex-col gap-4">
-		<!-- Hidden Email field -->
-		<input type="hidden" name="email" bind:value={$formData.email} />
-	<!-- 8-Digit Input OTP Component -->
-        <Form.Field {form} name="otp">
-            <Form.Control>
-                {#snippet children({ props })}
-                    <div class="flex flex-col gap-2">
-                        <InputOTP.Root
-                            {...props}
-                            maxlength={8}
-                            disabled={isSubmitting}
-                            autofocus={true}
-                            class="focus-within:ring-1 focus-within:ring-auth-primary/40 rounded-md w-max"
-                            bind:value={$formData.otp}
-                        >
-                            {#snippet children({ cells })}
-                                <!-- Added focus-within styling to match your auth input variant -->
-                                <div
-                                    class="relative w-max rounded-md border border-transparent transition-all  aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
-                                    aria-invalid={$errors.otp ? 'true' : undefined}
-                                >
-                                    <InputOTP.Group>
-                                        {#each cells as cell}
-                                            <InputOTP.Slot
-                                                {cell}
-                                                class="h-10 w-10 border border-white/10 bg-auth-input font-sans text-base font-medium text-white"
-                                            />
-                                        {/each}
-                                    </InputOTP.Group>
+		<form method="POST" use:enhance class="auth-form">
+			<input type="hidden" name="email" bind:value={$formData.email} />
 
-                                    <!-- Placeholder Overlay -->
-                                    <div class="pointer-events-none absolute inset-0 flex">
-                                        {#each cells as cell, index}
-                                            <div class="flex h-10 w-10 items-center justify-center text-base font-medium text-white/50">
-                                                {#if !cell.char && "YOUROTP!"[index]}
-                                                    {"YOUROTP!"[index]}
-                                                {/if}
-                                            </div>
-                                        {/each}
-                                    </div>
-                                </div>
-                            {/snippet}
-                        </InputOTP.Root>
-                    </div>
-                {/snippet}
-            </Form.Control>
-            <Form.FieldErrors class="text-xs text-[#FB6363]" />
-        </Form.Field>
-
-		<!-- New Password -->
-		<Form.Field {form} name="password">
-			<Form.Control>
-				{#snippet children({ props })}
-					<AuthPasswordInput
-						{...props}
-						placeholder="New Password"
-						disabled={isSubmitting}
-						bind:value={$formData.password}
-					/>
-				{/snippet}
-			</Form.Control>
-			<Form.FieldErrors class="text-xs text-[#FB6363]" />
-		</Form.Field>
-
-		<!-- Confirm Password -->
-		<Form.Field {form} name="confirmPassword">
-			<Form.Control>
-				{#snippet children({ props })}
-					<AuthPasswordInput
-						{...props}
-						placeholder="Confirm New Password"
-						disabled={isSubmitting}
-						bind:value={$formData.confirmPassword}
-					/>
-				{/snippet}
-			</Form.Control>
-			<Form.FieldErrors class="text-xs text-[#FB6363]" />
-		</Form.Field>
-
-		<!-- Submit button -->
-		<Button
-			type="submit"
-			disabled={isSubmitting}
-			variant="authPrimary"
-			class="auth-btn-primary mt-2"
-		>
-			{#if isSubmitting}
-				<Spinner class="mr-2 size-4" />
-				Updating...
-			{:else}
-				Update Password
-			{/if}
-		</Button>
-
-		<!-- Error box -->
-		<AuthErrorBox {apiError} />
-	</form>
-
-	<!-- Footer link -->
-	<p class="mt-6 text-center text-sm text-white" style="font-family: 'Inter Variable', sans-serif;">
-		Remember your password?
-		<Tooltip.Provider>
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<a
+			<Form.Field {form} name="otp" class="auth-field">
+				<label class="auth-field-label" for="reset-otp">Verification code</label>
+				<Form.Control>
+					{#snippet children({ props })}
+						<InputOTP.Root
 							{...props}
-							href="/login"
-							class="cursor-pointer font-semibold text-white underline underline-offset-2 transition-colors hover:text-[#E8DEC8]"
+							id="reset-otp"
+							maxlength={8}
+							disabled={isSubmitting}
+							autofocus={true}
+							class="w-max"
+							bind:value={$formData.otp}
 						>
-							Sign in
-						</a>
+							{#snippet children({ cells })}
+								<div
+									class="auth-otp-shell relative"
+									aria-invalid={$errors.otp ? 'true' : undefined}
+								>
+									<InputOTP.Group>
+										{#each cells as cell}
+											<InputOTP.Slot {cell} class="auth-otp-slot" />
+										{/each}
+									</InputOTP.Group>
+
+									<div class="pointer-events-none absolute inset-0 flex">
+										{#each cells as cell, index}
+											<div class="auth-otp-placeholder flex items-center justify-center">
+												{#if !cell.char && '01234567'[index]}
+													{'01234567'[index]}
+												{/if}
+											</div>
+										{/each}
+									</div>
+								</div>
+							{/snippet}
+						</InputOTP.Root>
 					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content class="bg-[#232323]" arrowClasses="bg-[#232323]"
-					>Login to your account</Tooltip.Content
-				>
-			</Tooltip.Root>
-		</Tooltip.Provider>
-	</p>
-{/if}
+				</Form.Control>
+				<Form.FieldErrors class="auth-field-error" />
+			</Form.Field>
+
+			<Form.Field {form} name="password" class="auth-field">
+				<label class="auth-field-label" for="new-password">New password</label>
+				<Form.Control>
+					{#snippet children({ props })}
+						<AuthPasswordInput
+							{...props}
+							id="new-password"
+							placeholder="Enter a new password"
+							disabled={isSubmitting}
+							bind:value={$formData.password}
+						/>
+					{/snippet}
+				</Form.Control>
+				<Form.FieldErrors class="auth-field-error" />
+			</Form.Field>
+
+			<Form.Field {form} name="confirmPassword" class="auth-field">
+				<label class="auth-field-label" for="confirm-new-password">Confirm new password</label>
+				<Form.Control>
+					{#snippet children({ props })}
+						<AuthPasswordInput
+							{...props}
+							id="confirm-new-password"
+							placeholder="Re-enter your new password"
+							disabled={isSubmitting}
+							bind:value={$formData.confirmPassword}
+						/>
+					{/snippet}
+				</Form.Control>
+				<Form.FieldErrors class="auth-field-error" />
+			</Form.Field>
+
+			<Button type="submit" disabled={isSubmitting} variant="authPrimary" class="auth-btn-primary">
+				{#if isSubmitting}
+					<Spinner class="mr-2 size-4" />
+					Updating...
+				{:else}
+					Update password
+				{/if}
+			</Button>
+
+			<AuthErrorBox {apiError} />
+		</form>
+
+		<p class="auth-footer">
+			Remember your password?
+			<Tooltip.Provider>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<a {...props} href="/login">Sign in</a>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content class="bg-[#3E3E3E]" arrowClasses="bg-[#3E3E3E]"
+						>Login to your account</Tooltip.Content
+					>
+				</Tooltip.Root>
+			</Tooltip.Provider>
+		</p>
+	{/if}
+</div>

@@ -8,7 +8,6 @@
 <!-- Layer 1: Full-screen background image -->
 <div class="fixed inset-0 -z-20 bg-[#141414]">
 	<!-- <img src={vintageFloral} alt="" class="h-full w-full object-cover" aria-hidden="true" /> -->
-
 </div>
 
 <!-- Layer 2: Dark overlay with blur -->
@@ -19,10 +18,15 @@
 ></div> -->
 
 <!-- Layer 3: Card container -->
+
 <div class="flex min-h-svh items-center justify-center p-4 md:p-8">
-	<div class="grid w-full max-w-[960px] min-h-[500px] grid-cols-1 overflow-hidden rounded-[20px] md:h-[769px] md:grid-cols-2">
+	<div
+		class="grid min-h-[calc(100svh-2rem)] w-full max-w-[960px] grid-cols-1 overflow-hidden rounded-[20px] md:min-h-[calc(100svh-4rem)] md:grid-cols-2"
+	>
 		<!-- Left Column: Auth Panel -->
-		<div class="relative flex flex-col justify-center overflow-y-auto bg-[#1C1B1B] px-8 py-10 md:px-20 md:py-20">
+		<div
+			class="relative flex flex-col justify-center overflow-visible bg-[#1C1B1B] px-8 py-10 md:px-20 md:py-12"
+		>
 			{@render children()}
 		</div>
 
@@ -34,7 +38,7 @@
 			<img
 				src={vintageFloral}
 				alt=""
-				class="absolute right-0 top-1/2 h-[1200px] w-[1200px] -translate-y-1/2 max-w-none object-cover object-right blur-[33px]"
+				class="absolute top-1/2 right-0 h-[1200px] w-[1200px] max-w-none -translate-y-1/2 object-cover object-right blur-[33px]"
 				aria-hidden="true"
 			/>
 
