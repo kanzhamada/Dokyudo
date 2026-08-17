@@ -432,7 +432,7 @@
 				class="transition-opacity group-hover/header:pointer-events-auto group-hover/header:opacity-100 group-data-[collapsible=icon]:hidden"
 			>
 				<Sidebar.Trigger
-					class="size-5 shrink-0 cursor-pointer text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+					class="size-5 shrink-0 cursor-pointer text-sidebar-foreground/70 transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:scale-90 active:bg-sidebar-accent active:text-white"
 				/>
 			</div>
 		</div>
@@ -447,14 +447,14 @@
 					<!-- Collapsed mode logo injected directly into the menu structure -->
 					<Sidebar.MenuItem class="hidden group-data-[collapsible=icon]:block">
 						<Sidebar.MenuButton
-							class="h-9 px-2 font-geist text-[13px]"
+							class="h-9 px-2 font-geist text-[13px] transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent"
 							tooltipContent="Expand Sidebar (Ctrl + B)"
 						>
 							{#snippet child({ props })}
 								<a
 									href="##"
 									{...props}
-									class={(props.class as string) + ' group/logo cursor-pointer'}
+									class={(props.class as string) + ' group/logo cursor-pointer active:scale-[0.98]'}
 									onclick={(e) => {
 										e.preventDefault();
 										sidebar.toggle();
@@ -538,7 +538,7 @@
 				<Sidebar.MenuButton
 					size="lg"
 					tooltipContent="Profile"
-					class="h-12! w-full cursor-pointer p-1.5 hover:bg-sidebar-accent"
+					class="h-12! w-full cursor-pointer p-1.5 transition-all duration-150 hover:bg-sidebar-accent active:scale-[0.98] active:bg-sidebar-accent active:brightness-110"
 					onclick={() => (isUserMenuOpen = !isUserMenuOpen)}
 				>
 					<AvatarPrimitive.Root
@@ -583,12 +583,13 @@
 		<Sidebar.MenuButton
 			isActive={item.active}
 			tooltipContent={item.label}
-			class="h-9 px-2 font-geist text-[13px]"
+			class="h-9 px-2 font-geist text-[13px] transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white"
 		>
 			{#snippet child({ props })}
 				<a
 					href={item.href}
 					{...props}
+					class={(props.class as string) + ' transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent'}
 					onmouseenter={() => (hoveredNavHref = item.href)}
 					onmouseleave={() => (hoveredNavHref = null)}
 				>
@@ -615,13 +616,13 @@
 	<Sidebar.MenuItem>
 		<Sidebar.MenuButton
 			isActive={$page.url.pathname === `/app/chat/${item.id}`}
-			class="h-7 cursor-pointer px-2 font-geist text-xs text-sidebar-muted-foreground"
+			class="h-7 cursor-pointer px-2 font-geist text-xs text-sidebar-muted-foreground transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white"
 		>
 			{#snippet child({ props })}
 				<a
 					href="/app/chat/{item.id}"
 					{...props}
-					class={(props.class as string) + ' w-full overflow-hidden text-left'}
+					class={(props.class as string) + ' w-full overflow-hidden text-left transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent'}
 					onmouseenter={() => conversationCache.prefetch(item.id)}
 				>
 					{#if item.title.length > 25}
@@ -647,7 +648,7 @@
 		{#if item.isPinned}
 			<Sidebar.MenuAction
 				showOnHover={false}
-				class="cursor-pointer"
+				class="cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80"
 				onclick={(e) => openConversationMenu(e, item)}
 			>
 				<div
@@ -666,7 +667,7 @@
 		{:else}
 			<Sidebar.MenuAction
 				showOnHover={true}
-				class="cursor-pointer"
+				class="cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80"
 				onclick={(e) => openConversationMenu(e, item)}
 			>
 				<MxIcon name="menu-dots-outline" class="size-4" />
@@ -680,7 +681,7 @@
 	<!-- Backdrop to capture click outside -->
 	<div
 		role="presentation"
-		class="fixed inset-0 z-50 bg-transparent"
+		class="fixed inset-0 z-[60] bg-transparent"
 		onclick={() => (isUserMenuOpen = false)}
 		onkeydown={() => (isUserMenuOpen = false)}
 	></div>
@@ -688,13 +689,13 @@
 	<!-- Positioned Floating User Account Menu -->
 	<div
 		transition:scale={{ duration: 150, start: 0.95 }}
-		class="fixed bottom-16 left-3 z-50 w-56 min-w-56 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+		class="fixed bottom-16 left-3 z-[60] w-56 min-w-56 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 	>
 		<div class="px-2.5 py-1.5 font-sans text-xs font-semibold text-white/45">My Account</div>
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
 				openAccountPanel('settings');
@@ -705,7 +706,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
 				openAccountPanel('billing');
@@ -716,7 +717,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
 				openAccountPanel('shared-links');
@@ -728,7 +729,7 @@
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/20 active:text-red-200"
 			onclick={() => {
 				isUserMenuOpen = false;
 				isLogoutDialogOpen = true;
@@ -745,7 +746,7 @@
 	<!-- Backdrop to capture click outside -->
 	<div
 		role="presentation"
-		class="fixed inset-0 z-50 bg-transparent"
+		class="fixed inset-0 z-[60] bg-transparent"
 		onclick={() => (activeConversationMenu = null)}
 		onkeydown={() => (activeConversationMenu = null)}
 	></div>
@@ -754,11 +755,11 @@
 	<div
 		transition:scale={{ duration: 150, start: 0.95 }}
 		style={`position: fixed; top: ${Math.min(activeConversationMenu.y + 4, window.innerHeight - 170)}px; left: ${Math.min(Math.max(16, activeConversationMenu.x - 140), window.innerWidth - 200)}px;`}
-		class="z-50 w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+		class="z-[60] w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 	>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
 			onclick={() => {
 				const item = activeConversationMenu?.item;
 				activeConversationMenu = null;
@@ -770,7 +771,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
 			onclick={() => {
 				const item = activeConversationMenu?.item;
 				activeConversationMenu = null;
@@ -782,7 +783,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
 			onclick={() => {
 				const item = activeConversationMenu?.item;
 				activeConversationMenu = null;
@@ -800,7 +801,7 @@
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/20 active:text-red-200"
 			onclick={() => {
 				const item = activeConversationMenu?.item;
 				activeConversationMenu = null;
@@ -898,3 +899,13 @@
 		}
 	}}
 />
+
+<style>
+	:global([data-slot="sidebar"] button),
+	:global([data-slot="sidebar"] a),
+	:global([data-slot="sidebar"] [data-slot="sidebar-menu-button"]),
+	:global([data-slot="sidebar"] [data-slot="sidebar-menu-action"]) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		touch-action: manipulation;
+	}
+</style>
