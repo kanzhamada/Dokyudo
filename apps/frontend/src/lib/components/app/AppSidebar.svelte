@@ -411,7 +411,7 @@
 <Sidebar.Root collapsible="icon" class="border-none">
 	<!-- HEADER -->
 	<Sidebar.Header class="group-data-[collapsible=icon]:hidden">
-		<div class="group/header flex items-center justify-between px-1.5 py-2">
+		<div class="group/header flex items-center justify-between px-2.5 md:px-1.5 py-2.5 md:py-2">
 			<div class="flex items-center gap-1.5">
 				<!-- Brand Logo -->
 				<div
@@ -432,7 +432,7 @@
 				class="transition-opacity group-hover/header:pointer-events-auto group-hover/header:opacity-100 group-data-[collapsible=icon]:hidden"
 			>
 				<Sidebar.Trigger
-					class="size-5 shrink-0 cursor-pointer text-sidebar-foreground/70 transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:scale-90 active:bg-sidebar-accent active:text-white"
+					class="size-6 md:size-5 shrink-0 cursor-pointer text-sidebar-foreground/70 transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:scale-90 active:bg-sidebar-accent active:text-white"
 				/>
 			</div>
 		</div>
@@ -442,12 +442,12 @@
 		<!-- CONTENT -->
 		<Sidebar.Content class="gap-0 overflow-hidden">
 			<!-- Main Navigation -->
-			<Sidebar.Group class="shrink-0 px-2 pt-2 pb-1">
-				<Sidebar.Menu class="gap-1">
+			<Sidebar.Group class="shrink-0 px-2.5 md:px-2 pt-2.5 md:pt-2 pb-1.5 md:pb-1">
+				<Sidebar.Menu class="gap-1.5 md:gap-1">
 					<!-- Collapsed mode logo injected directly into the menu structure -->
 					<Sidebar.MenuItem class="hidden group-data-[collapsible=icon]:block">
 						<Sidebar.MenuButton
-							class="h-9 px-2 font-geist text-[13px] transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent"
+							class="h-10 md:h-9 px-3 md:px-2 font-geist text-[14px] md:text-[13px] transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent"
 							tooltipContent="Expand Sidebar (Ctrl + B)"
 						>
 							{#snippet child({ props })}
@@ -485,10 +485,10 @@
 			<!-- Recent Chats -->
 			<!-- Hide entire group when collapsed -->
 			<Sidebar.Group
-				class="min-h-0 flex-1 overflow-hidden px-2 pt-2 pb-1 group-data-[collapsible=icon]:hidden"
+				class="min-h-0 flex-1 overflow-hidden px-2.5 md:px-2 pt-2 md:pt-2 pb-1.5 md:pb-1 group-data-[collapsible=icon]:hidden"
 			>
 				<Sidebar.GroupLabel
-					class="mb-1 h-6 shrink-0 px-2 font-geist text-[10px] font-medium tracking-[0.08em] text-sidebar-muted"
+					class="mb-2 md:mb-1 mt-1 md:mt-0 h-6 shrink-0 px-2.5 md:px-2 font-geist text-[11px] md:text-[10px] font-medium tracking-[0.08em] text-sidebar-muted"
 				>
 					Recent Chats
 				</Sidebar.GroupLabel>
@@ -498,15 +498,15 @@
 					onscroll={handleSidebarScroll}
 					bind:this={scrollContainer}
 				>
-					<Sidebar.Menu class="gap-px">
+					<Sidebar.Menu class="gap-1.5 md:gap-px">
 						{#if !hasLoadedInitialConversations && isLoadingConversations}
 							{#each conversationSkeletons as skeleton (skeleton)}
 								<Sidebar.MenuItem class="px-2 py-1">
-									<Skeleton class="h-5 w-full rounded bg-white/5" />
+									<Skeleton class="h-6 md:h-5 w-full rounded bg-white/5" />
 								</Sidebar.MenuItem>
 							{/each}
 						{:else if (conversationsStore.list.length > 0 ? conversationsStore.list : conversations).length === 0}
-							<div class="px-2 py-1.5 font-geist text-[11px] text-sidebar-muted-foreground/60">
+							<div class="px-2.5 py-2 md:px-2 md:py-1.5 font-geist text-[12px] md:text-[11px] text-sidebar-muted-foreground/60">
 								No recent chats
 							</div>
 						{:else}
@@ -531,18 +531,18 @@
 	</div>
 
 	<!-- FOOTER -->
-	<Sidebar.Footer class="pb-3">
-		<div class="mx-2 mb-1.5 h-px bg-white/10"></div>
+	<Sidebar.Footer class="pb-3 px-2.5 md:px-2">
+		<div class="mx-2 mb-2 md:mb-1.5 h-px bg-white/10"></div>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton
 					size="lg"
 					tooltipContent="Profile"
-					class="h-12! w-full cursor-pointer p-1.5 transition-all duration-150 hover:bg-sidebar-accent active:scale-[0.98] active:bg-sidebar-accent active:brightness-110"
+					class="h-14! md:h-12! w-full cursor-pointer p-2 md:p-1.5 transition-all duration-150 hover:bg-sidebar-accent active:scale-[0.98] active:bg-sidebar-accent active:brightness-110"
 					onclick={() => (isUserMenuOpen = !isUserMenuOpen)}
 				>
 					<AvatarPrimitive.Root
-						class="size-7 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
+						class="size-8 md:size-7 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
 					>
 						{#if userProfile?.user?.profilePictureUrl}
 							<AvatarPrimitive.Image
@@ -558,16 +558,16 @@
 						</AvatarPrimitive.Fallback>
 					</AvatarPrimitive.Root>
 					<div
-						class="ml-1.5 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
+						class="ml-2 md:ml-1.5 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
 					>
-						<span class="truncate font-geist text-[13px] font-medium text-white">{displayName}</span
+						<span class="truncate font-geist text-[14px] md:text-[13px] font-medium text-white">{displayName}</span
 						>
-						<span class="truncate font-geist text-[11px] text-sidebar-muted-foreground"
+						<span class="truncate font-geist text-[12px] md:text-[11px] text-sidebar-muted-foreground"
 							>{subscriptionTier}</span
 						>
 					</div>
 					<ChevronsUpDown
-						class="size-3.5 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
+						class="size-4 md:size-3.5 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
 					/>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
@@ -583,13 +583,16 @@
 		<Sidebar.MenuButton
 			isActive={item.active}
 			tooltipContent={item.label}
-			class="h-9 px-2 font-geist text-[13px] transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white"
+			class="h-10 md:h-9 px-3 md:px-2 font-geist text-[14px] md:text-[13px] transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white"
 		>
 			{#snippet child({ props })}
 				<a
 					href={item.href}
 					{...props}
 					class={(props.class as string) + ' transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent'}
+					onclick={() => {
+						if (sidebar.isMobile) sidebar.setOpenMobile(false);
+					}}
 					onmouseenter={() => (hoveredNavHref = item.href)}
 					onmouseleave={() => (hoveredNavHref = null)}
 				>
@@ -597,13 +600,13 @@
 						{#if mxBoldName(item.icon) && (item.active || hoveredNavHref === item.href)}
 							<MxIcon
 								name={mxBoldName(item.icon)!}
-								class="mr-2.5 size-4 group-data-[collapsible=icon]:mr-0"
+								class="mr-3 md:mr-2.5 size-4.5 md:size-4 group-data-[collapsible=icon]:mr-0"
 							/>
 						{:else}
-							<MxIcon name={item.icon} class="mr-2.5 size-4 group-data-[collapsible=icon]:mr-0" />
+							<MxIcon name={item.icon} class="mr-3 md:mr-2.5 size-4.5 md:size-4 group-data-[collapsible=icon]:mr-0" />
 						{/if}
 					{:else}
-						<item.icon class="mr-2.5 size-4 group-data-[collapsible=icon]:mr-0" />
+						<item.icon class="mr-3 md:mr-2.5 size-4.5 md:size-4 group-data-[collapsible=icon]:mr-0" />
 					{/if}
 					<span class="group-data-[collapsible=icon]:hidden">{item.label}</span>
 				</a>
@@ -616,13 +619,16 @@
 	<Sidebar.MenuItem>
 		<Sidebar.MenuButton
 			isActive={$page.url.pathname === `/app/chat/${item.id}`}
-			class="h-7 cursor-pointer px-2 font-geist text-xs text-sidebar-muted-foreground transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white"
+			class="h-9.5 md:h-7 cursor-pointer px-3 md:px-2 font-geist text-[13.5px] md:text-xs text-sidebar-muted-foreground transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white"
 		>
 			{#snippet child({ props })}
 				<a
 					href="/app/chat/{item.id}"
 					{...props}
 					class={(props.class as string) + ' w-full overflow-hidden text-left transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent'}
+					onclick={() => {
+						if (sidebar.isMobile) sidebar.setOpenMobile(false);
+					}}
 					onmouseenter={() => conversationCache.prefetch(item.id)}
 				>
 					{#if item.title.length > 25}
@@ -648,7 +654,7 @@
 		{#if item.isPinned}
 			<Sidebar.MenuAction
 				showOnHover={false}
-				class="cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80"
+				class="top-2 md:top-1 cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80 size-6 md:size-5 flex items-center justify-center"
 				onclick={(e) => openConversationMenu(e, item)}
 			>
 				<div
@@ -667,7 +673,7 @@
 		{:else}
 			<Sidebar.MenuAction
 				showOnHover={true}
-				class="cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80"
+				class="top-2 md:top-1 cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80 size-6 md:size-5 flex items-center justify-center"
 				onclick={(e) => openConversationMenu(e, item)}
 			>
 				<MxIcon name="menu-dots-outline" class="size-4" />
@@ -698,6 +704,7 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
+				if (sidebar.isMobile) sidebar.setOpenMobile(false);
 				openAccountPanel('settings');
 			}}
 		>
@@ -709,6 +716,7 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
+				if (sidebar.isMobile) sidebar.setOpenMobile(false);
 				openAccountPanel('billing');
 			}}
 		>
@@ -720,6 +728,7 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
 			onclick={() => {
 				isUserMenuOpen = false;
+				if (sidebar.isMobile) sidebar.setOpenMobile(false);
 				openAccountPanel('shared-links');
 			}}
 		>
@@ -732,6 +741,7 @@
 			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/20 active:text-red-200"
 			onclick={() => {
 				isUserMenuOpen = false;
+				if (sidebar.isMobile) sidebar.setOpenMobile(false);
 				isLogoutDialogOpen = true;
 			}}
 		>
@@ -763,6 +773,7 @@
 			onclick={() => {
 				const item = activeConversationMenu?.item;
 				activeConversationMenu = null;
+				if (sidebar.isMobile) sidebar.setOpenMobile(false);
 				if (item) openShareDialog(item);
 			}}
 		>
@@ -775,6 +786,7 @@
 			onclick={() => {
 				const item = activeConversationMenu?.item;
 				activeConversationMenu = null;
+				if (sidebar.isMobile) sidebar.setOpenMobile(false);
 				if (item) openEditModal(item);
 			}}
 		>
@@ -805,6 +817,7 @@
 			onclick={() => {
 				const item = activeConversationMenu?.item;
 				activeConversationMenu = null;
+				if (sidebar.isMobile) sidebar.setOpenMobile(false);
 				if (item) openDeleteModal(item);
 			}}
 		>
