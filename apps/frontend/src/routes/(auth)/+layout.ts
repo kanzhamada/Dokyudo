@@ -1,30 +1,16 @@
 import { browser } from '$app/environment';
 import { redirect } from '@sveltejs/kit';
 import type { LayoutLoad } from './$types';
-import { isJwtExpired } from '$lib/utils/jwt';
+import { sessionStore } from '$lib/state/session.store.svelte';
 
-const SESSION_KEY = 'dokyudo_session';
-
-export const load: LayoutLoad = () => {
+export const load: LayoutLoad = async () => {
 	if (!browser) return;
 
-	const sessionRaw = localStorage.getItem(SESSION_KEY);
-	if (!sessionRaw) return;
-
-	let session: { accessToken?: string };
-	try {
-		session = JSON.parse(sessionRaw);
-	} catch {
-		return;
-	}
-
-	const token = session?.accessToken;
-	if (!token) return;
-
-	// Never touch the stored JWT here — it stays in localStorage until the user
-	// explicitly destroys the session (logout / session-expired dialog).
-	// While the token is still valid, bounce the user back into /app.
-	if (!isJwtExpired(token)) {
+	// The session lives in httpOnly cookies, so the only way to know whether
+	// the user is signed in is to ask the API. While a valid session exists,
+	// keep the user inside /app — they only leave after a deliberate logout.
+	const authenticated = await sessionStore.hydrate();
+	if (authenticated) {
 		redirect(307, '/app/chat');
 	}
 };

@@ -1,6 +1,5 @@
 import { PUBLIC_API_URL } from '$env/static/public';
 import { dokyudoFetch } from '$lib/apiClient';
-import { sessionStore } from '$lib/state/session.store.svelte';
 import type { ApiErrorResponse } from '$lib/types/api.types';
 import type { GetConversationResponse } from '$lib/types/rag.types';
 
@@ -48,8 +47,6 @@ function isStale(id: string): boolean {
 
 async function fetchEntry(id: string) {
 	const headers = new Headers();
-	const token = sessionStore.getAccessToken();
-	if (token) headers.set('Authorization', `Bearer ${token}`);
 	const entry = entries[id];
 	if (entry?.etag) headers.set('If-None-Match', entry.etag);
 

@@ -56,7 +56,6 @@
 	import { PUBLIC_API_URL } from '$env/static/public';
 	import { dokyudoFetch } from '$lib/apiClient';
 	import { apiRequest } from '$lib/api/client';
-	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
 	import { accountPanel, openAccountPanel } from '$lib/state/account-panel.store.svelte';
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
@@ -1385,13 +1384,9 @@
 		};
 
 		try {
-			const token = sessionStore.getAccessToken();
 			const headers: Record<string, string> = {
 				'Content-Type': 'application/json'
 			};
-			if (token) {
-				headers['Authorization'] = `Bearer ${token}`;
-			}
 
 			const res = await dokyudoFetch(`${PUBLIC_API_URL}/api/rag/chat`, {
 				method: 'POST',
@@ -1670,11 +1665,10 @@
 		// matters: stop first, then disconnect.
 		const targetId = activeTurnWriteTargetId;
 		if (targetId) {
-			const token = sessionStore.getAccessToken();
 			try {
 				await fetch(`${PUBLIC_API_URL}/api/rag/turns/${targetId}/stop`, {
 					method: 'POST',
-					headers: token ? { Authorization: `Bearer ${token}` } : {}
+					credentials: 'include'
 				});
 			} catch {
 				// Network hiccup — the local freeze below still applies.

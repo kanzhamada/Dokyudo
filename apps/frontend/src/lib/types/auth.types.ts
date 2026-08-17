@@ -1,11 +1,18 @@
-/** Login success response */
+/** Login success response (tokens are delivered via httpOnly cookies) */
 export interface LoginResponse {
-	accessToken: string;
-	refreshToken: string;
 	user: {
 		id: string;
 		email: string;
 	};
+}
+
+/** `GET /api/auth/session` response used to hydrate client auth state. */
+export interface SessionResponse {
+	authenticated: boolean;
+	user: {
+		id: string;
+		email: string;
+	} | null;
 }
 
 /** Register success response */
@@ -85,10 +92,8 @@ export type VerifyEmailRequestPayload = {
 	type: string;
 };
 
-/** Verify email success response */
+/** Verify email success response (tokens are delivered via httpOnly cookies) */
 export interface VerifyEmailResponse {
-	accessToken: string;
-	refreshToken: string;
 	user: {
 		id: string;
 		email: string;

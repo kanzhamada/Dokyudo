@@ -9,7 +9,7 @@ import type {
 	UpdatePasswordResponse,
 	UpdateTenantNameResponse,
 	VerifyEmailResponse,
-	UserProfileResponse,
+	SessionResponse,
 	LoginRequestPayload,
 	RegisterRequestPayload,
 	ForgotPasswordRequestPayload,
@@ -19,6 +19,11 @@ import type {
 	VerifyEmailRequestPayload
 } from '../types/auth.types';
 import { PUBLIC_API_URL } from '$env/static/public';
+
+/** Hydrates the current auth state from the httpOnly session cookies. */
+export function getSession(): Promise<ApiResult<SessionResponse>> {
+	return apiRequest<SessionResponse>('/api/auth/session', { method: 'GET' });
+}
 
 export function authLogin(params: LoginRequestPayload): Promise<ApiResult<LoginResponse>> {
 	return apiRequest<LoginResponse>('/api/auth/login', { method: 'POST', body: params });

@@ -1,52 +1,75 @@
-import { isJwtExpired } from '$lib/utils/jwt';
+import { PUBLIC_API_URL } from '$env/static/public';
+import { dokyudoFetch } from '$lib/apiClient';
 import { sessionExpiryStore } from '$lib/state/session-expiry.store.svelte';
 
-const SESSION_KEY = 'dokyudo_session';
-
-interface SessionData {
-	accessToken: string;
-	refreshToken: string;
-	user: { id: string; email: string };
+export interface SessionUser {
+	id: string;
+	email: string;
 }
 
-function createSessionStore() {
-	const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(SESSION_KEY) : null;
+interface SessionResponse {
+	authenticated: boolean;
+	user: SessionUser | null;
+}
 
-	let session = $state<SessionData | null>(null);
-	if (stored) {
+/**
+ * Client-side auth state for the current session.
+ *
+ * Tokens live in httpOnly cookies (scoped to the shared registrable domain),
+ * so the browser never exposes them to JS. This store only holds the resolved
+ * user identity, hydrated from `GET /api/auth/session`.
+ */
+function createSessionStore() {
+	let user = $state<SessionUser | null>(null);
+	let authenticated = $state(false);
+	let isHydrated = $state(false);
+
+	async function hydrate(): Promise<boolean> {
 		try {
-			session = JSON.parse(stored);
+			const response = await dokyudoFetch(`${PUBLIC_API_URL}/api/auth/session`, {
+				method: 'GET'
+			});
+			const data = (await response.json()) as SessionResponse;
+
+			user = data.authenticated ? data.user : null;
+			authenticated = data.authenticated;
+			isHydrated = true;
+
+			if (!authenticated) {
+				sessionExpiryStore.clear();
+			}
+
+			return authenticated;
 		} catch {
-			// Corrupt session data — treat as no session without touching storage.
+			// Network failure — keep the current state, mark hydrated so guards
+			// do not loop forever on a downed API.
+			isHydrated = true;
+			return authenticated;
 		}
 	}
 
 	return {
-		get value() {
-			return session;
+		get user() {
+			return user;
 		},
-		set(data: SessionData) {
-			session = data;
-			if (typeof localStorage !== 'undefined') {
-				localStorage.setItem(SESSION_KEY, JSON.stringify(data));
-			}
+		get authenticated() {
+			return authenticated;
+		},
+		get isHydrated() {
+			return isHydrated;
+		},
+		set(data: SessionUser) {
+			user = data;
+			authenticated = true;
+			isHydrated = true;
 		},
 		clear() {
-			session = null;
-			if (typeof localStorage !== 'undefined') {
-				localStorage.removeItem(SESSION_KEY);
-			}
+			user = null;
+			authenticated = false;
+			isHydrated = true;
 			sessionExpiryStore.clear();
 		},
-		getAccessToken(): string | null {
-			return session?.accessToken ?? null;
-		},
-		isExpired(): boolean {
-			return session ? isJwtExpired(session.accessToken) : true;
-		},
-		hasValidSession(): boolean {
-			return !!session && !isJwtExpired(session.accessToken);
-		}
+		hydrate
 	};
 }
 

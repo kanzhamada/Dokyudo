@@ -75,7 +75,7 @@
 				console.log('[Auth Login] Backend Response (POST /api/auth/login):', result);
 
 				if (result.ok) {
-					sessionStore.set(result.data);
+					sessionStore.set(result.data.user);
 					localStorage.removeItem('dokyudo_login_lockout');
 					await goto(redirectPath);
 				} else {
@@ -102,6 +102,13 @@
 	onMount(() => {
 		redirectPath = resolveRedirectParam();
 		loadRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY);
+
+		// Surface OAuth failures reported back by the backend callback
+		// (e.g. user denied consent) as a visible error on this page.
+		const oauthError = new URLSearchParams(window.location.search).get('oauth_error');
+		if (oauthError) {
+			apiError = decodeURIComponent(oauthError);
+		}
 
 		const storedLockout = localStorage.getItem('dokyudo_login_lockout');
 		if (storedLockout) {

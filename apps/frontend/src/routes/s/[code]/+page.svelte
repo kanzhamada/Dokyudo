@@ -44,7 +44,7 @@
 	let copiedMessageId = $state<string | null>(null);
 	let codeBlockInstances: { el: HTMLElement; unmount: () => void }[] = [];
 
-	const isSignedIn = $derived(!!sessionStore.getAccessToken());
+	const isSignedIn = $derived(sessionStore.authenticated);
 	const footerHint = $derived(
 		isSignedIn
 			? 'Continue in your private chat (a copy of this link).'
@@ -147,7 +147,7 @@
 
 	async function handleContinue() {
 		if (isContinuing || !share) return;
-		if (!sessionStore.getAccessToken()) {
+		if (!sessionStore.authenticated) {
 			await goto(`/login?redirect=/s/${share.code}`);
 			return;
 		}

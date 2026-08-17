@@ -10,7 +10,9 @@ interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
 
 /**
  * Base API Client wrapper.
- * Centralizes request formatting, standard error handling, and authorization headers.
+ * Centralizes request formatting, standard error handling, and authorization.
+ * Authentication is carried by httpOnly cookies (sent automatically via
+ * `credentials: 'include'` in dokyudoFetch) — no manual token handling here.
  */
 export async function apiRequest<T>(
 	path: string,
@@ -25,10 +27,6 @@ export async function apiRequest<T>(
 	if (isJson && !finalHeaders.has('Content-Type')) {
 		finalHeaders.set('Content-Type', 'application/json');
 	}
-
-	// Attach auth token from session store if available
-	const token = sessionStore.getAccessToken();
-	if (token) finalHeaders.set('Authorization', `Bearer ${token}`);
 
 	const fetchOptions: RequestInit = {
 		method: options.method || 'GET',
@@ -52,9 +50,9 @@ export async function apiRequest<T>(
 
 		const errorBody = (await response.json()) as ApiErrorResponse;
 
-		// A 401 on a request that carried our token means the session is no
-		// longer valid (typically an expired JWT) — surface the login dialog.
-		if (response.status === 401 && token) {
+		// A 401 on an authenticated request means the session is no longer
+		// valid (expired/revoked) — surface the re-login dialog.
+		if (response.status === 401 && sessionStore.authenticated) {
 			sessionExpiryStore.trigger();
 		}
 

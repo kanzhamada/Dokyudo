@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { authVerifyEmail } from '$lib/api/auth';
 	import { sessionStore } from '$lib/state/session.store.svelte';
@@ -28,9 +29,9 @@
 			console.log('[Auth Verify] Backend Response:', result);
 
 			if (result.ok) {
-				sessionStore.set(result.data);
+				sessionStore.set(result.data.user);
 				localStorage.removeItem('dokyudo_register_lockout');
-				await goto('/app/chat');
+				await goto(resolve('/app/chat'));
 			} else {
 				errorMessage = result.error.message || 'Verification link is invalid or has expired.';
 			}
@@ -44,7 +45,10 @@
 </script>
 
 <svelte:head>
-	{@html seo({ title: 'Verifying Email | Dokyudo', description: 'Confirming your email address to activate your Dokyudo account.' })}
+	{@html seo({
+		title: 'Verifying Email | Dokyudo',
+		description: 'Confirming your email address to activate your Dokyudo account.'
+	})}
 </svelte:head>
 
 <AuthBackButton href="/login" tooltipText="Back to Sign In" />

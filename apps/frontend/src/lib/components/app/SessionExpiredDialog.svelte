@@ -5,10 +5,14 @@
 	import { resolve } from '$app/paths';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { sessionExpiryStore } from '$lib/state/session-expiry.store.svelte';
+	import { authLogout } from '$lib/api/auth';
 
 	let open = $derived(sessionExpiryStore.value);
 
 	async function handleRedirectToLogin() {
+		// Best-effort: clear the httpOnly cookies on the server, then drop the
+		// local state and send the user to sign in again.
+		await authLogout().catch(() => {});
 		sessionStore.clear();
 		await goto(resolve('/login'));
 	}

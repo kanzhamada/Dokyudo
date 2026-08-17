@@ -40,31 +40,33 @@
 		});
 	});
 
-	// Detect an expired JWT while the user is actively using the app: poll on a
-	// timer and re-check whenever the tab regains focus/visibility. Once the
-	// token's `exp` passes, show the session-expired dialog.
+	// Detect a lost session (expired/revoked) while the user is actively using
+	// the app: poll the session endpoint on a timer and re-check whenever the
+	// tab regains focus/visibility. A 401 from any API call also triggers it.
 	let expiryTimer: ReturnType<typeof setInterval> | null = null;
 
-	function checkSessionExpiry() {
-		if (sessionStore.value && sessionStore.isExpired()) {
+	async function checkSession() {
+		if (!sessionStore.authenticated) return;
+		const stillAuthed = await sessionStore.hydrate();
+		if (!stillAuthed) {
 			sessionExpiryStore.trigger();
 		}
 	}
 
 	onMount(() => {
-		checkSessionExpiry();
-		expiryTimer = setInterval(checkSessionExpiry, 15000);
-		document.addEventListener('visibilitychange', checkSessionExpiry);
-		window.addEventListener('focus', checkSessionExpiry);
+		checkSession();
+		expiryTimer = setInterval(checkSession, 30000);
+		document.addEventListener('visibilitychange', checkSession);
+		window.addEventListener('focus', checkSession);
 	});
 
 	onDestroy(() => {
 		if (expiryTimer) clearInterval(expiryTimer);
 		if (typeof document !== 'undefined') {
-			document.removeEventListener('visibilitychange', checkSessionExpiry);
+			document.removeEventListener('visibilitychange', checkSession);
 		}
 		if (typeof window !== 'undefined') {
-			window.removeEventListener('focus', checkSessionExpiry);
+			window.removeEventListener('focus', checkSession);
 		}
 	});
 </script>
