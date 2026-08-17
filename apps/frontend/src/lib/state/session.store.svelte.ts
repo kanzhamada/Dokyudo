@@ -1,3 +1,6 @@
+import { isJwtExpired } from '$lib/utils/jwt';
+import { sessionExpiryStore } from '$lib/state/session-expiry.store.svelte';
+
 const SESSION_KEY = 'dokyudo_session';
 
 interface SessionData {
@@ -9,7 +12,14 @@ interface SessionData {
 function createSessionStore() {
 	const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(SESSION_KEY) : null;
 
-	let session = $state<SessionData | null>(stored ? JSON.parse(stored) : null);
+	let session = $state<SessionData | null>(null);
+	if (stored) {
+		try {
+			session = JSON.parse(stored);
+		} catch {
+			// Corrupt session data — treat as no session without touching storage.
+		}
+	}
 
 	return {
 		get value() {
@@ -26,9 +36,16 @@ function createSessionStore() {
 			if (typeof localStorage !== 'undefined') {
 				localStorage.removeItem(SESSION_KEY);
 			}
+			sessionExpiryStore.clear();
 		},
 		getAccessToken(): string | null {
 			return session?.accessToken ?? null;
+		},
+		isExpired(): boolean {
+			return session ? isJwtExpired(session.accessToken) : true;
+		},
+		hasValidSession(): boolean {
+			return !!session && !isJwtExpired(session.accessToken);
 		}
 	};
 }

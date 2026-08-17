@@ -2,6 +2,7 @@ import { PUBLIC_API_URL } from '$env/static/public';
 import type { ApiErrorResponse, ApiResult } from '../types/api.types';
 import { dokyudoFetch } from '$lib/apiClient';
 import { sessionStore } from '$lib/state/session.store.svelte';
+import { sessionExpiryStore } from '$lib/state/session-expiry.store.svelte';
 
 interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
 	body?: Record<string, unknown> | FormData;
@@ -50,8 +51,15 @@ export async function apiRequest<T>(
 		}
 
 		const errorBody = (await response.json()) as ApiErrorResponse;
+
+		// A 401 on a request that carried our token means the session is no
+		// longer valid (typically an expired JWT) — surface the login dialog.
+		if (response.status === 401 && token) {
+			sessionExpiryStore.trigger();
+		}
+
 		return { ok: false, error: errorBody.error };
-	} catch (error) {
+	} catch {
 		// Network or parsing errors
 		return {
 			ok: false,

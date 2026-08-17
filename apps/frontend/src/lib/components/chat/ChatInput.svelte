@@ -515,7 +515,7 @@
 		<!-- Row 2: Input Controls -->
 		<div class="flex w-full flex-row items-end gap-3">
 			<!-- Attach Document / Sparkles Toggle -->
-			<div class="relative flex h-9 items-center">
+			<div class="relative flex h-9 shrink-0 items-center">
 				{#if showSparkleToggle}
 					<!-- Sparkles toggle (landing search bar — connects to the
 					     Documents page search later). State-only for now. -->
@@ -582,9 +582,12 @@
 					aria-multiline="true"
 					aria-placeholder={placeholder}
 					data-placeholder={placeholder}
-					class="mention-editor max-h-32 min-h-[36px] w-full overflow-y-auto bg-transparent py-1.5 text-base break-words whitespace-pre-wrap text-white caret-white outline-none selection:bg-white/15 md:text-sm"
+					class="mention-editor relative max-h-32 min-h-[36px] w-full overflow-y-auto bg-transparent py-1.5 text-base leading-6 break-words whitespace-pre-wrap text-white caret-white outline-none selection:bg-white/15 md:text-sm md:leading-6"
 					oninput={() => {
 						syncValue();
+						if (editorEl && (editorEl.innerHTML === '<br>' || editorEl.textContent === '')) {
+							editorEl.innerHTML = '';
+						}
 						updateMentionState();
 					}}
 					onkeydown={handleKeyDown}
@@ -596,7 +599,7 @@
 
 			<!-- Model Switcher Dropdown -->
 			{#if showModelSelector}
-				<div class="group/model relative flex h-9 items-center">
+				<div class="group/model relative flex h-9 shrink-0 items-center">
 					<DropdownMenu.Root
 						onOpenChange={(open) => {
 							if (!open) modelSearchQuery = '';
@@ -683,7 +686,7 @@
 
 			<!-- Send Button -->
 			<button
-				class="group/send flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
+				class="group/send flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
 				disabled={isUploading ||
 					(!isGenerating &&
 						mentionStrippedLength(value.trim()) === 0 &&
@@ -713,6 +716,14 @@
 		content: attr(data-placeholder);
 		color: rgba(255, 255, 255, 0.4);
 		pointer-events: none;
-		display: block;
+		position: absolute;
+		top: 6px;
+		left: 0;
+		right: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		line-height: 24px;
+		height: 24px;
 	}
 </style>
