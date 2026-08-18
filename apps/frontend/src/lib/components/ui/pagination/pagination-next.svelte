@@ -21,6 +21,5 @@
 	)}
 	{...restProps}
 >
-	<span class="cn-pagination-next-text hidden sm:block">Next</span>
 	<ChevronRightIcon data-icon="inline-end" />
 </PaginationPrimitive.NextButton>

@@ -1,5 +1,5 @@
 export class MobileHeaderState {
-	type = $state<'default' | 'error' | 'success'>('default');
+	type = $state<'default' | 'error' | 'success' | 'info'>('default');
 	title = $state<string | null>(null);
 	message = $state<string | null>(null);
 	private timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -22,6 +22,22 @@ export class MobileHeaderState {
 
 	showSuccess(title: string, msg: string, duration = 4000) {
 		this.type = 'success';
+		this.title = title;
+		this.message = msg;
+
+		if (this.timeoutId) {
+			clearTimeout(this.timeoutId);
+		}
+
+		this.timeoutId = setTimeout(() => {
+			this.type = 'default';
+			this.title = null;
+			this.message = null;
+		}, duration);
+	}
+
+	showInfo(title: string, msg: string, duration = 4000) {
+		this.type = 'info';
 		this.title = title;
 		this.message = msg;
 

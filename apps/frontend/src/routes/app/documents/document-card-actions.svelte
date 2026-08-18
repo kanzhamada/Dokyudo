@@ -25,13 +25,33 @@
 	let menuOpen = $state(false);
 	let menuPos = $state({ x: 0, y: 0 });
 
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Unsupported
+			}
+		}
+	}
+
 	function toggleMenu(e: MouseEvent) {
+		triggerHaptic(15);
 		if (menuOpen) {
 			menuOpen = false;
 			return;
 		}
 		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-		menuPos = { x: rect.right - 160, y: rect.bottom + 4 };
+		const width = 160;
+		const height = 210;
+		const padding = 12;
+		const maxX = Math.max(padding, window.innerWidth - width - padding);
+		const x = Math.min(Math.max(rect.right - width, padding), maxX);
+		const opensBelow = rect.bottom + 4 + height <= window.innerHeight - padding;
+		const y = opensBelow
+			? rect.bottom + 4
+			: Math.max(padding, rect.top - height - 4);
+		menuPos = { x, y };
 		menuOpen = true;
 	}
 
@@ -57,7 +77,7 @@
 					{...props}
 					variant="ghost"
 					size="icon"
-					class="relative size-8 cursor-pointer rounded-full text-white/60 transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white aria-expanded:bg-white/10 aria-expanded:text-white"
+					class="relative size-11 cursor-pointer select-none rounded-full text-white/60 transition-all duration-150 hover:bg-white/10 active:scale-[0.88] focus-visible:bg-white/10 focus-visible:text-white aria-expanded:bg-white/10 aria-expanded:text-white md:size-8"
 					onclick={toggleMenu}
 					aria-haspopup="menu"
 					aria-expanded={menuOpen}
@@ -91,9 +111,10 @@
 	>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
+			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
 			disabled={previewDisabled}
 			onclick={() => {
+				triggerHaptic(15);
 				closeMenu();
 				onPreview?.();
 			}}
@@ -106,8 +127,9 @@
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 			onclick={() => {
+				triggerHaptic(15);
 				closeMenu();
 				onDownload?.();
 			}}
@@ -117,8 +139,9 @@
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 			onclick={() => {
+				triggerHaptic(15);
 				closeMenu();
 				onRename?.();
 			}}
@@ -129,8 +152,9 @@
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
+			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15 md:min-h-0"
 			onclick={() => {
+				triggerHaptic(15);
 				closeMenu();
 				onDelete?.();
 			}}
@@ -140,3 +164,12 @@
 		</button>
 	</div>
 {/if}
+
+<style>
+	:global(button),
+	:global(a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		touch-action: manipulation;
+	}
+</style>

@@ -214,9 +214,20 @@
 	/** Cached speech voices — populated via the voiceschanged event (async load). */
 	let speechVoices: SpeechSynthesisVoice[] = $state([]);
 
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Unsupported
+			}
+		}
+	}
+
 	function openTitleMenu(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
+		triggerHaptic(15);
 		const rect = (e.currentTarget as HTMLElement)?.getBoundingClientRect();
 		if (rect) {
 			titleMenuPos = {
@@ -234,6 +245,7 @@
 	function openResponseMenu(e: MouseEvent, msgIndex: number) {
 		e.preventDefault();
 		e.stopPropagation();
+		triggerHaptic(15);
 		const rect = (e.currentTarget as HTMLElement)?.getBoundingClientRect();
 		if (rect) {
 			responseMenuPos = {
@@ -756,7 +768,7 @@
 			const result = await updateConversation(chatId, { title: trimmed });
 			if (result.ok) {
 				conversationCache.invalidate(chatId);
-				toast.success('Conversation title updated');
+				showSuccess('Conversation title updated', '');
 			} else {
 				console.error('[Chat Detail] Update title failed, reverting:', result.error);
 				conversationTitle = oldTitle;
@@ -792,7 +804,7 @@
 			if (result.ok) {
 				conversationCache.invalidate(targetChatId);
 				console.log('[Chat Detail] Pin toggle success:', result.data);
-				toast.success(newPinnedState ? 'Conversation pinned' : 'Conversation unpinned');
+				showSuccess(newPinnedState ? 'Conversation pinned' : 'Conversation unpinned', '');
 			} else {
 				console.error('[Chat Detail] Pin toggle failed, reverting:', result.error);
 				isPinned = !newPinnedState;
@@ -820,7 +832,7 @@
 
 			conversationsStore.remove(chatId);
 			isDeleteConversationDialogOpen = false;
-			toast.success('Conversation deleted');
+			showSuccess('Conversation deleted', '');
 			await goto('/app/chat');
 		} catch (err) {
 			console.error('[Chat Detail] Failed to delete conversation:', err);
@@ -1055,6 +1067,22 @@
 			mobileHeaderState.showError(msg);
 		} else {
 			toast.error('Error', { description: msg });
+		}
+	}
+
+	function showSuccess(title: string, msg: string) {
+		if (window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showSuccess(title, msg);
+		} else {
+			toast.success(title, { description: msg });
+		}
+	}
+
+	function showInfo(title: string, msg: string) {
+		if (window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showInfo(title, msg);
+		} else {
+			toast.info(title, { description: msg });
 		}
 	}
 
@@ -1734,6 +1762,7 @@
 
 	function browseVariant(msg: ChatMessage, delta: number) {
 		if (isGenerating) return;
+		triggerHaptic(15);
 		const max = msg.variants?.length ?? 0;
 		msg.variantIndex = Math.min(max, Math.max(0, (msg.variantIndex ?? 0) + delta));
 	}
@@ -1745,6 +1774,7 @@
 	}
 
 	async function beginEditMessage(msg: ChatMessage) {
+		triggerHaptic(15);
 		editingMessageId = msg.id;
 		editingMessageValue = msg.content;
 		await tick();
@@ -1759,6 +1789,7 @@
 	function saveEditMessage(msg: ChatMessage) {
 		const editedPrompt = editingMessageValue.trim();
 		if (mentionStrippedLength(editedPrompt) === 0 || isGenerating) return;
+		triggerHaptic(20);
 		const msgIndex = messages.indexOf(msg);
 		if (msgIndex !== -1) {
 			// Remove the edited question and everything after it — the turn is
@@ -1781,10 +1812,11 @@
 	}
 
 	function copyToClipboard(text: string, msgId: string) {
+		triggerHaptic(25);
 		const cleanText = text.replace(/\s*\[Doc [^\]]+\]/gi, '').trim();
 		navigator.clipboard.writeText(cleanText);
 		copiedMessageId = msgId;
-		toast.success('Copied to clipboard');
+		showSuccess('Copied to clipboard', '');
 		setTimeout(() => {
 			if (copiedMessageId === msgId) copiedMessageId = null;
 		}, 2000);
@@ -1792,6 +1824,7 @@
 
 	async function toggleFeedback(msg: ChatMessage, rating: 'good' | 'bad') {
 		if (!msg.turnId) return;
+		triggerHaptic(20);
 		const prev = msg.feedback ?? null;
 		// Clicking the active rating again clears it.
 		const next = prev === rating ? null : rating;
@@ -1799,11 +1832,11 @@
 		msg.feedback = next;
 
 		if (next === 'good') {
-			toast.success('Feedback recorded: Helpful response');
+			showSuccess('Feedback recorded', 'Helpful response');
 		} else if (next === 'bad') {
-			toast.info('Feedback recorded: Needs improvement');
+			showInfo('Feedback recorded', 'Needs improvement');
 		} else {
-			toast.info('Feedback cleared');
+			showInfo('Feedback cleared', '');
 		}
 
 		console.log('[Chat Detail] Updating turn feedback:', { turnId: msg.turnId, rating: next });
@@ -1828,7 +1861,7 @@
 		}
 		// Push the new branch to the top of the sidebar before navigating.
 		conversationsStore.addOrUpdate(result.data.id, result.data.title);
-		toast.success('Branch created');
+		showSuccess('Branch created', '');
 		await goto(`/app/chat/${result.data.id}`);
 	}
 
@@ -1952,9 +1985,10 @@
 		// Firefox on Linux often has zero TTS voices — suggest Chrome once.
 		if (!ttsChromeHintShown && isFirefoxOnLinux()) {
 			ttsChromeHintShown = true;
-			toast.info('Use Chrome for a better read-aloud experience', {
-				description: 'Firefox on Linux often has no speech voices installed.'
-			});
+			showInfo(
+				'Use Chrome for a better read-aloud experience',
+				'Firefox on Linux often has no speech voices installed.'
+			);
 		}
 		console.log(
 			'[ReadAloud] state: speaking =',
@@ -1971,7 +2005,7 @@
 		const text = textForSpeech(msg.content);
 		console.log('[ReadAloud] text length =', text.length, '| raw length =', msg.content.length);
 		if (!text) {
-			toast.info('Nothing to read aloud');
+			showInfo('Nothing to read aloud', '');
 			return;
 		}
 		const lang = detectSpeechLang(text);
@@ -2068,7 +2102,7 @@
 			conversationCache.invalidate(chatId);
 			isDeleteResponseDialogOpen = false;
 			targetDeleteMessageIndex = null;
-			toast.success('Response deleted');
+			showSuccess('Response deleted', '');
 		} catch (err) {
 			console.error('[Chat Detail] Failed to delete turn:', err);
 			toast.error('Failed to delete response');
@@ -2092,7 +2126,7 @@
 <div class="relative flex h-full w-full overflow-hidden bg-[#1F1E1D] font-sans text-white">
 	{#if citationPreview}
 		<!-- Mobile: full-screen preview -->
-		<div class="h-full w-full md:hidden">
+		<div class="fixed inset-0 z-[60] h-full w-full bg-[#1F1E1D] md:hidden">
 			<PdfPreviewPanel
 				src={citationPreview.src}
 				name={citationPreview.name}
@@ -2341,8 +2375,11 @@
 									<button
 										{...props}
 										type="button"
-										class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-										onclick={() => goto('/app/chat')}
+										class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.94]"
+										onclick={() => {
+											triggerHaptic(15);
+											goto('/app/chat');
+										}}
 									>
 										<Plus class="size-4" />
 										<span>New chat</span>
@@ -2367,7 +2404,7 @@
 										<button
 											{...props}
 											type="button"
-											class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+											class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.97]"
 											onclick={openTitleMenu}
 										>
 											{#if isPinned}
@@ -2392,7 +2429,7 @@
 					{:else}
 						<button
 							type="button"
-							class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+							class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.97]"
 							onclick={openTitleMenu}
 						>
 							{#if isPinned}
@@ -2414,8 +2451,11 @@
 									<button
 										{...props}
 										type="button"
-										class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-										onclick={shareConversation}
+										class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.90] disabled:cursor-not-allowed disabled:opacity-40"
+										onclick={() => {
+											triggerHaptic(15);
+											shareConversation();
+										}}
 										disabled={isShareDisabled}
 										aria-label="Share conversation"
 									>
@@ -2442,7 +2482,8 @@
 													{...tooltipProps}
 													{...dropdownProps}
 													type="button"
-													class="relative flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+													onclick={() => triggerHaptic(15)}
+													class="relative flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.90]"
 													aria-label="Conversation references"
 												>
 													<MxIcon name="document-outline" class="size-4" />
@@ -2480,9 +2521,11 @@
 							{:else}
 								{#each conversationReferences as reference (reference.id)}
 									<DropdownMenu.Item
-										class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-xs text-white/75 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-										onclick={() =>
-											openCitationPreview(reference.id, reference.name, reference.pages ?? [])}
+										class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-xs text-white/75 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98]"
+										onclick={() => {
+											triggerHaptic(15);
+											openCitationPreview(reference.id, reference.name, reference.pages ?? []);
+										}}
 									>
 										<MxIcon name="document-outline" class="size-3.5 shrink-0 text-white/50" />
 										<span class="min-w-0 flex-1 truncate">{reference.name}</span>
@@ -2512,7 +2555,7 @@
 					{#each conversationCheckpoints as checkpoint (checkpoint.id)}
 						<button
 							type="button"
-							class="h-0.5 shrink-0 cursor-pointer rounded-full transition-all duration-300 {checkpoint.id ===
+							class="h-0.5 shrink-0 cursor-pointer rounded-full transition-all duration-300 select-none active:scale-95 {checkpoint.id ===
 							currentCheckpointId
 								? 'w-4.5 bg-[#DB8F5E]'
 								: 'w-3 bg-white/25 hover:w-4.5 hover:bg-white/50'}"
@@ -2530,7 +2573,7 @@
 						{#each conversationCheckpoints as checkpoint (checkpoint.id)}
 							<button
 								type="button"
-								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-white/10 {checkpoint.id ===
+								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-all duration-150 select-none hover:bg-white/10 active:scale-[0.98] {checkpoint.id ===
 								currentCheckpointId
 									? 'text-[#E59C6D]'
 									: 'text-white/55'}"
@@ -2593,7 +2636,7 @@
 										></textarea>
 										<div class="mt-2 flex items-center justify-between gap-2">
 											<div
-												class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] {mentionStrippedLength(
+												class="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] select-none {mentionStrippedLength(
 													editingMessageValue
 												) >= 690
 													? 'text-red-400'
@@ -2611,12 +2654,12 @@
 												<Button
 													variant="ghost"
 													size="sm"
-													class="cursor-pointer text-xs text-white/70 hover:bg-white/10 hover:text-white focus:outline-none"
+													class="cursor-pointer text-xs text-white/70 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.95]"
 													onclick={cancelEditMessage}>Cancel</Button
 												>
 												<Button
 													size="sm"
-													class="cursor-pointer border border-white/20 bg-white/15 text-xs font-medium text-white hover:bg-white/25 hover:text-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+													class="cursor-pointer border border-white/20 bg-white/15 text-xs font-medium text-white transition-all duration-150 select-none hover:bg-white/25 hover:text-white focus:outline-none active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-40"
 													disabled={mentionStrippedLength(editingMessageValue.trim()) === 0}
 													onclick={() => saveEditMessage(msg)}>Save &amp; resubmit</Button
 												>
@@ -2628,10 +2671,12 @@
 												{#if seg.type === 'mention' && seg.id}
 													<button
 														type="button"
-														class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 align-baseline text-[11px] leading-none font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/20 hover:text-white"
+														class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 align-baseline text-[11px] leading-none font-medium text-white/80 transition-all duration-150 select-none hover:border-white/30 hover:bg-white/20 hover:text-white active:scale-[0.95]"
 														title="Open {seg.title} in PDF viewer"
-														onclick={() =>
-															openCitationPreview(seg.id!, seg.title ?? 'Document', [])}
+														onclick={() => {
+															triggerHaptic(15);
+															openCitationPreview(seg.id!, seg.title ?? 'Document', []);
+														}}
 													>
 														<MxIcon name="document-outline" class="size-3 text-white/60" />
 														{seg.title}
@@ -2655,7 +2700,7 @@
 															{...props}
 															variant="ghost"
 															size="icon"
-															class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+															class="h-6 w-6 cursor-pointer text-white/40 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.88]"
 															onclick={() => copyToClipboard(msg.content, msg.id)}
 															aria-label="Copy question"
 														>
@@ -2683,7 +2728,7 @@
 																{...props}
 																variant="ghost"
 																size="icon"
-																class="h-6 w-6 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+																class="h-6 w-6 cursor-pointer text-white/40 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.88]"
 																onclick={() => beginEditMessage(msg)}
 																aria-label="Edit question"
 															>
@@ -3065,7 +3110,7 @@
 										<span class="text-xs font-medium text-white/60">Reading aloud…</span>
 										<button
 											type="button"
-											class="flex cursor-pointer items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/80 transition-colors hover:bg-white/20 hover:text-white focus:outline-none"
+											class="flex cursor-pointer items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/80 transition-all duration-150 select-none hover:bg-white/20 hover:text-white focus:outline-none active:scale-95"
 											onclick={stopSpeaking}
 											aria-label="Stop reading"
 										>
@@ -3097,7 +3142,7 @@
 																{...props}
 																variant="ghost"
 																size="icon"
-																class="h-7 w-7 cursor-pointer text-white/40 hover:bg-white/10 hover:text-white"
+																class="h-7 w-7 cursor-pointer text-white/40 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.88]"
 																onclick={() => copyToClipboard(displayedContentOf(msg), msg.id)}
 																aria-label="Copy response"
 															>
@@ -3125,7 +3170,8 @@
 																{...props}
 																variant="ghost"
 																size="icon"
-																class="h-7 w-7 cursor-pointer {msg.feedback === 'good'
+																class="h-7 w-7 cursor-pointer transition-all duration-150 select-none active:scale-[0.88] {msg.feedback ===
+																'good'
 																	? 'bg-white/10 text-white hover:bg-white/20 hover:text-white'
 																	: 'text-white/40 hover:bg-white/10 hover:text-white'}"
 																onclick={() => toggleFeedback(msg, 'good')}
@@ -3151,7 +3197,8 @@
 																{...props}
 																variant="ghost"
 																size="icon"
-																class="h-7 w-7 cursor-pointer {msg.feedback === 'bad'
+																class="h-7 w-7 cursor-pointer transition-all duration-150 select-none active:scale-[0.88] {msg.feedback ===
+																'bad'
 																	? 'bg-white/10 text-white hover:bg-white/20 hover:text-white'
 																	: 'text-white/40 hover:bg-white/10 hover:text-white'}"
 																onclick={() => toggleFeedback(msg, 'bad')}
@@ -3181,7 +3228,7 @@
 																				{...tooltipProps}
 																				{...dropdownProps}
 																				type="button"
-																				class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white"
+																				class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.88]"
 																				aria-label="Retry response"
 																			>
 																				<RotateCw class="size-3.5" />
@@ -3202,8 +3249,11 @@
 														class="w-36 border-white/15 bg-[#232323] p-1 text-white"
 													>
 														<DropdownMenu.Item
-															class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none"
-															onclick={() => retryMessage(msg, messages[msgIndex - 1])}
+															class="flex cursor-pointer items-center gap-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none active:scale-[0.98]"
+															onclick={() => {
+																triggerHaptic(20);
+																retryMessage(msg, messages[msgIndex - 1]);
+															}}
 														>
 															<RotateCw class="size-3.5 text-white/70" />
 															<span>Try Again</span>
@@ -3219,7 +3269,7 @@
 															<button
 																{...props}
 																type="button"
-																class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+																class="flex size-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.88]"
 																onclick={(e) => openResponseMenu(e, msgIndex)}
 																aria-label="More options"
 															>
@@ -3237,11 +3287,11 @@
 										</div>
 										{#if msg.variants && msg.variants.length > 0}
 											<div
-												class="inline-flex items-center gap-0.5 rounded-full border border-white/10 bg-white/5 px-1 py-0.5 text-[11px] font-medium text-white/50"
+												class="inline-flex items-center gap-0.5 rounded-full border border-white/10 bg-white/5 px-1 py-0.5 text-[11px] font-medium text-white/50 select-none"
 											>
 												<button
 													type="button"
-													class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+													class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:cursor-not-allowed disabled:opacity-30"
 													onclick={() => browseVariant(msg, -1)}
 													disabled={isGenerating || (msg.variantIndex ?? 0) <= 0}
 													aria-label="Previous response"
@@ -3253,7 +3303,7 @@
 												>
 												<button
 													type="button"
-													class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+													class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:cursor-not-allowed disabled:opacity-30"
 													onclick={() => browseVariant(msg, 1)}
 													disabled={isGenerating ||
 														(msg.variantIndex ?? 0) >= (msg.variants?.length ?? 0)}
@@ -3425,8 +3475,9 @@
 	>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98]"
 			onclick={() => {
+				triggerHaptic(15);
 				isTitleMenuOpen = false;
 				openTitleEditDialog();
 			}}
@@ -3436,8 +3487,11 @@
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-			onclick={togglePinConversation}
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98]"
+			onclick={() => {
+				triggerHaptic(15);
+				togglePinConversation();
+			}}
 		>
 			{#if isPinned}
 				<MxIcon name="pin-bold" class="size-3.5 text-white/60" />
@@ -3450,8 +3504,9 @@
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
 			onclick={() => {
+				triggerHaptic(15);
 				isTitleMenuOpen = false;
 				isDeleteConversationDialogOpen = true;
 			}}
@@ -3479,16 +3534,20 @@
 	>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-			onclick={() => branchFromMessage(activeResponseMenuMsgIndex!)}
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98]"
+			onclick={() => {
+				triggerHaptic(15);
+				branchFromMessage(activeResponseMenuMsgIndex!);
+			}}
 		>
 			<GitBranch class="size-3.5 text-white/70" />
 			<span>Branch in new chat</span>
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98]"
 			onclick={() => {
+				triggerHaptic(15);
 				const msgIndex = activeResponseMenuMsgIndex;
 				closeResponseMenu();
 				if (msgIndex !== null) toggleReadAloud(msgIndex);
@@ -3504,9 +3563,10 @@
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
 			disabled={messages[activeResponseMenuMsgIndex]?.isStreaming}
 			onclick={() => {
+				triggerHaptic(15);
 				if (activeResponseMenuMsgIndex !== null) {
 					openDeleteResponseDialog(activeResponseMenuMsgIndex);
 				}
@@ -3564,5 +3624,12 @@
 		border-bottom: none !important;
 		margin-top: 1.25rem;
 		margin-bottom: 1.25rem;
+	}
+
+	:global(button),
+	:global(a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		touch-action: manipulation;
 	}
 </style>

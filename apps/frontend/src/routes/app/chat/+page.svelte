@@ -157,6 +157,16 @@
 		}
 	}
 
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Unsupported
+			}
+		}
+	}
+
 	function openConfigureDialog() {
 		openAccountPanel('byok');
 	}
@@ -381,7 +391,8 @@
 										<Tabs.Trigger
 											{...props}
 											value="chat"
-											class="flex cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 transition-all
+											onclick={() => triggerHaptic(20)}
+											class="flex cursor-pointer select-none items-center gap-2 rounded-full px-4 py-1.5 transition-all duration-150 active:scale-[0.96]
 												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-[#B8B5B5]/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
 												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-[#232323]/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-[#B8B5B5]/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
 										>
@@ -410,7 +421,8 @@
 										<Tabs.Trigger
 											{...props}
 											value="search"
-											class="flex cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 transition-all
+											onclick={() => triggerHaptic(20)}
+											class="flex cursor-pointer select-none items-center gap-2 rounded-full px-4 py-1.5 transition-all duration-150 active:scale-[0.96]
 												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-[#B8B5B5]/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
 												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-[#232323]/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-[#B8B5B5]/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
 										>
@@ -439,7 +451,7 @@
 			<div class="flex items-center gap-2 @3xl:gap-3">
 				<!-- Character Count Indicator Capsule -->
 				<div
-					class="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {mentionStrippedLength(
+					class="flex shrink-0 select-none items-center gap-1.5 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {mentionStrippedLength(
 						inputValue
 					) >= 690
 						? 'text-red-400'
@@ -454,7 +466,7 @@
 
 				<!-- Usage Info Capsule (Desktop) -->
 				<div
-					class="hidden shrink-0 items-center gap-4 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-4 py-1.5 text-xs text-white/[0.40] backdrop-blur-[42px] transition-colors @3xl:flex"
+					class="hidden shrink-0 select-none items-center gap-4 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-4 py-1.5 text-xs text-white/[0.40] backdrop-blur-[42px] transition-colors @3xl:flex"
 				>
 					{@render desktopUsageMetric(
 						'document-upload-outline',
@@ -490,7 +502,8 @@
 				<div class="flex shrink-0 items-center @3xl:hidden">
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger
-							class="flex size-8 cursor-pointer items-center justify-center rounded-full border border-white/[0.16] bg-[#232323]/[0.40] text-white/[0.40] backdrop-blur-[42px] transition-colors hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] focus:outline-none"
+							onclick={() => triggerHaptic(15)}
+							class="flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-white/[0.16] bg-[#232323]/[0.40] text-white/[0.40] backdrop-blur-[42px] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-[0.90] focus:outline-none"
 						>
 							<MxIcon name="diagram-up-bold" class="size-4" />
 						</DropdownMenu.Trigger>
@@ -536,3 +549,12 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	:global(button),
+	:global(a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		touch-action: manipulation;
+	}
+</style>

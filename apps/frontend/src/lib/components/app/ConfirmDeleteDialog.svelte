@@ -25,7 +25,18 @@
 		onClose
 	}: Props = $props();
 
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Unsupported
+			}
+		}
+	}
+
 	function handleClose() {
+		triggerHaptic(15);
 		open = false;
 		onClose?.();
 	}
@@ -46,16 +57,19 @@
 		<Dialog.Footer class="mt-1 flex gap-2 sm:justify-end">
 			<Button
 				variant="ghost"
-				class="cursor-pointer text-white/60 hover:bg-white/10 hover:text-white"
+				class="cursor-pointer select-none text-white/60 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.96]"
 				disabled={isDeleting}
 				onclick={handleClose}
 			>
 				Cancel
 			</Button>
 			<Button
-				class="cursor-pointer bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+				class="cursor-pointer select-none bg-red-500 text-white transition-all duration-150 hover:bg-red-600 active:scale-[0.96] disabled:opacity-50"
 				disabled={isDeleting}
-				onclick={onConfirm}
+				onclick={() => {
+					triggerHaptic(20);
+					onConfirm();
+				}}
 			>
 				{#if isDeleting}
 					<Spinner class="mr-2" />
@@ -67,3 +81,12 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+<style>
+	:global(button),
+	:global(a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		touch-action: manipulation;
+	}
+</style>

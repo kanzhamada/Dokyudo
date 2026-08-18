@@ -20,6 +20,16 @@
 		onSuccess?: () => void;
 	} = $props();
 
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Unsupported
+			}
+		}
+	}
+
 	interface UploadItem {
 		id: string;
 		file: File;
@@ -536,8 +546,11 @@
 				<p class="mb-5 text-sm text-[#767676]">Or choose another option:</p>
 
 				<Button
-					onclick={() => fileInputEl?.click()}
-					class="relative cursor-pointer overflow-hidden rounded-[8px] border-t border-white/20 bg-[#302F2F] px-8 font-medium text-white shadow-[0_2px_4px_rgba(0,0,0,0.4)] hover:bg-[#404040]"
+					onclick={() => {
+						triggerHaptic(15);
+						fileInputEl?.click();
+					}}
+					class="relative cursor-pointer select-none overflow-hidden rounded-[8px] border-t border-white/20 bg-[#302F2F] px-8 font-medium text-white shadow-[0_2px_4px_rgba(0,0,0,0.4)] transition-all duration-150 hover:bg-[#404040] active:scale-[0.96]"
 				>
 					Browse files...
 				</Button>
@@ -575,8 +588,11 @@
 														<button
 															type="button"
 															{...props}
-															onclick={() => removeItem(item)}
-															class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+															onclick={() => {
+																triggerHaptic(15);
+																removeItem(item);
+															}}
+															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-white active:scale-90"
 														>
 															<XIcon class="size-5" />
 														</button>
@@ -620,8 +636,11 @@
 														<button
 															type="button"
 															{...props}
-															onclick={() => removeItem(item)}
-															class="cursor-pointer text-[#767676] transition-colors hover:text-[#ef4444]"
+															onclick={() => {
+																triggerHaptic(15);
+																removeItem(item);
+															}}
+															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-[#ef4444] active:scale-90"
 														>
 															<MxIcon name="trash-bin-minimalistic-outline" class="size-5" />
 														</button>
@@ -666,8 +685,11 @@
 														<button
 															type="button"
 															{...props}
-															onclick={() => retryItem(item)}
-															class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+															onclick={() => {
+																triggerHaptic(15);
+																retryItem(item);
+															}}
+															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-white active:scale-90"
 														>
 															<RotateCcwIcon class="size-5" />
 														</button>
@@ -687,8 +709,11 @@
 														<button
 															type="button"
 															{...props}
-															onclick={() => removeItem(item)}
-															class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+															onclick={() => {
+																triggerHaptic(15);
+																removeItem(item);
+															}}
+															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-white active:scale-90"
 														>
 															<XIcon class="size-5" />
 														</button>
@@ -743,8 +768,11 @@
 														<button
 															type="button"
 															{...props}
-															onclick={() => removeItem(item)}
-															class="cursor-pointer text-[#767676] transition-colors hover:text-white"
+															onclick={() => {
+																triggerHaptic(15);
+																removeItem(item);
+															}}
+															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-white active:scale-90"
 														>
 															<XIcon class="size-5" />
 														</button>
@@ -794,7 +822,8 @@
 		>
 			<button
 				type="button"
-				class="flex cursor-pointer items-center gap-2 text-[#767676] transition-colors hover:text-white"
+				onclick={() => triggerHaptic(15)}
+				class="flex cursor-pointer select-none items-center gap-2 text-[#767676] transition-all duration-150 hover:text-white active:scale-[0.96]"
 			>
 				<div class="flex h-5 w-5 items-center justify-center rounded-full border border-current">
 					<span class="text-xs font-bold">?</span>
@@ -808,9 +837,12 @@
 					<Button
 						type="button"
 						variant="ghost"
-						onclick={retryAllFailed}
+						onclick={() => {
+							triggerHaptic(15);
+							retryAllFailed();
+						}}
 						disabled={isAnyUploading}
-						class="cursor-pointer border border-[#DB8F5E]/40 bg-[#DB8F5E]/10 text-sm font-medium text-[#DB8F5E] hover:bg-[#DB8F5E]/20 hover:text-white disabled:opacity-40"
+						class="cursor-pointer select-none border border-[#DB8F5E]/40 bg-[#DB8F5E]/10 text-sm font-medium text-[#DB8F5E] transition-all duration-150 hover:bg-[#DB8F5E]/20 hover:text-white active:scale-[0.96] disabled:opacity-40"
 					>
 						<RotateCcwIcon class="mr-2 size-4" />
 						Retry Failed ({failedCount})
@@ -822,9 +854,12 @@
 					<Button
 						type="button"
 						variant="ghost"
-						onclick={cancelAllBackendUploads}
+						onclick={() => {
+							triggerHaptic(15);
+							cancelAllBackendUploads();
+						}}
 						disabled={isCleaningUp}
-						class="cursor-pointer border border-red-500/30 bg-red-950/30 text-sm font-medium text-red-400 hover:bg-red-900/50 hover:text-red-300 disabled:opacity-40"
+						class="cursor-pointer select-none border border-red-500/30 bg-red-950/30 text-sm font-medium text-red-400 transition-all duration-150 hover:bg-red-900/50 hover:text-red-300 active:scale-[0.96] disabled:opacity-40"
 					>
 						{#if isCleaningUp}
 							<Loader2Icon class="mr-2 size-4 animate-spin" />
@@ -838,9 +873,12 @@
 					<Button
 						type="button"
 						variant="ghost"
-						onclick={discardLocalStagedFiles}
+						onclick={() => {
+							triggerHaptic(15);
+							discardLocalStagedFiles();
+						}}
 						disabled={uploadFiles.length === 0}
-						class="cursor-pointer text-sm font-medium text-white hover:bg-white/10 disabled:opacity-40"
+						class="cursor-pointer select-none text-sm font-medium text-white transition-all duration-150 hover:bg-white/10 active:scale-[0.96] disabled:opacity-40"
 					>
 						Discard All
 					</Button>
@@ -854,9 +892,16 @@
 									<Button
 										{...props}
 										type="button"
-										onclick={hasAllSucceeded ? finishAndClose : startBatchUpload}
+										onclick={() => {
+											triggerHaptic(20);
+											if (hasAllSucceeded) {
+												finishAndClose();
+											} else {
+												startBatchUpload();
+											}
+										}}
 										disabled={uploadFiles.length === 0 || isAnyUploading || hasFailedUploads}
-										class="relative cursor-pointer bg-[#DB8F5E] font-medium text-white hover:bg-[#C47D4E] disabled:bg-[#DB8F5E]/40 disabled:text-white/50 disabled:opacity-100"
+										class="relative cursor-pointer select-none bg-[#DB8F5E] font-medium text-white transition-all duration-150 hover:bg-[#C47D4E] active:scale-[0.96] disabled:bg-[#DB8F5E]/40 disabled:text-white/50 disabled:opacity-100"
 									>
 										{#if isAnyUploading}
 											<Loader2Icon class="mr-2 size-4 animate-spin" />
@@ -893,3 +938,12 @@
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
+
+<style>
+	:global(button),
+	:global(a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		touch-action: manipulation;
+	}
+</style>

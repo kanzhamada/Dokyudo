@@ -20,6 +20,66 @@
 
 	let { src, name, initialPages = [], onclose }: Props = $props();
 
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Unsupported
+			}
+		}
+	}
+
+	/* ── Mobile Swipe-Down to Dismiss ── */
+	let touchStartY = $state(0);
+	let touchCurrentY = $state(0);
+	let isDragging = $state(false);
+	let dragOffsetY = $state(0);
+	let isClosing = $state(false);
+
+	function handleTouchStart(e: TouchEvent) {
+		if (typeof window !== 'undefined' && window.innerWidth >= 768) return;
+		if (!onclose) return;
+		if (e.touches.length !== 1) return;
+		const target = e.target as HTMLElement;
+		if (target.closest('button') || target.closest('a') || target.closest('input')) return;
+
+		touchStartY = e.touches[0].clientY;
+		touchCurrentY = touchStartY;
+		isDragging = true;
+		dragOffsetY = 0;
+	}
+
+	function handleTouchMove(e: TouchEvent) {
+		if (!isDragging) return;
+		touchCurrentY = e.touches[0].clientY;
+		const deltaY = touchCurrentY - touchStartY;
+		if (deltaY > 0) {
+			dragOffsetY = deltaY;
+		} else {
+			dragOffsetY = deltaY * 0.15;
+		}
+	}
+
+	function handleTouchEnd() {
+		if (!isDragging) return;
+		isDragging = false;
+
+		const deltaY = touchCurrentY - touchStartY;
+		const dismissThreshold = 80;
+
+		if (deltaY > dismissThreshold) {
+			triggerHaptic(20);
+			isClosing = true;
+			dragOffsetY = typeof window !== 'undefined' ? window.innerHeight : 600;
+			setTimeout(() => {
+				onclose?.();
+			}, 220);
+		} else {
+			dragOffsetY = 0;
+		}
+	}
+
 	// Scroll plugin reference — captured once on viewer ready
 	let scrollCap: any = null;
 	let isFirstLayoutReady = true;
@@ -109,11 +169,35 @@
 -->
 <div
 	class="pdf-panel relative flex h-full w-full flex-col overflow-hidden bg-dk-bg p-3 sm:p-4 md:p-5"
+	style={dragOffsetY !== 0 || isClosing
+		? `transform: translateY(${Math.max(0, dragOffsetY)}px); transition: ${isDragging ? 'none' : 'transform 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 220ms ease'}; opacity: ${isClosing ? 0 : Math.max(0.4, 1 - dragOffsetY / 500)};`
+		: ''}
 >
-	<div class="sheet-handle md:hidden" aria-hidden="true"></div>
+	<!-- Sheet Handle & Swipe-Down Zone for Mobile -->
+	<div
+		class="sheet-handle-zone md:hidden"
+		ontouchstart={handleTouchStart}
+		ontouchmove={handleTouchMove}
+		ontouchend={handleTouchEnd}
+		ontouchcancel={handleTouchEnd}
+		role="button"
+		tabindex="0"
+		aria-label="Swipe down to close"
+	>
+		<div
+			class="sheet-handle {isDragging && dragOffsetY > 8 ? 'sheet-handle-active' : ''}"
+			aria-hidden="true"
+		></div>
+	</div>
 
 	<!-- Header: document name + close button -->
-	<div class="panel-header relative mt-10 mb-3 flex items-start justify-between gap-3 md:mt-0">
+	<div
+		class="panel-header relative mt-6 mb-3 flex items-start justify-between gap-3 md:mt-0"
+		ontouchstart={handleTouchStart}
+		ontouchmove={handleTouchMove}
+		ontouchend={handleTouchEnd}
+		ontouchcancel={handleTouchEnd}
+	>
 		<div class="min-w-0 flex-1">
 			<div class="flex min-w-0 items-start gap-2">
 				<h3
@@ -145,8 +229,11 @@
 							<button
 								{...props}
 								type="button"
-								class="close-button cursor-pointer rounded-full text-dk-muted-gray hover:-translate-y-px hover:bg-white/10 hover:text-dk-light active:translate-y-0"
-								onclick={onclose}
+								class="close-button cursor-pointer select-none rounded-full text-dk-muted-gray transition-all duration-150 hover:bg-white/10 hover:text-dk-light active:scale-90"
+								onclick={() => {
+									triggerHaptic(15);
+									onclose?.();
+								}}
 								aria-label="Close document preview"
 							>
 								<XIcon class="size-4" strokeWidth={1.8} />
@@ -232,9 +319,6 @@
 		line-height: 1;
 		letter-spacing: 0.08em;
 		white-space: nowrap;
-	}
-
-	.status-chip {
 		color: rgba(244, 230, 212, 0.52);
 	}
 
@@ -255,15 +339,35 @@
 			transform 500ms cubic-bezier(0.32, 0.72, 0, 1);
 	}
 
-	.sheet-handle {
+	.sheet-handle-zone {
 		position: absolute;
-		top: 0.5rem;
-		left: 50%;
-		height: 0.25rem;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 2.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 20;
+		cursor: grab;
+		touch-action: none;
+	}
+
+	.sheet-handle {
+		height: 0.28rem;
 		width: 2.5rem;
-		transform: translateX(-50%);
 		border-radius: 999px;
-		background: rgba(244, 230, 212, 0.22);
+		background: rgba(244, 230, 212, 0.25);
+		transition:
+			background-color 200ms cubic-bezier(0.32, 0.72, 0, 1),
+			width 200ms cubic-bezier(0.32, 0.72, 0, 1),
+			transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
+	}
+
+	.sheet-handle-active {
+		background: rgba(219, 143, 94, 0.85);
+		width: 3.25rem;
+		transform: scale(1.05);
 	}
 
 	@keyframes panel-enter {
@@ -298,5 +402,12 @@
 		:global(.close-button) {
 			transition: none;
 		}
+	}
+
+	:global(button),
+	:global(a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		touch-action: manipulation;
 	}
 </style>

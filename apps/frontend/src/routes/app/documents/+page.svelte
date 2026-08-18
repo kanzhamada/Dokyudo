@@ -33,6 +33,8 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
+	import ChevronLastIcon from '@lucide/svelte/icons/chevron-last';
 	import CheckSquareIcon from '@lucide/svelte/icons/check-square';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
@@ -70,6 +72,16 @@
 	import PdfPreviewPanel from '$lib/components/app/PdfPreviewPanel.svelte';
 
 	let { data }: { data: PageData } = $props();
+
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Unsupported
+			}
+		}
+	}
 
 	function showError(msg: string) {
 		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
@@ -561,6 +573,7 @@
 	}
 
 	function toggleSelectDoc(id: string) {
+		triggerHaptic(15);
 		if (selectedDocIds.includes(id)) {
 			selectedDocIds = selectedDocIds.filter((item) => item !== id);
 			deselectedCardIds = [...deselectedCardIds.filter((item) => item !== id), id];
@@ -573,16 +586,19 @@
 	}
 
 	function selectAllPageDocuments() {
+		triggerHaptic(15);
 		const currentPageIds = table.getRowModel().rows.map((row) => (row.original as Document).id);
 		const combined = new Set([...selectedDocIds, ...currentPageIds]);
 		selectedDocIds = Array.from(combined);
 	}
 
 	function selectAllTotalDocuments() {
+		triggerHaptic(15);
 		selectedDocIds = documentsList.map((d) => d.id);
 	}
 
 	function clearSelection() {
+		triggerHaptic(15);
 		selectedDocIds = [];
 	}
 
@@ -801,10 +817,17 @@
 
 	/* ── Sort handler ── */
 	function handleSort(columnId: string) {
+		triggerHaptic(15);
 		const col = table.getColumn(columnId);
 		if (col) {
 			col.toggleSorting(col.getIsSorted() === 'asc');
 		}
+	}
+
+	function goToPage(targetPage: number) {
+		triggerHaptic(15);
+		uiPage = targetPage;
+		keepDocumentsAtBottom();
 	}
 
 	/* ── Floating dropdown state (from scratch, AppSidebar pattern) ── */
@@ -821,42 +844,63 @@
 		selectMenuOpen = false;
 	}
 
-	function positionMenu(e: MouseEvent, width: number) {
+	function teleport(node: HTMLElement) {
+		document.body.appendChild(node);
+		return {
+			destroy() {
+				node.remove();
+			}
+		};
+	}
+
+	function positionMenu(e: MouseEvent, width: number, height: number) {
 		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-		return { x: rect.right - width, y: rect.bottom + 4 };
+		const padding = 12;
+		const maxX = Math.max(padding, window.innerWidth - width - padding);
+		const x = Math.min(Math.max(rect.right - width, padding), maxX);
+		const opensBelow = rect.bottom + 4 + height <= window.innerHeight - padding;
+		const y = opensBelow
+			? rect.bottom + 4
+			: Math.max(padding, rect.top - height - 4);
+
+		return { x, y };
 	}
 
 	function toggleFilterMenu(e: MouseEvent) {
+		triggerHaptic(15);
 		if (filterMenuOpen) {
 			filterMenuOpen = false;
 			return;
 		}
 		closeMenus();
-		filterMenuPos = positionMenu(e, 208);
+		filterMenuPos = positionMenu(e, 208, 160);
 		filterMenuOpen = true;
 	}
 
 	function toggleSortMenu(e: MouseEvent) {
+		triggerHaptic(15);
 		if (sortMenuOpen) {
 			sortMenuOpen = false;
 			return;
 		}
 		closeMenus();
-		sortMenuPos = positionMenu(e, 176);
+		sortMenuPos = positionMenu(e, 176, 160);
 		sortMenuOpen = true;
 	}
 
 	function toggleSelectMenu(e: MouseEvent) {
+		triggerHaptic(15);
 		if (selectMenuOpen) {
 			selectMenuOpen = false;
 			return;
 		}
 		closeMenus();
-		selectMenuPos = positionMenu(e, 240);
+		selectMenuPos = positionMenu(e, 240, 240);
 		selectMenuOpen = true;
 	}
 
 	function toggleFilter(kind: 'pdf' | 'docx' | 'txt') {
+		triggerHaptic(15);
 		if (kind === 'pdf') filterPdf = !filterPdf;
 		else if (kind === 'docx') filterDocx = !filterDocx;
 		else filterTxt = !filterTxt;
@@ -884,7 +928,7 @@
 	<Tooltip.Provider delayDuration={100}>
 		<div
 			data-documents-scroll
-			class="flex h-full w-full flex-col gap-6 overflow-y-auto px-4 py-6 font-geist md:px-10 md:py-8"
+			class="flex h-full w-full flex-col gap-4 overflow-y-auto px-4 py-4 font-geist md:gap-6 md:px-10 md:py-8"
 		>
 			<!-- Row 1: Breadcrumb -->
 			<Breadcrumb.Root class="mt-16 md:mt-0">
@@ -902,9 +946,9 @@
 			</Breadcrumb.Root>
 
 			<!-- Row 2: Header & Primary Action -->
-			<div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-start">
+			<div class="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start md:gap-4">
 				<div>
-					<h1 class="text-3xl font-semibold text-white md:text-4xl">
+					<h1 class="text-[28px] leading-tight font-semibold text-white md:text-4xl">
 						Document Library
 					</h1>
 					<p class="mt-1 max-w-3xl text-sm font-normal text-[#767676] md:text-base">
@@ -912,7 +956,7 @@
 					</p>
 				</div>
 
-				<div class="flex items-center gap-2">
+				<div class="flex w-full items-center gap-2 sm:w-auto">
 					<Tooltip.Root>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
@@ -922,8 +966,11 @@
 									type="button"
 									disabled={isRefreshing}
 									aria-label="Refresh document data"
-									onclick={refreshPage}
-									class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:cursor-wait disabled:opacity-60"
+									onclick={() => {
+										triggerHaptic(15);
+										refreshPage();
+									}}
+									class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white active:scale-[0.90] disabled:cursor-wait disabled:opacity-60 md:size-9"
 								>
 									<RefreshCwIcon class="size-4 {isRefreshing ? 'animate-spin' : ''}" />
 								</Button>
@@ -937,8 +984,11 @@
 					</Tooltip.Root>
 
 					<Button
-						class="group cursor-pointer rounded-full bg-[#DB8F5E] px-4 font-normal text-white transition-[background-color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-[#C47D4E] active:scale-[0.98]"
-						onclick={() => (uploadDialogOpen = true)}
+						class="group h-11 flex-1 cursor-pointer select-none rounded-full bg-[#DB8F5E] px-4 font-normal text-white transition-all duration-150 hover:bg-[#C47D4E] active:scale-[0.96] sm:flex-none md:h-9"
+						onclick={() => {
+							triggerHaptic(20);
+							uploadDialogOpen = true;
+						}}
 					>
 						<PlusIcon
 							data-icon="inline-start"
@@ -950,34 +1000,34 @@
 			</div>
 
 			<!-- Usage Summary -->
-			<div class="grid gap-3 sm:grid-cols-3">
-				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4">
+			<div class="grid grid-cols-1 gap-2.5 min-[380px]:grid-cols-2 sm:grid-cols-3 sm:gap-3">
+				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-3.5 md:p-4">
 					<div class="flex items-center gap-2 text-xs font-medium text-[#959595]">
 						<FilesIcon class="size-4 text-white/60" />
 						<span>Total Documents</span>
 					</div>
-					<p class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+					<p class="mt-2.5 text-2xl font-semibold tracking-[-0.03em] text-white md:mt-3">
 						{totalDocumentCount}
 					</p>
 				</div>
 
-				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4">
+				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-3.5 md:p-4">
 					<div class="flex items-center gap-2 text-xs font-medium text-[#959595]">
 						<ArrowUpIcon class="size-4 text-white/60" />
 						<span>Max Upload</span>
 					</div>
-					<p class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+					<p class="mt-2.5 text-2xl font-semibold tracking-[-0.03em] text-white md:mt-3">
 						{uploadUsageDisplay}
 					</p>
 					<p class="mt-1 text-xs text-white/40">Reset in {uploadResetCountdown}</p>
 				</div>
 
-				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4">
+				<div class="col-span-1 rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-3.5 min-[380px]:col-span-2 md:p-4 sm:col-span-1">
 					<div class="flex items-center gap-2 text-xs font-medium text-[#959595]">
 						<HardDriveIcon class="size-4 text-white/60" />
 						<span>Total Storage</span>
 					</div>
-					<p class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+					<p class="mt-2.5 text-2xl font-semibold tracking-[-0.03em] text-white md:mt-3">
 						{storageUsageDisplay}
 					</p>
 					<div class="mt-3 flex items-center gap-2">
@@ -1017,7 +1067,8 @@
 							<ToggleGroup.Item
 								value="keyword"
 								aria-label="Toggle keyword search"
-								class="flex h-7 w-7 cursor-pointer items-center justify-center !rounded-l-full text-white/50 transition-[background-color,color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.05] hover:text-white/70 data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
+								onclick={() => triggerHaptic(15)}
+								class="flex h-7 w-7 cursor-pointer select-none items-center justify-center !rounded-l-full text-white/50 transition-all duration-150 hover:bg-white/[0.05] hover:text-white/70 active:scale-[0.90] data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
 							>
 								<Tooltip.Root>
 									<Tooltip.Trigger>
@@ -1037,7 +1088,8 @@
 							<ToggleGroup.Item
 								value="semantic"
 								aria-label="Toggle semantic search"
-								class="flex h-7 w-7 cursor-pointer items-center justify-center !rounded-r-full text-white/50 transition-[background-color,color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.05] hover:text-white/70 data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
+								onclick={() => triggerHaptic(15)}
+								class="flex h-7 w-7 cursor-pointer select-none items-center justify-center !rounded-r-full text-white/50 transition-all duration-150 hover:bg-white/[0.05] hover:text-white/70 active:scale-[0.90] data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
 							>
 								<Tooltip.Root>
 									<Tooltip.Trigger>
@@ -1074,7 +1126,7 @@
 								executeSemanticSearch();
 							}
 						}}
-						class="h-9 rounded-full border border-white/[0.16] bg-transparent pr-10 pl-[82px] font-normal text-white transition-[border-color,box-shadow] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] placeholder:text-white/40 focus-visible:border-white/35 focus-visible:ring-white/20"
+						class="h-11 rounded-full border border-white/[0.16] bg-transparent pr-10 pl-[82px] font-normal text-white transition-[border-color,box-shadow] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] placeholder:text-white/40 focus-visible:border-white/35 focus-visible:ring-white/20 md:h-9"
 					/>
 
 					<!-- Loading Spinner or Clear Button on the right -->
@@ -1085,6 +1137,7 @@
 							<button
 								type="button"
 								onclick={() => {
+									triggerHaptic(15);
 									if (searchMode === 'keyword') {
 										globalFilter = '';
 									} else {
@@ -1092,7 +1145,7 @@
 										refreshDocuments();
 									}
 								}}
-								class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white"
+								class="flex size-5 cursor-pointer select-none items-center justify-center rounded-full text-white/50 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90"
 								aria-label="Clear search"
 							>
 								<XIcon class="size-3.5" />
@@ -1109,7 +1162,7 @@
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white"
+								class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white md:size-9"
 								onclick={toggleFilterMenu}
 								aria-haspopup="menu"
 								aria-expanded={filterMenuOpen}
@@ -1127,19 +1180,21 @@
 
 				{#if filterMenuOpen}
 					<div
+						use:teleport
 						role="presentation"
 						class="fixed inset-0 z-50 bg-transparent"
 						onclick={closeMenus}
 						onkeydown={closeMenus}
 					></div>
 					<div
+						use:teleport
 						transition:scale={{ duration: 150, start: 0.95 }}
 						style={`position: fixed; top: ${filterMenuPos.y}px; left: ${filterMenuPos.x}px;`}
 						class="z-50 w-52 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
 						<button
 							type="button"
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => toggleFilter('pdf')}
 						>
 							<FileTextIcon class="size-3.5 text-white/60" />
@@ -1150,7 +1205,7 @@
 						</button>
 						<button
 							type="button"
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => toggleFilter('docx')}
 						>
 							<FilesIcon class="size-3.5 text-white/60" />
@@ -1161,7 +1216,7 @@
 						</button>
 						<button
 							type="button"
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => toggleFilter('txt')}
 						>
 							<FileStackIcon class="size-3.5 text-white/60" />
@@ -1181,7 +1236,7 @@
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white"
+								class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white md:size-9"
 								onclick={toggleSortMenu}
 								aria-haspopup="menu"
 								aria-expanded={sortMenuOpen}
@@ -1199,19 +1254,21 @@
 
 				{#if sortMenuOpen}
 					<div
+						use:teleport
 						role="presentation"
 						class="fixed inset-0 z-50 bg-transparent"
 						onclick={closeMenus}
 						onkeydown={closeMenus}
 					></div>
 					<div
+						use:teleport
 						transition:scale={{ duration: 150, start: 0.95 }}
 						style={`position: fixed; top: ${sortMenuPos.y}px; left: ${sortMenuPos.x}px;`}
 						class="z-50 w-44 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
 						<button
 							type="button"
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => handleSort('name')}
 						>
 							<ArrowDownAZIcon class="size-3.5 text-white/60" />
@@ -1224,7 +1281,7 @@
 						</button>
 						<button
 							type="button"
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => handleSort('uploadedAt')}
 						>
 							<CalendarDaysIcon class="size-3.5 text-white/60" />
@@ -1237,7 +1294,7 @@
 						</button>
 						<button
 							type="button"
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => handleSort('size')}
 						>
 							<HardDriveIcon class="size-3.5 text-white/60" />
@@ -1258,10 +1315,10 @@
 							<Button
 								{...props}
 								variant="ghost"
-								class="h-9 cursor-pointer rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white {selectedCount >
+								class="h-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white active:scale-[0.90] aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white md:h-9 {selectedCount >
 								0
 									? 'border-white/[0.80] bg-[#B8B5B5]/[0.40] px-2.5'
-									: 'flex w-9 items-center justify-center p-0'}"
+									: 'flex w-11 items-center justify-center p-0 md:w-9'}"
 								onclick={toggleSelectMenu}
 								aria-haspopup="menu"
 								aria-expanded={selectMenuOpen}
@@ -1284,20 +1341,23 @@
 
 				{#if selectMenuOpen}
 					<div
+						use:teleport
 						role="presentation"
 						class="fixed inset-0 z-50 bg-transparent"
 						onclick={closeMenus}
 						onkeydown={closeMenus}
 					></div>
 					<div
+						use:teleport
 						transition:scale={{ duration: 150, start: 0.95 }}
 						style={`position: fixed; top: ${selectMenuPos.y}px; left: ${selectMenuPos.x}px;`}
 						class="z-50 w-60 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
 						<button
 							type="button"
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => {
+								triggerHaptic(15);
 								selectAllPageDocuments();
 								closeMenus();
 							}}
@@ -1307,8 +1367,9 @@
 						</button>
 						<button
 							type="button"
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => {
+								triggerHaptic(15);
 								selectAllTotalDocuments();
 								closeMenus();
 							}}
@@ -1319,8 +1380,9 @@
 						{#if selectedCount > 0}
 							<button
 								type="button"
-								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+								class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 								onclick={() => {
+									triggerHaptic(15);
 									clearSelection();
 									closeMenus();
 								}}
@@ -1331,9 +1393,10 @@
 							<div class="my-1 h-px bg-white/10"></div>
 							<button
 								type="button"
-								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
+								class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:opacity-40 md:min-h-0"
 								disabled={isBatchDownloading}
 								onclick={() => {
+									triggerHaptic(15);
 									closeMenus();
 									handleBatchDownload();
 								}}
@@ -1347,8 +1410,9 @@
 							</button>
 							<button
 								type="button"
-								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:bg-red-500/15"
+								class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15 md:min-h-0"
 								onclick={() => {
+									triggerHaptic(15);
 									closeMenus();
 									showBatchDeleteModal = true;
 								}}
@@ -1412,7 +1476,7 @@
 							tabindex="0"
 							onclick={() => toggleSelectDoc(doc.id)}
 							onkeydown={(e) => e.key === 'Enter' && toggleSelectDoc(doc.id)}
-							class="group relative cursor-pointer overflow-hidden rounded-2xl border p-4 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px md:p-5 {isSelected
+							class="group relative cursor-pointer select-none overflow-hidden rounded-2xl border p-3.5 transition-all duration-150 active:scale-[0.985] md:p-5 {isSelected
 								? 'selected-card-glass border-white/45 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] ring-1 ring-white/10'
 								: 'border-[#302F2F] bg-[#191919]/[0.53] hover:border-[#949494] hover:bg-[#525252]/[0.53]'} {deselectedCardIds.includes(
 								doc.id
@@ -1440,7 +1504,7 @@
 												{#snippet child({ props })}
 													<div
 														{...props}
-														class="match-score"
+														class="match-score select-none"
 														aria-label={`${(score * 100).toFixed(2)} percent match`}
 													>
 														<span class="match-score-dot" aria-hidden="true"></span>
@@ -1496,8 +1560,9 @@
 								<div class="semantic-match-panel">
 									<button
 										type="button"
-										class="semantic-match-trigger"
+										class="semantic-match-trigger select-none transition-all duration-150 active:scale-[0.99]"
 										onclick={(e) => {
+											triggerHaptic(15);
 											e.stopPropagation();
 											if (expandedDocs.includes(doc.id)) {
 												expandedDocs = expandedDocs.filter((id) => id !== doc.id);
@@ -1558,7 +1623,7 @@
 										<Tooltip.Root>
 											<Tooltip.Trigger>
 												{#snippet child({ props })}
-													<div {...props} class="page-reference">
+													<div {...props} class="page-reference select-none">
 														<BookOpenIcon class="size-3.5 text-[#DB8F5E]" strokeWidth={1.7} />
 														<span
 															>Page{pages.length > 1 ? 's' : ''}
@@ -1579,7 +1644,7 @@
 								<!-- Vectorizing / Quota / Failed Status Badge -->
 								{#if doc.status === 'pending' || doc.status === 'confirmed'}
 									<div
-										class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 transition-[background-color,border-color,transform] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:-translate-y-px group-hover:border-white/30 group-hover:bg-white/20"
+										class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 transition-all duration-150"
 									>
 										<SparklesIcon class="size-3.5 animate-pulse text-white" />
 										<span class="tracking-wide">Preparing…</span>
@@ -1590,7 +1655,7 @@
 											{#snippet child({ props })}
 												<div
 													{...props}
-													class="inline-flex cursor-help items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300"
+													class="inline-flex cursor-help select-none items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300"
 												>
 													<MxIcon name="clock-outline" class="size-3.5 text-amber-400" />
 													<span class="font-medium tracking-wide">Resuming Tomorrow</span>
@@ -1605,14 +1670,14 @@
 									</Tooltip.Root>
 								{:else if doc.status === 'failed_vectorizing'}
 									<div
-										class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
+										class="inline-flex select-none items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
 									>
 										<XIcon class="size-3.5 text-red-400" />
 										<span class="font-medium tracking-wide">Failed Vectorizing</span>
 									</div>
 								{:else if doc.status === 'failed'}
 									<div
-										class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
+										class="inline-flex select-none items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
 									>
 										<XIcon class="size-3.5 text-red-400" />
 										<span class="font-medium tracking-wide">Processing Failed</span>
@@ -1649,9 +1714,25 @@
 								{#snippet children({ pages, currentPage })}
 									<Pagination.Content>
 										<Pagination.Item>
+											<button
+												type="button"
+												aria-label="Go to first page"
+												title="First page"
+												disabled={currentPage === 1}
+												onclick={() => goToPage(1)}
+												class="flex size-9 cursor-pointer select-none items-center justify-center rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
+											>
+												<ChevronFirstIcon class="size-4" />
+											</button>
+										</Pagination.Item>
+
+										<Pagination.Item>
 											<Pagination.Previous
-												onclick={keepDocumentsAtBottom}
-												class="cursor-pointer rounded-full text-white transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white disabled:text-white/20"
+												onclick={() => {
+													triggerHaptic(15);
+													keepDocumentsAtBottom();
+												}}
+												class="cursor-pointer select-none rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
 											/>
 										</Pagination.Item>
 
@@ -1660,13 +1741,16 @@
 												<Pagination.Item>
 													<Pagination.Ellipsis class="text-white/60" />
 												</Pagination.Item>
-											{:else}
+											{:else if page.value !== 1 && page.value !== totalPages}
 												<Pagination.Item>
 													<Pagination.Link
 														{page}
 														isActive={currentPage === page.value}
-														onclick={keepDocumentsAtBottom}
-														class="cursor-pointer rounded-full text-white/75 transition-[background-color,border-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white data-[active=true]:border-white/45 data-[active=true]:bg-white/10 data-[active=true]:text-white"
+														onclick={() => {
+															triggerHaptic(15);
+															keepDocumentsAtBottom();
+														}}
+														class="cursor-pointer select-none rounded-full text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 data-[active=true]:border-white/45 data-[active=true]:bg-white/10 data-[active=true]:text-white"
 													>
 														{page.value}
 													</Pagination.Link>
@@ -1676,9 +1760,25 @@
 
 										<Pagination.Item>
 											<Pagination.Next
-												onclick={keepDocumentsAtBottom}
-												class="cursor-pointer rounded-full text-white transition-[background-color,color,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-px hover:bg-white/10 hover:text-white disabled:text-white/20"
+												onclick={() => {
+													triggerHaptic(15);
+													keepDocumentsAtBottom();
+												}}
+												class="cursor-pointer select-none rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
 											/>
+										</Pagination.Item>
+
+										<Pagination.Item>
+											<button
+												type="button"
+												aria-label="Go to last page"
+												title="Last page"
+												disabled={currentPage === totalPages}
+												onclick={() => goToPage(totalPages)}
+												class="flex size-9 cursor-pointer select-none items-center justify-center rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
+											>
+												<ChevronLastIcon class="size-4" />
+											</button>
 										</Pagination.Item>
 									</Pagination.Content>
 								{/snippet}
@@ -1697,7 +1797,7 @@
 			{@render mainList()}
 		</div>
 		{#if previewDocument}
-			<div class="h-full w-full">
+			<div class="fixed inset-0 z-[60] h-full w-full bg-[#1F1E1D]">
 				<PdfPreviewPanel
 					src={previewDocument.url ?? ''}
 					name={previewDocument.name}
@@ -1790,17 +1890,23 @@
 			<Button
 				type="button"
 				variant="ghost"
-				onclick={() => (renameDialogOpen = false)}
+				onclick={() => {
+					triggerHaptic(15);
+					renameDialogOpen = false;
+				}}
 				disabled={isRenaming}
-				class="cursor-pointer text-sm text-white hover:bg-white/10"
+				class="cursor-pointer select-none text-sm text-white transition-all duration-150 hover:bg-white/10 active:scale-[0.96]"
 			>
 				Cancel
 			</Button>
 			<Button
 				type="button"
-				onclick={confirmRename}
+				onclick={() => {
+					triggerHaptic(20);
+					confirmRename();
+				}}
 				disabled={isRenaming}
-				class="cursor-pointer bg-[#DB8F5E] text-white hover:bg-[#C47D4E] disabled:opacity-50"
+				class="cursor-pointer select-none bg-[#DB8F5E] text-white transition-all duration-150 hover:bg-[#C47D4E] active:scale-[0.96] disabled:opacity-50"
 			>
 				{#if isRenaming}
 					<Loader2Icon class="mr-2 size-4 animate-spin" />
@@ -1833,17 +1939,23 @@
 			<Button
 				type="button"
 				variant="ghost"
-				onclick={() => (showBatchDeleteModal = false)}
+				onclick={() => {
+					triggerHaptic(15);
+					showBatchDeleteModal = false;
+				}}
 				disabled={isBatchDeleting}
-				class="cursor-pointer text-sm text-white hover:bg-white/10"
+				class="cursor-pointer select-none text-sm text-white transition-all duration-150 hover:bg-white/10 active:scale-[0.96]"
 			>
 				Cancel
 			</Button>
 			<Button
 				type="button"
-				onclick={executeBatchDelete}
+				onclick={() => {
+					triggerHaptic(20);
+					executeBatchDelete();
+				}}
 				disabled={isBatchDeleting}
-				class="cursor-pointer border border-red-500/40 bg-red-950/60 font-medium text-red-400 hover:bg-red-900/80 hover:text-red-300 disabled:opacity-50"
+				class="cursor-pointer select-none border border-red-500/40 bg-red-950/60 font-medium text-red-400 transition-all duration-150 hover:bg-red-900/80 hover:text-red-300 active:scale-[0.96] disabled:opacity-50"
 			>
 				{#if isBatchDeleting}
 					<Loader2Icon class="mr-2 size-4 animate-spin" />
@@ -2141,5 +2253,12 @@
 			transform: translateX(-120%);
 			opacity: 0;
 		}
+	}
+
+	:global(button),
+	:global(a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		touch-action: manipulation;
 	}
 </style>

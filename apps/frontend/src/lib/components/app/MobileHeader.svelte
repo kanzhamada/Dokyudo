@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
+	import Info from '@lucide/svelte/icons/info';
 	import favicon from '$lib/assets/favicon.svg?raw';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 
@@ -16,14 +17,7 @@
 		bottom?: Snippet;
 	}
 
-	let {
-		class: className = '',
-		children,
-		leading,
-		center,
-		trailing,
-		bottom
-	}: Props = $props();
+	let { class: className = '', children, leading, center, trailing, bottom }: Props = $props();
 
 	const sidebar = useSidebar();
 </script>
@@ -34,9 +28,11 @@
 		? 'h-auto min-h-14 border-red-500/50 bg-red-950/[0.60] px-4 py-3'
 		: mobileHeaderState.type === 'success'
 			? 'h-auto min-h-14 border-green-500/50 bg-green-950/[0.60] px-4 py-3'
-			: bottom
-				? 'h-auto min-h-14 border-white/[0.16] bg-[#232323]/[0.85] px-3'
-				: 'h-14 border-white/[0.16] bg-[#232323]/[0.40] px-4'} {className}"
+			: mobileHeaderState.type === 'info'
+				? 'h-auto min-h-14 border-blue-500/50 bg-blue-950/[0.60] px-4 py-3'
+				: bottom
+					? 'h-auto min-h-14 border-white/[0.16] bg-[#232323]/[0.85] px-3'
+					: 'h-14 border-white/[0.16] bg-[#232323]/[0.40] px-4'} {className}"
 >
 	{#if mobileHeaderState.type === 'error'}
 		<div class="flex w-full items-start gap-3">
@@ -54,10 +50,22 @@
 				<span class="text-sm leading-snug text-green-200">{mobileHeaderState.message}</span>
 			</div>
 		</div>
+	{:else if mobileHeaderState.type === 'info'}
+		<div class="flex w-full items-start gap-3">
+			<Info class="mt-0.5 size-5 shrink-0 text-blue-400" />
+			<div class="flex flex-col">
+				<span class="text-sm font-semibold text-white">{mobileHeaderState.title || 'Info'}</span>
+				<span class="text-sm leading-snug text-blue-200">{mobileHeaderState.message}</span>
+			</div>
+		</div>
 	{:else if children}
 		{@render children()}
 	{:else}
-		<div class="flex h-14 w-full items-center justify-between {leading || center || trailing ? 'px-0' : ''}">
+		<div
+			class="flex h-14 w-full items-center justify-between {leading || center || trailing
+				? 'px-0'
+				: ''}"
+		>
 			<div class="flex items-center gap-1">
 				{#if leading}
 					{@render leading()}

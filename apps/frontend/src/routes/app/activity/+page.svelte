@@ -28,6 +28,16 @@
 
 	let searchTimeout: ReturnType<typeof setTimeout>;
 
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Unsupported
+			}
+		}
+	}
+
 	async function fetchActivities(queryPage: number = 1) {
 		isLoading = true;
 
@@ -76,6 +86,7 @@
 	}
 
 	function handleCategorySelect(category: string) {
+		triggerHaptic(15);
 		selectedCategory = category;
 		fetchActivities(1);
 	}
@@ -85,6 +96,7 @@
 	}
 
 	function resetFilters() {
+		triggerHaptic(15);
 		searchQuery = '';
 		selectedCategory = '';
 		startDate = '';
@@ -170,7 +182,7 @@
 				<button
 					type="button"
 					aria-pressed={selectedCategory === cat.id}
-					class="h-7 shrink-0 rounded-md px-2.5 text-[11px] font-medium transition-[background-color,color,transform] duration-200 active:scale-[0.98] {selectedCategory ===
+					class="h-7 shrink-0 cursor-pointer select-none rounded-md px-2.5 text-[11px] font-medium transition-all duration-150 active:scale-[0.96] {selectedCategory ===
 					cat.id
 						? 'bg-[#E8E8E8] text-[#181818] shadow-[0_2px_8px_rgba(255,255,255,0.12)]'
 						: 'text-[#969696] hover:bg-white/[0.06] hover:text-[#F2F2F2]'}"
@@ -211,7 +223,7 @@
 			<Button
 				variant="ghost"
 				size="sm"
-				class="h-9 shrink-0 gap-1.5 rounded-lg px-2.5 text-[11px] text-[#969696] hover:bg-white/[0.06] hover:text-[#F2F2F2] disabled:opacity-40"
+				class="h-9 shrink-0 cursor-pointer select-none gap-1.5 rounded-lg px-2.5 text-[11px] text-[#969696] transition-all duration-150 hover:bg-white/[0.06] hover:text-[#F2F2F2] active:scale-[0.94] disabled:opacity-40"
 				onclick={resetFilters}
 				disabled={!hasActiveFilters}
 				aria-label="Reset filters"
@@ -232,3 +244,12 @@
 	<!-- Data Table -->
 	<DataTable data={activities} {meta} {isLoading} onPageChange={handlePageChange} />
 </div>
+
+<style>
+	:global(button),
+	:global(a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		touch-action: manipulation;
+	}
+</style>

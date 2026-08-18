@@ -366,7 +366,18 @@
 		editorEl.focus();
 	}
 
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Unsupported
+			}
+		}
+	}
+
 	function handleSendClick() {
+		triggerHaptic(20);
 		if (isGenerating) {
 			onstop();
 		} else {
@@ -470,7 +481,7 @@
 							role="option"
 							bind:this={mentionItemEls[index]}
 							aria-selected={index === effectiveHighlight}
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white {index ===
+							class="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-white/75 transition-all duration-150 hover:bg-white/[0.12] hover:text-white active:scale-[0.98] {index ===
 							effectiveHighlight
 								? 'bg-white/[0.12] text-white'
 								: ''}"
@@ -501,8 +512,11 @@
 					>
 						<span class="max-w-[200px] truncate">{file.name}</span>
 						<button
-							class="flex cursor-pointer items-center justify-center rounded-full p-0.5 text-white/[0.40] transition-colors hover:bg-white/[0.16] hover:text-white"
-							onclick={() => removeFile(index)}
+							class="flex cursor-pointer select-none items-center justify-center rounded-full p-0.5 text-white/[0.40] transition-all duration-150 hover:bg-white/[0.16] hover:text-white active:scale-[0.88]"
+							onclick={() => {
+								triggerHaptic(15);
+								removeFile(index);
+							}}
 							aria-label="Remove file"
 						>
 							<X class="size-3.5" />
@@ -522,12 +536,15 @@
 					<Tooltip.Provider delayDuration={100}>
 						<Tooltip.Root>
 							<Tooltip.Trigger
-								class="flex cursor-pointer items-center transition-colors focus:outline-none {sparkleActive
+								class="flex cursor-pointer select-none items-center transition-all duration-150 active:scale-[0.90] focus:outline-none {sparkleActive
 									? 'text-[#DB8F5E]'
 									: 'text-white/[0.40] hover:text-white/[0.69]'}"
 								aria-label={sparkleActive ? 'AI search active' : 'Enable AI search'}
 								aria-pressed={sparkleActive}
-								onclick={() => (sparkleActive = !sparkleActive)}
+								onclick={() => {
+									triggerHaptic(15);
+									sparkleActive = !sparkleActive;
+								}}
 							>
 								<Sparkles class="size-5" />
 							</Tooltip.Trigger>
@@ -543,9 +560,12 @@
 					<Tooltip.Provider delayDuration={100}>
 						<Tooltip.Root>
 							<Tooltip.Trigger
-								class="flex cursor-pointer items-center text-white/[0.40] transition-colors focus-within:text-white/[0.69] hover:text-white/[0.69]"
+								class="flex cursor-pointer select-none items-center text-white/[0.40] transition-all duration-150 active:scale-[0.90] focus-within:text-white/[0.69] hover:text-white/[0.69]"
 								aria-label="Attach Document"
-								onclick={triggerFileInput}
+								onclick={() => {
+									triggerHaptic(15);
+									triggerFileInput();
+								}}
 							>
 								<MxIcon name="attach-circle-outline" class="size-5" />
 							</Tooltip.Trigger>
@@ -606,7 +626,7 @@
 						}}
 					>
 						<DropdownMenu.Trigger
-							class="flex cursor-pointer items-center gap-1 px-2 py-1 text-white/[0.40] transition-colors group-focus-within/model:text-white/[0.69] group-hover/model:text-white/[0.69] focus-within:text-white/[0.69] hover:text-white/[0.69] focus:outline-none"
+							class="flex cursor-pointer select-none items-center gap-1 px-2 py-1 text-white/[0.40] transition-all duration-150 group-focus-within/model:text-white/[0.69] group-hover/model:text-white/[0.69] hover:text-white/[0.69] focus-within:text-white/[0.69] active:scale-[0.96] focus:outline-none"
 						>
 							<img
 								src={selectedModel.icon}
@@ -637,8 +657,11 @@
 										</div>
 										{#each group.options as option (`${option.provider}:${option.model}`)}
 											<DropdownMenu.Item
-												class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/75 focus:bg-white/[0.16] focus:text-white data-highlighted:bg-white/[0.12]"
-												onclick={() => (selectedModel = option)}
+												class="flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/75 transition-all duration-150 hover:bg-white/[0.12] hover:text-white focus:bg-white/[0.16] focus:text-white active:scale-[0.98] data-highlighted:bg-white/[0.12]"
+												onclick={() => {
+													triggerHaptic(15);
+													selectedModel = option;
+												}}
 											>
 												<img
 													src={option.icon}
@@ -655,8 +678,11 @@
 								</div>
 								<div class="border-t border-white/10 p-1">
 									<DropdownMenu.Item
-										class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 focus:bg-white/[0.12] focus:text-white data-highlighted:bg-white/[0.12]"
-										onclick={onconfigure}
+										class="flex cursor-pointer select-none items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/65 transition-all duration-150 hover:bg-white/[0.12] hover:text-white focus:bg-white/[0.12] focus:text-white active:scale-[0.98] data-highlighted:bg-white/[0.12]"
+										onclick={() => {
+											triggerHaptic(20);
+											onconfigure?.();
+										}}
 									>
 										<MxIcon name="settings-settings-outline" class="size-3.5" />
 										<span>Configure</span>
@@ -671,8 +697,11 @@
 							>
 								{#each llmOptions as option}
 									<DropdownMenu.Item
-										class="flex cursor-pointer items-center gap-2 focus:bg-white/[0.16] focus:text-white"
-										onclick={() => (selectedModel = option)}
+										class="flex cursor-pointer select-none items-center gap-2 transition-all duration-150 hover:bg-white/[0.12] hover:text-white focus:bg-white/[0.16] focus:text-white active:scale-[0.98]"
+										onclick={() => {
+											triggerHaptic(15);
+											selectedModel = option;
+										}}
 									>
 										<img src={option.icon} alt={option.name} class="size-4 brightness-0 invert" />
 										<span class="truncate">{option.name}</span>
@@ -686,7 +715,7 @@
 
 			<!-- Send Button -->
 			<button
-				class="group/send flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-black disabled:opacity-40"
+				class="group/send flex h-9 w-9 shrink-0 cursor-pointer select-none items-center justify-center rounded-full bg-white/10 text-white transition-all duration-150 hover:bg-white hover:text-black active:scale-[0.90] disabled:opacity-40"
 				disabled={isUploading ||
 					(!isGenerating &&
 						mentionStrippedLength(value.trim()) === 0 &&
@@ -704,7 +733,7 @@
 					<Square class="size-4" />
 				{:else}
 					<span class="group-hover/send:hidden"><MxIcon name="send1-outline" class="size-5 -rotate-45" /></span>
-						<span class="hidden group-hover/send:block"><MxIcon name="send1-bold" class="size-5 -rotate-45" /></span>
+					<span class="hidden group-hover/send:block"><MxIcon name="send1-bold" class="size-5 -rotate-45" /></span>
 				{/if}
 			</button>
 		</div>
@@ -725,5 +754,12 @@
 		text-overflow: ellipsis;
 		line-height: 24px;
 		height: 24px;
+	}
+
+	:global(button),
+	:global(a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		touch-action: manipulation;
 	}
 </style>
