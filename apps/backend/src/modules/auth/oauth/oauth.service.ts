@@ -26,15 +26,6 @@ export interface OAuthCallbackResult {
 
 export class OAuthService {
     /**
-     * Temporary debug instrumentation for tracing the OAuth flow end to end.
-     * Emits one-line JSON events (same style as logger.middleware.ts).
-     * TODO: remove once the activity_logs issue is confirmed fixed.
-     */
-    private static debugLog(event: string, data: Record<string, unknown> = {}) {
-        console.log(JSON.stringify({ event: `oauth_debug.${event}`, ...data }));
-    }
-
-    /**
      * Initiates the OAuth flow by generating the Supabase authorization URL.
      * Uses Supabase's built-in PKCE flow — no client_secret needed in our backend.
      */
@@ -63,11 +54,6 @@ export class OAuthService {
                 status: 500,
             });
         }
-
-        this.debugLog("initiate", {
-            provider: params.provider,
-            url: data.url,
-        });
 
         return data.url;
     }
@@ -99,9 +85,6 @@ export class OAuthService {
             // Thrown (not returned as {error}) e.g. when the PKCE verifier is
             // gone from memory — a server restart between initiate and
             // callback. Report it as a clean auth failure, not a 500.
-            this.debugLog("code_exchange_threw", {
-                error: exchangeErr.message,
-            });
             if (params.logContext) {
                 params.logContext.oauthExchangeError = exchangeErr.message;
             }
@@ -129,13 +112,6 @@ export class OAuthService {
         const isEmailVerified =
             user.email_confirmed_at != null ||
             user.identities?.[0]?.identity_data?.email_verified === true;
-
-        this.debugLog("code_exchanged", {
-            userId: user.id,
-            email: user.email ?? "unknown",
-            emailVerified: isEmailVerified,
-            provider: params.provider,
-        });
 
         if (!isEmailVerified) {
             // Kill the session immediately — do not let unverified users through
@@ -226,6 +202,7 @@ export class OAuthService {
                         userId: user.id,
                         requestId: params.requestId,
                         provider: params.provider,
+                        logContext: params.logContext,
                     });
                 }
             } catch (welcomeErr: any) {
@@ -234,11 +211,6 @@ export class OAuthService {
                 }
             }
 
-            this.debugLog("activity_logging", {
-                tenantId,
-                userId: user.id,
-                action: "auth.login",
-            });
             await logActivity({
                 tenantId,
                 userId: user.id,
@@ -247,27 +219,8 @@ export class OAuthService {
                 userAgent: params.userAgent,
                 requestId: params.requestId,
                 metadata: { provider: params.provider },
-            });
-
-            // Verify the row actually landed in activity_logs.
-            const [verify] = await db
-                .select({ total: count() })
-                .from(activityLogs)
-                .where(
-                    and(
-                        eq(activityLogs.userId, user.id),
-                        eq(activityLogs.action, "auth.login"),
-                    ),
-                );
-            this.debugLog("activity_verified", {
-                userId: user.id,
-                rowsInTable: verify.total,
-            });
+            }, params.logContext);
         } else {
-            this.debugLog("activity_skipped", {
-                userId: user.id,
-                reason: "no tenant mapping resolved",
-            });
             if (params.logContext) {
                 params.logContext.activityLogWarning =
                     `Could not log activity for OAuth user ${user.id}: user record not found in public.users`;
@@ -320,12 +273,6 @@ export class OAuthService {
         //    code exchange completed.
         for (let attempt = 0; attempt < 3; attempt++) {
             const tenantId = await lookupTenantId();
-            this.debugLog("tenant_lookup", {
-                attempt: attempt + 1,
-                found: !!tenantId,
-                tenantId: tenantId ?? undefined,
-                userId: params.userId,
-            });
             if (tenantId) return tenantId;
             if (attempt < 2) {
                 await new Promise((resolve) => setTimeout(resolve, 200));
@@ -382,18 +329,8 @@ export class OAuthService {
                 return tenant.id;
             });
 
-            this.debugLog("fallback_provisioned", {
-                userId: params.userId,
-                email: params.email,
-                tenantId: provisionedTenantId ?? null,
-            });
-
             return provisionedTenantId;
         } catch (err: any) {
-            this.debugLog("provision_failed", {
-                userId: params.userId,
-                error: err.message,
-            });
             if (params.logContext) {
                 params.logContext.oauthProvisioningError = err.message;
             }

@@ -101,14 +101,6 @@ async function processOAuthCallback(c: Context, provider: "google" | "github") {
       logContext.userId = result.user.id;
     }
 
-    // Debug: confirm the callback completed and cookies are being issued.
-    console.log(JSON.stringify({
-      event: "oauth_debug.callback_redirect",
-      provider,
-      userId: result.user.id,
-      email: result.user.email,
-    }));
-
     // Issue the session as httpOnly cookies scoped to the shared domain
     // and send the user straight into the app — no tokens in the URL.
     setSessionCookies(c, result.accessToken, result.refreshToken);

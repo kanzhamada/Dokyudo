@@ -67,8 +67,9 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
     let penaltyScore = 0;
     try {
         penaltyScore = Number(await redis.get(penaltyKey)) || 0;
-    } catch (err) {
-        console.error("Redis penalty check failed:", err);
+    } catch (err: any) {
+        const logContext = c.get("logContext");
+        if (logContext) logContext.redisError = err.message;
     }
 
     // Penalties (and the strict/block escalation they unlock) only apply to
@@ -94,8 +95,9 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
         const result = await limiter.limit(ip);
         success = result.success;
         limitInfo = result;
-    } catch (err) {
-        console.error("Redis rate limit failed:", err);
+    } catch (err: any) {
+        const logContext = c.get("logContext");
+        if (logContext) logContext.redisError = err.message;
     }
 
     if (limitInfo) {
@@ -131,8 +133,9 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
             try {
                 await redis.incr(penaltyKey);
                 await redis.expire(penaltyKey, 3600);
-            } catch (err) {
-                console.error("Redis penalty incr failed:", err);
+            } catch (err: any) {
+                const logContext = c.get("logContext");
+                if (logContext) logContext.redisError = err.message;
             }
         }
         throw error;
@@ -147,8 +150,9 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
         try {
             await redis.incr(penaltyKey);
             await redis.expire(penaltyKey, 3600);
-        } catch (err) {
-            console.error("Redis penalty incr failed:", err);
+        } catch (err: any) {
+            const logContext = c.get("logContext");
+            if (logContext) logContext.redisError = err.message;
         }
     }
 }

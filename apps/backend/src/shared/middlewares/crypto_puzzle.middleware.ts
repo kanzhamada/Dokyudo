@@ -67,7 +67,8 @@ export async function cryptoPuzzleMiddleware(c: Context, next: Next) {
     await redis.setex(redisKey, 3600, "1");
   } catch (err: any) {
     if (err instanceof AppError) throw err;
-    console.error("[CryptoPuzzle] Redis error:", err.message);
+    const logContext = c.get("logContext");
+    if (logContext) logContext.redisError = err.message;
   }
 
   await next();

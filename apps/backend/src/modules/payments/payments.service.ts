@@ -267,7 +267,7 @@ export class PaymentsService {
                     ipAddress: params.clientIp,
                     userAgent: params.userAgent,
                     requestId: logContext?.requestId,
-                });
+                }, logContext);
 
                 // 5. Send the payment confirmation email with the summary.
                 // Best-effort: a delivery failure must never break the webhook
@@ -349,7 +349,7 @@ export class PaymentsService {
                         ipAddress: params.clientIp,
                         userAgent: params.userAgent,
                         requestId: logContext?.requestId,
-                    });
+                    }, logContext);
                 }
                 break;
             }
@@ -376,7 +376,7 @@ export class PaymentsService {
                             ipAddress: params.clientIp,
                             userAgent: params.userAgent,
                             requestId: logContext?.requestId,
-                        });
+                        }, logContext);
                     }
                 }
                 break;
@@ -536,11 +536,11 @@ export class PaymentsService {
                 paidAt: params.paidAt,
                 dashboardUrl: `${getEnv("FRONTEND_URL")}/app?billing=open`,
                 externalId: params.externalId,
+                logContext: params.logContext,
             });
         } catch (err: any) {
             // Never propagate: the webhook response is independent of email delivery.
             if (params.logContext) params.logContext.emailError = err.message;
-            console.error("[Payments] Failed to send payment success email:", err.message);
         }
     }
 }

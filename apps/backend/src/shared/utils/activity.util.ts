@@ -18,16 +18,18 @@ export interface LogActivityParams {
 /**
  * Helper to log user and system activities.
  * Awaited to ensure execution completes in serverless environments.
+ * On a write failure the error is recorded into the caller's `logContext`
+ * (wide-event log) instead of being thrown — it must never break the request.
  */
-export async function logActivity(params: LogActivityParams): Promise<void> {
+export async function logActivity(
+    params: LogActivityParams,
+    logContext?: Record<string, any>,
+): Promise<void> {
     try {
         await db.insert(activityLogs).values(params);
     } catch (err: any) {
-        // We log the error but don't throw it, so we don't break the main request
-        console.error(JSON.stringify({
-            event: "activity_log.write_failed",
-            error: err.message,
-            context: params
-        }));
+        if (logContext) {
+            logContext.activityLogWriteError = err.message;
+        }
     }
 }

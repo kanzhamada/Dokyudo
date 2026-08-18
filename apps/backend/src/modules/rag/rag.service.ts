@@ -833,7 +833,6 @@ ${effectiveQuestion}`;
                     logContext.turnStatus = status;
                 }
             } catch (dbErr: any) {
-                console.error("[RAG DB SAVE ERROR]:", dbErr);
                 if (logContext) {
                     logContext.ragEvent = "conversation_save_error";
                     logContext.ragError = dbErr.message;
@@ -954,9 +953,6 @@ data: ${JSON.stringify(startedPayload)}
                                     ),
                                 );
                         });
-                        console.log(
-                            `[RAG DETACH] turnId=${turnId} client left — flipped to awaiting_indexing, continuing generation in-process`,
-                        );
                     } catch (dbErr: any) {
                         if (logContext) logContext.ragDetachMarkError = dbErr.message;
                     }
@@ -1349,14 +1345,8 @@ data: ${JSON.stringify(startedPayload)}
                                     ),
                                 );
                         });
-                        console.log(
-                            `[RAG DETACH] turnId=${turnId} completed in-process after client left (${latencyMs}ms, status=${success ? "complete" : "failed"})`,
-                        );
                     } catch (dbErr: any) {
-                        console.error(
-                            `[RAG DETACH] turnId=${turnId} failed to persist detached completion:`,
-                            dbErr.message,
-                        );
+                        if (logContext) logContext.ragDetachPersistError = dbErr.message;
                         // The turn stays awaiting — the sweep regenerates it.
                     }
                 } else {
@@ -1759,7 +1749,6 @@ Always include the document references ([Doc N: Page X]) in your answer.
             logContext,
         } = params;
         const startMs = Date.now();
-        console.log(`[RAG DETACHED] turnId=${turnId} pipeline started (sweep, question="${question.slice(0, 60)}")`);
 
         const persistBlocked = async (): Promise<void> => {
             await withAuthDb(tenantId, async (tx) => {
@@ -1895,7 +1884,6 @@ Always include the document references ([Doc N: Page X]) in your answer.
             // idempotent: if a duplicate cron invocation already completed the
             // turn, this update matches no row.
             const latencyMs = Date.now() - startMs;
-            console.log(`[RAG DETACHED] turnId=${turnId} answer generated (${latencyMs}ms) — persisting complete`);
             const modelUsed = successfulModel || (useByok ? (model || "auto") : "auto");
             await withAuthDb(tenantId, async (tx) => {
                 await tx
@@ -1969,7 +1957,6 @@ Always include the document references ([Doc N: Page X]) in your answer.
             }
         } catch (error: any) {
             if (logContext) logContext.ragDetachedError = error.message;
-            console.error("[RAG DETACHED ERROR]:", error);
             try {
                 await withAuthDb(tenantId, async (tx) => {
                     await tx
@@ -2092,8 +2079,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
                 modelRequest: { provider?: string; model?: string } | null;
                 updatedAt: Date;
             }>;
-        } catch (err: any) {
-            console.error("[RAG SWEEP] Failed to load awaiting turns:", err.message);
+        } catch {
             return result;
         }
         if (turns.length === 0) return result;
@@ -2119,8 +2105,7 @@ Always include the document references ([Doc N: Page X]) in your answer.
                     .from(documents)
                     .where(inArray(documents.id, docIds));
                 for (const row of rows) docStatus.set(row.id, row.status);
-            } catch (err: any) {
-                console.error("[RAG SWEEP] Failed to load document statuses:", err.message);
+            } catch {
                 return result;
             }
         }
@@ -2152,18 +2137,11 @@ Always include the document references ([Doc N: Page X]) in your answer.
                             ),
                         );
                     result.failed++;
-                } catch (err: any) {
-                    console.error(
-                        `[RAG SWEEP] Failed to mark turn ${turn.id} failed:`,
-                        err.message,
-                    );
+                } catch {
+                    // Best-effort — the next sweep pass retries.
                 }
             } else if (allReady) {
                 try {
-                    const awaitingMs = Date.now() - new Date(turn.updatedAt).getTime();
-                    console.log(
-                        `[RAG SWEEP] turnId=${turn.id} picked up after ${Math.round(awaitingMs / 1000)}s awaiting — running detached pipeline`,
-                    );
                     await RagService.completeTurnDetached({
                         tenantId: turn.tenantId,
                         conversationId: turn.conversationId,
@@ -2180,13 +2158,9 @@ Always include the document references ([Doc N: Page X]) in your answer.
                         logContext: { sweep: true, turnId: turn.id },
                     });
                     result.completed++;
-                } catch (err: any) {
+                } catch {
                     // completeTurnDetached already persisted "failed" — the
                     // outer catch only fires on unexpected internal throws.
-                    console.error(
-                        `[RAG SWEEP] completeTurnDetached failed for ${turn.id}:`,
-                        err.message,
-                    );
                     result.failed++;
                 }
             } else {
@@ -2194,9 +2168,6 @@ Always include the document references ([Doc N: Page X]) in your answer.
             }
         }
 
-        console.log(
-            `[RAG SWEEP] completed=${result.completed} failed=${result.failed} stillWaiting=${result.stillWaiting}`,
-        );
         return result;
     }
 

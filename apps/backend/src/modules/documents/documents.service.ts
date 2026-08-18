@@ -73,7 +73,7 @@ async function markDocumentFailed(params: {
             resourceId: params.documentId,
             metadata: { reason: "Processing or upload confirmation failed" },
             requestId: params.logContext?.requestId,
-        });
+        }, params.logContext);
     } catch (err: any) {
         if (params.logContext) {
             params.logContext.markFailedError = err.message;
@@ -371,7 +371,7 @@ export class DocumentsService {
             ipAddress: params.clientIp,
             userAgent: params.userAgent,
             requestId: params.logContext?.requestId,
-        });
+        }, params.logContext);
 
         if (params.logContext) {
             params.logContext.trace.push("confirm_success");
@@ -514,7 +514,7 @@ export class DocumentsService {
             ipAddress: params.clientIp,
             userAgent: params.userAgent,
             requestId: params.logContext?.requestId,
-        });
+        }, params.logContext);
 
         return {
             success: true,
@@ -653,7 +653,7 @@ export class DocumentsService {
                 ipAddress: params.clientIp,
                 userAgent: params.userAgent,
                 requestId: params.logContext?.requestId,
-            });
+            }, params.logContext);
         }
 
         return {
@@ -865,7 +865,7 @@ export class DocumentsService {
             ipAddress: params.clientIp,
             userAgent: params.userAgent,
             requestId: params.logContext?.requestId,
-        });
+        }, params.logContext);
 
         return {
             success: true,

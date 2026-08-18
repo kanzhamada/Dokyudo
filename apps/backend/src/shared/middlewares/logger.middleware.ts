@@ -32,6 +32,9 @@ export const loggerMiddleware: MiddlewareHandler = async (c, next) => {
     logContext.status = c.res.status;
     logContext.durationMs = Math.round(performance.now() - start);
 
+    // Every wide-event log line carries an automatic timestamp.
+    logContext.timestamp = new Date().toISOString();
+
     const isDev = Deno.env.get("NODE_ENV") !== "prod";
     if (isDev) {
         console.log(JSON.stringify(logContext, null, 2));

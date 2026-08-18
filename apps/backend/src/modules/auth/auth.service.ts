@@ -189,6 +189,7 @@ export class AuthService {
                 verifyUrl,
                 linkData.user.id,
                 params.requestId,
+                params.logContext,
             );
 
             // Cache the unverified state to prevent resends for 24 hours (86400s), matching Supabase's link expiry
@@ -220,6 +221,7 @@ export class AuthService {
                 userId: linkData.user.id,
                 requestId: params.requestId,
                 provider: "email",
+                logContext: params.logContext,
             });
         } catch (welcomeErr: any) {
             if (params.logContext) {
@@ -278,7 +280,7 @@ export class AuthService {
                 ipAddress: params.clientIp,
                 userAgent: params.userAgent,
                 requestId: params.requestId,
-            });
+            }, params.logContext);
         }
 
         return { session, user };
@@ -494,7 +496,7 @@ export class AuthService {
                 userAgent: params.userAgent,
                 requestId: params.requestId,
                 metadata: { provider: "email" },
-            });
+            }, params.logContext);
         }
 
         // Cleanup: Remove the unverified email cooldown cache since user is now verified and logged in
@@ -584,7 +586,7 @@ export class AuthService {
                     tenantId: userRecord.tenantId,
                     userId: userData.user.id,
                     action: "auth.logout",
-                });
+                }, params.logContext);
             }
         }
     }
@@ -691,6 +693,7 @@ export class AuthService {
                 recoveryUrl,
                 linkData.properties.email_otp,
                 params.requestId,
+                params.logContext,
             );
         }
 
@@ -787,7 +790,7 @@ export class AuthService {
                 userAgent: params.userAgent,
                 requestId: params.requestId,
                 metadata: { type: "otp_reset" },
-            });
+            }, params.logContext);
         }
     }
 
@@ -865,7 +868,7 @@ export class AuthService {
                 userId: data.user.id,
                 action: "auth.password_reset",
                 metadata: { type: "update_password" },
-            });
+            }, params.logContext);
         }
     }
 
@@ -905,7 +908,7 @@ export class AuthService {
             ipAddress: params.clientIp,
             userAgent: params.userAgent,
             requestId: params.logContext?.requestId,
-        });
+        }, params.logContext);
 
         return {
             tenant: {

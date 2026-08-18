@@ -111,7 +111,6 @@ export async function checkObjectExists(
         await client.send(command);
         return true;
     } catch (err: any) {
-        console.error("S3 HeadObject Error:", err.name, err.$metadata?.httpStatusCode, err);
         if (
             err.name === "NotFound" || 
             err.name === "NoSuchKey" || 
@@ -135,11 +134,6 @@ export async function deleteObject(
         Bucket: bucketName,
         Key: objectKey,
     });
-    
-    try {
-        await client.send(command);
-    } catch (err: any) {
-        console.error("S3 DeleteObject Error:", err.name, err.$metadata?.httpStatusCode, err);
-        throw err;
-    }
+
+    await client.send(command);
 }

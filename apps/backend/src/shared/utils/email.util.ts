@@ -22,8 +22,9 @@ export async function sendWelcomeEmailOnce(params: {
     userId: string;
     requestId: string;
     provider?: string;
+    logContext?: Record<string, any>;
 }): Promise<boolean> {
-    const { email, userId, requestId, provider } = params;
+    const { email, userId, requestId, provider, logContext } = params;
     const markerKey = `welcome_email:${userId}`;
 
     let claimed = false;
@@ -33,10 +34,7 @@ export async function sendWelcomeEmailOnce(params: {
             ex: WELCOME_EMAIL_MARKER_TTL_SECONDS,
         })) === "OK";
     } catch (err: any) {
-        console.error(
-            "[Welcome Email] Failed to claim marker, skipping:",
-            err.message,
-        );
+        if (logContext) logContext.emailMarkerError = err.message;
         return false;
     }
     if (!claimed) return false;
@@ -78,21 +76,14 @@ export async function sendWelcomeEmailOnce(params: {
     );
 
     if (error) {
-        console.error(
-            "Failed to send welcome email via Resend:",
-            error.message,
-        );
+        if (logContext) logContext.emailError = error.message;
         // Release the marker so a later login/registration can retry.
         try {
             await redis.del(markerKey);
-        } catch (delErr: any) {
-            console.error(
-                "[Welcome Email] Failed to release marker:",
-                delErr.message,
-            );
+        } catch {
+            // Best-effort marker release.
         }
         if (Deno.env.get("NODE_ENV") === "test" || Deno.env.get("NODE_ENV") === "dev") {
-            console.warn("[TEST/DEV] Bypassing Resend welcome email error in non-production environment.");
             return true;
         }
         throw new AppError({
@@ -110,6 +101,7 @@ export async function sendVerificationEmail(
     actionLink: string,
     userId: string,
     requestId: string,
+    logContext?: Record<string, any>,
 ) {
     const { error } = await resend.emails.send(
         {
@@ -144,12 +136,8 @@ export async function sendVerificationEmail(
     );
 
     if (error) {
-        console.error(
-            "Failed to send verification email via Resend:",
-            error.message,
-        );
+        if (logContext) logContext.emailError = error.message;
         if (Deno.env.get("NODE_ENV") === "test" || Deno.env.get("NODE_ENV") === "dev") {
-            console.warn("[TEST/DEV] Bypassing Resend email error in non-production environment.");
             return;
         }
         throw new AppError({
@@ -165,6 +153,7 @@ export async function sendRecoveryEmail(
     actionLink: string,
     otp: string,
     requestId: string,
+    logContext?: Record<string, any>,
 ) {
     const { error } = await resend.emails.send(
         {
@@ -205,12 +194,8 @@ export async function sendRecoveryEmail(
     );
 
     if (error) {
-        console.error(
-            "Failed to send recovery email via Resend:",
-            error.message,
-        );
+        if (logContext) logContext.emailError = error.message;
         if (Deno.env.get("NODE_ENV") === "test" || Deno.env.get("NODE_ENV") === "dev") {
-            console.warn("[TEST/DEV] Bypassing Resend email error in non-production environment.");
             return;
         }
         throw new AppError({
@@ -228,8 +213,9 @@ export async function sendShareInviteEmail(params: {
     shareUrl: string;
     expiresAt: string | null;
     shareCode: string;
+    logContext?: Record<string, any>;
 }) {
-    const { email, sharerName, conversationTitle, shareUrl, expiresAt, shareCode } = params;
+    const { email, sharerName, conversationTitle, shareUrl, expiresAt, shareCode, logContext } = params;
 
     const expiryLine = expiresAt
         ? `This link expires on ${new Date(expiresAt).toLocaleDateString("en-US", {
@@ -276,12 +262,8 @@ export async function sendShareInviteEmail(params: {
     );
 
     if (error) {
-        console.error(
-            "Failed to send share invite email via Resend:",
-            error.message,
-        );
+        if (logContext) logContext.emailError = error.message;
         if (Deno.env.get("NODE_ENV") === "test" || Deno.env.get("NODE_ENV") === "dev") {
-            console.warn("[TEST/DEV] Bypassing Resend email error in non-production environment.");
             return;
         }
         throw new AppError({
@@ -313,8 +295,9 @@ export async function sendPaymentSuccessEmail(params: {
     paidAt: Date;
     dashboardUrl: string;
     externalId: string;
+    logContext?: Record<string, any>;
 }) {
-    const { email, planName, amountMinor, currency, paidAt, dashboardUrl, externalId } = params;
+    const { email, planName, amountMinor, currency, paidAt, dashboardUrl, externalId, logContext } = params;
 
     // Stripe reports amount_total in the currency's smallest unit. Zero-decimal
     // currencies (IDR, JPY, VND, ...) report whole units, everything else
@@ -396,12 +379,8 @@ export async function sendPaymentSuccessEmail(params: {
     );
 
     if (error) {
-        console.error(
-            "Failed to send payment success email via Resend:",
-            error.message,
-        );
+        if (logContext) logContext.emailError = error.message;
         if (Deno.env.get("NODE_ENV") === "test" || Deno.env.get("NODE_ENV") === "dev") {
-            console.warn("[TEST/DEV] Bypassing Resend email error in non-production environment.");
             return;
         }
         throw new AppError({
