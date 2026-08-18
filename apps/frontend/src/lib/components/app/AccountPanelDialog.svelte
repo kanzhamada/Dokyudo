@@ -640,6 +640,16 @@
 		}
 	}
 
+	function triggerHaptic(duration = 20) {
+		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+			try {
+				navigator.vibrate(duration);
+			} catch {
+				// Vibration API may be unsupported or restricted
+			}
+		}
+	}
+
 	// ─── Loading + clock effects ─────────────────────────────────────────────
 	// Setiap tab hanya me-load endpoint SATU KALI per sesi dialog terbuka.
 	// Flag loadedTabs di-reset saat dialog ditutup, jadi membuka ulang panel
@@ -710,11 +720,11 @@
 >
 	<Dialog.Content
 		showCloseButton={true}
-		class="max-h-[min(780px,calc(100vh-2rem))] gap-0 overflow-hidden rounded-[18px] border border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-[880px] lg:max-w-[940px]"
+		class="flex h-[85vh] max-h-[680px] min-h-[480px] w-[calc(100%-1.5rem)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:h-[660px] sm:max-h-[min(660px,calc(100vh-2rem))] sm:min-h-0 sm:w-full sm:max-w-[880px] sm:rounded-[18px] lg:max-w-[940px]"
 	>
-		<Dialog.Header class="border-b border-white/[0.09] px-5 py-4 pr-14">
+		<Dialog.Header class="shrink-0 border-b border-white/[0.09] px-4 py-3.5 pr-12 sm:px-5 sm:py-4 sm:pr-14">
 			<Dialog.Title
-				class="flex items-center gap-2 text-[17px] font-medium tracking-[-0.02em] text-white"
+				class="flex items-center gap-2 text-base font-medium tracking-[-0.02em] text-white sm:text-[17px]"
 			>
 				{#if accountPanel.tab === 'settings'}
 					<Settings2 class="size-[15px] text-white/55" strokeWidth={1.8} />
@@ -727,35 +737,38 @@
 				{/if}
 				{activeTab.label}
 			</Dialog.Title>
-			<Dialog.Description class="mt-1 text-xs leading-5 text-white/45">
+			<Dialog.Description class="mt-0.5 line-clamp-1 text-[11px] leading-4 text-white/45 sm:mt-1 sm:text-xs sm:leading-5">
 				{activeTab.description}
 			</Dialog.Description>
 		</Dialog.Header>
 
-		<div class="flex h-[70vh] min-h-0 flex-col sm:h-[600px] sm:flex-row">
+		<div class="flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col sm:flex-row">
 			<!-- Side tab rail -->
 			<nav
 				aria-label="Account sections"
-				class="flex shrink-0 [scrollbar-width:none] flex-row gap-0.5 overflow-x-auto border-b border-white/[0.09] p-2 sm:w-52 sm:flex-col sm:border-r sm:border-b-0 sm:py-3 [&::-webkit-scrollbar]:hidden"
+				class="flex w-full min-w-0 shrink-0 flex-row gap-1 overflow-x-auto border-b border-white/[0.09] p-1.5 [scrollbar-width:none] sm:w-52 sm:flex-col sm:gap-0.5 sm:border-r sm:border-b-0 sm:p-2 sm:py-3 [&::-webkit-scrollbar]:hidden"
 			>
 				{#each tabs as item (item.id)}
 					<button
 						type="button"
 						aria-current={accountPanel.tab === item.id ? 'page' : undefined}
-						class="flex shrink-0 cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors {accountPanel.tab ===
+						class="flex shrink-0 cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-all duration-150 active:scale-[0.97] active:bg-white/[0.12] sm:gap-2.5 sm:px-3 sm:py-2 {accountPanel.tab ===
 						item.id
-							? 'bg-white/[0.08] text-white'
+							? 'bg-white/[0.1] text-white shadow-xs ring-1 ring-white/10'
 							: 'text-white/50 hover:bg-white/[0.04] hover:text-white/80'}"
-						onclick={() => (accountPanel.tab = item.id)}
+						onclick={() => {
+							triggerHaptic(20);
+							accountPanel.tab = item.id;
+						}}
 					>
 						{#if item.id === 'settings'}
-							<Settings2 class="size-4 shrink-0" strokeWidth={1.8} />
+							<Settings2 class="size-3.5 shrink-0 sm:size-4" strokeWidth={1.8} />
 						{:else if item.id === 'billing'}
-							<CreditCard class="size-4 shrink-0" strokeWidth={1.8} />
+							<CreditCard class="size-3.5 shrink-0 sm:size-4" strokeWidth={1.8} />
 						{:else if item.id === 'byok'}
-							<KeyRound class="size-4 shrink-0" strokeWidth={1.8} />
+							<KeyRound class="size-3.5 shrink-0 sm:size-4" strokeWidth={1.8} />
 						{:else}
-							<Link2 class="size-4 shrink-0" strokeWidth={1.8} />
+							<Link2 class="size-3.5 shrink-0 sm:size-4" strokeWidth={1.8} />
 						{/if}
 						<span class="whitespace-nowrap">{item.label}</span>
 					</button>
@@ -763,9 +776,9 @@
 			</nav>
 
 			<!-- Panel content -->
-			<div class="min-h-0 flex-1 overflow-y-auto">
+			<div class="min-h-0 w-full min-w-0 max-w-full flex-1 overflow-y-auto overflow-x-hidden">
 				{#if accountPanel.tab === 'settings'}
-					<div class="space-y-5 p-5">
+					<div class="space-y-5 p-4 sm:p-5">
 						<section aria-labelledby="profile-details-title">
 							<div class="mb-3 flex items-start gap-2.5">
 								<div
@@ -810,7 +823,7 @@
 									<Button
 										type="submit"
 										disabled={profileLoading || savingName || !profile}
-										class="h-9 rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-40"
+										class="h-9 w-full cursor-pointer select-none rounded-lg bg-[#DB8F5E] px-4 text-xs font-medium text-black transition-all duration-150 hover:bg-[#E59C6D] active:scale-[0.98] active:brightness-95 disabled:opacity-40 sm:w-auto"
 									>
 										{#if savingName}
 											<Spinner class="mr-1.5 size-3.5" />
@@ -858,10 +871,13 @@
 										/>
 										<button
 											type="button"
-											class="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-white/35 transition-colors hover:text-white"
+											class="absolute top-1/2 right-2.5 -translate-y-1/2 cursor-pointer select-none rounded-md p-1 text-white/35 transition-all duration-150 hover:text-white active:scale-90"
 											aria-label={showPassword ? 'Hide new password' : 'Show new password'}
 											aria-pressed={showPassword}
-											onclick={() => (showPassword = !showPassword)}
+											onclick={() => {
+												triggerHaptic(15);
+												showPassword = !showPassword;
+											}}
 										>
 											{#if showPassword}
 												<EyeOff class="size-4" strokeWidth={1.8} />
@@ -895,12 +911,15 @@
 										/>
 										<button
 											type="button"
-											class="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-white/35 transition-colors hover:text-white"
+											class="absolute top-1/2 right-2.5 -translate-y-1/2 cursor-pointer select-none rounded-md p-1 text-white/35 transition-all duration-150 hover:text-white active:scale-90"
 											aria-label={showConfirmPassword
 												? 'Hide password confirmation'
 												: 'Show password confirmation'}
 											aria-pressed={showConfirmPassword}
-											onclick={() => (showConfirmPassword = !showConfirmPassword)}
+											onclick={() => {
+												triggerHaptic(15);
+												showConfirmPassword = !showConfirmPassword;
+											}}
 										>
 											{#if showConfirmPassword}
 												<EyeOff class="size-4" strokeWidth={1.8} />
@@ -918,7 +937,7 @@
 									<Button
 										type="submit"
 										disabled={updatingPassword}
-										class="h-9 rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-40"
+										class="h-9 w-full cursor-pointer select-none rounded-lg bg-[#DB8F5E] px-4 text-xs font-medium text-black transition-all duration-150 hover:bg-[#E59C6D] active:scale-[0.98] active:brightness-95 disabled:opacity-40 sm:w-auto"
 									>
 										{#if updatingPassword}
 											<Spinner class="mr-1.5 size-3.5" />
@@ -932,7 +951,7 @@
 						</section>
 					</div>
 				{:else if accountPanel.tab === 'billing'}
-					<div class="space-y-5 p-5">
+					<div class="space-y-5 p-4 sm:p-5">
 						<section aria-labelledby="current-plan-title">
 							<div class="mb-3 flex items-start justify-between gap-3">
 								<div class="min-w-0">
@@ -944,7 +963,7 @@
 									</p>
 									{#if activePlan}
 										<div class="mt-1 flex flex-wrap items-center gap-2">
-											<h2 class="text-lg font-medium tracking-[-0.02em] text-white">
+											<h2 class="text-base font-medium tracking-[-0.02em] text-white sm:text-lg">
 												{activePlan.name}
 											</h2>
 											<span
@@ -966,8 +985,11 @@
 								<button
 									type="button"
 									disabled={billingLoading}
-									class="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-white/45 transition-colors hover:bg-white/[0.07] hover:text-white disabled:pointer-events-none disabled:opacity-40"
-									onclick={() => loadUsage()}
+									class="inline-flex shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-white/45 transition-all duration-150 hover:bg-white/[0.07] hover:text-white active:scale-[0.95] active:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40"
+									onclick={() => {
+										triggerHaptic(20);
+										loadUsage();
+									}}
 								>
 									<RefreshCw
 										class="size-3 {billingLoading ? 'animate-spin' : ''}"
@@ -990,48 +1012,51 @@
 									<p class="text-sm text-white/55">{billingError}</p>
 									<Button
 										variant="outline"
-										class="border-white/[0.15] bg-transparent text-xs text-white/75 hover:bg-white/[0.08] hover:text-white"
-										onclick={() => loadUsage()}
+										class="border-white/[0.15] bg-transparent text-xs text-white/75 transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-[0.98]"
+										onclick={() => {
+											triggerHaptic(20);
+											loadUsage();
+										}}
 									>
 										Try again
 									</Button>
 								</div>
 							{:else if usage}
 								<div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-									<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-3">
+									<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-2.5 sm:p-3">
 										<FileText class="mb-2 size-3.5 text-white/40" strokeWidth={1.8} />
 										<p class="text-[10px] text-white/35">Uploads</p>
-										<p class="mt-1 text-base font-medium text-white/85">
+										<p class="mt-1 text-sm font-medium text-white/85 sm:text-base">
 											{usage.uploadsCount.toLocaleString()}
 											<span class="text-[10px] font-normal text-white/35">
 												/ {activeLimits?.maxUploadsPerMonth}</span
 											>
 										</p>
 									</div>
-									<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-3">
+									<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-2.5 sm:p-3">
 										<Search class="mb-2 size-3.5 text-white/40" strokeWidth={1.8} />
 										<p class="text-[10px] text-white/35">Searches</p>
-										<p class="mt-1 text-base font-medium text-white/85">
+										<p class="mt-1 text-sm font-medium text-white/85 sm:text-base">
 											{usage.searchesCount.toLocaleString()}
 											<span class="text-[10px] font-normal text-white/35">
 												/ {activeLimits?.maxSearchesPerMonth}</span
 											>
 										</p>
 									</div>
-									<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-3">
+									<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-2.5 sm:p-3">
 										<MessageCircle class="mb-2 size-3.5 text-white/40" strokeWidth={1.8} />
 										<p class="text-[10px] text-white/35">Q&amp;A</p>
-										<p class="mt-1 text-base font-medium text-white/85">
+										<p class="mt-1 text-sm font-medium text-white/85 sm:text-base">
 											{usage.qaCount.toLocaleString()}
 											<span class="text-[10px] font-normal text-white/35">
 												/ {activeLimits?.maxQnaPerMonth}</span
 											>
 										</p>
 									</div>
-									<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-3">
+									<div class="rounded-lg border border-white/[0.1] bg-white/[0.035] p-2.5 sm:p-3">
 										<HardDrive class="mb-2 size-3.5 text-white/40" strokeWidth={1.8} />
 										<p class="text-[10px] text-white/35">Storage</p>
-										<p class="mt-1 text-base font-medium text-white/85">
+										<p class="mt-1 text-sm font-medium text-white/85 sm:text-base">
 											{formatBytes(usage.storageUsedBytes)}
 											<span class="text-[10px] font-normal text-white/35">
 												/ {formatBytes(activeLimits?.maxStorageBytes ?? 0)}</span
@@ -1041,7 +1066,7 @@
 								</div>
 								{#if usage.tier === 'FREE'}
 									<div
-										class="mt-3 flex items-center gap-2.5 rounded-lg border border-white/[0.1] bg-white/[0.025] p-3"
+										class="mt-3 flex items-center gap-2.5 rounded-lg border border-white/[0.1] bg-white/[0.025] p-2.5 sm:p-3"
 									>
 										<CalendarClock class="size-4 shrink-0 text-white/40" strokeWidth={1.8} />
 										<div>
@@ -1067,8 +1092,11 @@
 										<Button
 											variant="outline"
 											disabled={isPortalLoading}
-											onclick={openBillingPortal}
-											class="h-9 shrink-0 border-white/[0.15] bg-white/[0.04] text-xs text-white/75 hover:bg-white/[0.1] hover:text-white disabled:opacity-40"
+											onclick={() => {
+												triggerHaptic(20);
+												openBillingPortal();
+											}}
+											class="h-9 w-full shrink-0 cursor-pointer select-none border-white/[0.15] bg-white/[0.04] text-xs text-white/75 transition-all duration-150 hover:bg-white/[0.1] hover:text-white active:scale-[0.98] active:bg-white/[0.12] disabled:opacity-40 sm:w-auto"
 										>
 											{#if isPortalLoading}
 												<Spinner class="mr-1.5 size-3.5" />
@@ -1101,8 +1129,8 @@
 							<div class="grid gap-2.5 sm:grid-cols-2">
 								{#each plans as plan (plan.tier)}
 									<article
-										class="rounded-lg border p-3 transition-colors {usage?.tier === plan.tier
-											? 'border-white/[0.3] bg-white/[0.07]'
+										class="rounded-lg border p-3 transition-all duration-150 sm:p-3.5 {usage?.tier === plan.tier
+											? 'border-white/[0.3] bg-white/[0.07] ring-1 ring-white/15 shadow-sm'
 											: 'border-white/[0.1] bg-white/[0.025]'}"
 										aria-label={`${plan.name} pricing plan`}
 									>
@@ -1151,8 +1179,11 @@
 											<button
 												type="button"
 												disabled={isCheckoutLoading || usage?.tier === 'SIMULATE'}
-												onclick={openSandboxCheckout}
-												class="mt-3 inline-flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-xs font-medium text-[#1B1B1B] transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-40"
+												onclick={() => {
+													triggerHaptic(20);
+													openSandboxCheckout();
+												}}
+												class="mt-3 inline-flex h-9 w-full cursor-pointer select-none items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-xs font-medium text-[#1B1B1B] transition-all duration-150 hover:bg-white/85 active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
 											>
 												{#if isCheckoutLoading}
 													<Spinner class="size-3.5" />
@@ -1167,7 +1198,7 @@
 											<button
 												type="button"
 												disabled
-												class="relative mt-3 inline-flex h-9 w-full cursor-not-allowed items-center justify-center overflow-hidden rounded-lg border border-white/[0.1] bg-white/[0.03] px-3 text-xs font-medium text-white/30"
+												class="relative mt-3 inline-flex h-9 w-full cursor-not-allowed select-none items-center justify-center overflow-hidden rounded-lg border border-white/[0.1] bg-white/[0.03] px-3 text-xs font-medium text-white/30"
 											>
 												Unavailable
 												<span
@@ -1180,7 +1211,7 @@
 											<button
 												type="button"
 												disabled
-												class="mt-3 inline-flex h-9 w-full cursor-not-allowed items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.03] px-3 text-xs font-medium text-white/35"
+												class="mt-3 inline-flex h-9 w-full cursor-not-allowed select-none items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.03] px-3 text-xs font-medium text-white/35"
 											>
 												{usage?.tier === plan.tier ? 'Current plan' : 'Included'}
 											</button>
@@ -1195,51 +1226,57 @@
 						</section>
 					</div>
 				{:else if accountPanel.tab === 'byok'}
-					<div class="p-5">
-						<div class="flex gap-2">
+					<div class="space-y-5 p-4 sm:p-5">
+						<div class="grid grid-cols-3 gap-1.5 sm:gap-2">
 							{#each BYOK_PROVIDER_OPTIONS as providerOption (providerOption.id)}
 								<button
 									type="button"
-									class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors {provider ===
+									class="flex min-w-0 cursor-pointer select-none flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center transition-all duration-150 active:scale-[0.97] sm:flex-row sm:justify-start sm:gap-2 sm:px-2.5 sm:py-2 sm:text-left {provider ===
 									providerOption.id
-										? 'border-[#DB8F5E]/60 bg-[#DB8F5E]/10 text-white'
-										: 'border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.08] hover:text-white/80'}"
-									onclick={() => selectConfigureProvider(providerOption.id)}
+										? 'border-[#DB8F5E]/60 bg-[#DB8F5E]/15 text-white ring-1 ring-[#DB8F5E]/30 shadow-xs'
+										: 'border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.08] hover:text-white/80 active:bg-white/[0.08]'}"
+									onclick={() => {
+										triggerHaptic(20);
+										selectConfigureProvider(providerOption.id);
+									}}
 								>
 									<img
 										src={providerOption.icon}
 										alt={providerOption.label}
 										class="size-4 shrink-0 opacity-70 brightness-0 invert"
 									/>
-									<span class="min-w-0 truncate text-xs font-medium">{providerOption.label}</span>
+									<span class="min-w-0 truncate text-[11px] font-medium sm:text-xs">{providerOption.label}</span>
 								</button>
 							{/each}
 						</div>
 
-						<div class="mt-5 flex flex-col gap-3">
+						<div class="flex flex-col gap-3">
 							<div class="flex items-center justify-between gap-3">
-								<div>
-									<p class="text-sm font-medium text-white/85">{providerLabel} API key</p>
-									<p class="mt-1 text-xs text-white/40">
+								<div class="min-w-0">
+									<p class="truncate text-sm font-medium text-white/85">{providerLabel} API key</p>
+									<p class="mt-0.5 text-[11px] text-white/40 sm:mt-1 sm:text-xs">
 										{BYOK_PROVIDER_OPTIONS.find((item) => item.id === provider)?.description}
 									</p>
 								</div>
-								<KeyRound class="size-4 text-white/35" />
+								<KeyRound class="size-4 shrink-0 text-white/35" />
 							</div>
 
 							{#if keyMasks[provider]}
 								<div
-									class="flex h-10 items-center justify-between rounded-lg border border-white/15 bg-black/20 px-3"
+									class="flex flex-col gap-2 rounded-lg border border-white/15 bg-black/20 p-2.5 sm:h-10 sm:flex-row sm:items-center sm:justify-between sm:px-3 sm:py-0"
 								>
-									<div class="flex items-center gap-2 text-sm text-white/75">
-										<Check class="size-4 text-white/60" />
+									<div class="flex items-center gap-2 text-xs text-white/75 sm:text-sm">
+										<Check class="size-4 shrink-0 text-white/60" />
 										<span>API Key Configured</span>
 									</div>
 									<button
 										type="button"
-										class="flex cursor-pointer items-center gap-1 text-xs text-white/50 transition-colors hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+										class="flex cursor-pointer select-none items-center justify-center gap-1 text-xs text-white/50 transition-all duration-150 hover:text-white/85 active:scale-[0.95] active:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
 										disabled={isResettingKey}
-										onclick={resetConfigureKey}
+										onclick={() => {
+											triggerHaptic(20);
+											resetConfigureKey();
+										}}
 									>
 										<RotateCw class="size-3.5" />
 										<span>{isResettingKey ? 'Resetting...' : 'Reset Key'}</span>
@@ -1268,11 +1305,14 @@
 								</p>
 							{/if}
 
-							<div class="flex justify-end gap-2 pt-0.5">
+							<div class="grid grid-cols-2 gap-2 pt-0.5 sm:flex sm:justify-end">
 								<Button
-									class="h-9 cursor-pointer rounded-lg bg-white px-3 text-xs font-medium text-black hover:bg-white/90 disabled:opacity-50"
+									class="h-9 cursor-pointer select-none rounded-lg bg-white px-3 text-xs font-medium text-black transition-all duration-150 hover:bg-white/90 active:scale-[0.98] active:brightness-95 disabled:opacity-50"
 									disabled={!apiKey.trim() || isTestingKey || isSavingKey || isResettingKey}
-									onclick={testConfigureKey}
+									onclick={() => {
+										triggerHaptic(20);
+										testConfigureKey();
+									}}
 								>
 									{#if isTestingKey}
 										<Spinner class="mr-1.5 size-3.5" />
@@ -1284,11 +1324,11 @@
 								{#if !testResult?.valid && apiKey.trim()}
 									<Tooltip.Provider delayDuration={100}>
 										<Tooltip.Root>
-											<Tooltip.Trigger>
+											<Tooltip.Trigger class="w-full sm:w-auto">
 												{#snippet child({ props })}
-													<span {...props} class="inline-flex">
+													<span {...props} class="inline-flex w-full sm:w-auto">
 														<Button
-															class="h-9 cursor-pointer rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-50"
+															class="h-9 w-full cursor-pointer select-none rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] active:scale-[0.98] disabled:opacity-50 sm:w-auto"
 															disabled={true}
 														>
 															Save key
@@ -1305,9 +1345,12 @@
 									</Tooltip.Provider>
 								{:else}
 									<Button
-										class="h-9 cursor-pointer rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black hover:bg-[#E59C6D] disabled:opacity-50"
+										class="h-9 w-full cursor-pointer select-none rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black transition-all duration-150 hover:bg-[#E59C6D] active:scale-[0.98] active:brightness-95 disabled:opacity-50 sm:w-auto"
 										disabled={!apiKey.trim() || isSavingKey || isResettingKey || !testResult?.valid}
-										onclick={saveConfigureKey}
+										onclick={() => {
+											triggerHaptic(20);
+											saveConfigureKey();
+										}}
 									>
 										{#if isSavingKey}
 											<Spinner class="mr-1.5 size-3.5" />
@@ -1321,17 +1364,20 @@
 						</div>
 					</div>
 				{:else}
-					<div class="p-5">
-						<div class="mb-3 flex items-center justify-between gap-3">
+					<div class="p-4 sm:p-5">
+						<div class="mb-3 flex items-center justify-between gap-2">
 							<p class="text-xs font-medium text-white/55">
 								{shares.length} active {shares.length === 1 ? 'link' : 'links'}
 							</p>
 							<div class="flex items-center gap-1">
 								<button
 									type="button"
-									class="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-white/45 transition-colors hover:bg-white/[0.07] hover:text-white disabled:pointer-events-none disabled:opacity-40"
+									class="inline-flex cursor-pointer select-none items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-white/45 transition-all duration-150 hover:bg-white/[0.07] hover:text-white active:scale-[0.95] active:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40"
 									disabled={sharesLoading}
-									onclick={() => loadShares()}
+									onclick={() => {
+										triggerHaptic(20);
+										loadShares();
+									}}
 								>
 									<RefreshCw
 										class="size-3 {sharesLoading ? 'animate-spin' : ''}"
@@ -1342,9 +1388,12 @@
 								{#if shares.length > 0}
 									<button
 										type="button"
-										class="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-red-400/80 transition-colors hover:bg-red-500/[0.1] hover:text-red-300 disabled:pointer-events-none disabled:opacity-40"
+										class="inline-flex cursor-pointer select-none items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-red-400/80 transition-all duration-150 hover:bg-red-500/[0.1] hover:text-red-300 active:scale-[0.95] active:bg-red-500/[0.2] disabled:pointer-events-none disabled:opacity-40"
 										disabled={isDeletingAll}
-										onclick={revokeAll}
+										onclick={() => {
+											triggerHaptic(20);
+											revokeAll();
+										}}
 									>
 										{#if isDeletingAll}
 											<RefreshCw class="size-3 animate-spin" strokeWidth={1.8} />
@@ -1369,7 +1418,7 @@
 									oninput={(event) => setSearchQuery(event.currentTarget.value)}
 									placeholder="Search by title or code"
 									aria-label="Search shared links"
-									class="h-10 w-full rounded-lg border border-white/[0.12] bg-white/[0.055] pl-9 text-sm text-white placeholder:text-white/28 focus:border-white/30 focus:ring-2 focus:ring-white/10 focus:outline-none"
+									class="h-9 w-full rounded-lg border border-white/[0.12] bg-white/[0.055] pl-9 text-xs text-white placeholder:text-white/28 focus:border-white/30 focus:ring-2 focus:ring-white/10 focus:outline-none sm:h-10 sm:text-sm"
 								/>
 							</div>
 						{/if}
@@ -1383,8 +1432,11 @@
 								<p class="text-sm text-white/55">{sharesError}</p>
 								<Button
 									variant="outline"
-									class="border-white/[0.15] bg-transparent text-xs text-white/75 hover:bg-white/[0.08] hover:text-white"
-									onclick={() => loadShares()}
+									class="border-white/[0.15] bg-transparent text-xs text-white/75 transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-[0.98]"
+									onclick={() => {
+										triggerHaptic(20);
+										loadShares();
+									}}
 								>
 									Try again
 								</Button>
@@ -1410,10 +1462,10 @@
 								{#each pageGroups as group (group.conversationId)}
 									<div class="overflow-hidden rounded-lg border border-white/[0.1]">
 										<div
-											class="flex items-center gap-2.5 border-b border-white/[0.08] bg-white/[0.035] px-3 py-2"
+											class="flex items-center gap-2 border-b border-white/[0.08] bg-white/[0.035] px-2.5 py-2 sm:gap-2.5 sm:px-3"
 										>
 											<div
-												class="flex size-7 shrink-0 items-center justify-center rounded-md bg-white/[0.07]"
+												class="flex size-6 shrink-0 items-center justify-center rounded-md bg-white/[0.07] sm:size-7"
 											>
 												<MxIcon name="document-outline" class="size-3.5 text-white/45" />
 											</div>
@@ -1426,10 +1478,13 @@
 											</span>
 											<button
 												type="button"
-												class="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-white/45 transition-colors hover:bg-red-500/[0.1] hover:text-red-300 disabled:pointer-events-none disabled:opacity-40"
+												class="inline-flex shrink-0 cursor-pointer select-none items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-white/45 transition-all duration-150 hover:bg-red-500/[0.1] hover:text-red-300 active:scale-[0.95] active:bg-red-500/[0.2] disabled:pointer-events-none disabled:opacity-40"
 												aria-label={`Delete all links for ${group.title}`}
 												disabled={deletingConversationId !== null}
-												onclick={() => revokeConversation(group.conversationId)}
+												onclick={() => {
+													triggerHaptic(20);
+													revokeConversation(group.conversationId);
+												}}
 											>
 												{#if deletingConversationId === group.conversationId}
 													<RefreshCw class="size-3 animate-spin" strokeWidth={1.8} />
@@ -1441,7 +1496,7 @@
 										</div>
 										<div class="divide-y divide-white/[0.07]">
 											{#each group.shares as share (share.code)}
-												<div class="flex items-center gap-3 py-2.5 pr-2.5 pl-3">
+												<div class="flex items-center gap-2.5 py-2.5 pr-2 pl-2.5 sm:gap-3 sm:pr-2.5 sm:pl-3">
 													<div
 														class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]"
 													>
@@ -1449,7 +1504,7 @@
 													</div>
 													<div class="min-w-0 flex-1">
 														<div class="flex items-center gap-2">
-															<p class="truncate text-sm text-white/80">{share.title}</p>
+															<p class="truncate text-xs font-medium text-white/80 sm:text-sm">{share.title}</p>
 															{#if share.isPrivate}
 																<span
 																	class="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-white/55 uppercase"
@@ -1471,16 +1526,22 @@
 														<button
 															type="button"
 															aria-label={`Open ${share.title}`}
-															class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
-															onclick={() => openLink(share)}
+															class="flex size-7 cursor-pointer select-none items-center justify-center rounded-md text-white/40 transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-[0.92] active:bg-white/[0.14] sm:size-8"
+															onclick={() => {
+																triggerHaptic(20);
+																openLink(share);
+															}}
 														>
 															<ExternalLink class="size-3.5" strokeWidth={1.8} />
 														</button>
 														<button
 															type="button"
-															class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
+															class="flex size-7 cursor-pointer select-none items-center justify-center rounded-md text-white/40 transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-[0.92] active:bg-white/[0.14] sm:size-8"
 															aria-label={`Copy ${share.title}`}
-															onclick={() => copyLink(share)}
+															onclick={() => {
+																triggerHaptic(30);
+																copyLink(share);
+															}}
 														>
 															{#if copiedCode === share.code}
 																<Check class="size-3.5 text-emerald-300" strokeWidth={2} />
@@ -1490,9 +1551,12 @@
 														</button>
 														<button
 															type="button"
-															class="flex size-8 cursor-pointer items-center justify-center rounded-md text-white/35 transition-colors hover:bg-red-500/[0.1] hover:text-red-300"
+															class="flex size-7 cursor-pointer select-none items-center justify-center rounded-md text-white/35 transition-all duration-150 hover:bg-red-500/[0.1] hover:text-red-300 active:scale-[0.92] active:bg-red-500/[0.2] sm:size-8"
 															aria-label={`Revoke ${share.title}`}
-															onclick={() => revokeLink(share.code)}
+															onclick={() => {
+																triggerHaptic(20);
+																revokeLink(share.code);
+															}}
 														>
 															<MxIcon name="trash-bin-minimalistic-outline" class="size-3.5" />
 														</button>
@@ -1508,9 +1572,12 @@
 								<div class="mt-3 flex items-center justify-between gap-3">
 									<button
 										type="button"
-										class="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] text-white/45 transition-colors hover:bg-white/[0.07] hover:text-white disabled:pointer-events-none disabled:opacity-40"
+										class="inline-flex cursor-pointer select-none items-center gap-1 rounded-md px-2 py-1 text-[11px] text-white/45 transition-all duration-150 hover:bg-white/[0.07] hover:text-white active:scale-[0.95] active:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40"
 										disabled={currentPage <= 1}
-										onclick={() => (currentPage -= 1)}
+										onclick={() => {
+											triggerHaptic(20);
+											currentPage -= 1;
+										}}
 									>
 										Previous
 									</button>
@@ -1519,9 +1586,12 @@
 									</span>
 									<button
 										type="button"
-										class="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] text-white/45 transition-colors hover:bg-white/[0.07] hover:text-white disabled:pointer-events-none disabled:opacity-40"
+										class="inline-flex cursor-pointer select-none items-center gap-1 rounded-md px-2 py-1 text-[11px] text-white/45 transition-all duration-150 hover:bg-white/[0.07] hover:text-white active:scale-[0.95] active:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40"
 										disabled={currentPage >= totalPages}
-										onclick={() => (currentPage += 1)}
+										onclick={() => {
+											triggerHaptic(20);
+											currentPage += 1;
+										}}
 									>
 										Next
 									</button>
@@ -1534,3 +1604,13 @@
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
+
+<style>
+	:global([data-slot="dialog-content"] button),
+	:global([data-slot="dialog-content"] a) {
+		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
+		-webkit-touch-callout: none;
+		user-select: none;
+		touch-action: manipulation;
+	}
+</style>
