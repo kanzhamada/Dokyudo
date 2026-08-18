@@ -1447,11 +1447,11 @@
 						>
 							<!-- Header -->
 							<div class="flex items-start justify-between gap-3">
-								<div class="flex items-center gap-3">
-									<div class="size-4.5 rounded-md bg-[#302F2F]"></div>
-									<div class="h-3.5 w-44 rounded-full bg-[#302F2F]"></div>
+								<div class="flex min-w-0 flex-1 items-center gap-3">
+									<div class="size-4.5 shrink-0 rounded-md bg-[#302F2F]"></div>
+									<div class="h-3.5 w-44 max-w-full rounded-full bg-[#302F2F]"></div>
 								</div>
-								<div class="flex items-center gap-3">
+								<div class="flex shrink-0 items-center gap-3">
 									<div class="h-5 w-20 rounded-full bg-[#DB8F5E]/15"></div>
 									<div class="size-7 rounded-full bg-[#302F2F]"></div>
 								</div>
@@ -1494,14 +1494,15 @@
 						>
 							<!-- Card Row 1: Header -->
 							<div class="flex items-start justify-between gap-3">
-								<div class="flex items-center gap-3">
+								<div class="flex min-w-0 flex-1 items-center gap-3">
 									<MxIcon name="document-outline" class="size-4.5 shrink-0 text-[#C5937B]" />
-									<span class="text-sm font-medium text-white md:text-base"
-										>{@html highlightMatch(doc.name, activeSearchQuery)}</span
-									>
+									<span
+										class="min-w-0 flex-1 truncate text-sm font-medium text-white md:text-base"
+										title={doc.name}
+									>{@html highlightMatch(doc.name, activeSearchQuery)}</span>
 								</div>
 								<div
-									class="flex items-center gap-3"
+									class="flex shrink-0 items-center gap-3"
 									onclick={(e) => e.stopPropagation()}
 									role="none"
 								>

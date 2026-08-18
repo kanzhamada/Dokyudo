@@ -369,15 +369,15 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content
-		class="border-[#302F2F] bg-[#191919]/[0.85] p-0 text-white backdrop-blur-[42px] sm:rounded-[22px]"
+		class="flex max-h-[calc(100dvh-1rem)] max-w-[calc(100%-1rem)] flex-col overflow-hidden rounded-[16px] border-[#302F2F] bg-[#191919]/[0.85] p-0 text-white backdrop-blur-[42px] sm:max-w-4xl sm:rounded-[22px]"
 	>
-		<div class="flex flex-col gap-5 p-8 pb-0 md:p-10 md:pb-0">
+		<div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-5 sm:gap-5 sm:p-8 sm:pb-0 md:p-10 md:pb-0">
 			<!-- Header Section -->
-			<div class="flex flex-col gap-2 text-center">
-				<Dialog.Title class="text-3xl font-semibold text-white md:text-4xl">
+			<div class="flex min-w-0 flex-col gap-2 text-center">
+				<Dialog.Title class="text-[28px] leading-tight font-semibold text-white md:text-4xl">
 					Upload Documents
 				</Dialog.Title>
-				<Dialog.Description class="text-sm font-normal text-[#767676] md:text-base">
+				<Dialog.Description class="mx-auto max-w-full px-2 text-sm leading-relaxed font-normal text-[#767676] md:text-base">
 					Add important project documents. Supported types: PDF, TXT, DOCX, and MD. (keep files under 25MB)
 				</Dialog.Description>
 			</div>
@@ -389,12 +389,12 @@
 				ondragover={handleDragOver}
 				ondragleave={handleDragLeave}
 				ondrop={handleDrop}
-				class="flex flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-6 py-10 transition-colors {isDragOver
+				class="flex w-full min-w-0 flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-4 py-8 transition-colors sm:px-6 sm:py-10 {isDragOver
 					? 'border-[#DB8F5E] bg-[#2A2A2A]/80'
 					: 'border-white/20 bg-[#2A2A2A]/40 hover:bg-[#2A2A2A]/60'}"
 			>
 				<!-- Illustrative Composition -->
-				<div class="relative mb-6 flex h-24 w-32 items-center justify-center">
+				<div class="relative mb-4 flex h-20 w-28 items-center justify-center sm:mb-6 sm:h-24 sm:w-32">
 					<!-- TXT Icon (Back Right) -->
 					<div
 						class="absolute top-2 right-2 flex h-16 w-12 rotate-6 transform items-center justify-center opacity-80 shadow-lg"
@@ -542,8 +542,8 @@
 					</div>
 				</div>
 
-				<h3 class="mb-2 text-lg font-bold text-white">Drop your files here</h3>
-				<p class="mb-5 text-sm text-[#767676]">Or choose another option:</p>
+				<h3 class="mb-2 text-center text-lg font-bold text-white">Drop your files here</h3>
+				<p class="mb-5 text-center text-sm text-[#767676]">Or choose another option:</p>
 
 				<Button
 					onclick={() => {
@@ -564,23 +564,23 @@
 							{#if item.status === 'staged'}
 								<!-- Row (Staged - Pre-upload) -->
 								<div
-									class="flex items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-4 py-3"
+									class="flex min-w-0 items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-3 py-3 sm:px-4"
 								>
-									<div class="flex items-center gap-4">
+									<div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
 										<div
-											class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/70"
+											class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/70"
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
-										<div class="flex flex-col">
-											<span class="text-sm font-bold text-white">{item.name}</span>
+										<div class="min-w-0 flex flex-col">
+											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
 											<span class="text-xs text-[#959595]"
 												>{item.sizeFormatted} -
 												<span class="text-white/60">ready to upload</span></span
 											>
 										</div>
 									</div>
-									<div class="flex items-center gap-4">
+									<div class="flex shrink-0 items-center gap-3 sm:gap-4">
 										<Tooltip.Provider delayDuration={100}>
 											<Tooltip.Root>
 												<Tooltip.Trigger>
@@ -610,23 +610,23 @@
 							{:else if item.status === 'success'}
 								<!-- Row (Success) -->
 								<div
-									class="flex items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-4 py-3"
+									class="flex min-w-0 items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-3 py-3 sm:px-4"
 								>
-									<div class="flex items-center gap-4">
+									<div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
 										<div
-											class="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3b82f6]/10 text-[#3b82f6]"
+											class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#3b82f6]/10 text-[#3b82f6]"
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
-										<div class="flex flex-col">
-											<span class="text-sm font-bold text-white">{item.name}</span>
+										<div class="min-w-0 flex flex-col">
+											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
 											<span class="text-xs text-[#959595]"
 												>{item.sizeFormatted} -
 												<span class="text-[#22c55e]">successful upload</span></span
 											>
 										</div>
 									</div>
-									<div class="flex items-center gap-4">
+									<div class="flex shrink-0 items-center gap-3 sm:gap-4">
 										<span class="text-sm font-bold text-white">100%</span>
 										<CheckCircle2Icon class="size-5 text-[#22c55e]" />
 										<Tooltip.Provider delayDuration={100}>
@@ -658,16 +658,16 @@
 							{:else if item.status === 'failed'}
 								<!-- Row (Failed) -->
 								<div
-									class="flex items-center justify-between rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/5 px-4 py-3 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+									class="flex min-w-0 items-center justify-between rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/5 px-3 py-3 shadow-[0_0_15px_rgba(239,68,68,0.1)] sm:px-4"
 								>
-									<div class="flex items-center gap-4">
+									<div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
 										<div
-											class="flex h-10 w-10 items-center justify-center rounded-lg bg-[#ef4444]/10 text-[#ef4444]"
+											class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#ef4444]/10 text-[#ef4444]"
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
-										<div class="flex flex-col">
-											<span class="text-sm font-bold text-white">{item.name}</span>
+										<div class="min-w-0 flex flex-col">
+											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
 											<span class="text-xs text-[#959595]"
 												>{item.sizeFormatted} -
 												<span class="font-bold text-[#ef4444]"
@@ -676,7 +676,7 @@
 											>
 										</div>
 									</div>
-									<div class="flex items-center gap-4">
+									<div class="flex shrink-0 items-center gap-3 sm:gap-4">
 										<span class="text-sm font-bold text-white">{item.progress}%</span>
 										<Tooltip.Provider delayDuration={100}>
 											<Tooltip.Root>
@@ -731,16 +731,16 @@
 							{:else}
 								<!-- Row (Uploading / Requesting / Confirming) -->
 								<div
-									class="flex items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-4 py-3"
+									class="flex min-w-0 items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-3 py-3 sm:px-4"
 								>
-									<div class="flex items-center gap-4">
+									<div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
 										<div
-											class="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/70"
+											class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/70"
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
-										<div class="flex flex-col">
-											<span class="text-sm font-bold text-white">{item.name}</span>
+										<div class="min-w-0 flex flex-col">
+											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
 											<span class="text-xs text-[#959595]"
 												>{item.sizeFormatted} -
 												<span class="font-medium text-white/80">
@@ -755,7 +755,7 @@
 											>
 										</div>
 									</div>
-									<div class="flex items-center gap-4">
+									<div class="flex shrink-0 items-center gap-3 sm:gap-4">
 										{#if item.status === 'uploading'}
 											<span class="text-sm font-bold text-white">{item.progress}%</span>
 										{:else}
@@ -793,7 +793,7 @@
 
 					<!-- Real-time Summary Bar -->
 					<div
-						class="flex items-center justify-between rounded-xl border border-white/10 bg-[#222222]/70 px-4 py-2.5 text-xs text-[#959595]"
+						class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-white/10 bg-[#222222]/70 px-3 py-2.5 text-xs text-[#959595] sm:px-4"
 					>
 						<div class="flex items-center gap-2">
 							<span class="font-medium text-white/60">Total:</span>
@@ -818,7 +818,7 @@
 
 		<!-- Footer Section -->
 		<div
-			class="flex items-center justify-between border-t border-white/10 bg-[#1F1E1D] px-8 py-5 sm:rounded-b-[22px]"
+			class="flex shrink-0 flex-col gap-3 border-t border-white/10 bg-[#1F1E1D] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-5 sm:rounded-b-[22px]"
 		>
 			<button
 				type="button"
@@ -831,7 +831,7 @@
 				<span class="text-sm font-medium">Get Help</span>
 			</button>
 
-			<div class="flex items-center gap-3">
+			<div class="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-3">
 				{#if hasFailedUploads}
 					<!-- Retry All Failed Button -->
 					<Button
@@ -901,7 +901,7 @@
 											}
 										}}
 										disabled={uploadFiles.length === 0 || isAnyUploading || hasFailedUploads}
-										class="relative cursor-pointer select-none bg-[#DB8F5E] font-medium text-white transition-all duration-150 hover:bg-[#C47D4E] active:scale-[0.96] disabled:bg-[#DB8F5E]/40 disabled:text-white/50 disabled:opacity-100"
+										class="relative max-w-full cursor-pointer select-none bg-[#DB8F5E] font-medium text-white transition-all duration-150 hover:bg-[#C47D4E] active:scale-[0.96] disabled:bg-[#DB8F5E]/40 disabled:text-white/50 disabled:opacity-100"
 									>
 										{#if isAnyUploading}
 											<Loader2Icon class="mr-2 size-4 animate-spin" />
