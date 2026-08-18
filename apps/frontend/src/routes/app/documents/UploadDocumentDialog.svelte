@@ -820,17 +820,6 @@
 		<div
 			class="flex shrink-0 flex-col gap-3 border-t border-white/10 bg-[#1F1E1D] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-5 sm:rounded-b-[22px]"
 		>
-			<button
-				type="button"
-				onclick={() => triggerHaptic(15)}
-				class="flex cursor-pointer select-none items-center gap-2 text-[#767676] transition-all duration-150 hover:text-white active:scale-[0.96]"
-			>
-				<div class="flex h-5 w-5 items-center justify-center rounded-full border border-current">
-					<span class="text-xs font-bold">?</span>
-				</div>
-				<span class="text-sm font-medium">Get Help</span>
-			</button>
-
 			<div class="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-3">
 				{#if hasFailedUploads}
 					<!-- Retry All Failed Button -->
