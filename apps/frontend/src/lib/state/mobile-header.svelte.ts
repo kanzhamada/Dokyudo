@@ -2,7 +2,12 @@ export class MobileHeaderState {
 	type = $state<'default' | 'error' | 'success' | 'info'>('default');
 	title = $state<string | null>(null);
 	message = $state<string | null>(null);
+	hidden = $state(false);
 	private timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+	setHidden(value: boolean) {
+		this.hidden = value;
+	}
 
 	showError(msg: string, duration = 4000) {
 		this.type = 'error';

@@ -273,7 +273,7 @@
 											<Pagination.Item>
 												<Pagination.Ellipsis class="text-white/60" />
 											</Pagination.Item>
-										{:else if page.value !== 1 && page.value !== meta.totalPages}
+										{:else if (page.value !== 1 && page.value !== meta.totalPages) || page.value === currentPage}
 											<Pagination.Item>
 												<Pagination.Link
 													{page}

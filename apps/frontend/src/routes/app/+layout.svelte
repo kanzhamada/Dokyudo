@@ -8,6 +8,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { sessionExpiryStore } from '$lib/state/session-expiry.store.svelte';
+	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 
 	let { children } = $props();
 
@@ -84,7 +85,7 @@
 		></div>
 
 		<div class="relative z-10 flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-			{#if !page.url.pathname.startsWith('/app/chat/')}
+			{#if !page.url.pathname.startsWith('/app/chat/') && !mobileHeaderState.hidden}
 				<MobileHeader />
 			{/if}
 

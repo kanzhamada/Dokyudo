@@ -481,6 +481,14 @@
 	let previewDocument = $state<Document | null>(null);
 	let uploadDialogOpen = $state(false);
 
+	$effect(() => {
+		const isPreviewOpen = previewDocument !== null;
+		mobileHeaderState.setHidden(isPreviewOpen);
+		return () => {
+			mobileHeaderState.setHidden(false);
+		};
+	});
+
 	/* ── Document Multi-Selection & Batch Delete State ── */
 	let selectedDocIds = $state<string[]>([]);
 	let selectedCount = $derived(selectedDocIds.length);
@@ -1741,7 +1749,7 @@
 												<Pagination.Item>
 													<Pagination.Ellipsis class="text-white/60" />
 												</Pagination.Item>
-											{:else if page.value !== 1 && page.value !== totalPages}
+											{:else if (page.value !== 1 && page.value !== totalPages) || page.value === currentPage}
 												<Pagination.Item>
 													<Pagination.Link
 														{page}
