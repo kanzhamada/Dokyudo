@@ -9,6 +9,7 @@ import rootRouter from "./api/router.ts";
 import { cryptoPuzzleMiddleware } from "./shared/middlewares/crypto_puzzle.middleware.ts";
 import { createApp } from "./config/hono.ts";
 import { RagService } from "./modules/rag/rag.service.ts";
+import { AccountDeletionService } from "./modules/account_deletion/account_deletion.service.ts";
 
 const app = createApp();
 
@@ -141,6 +142,11 @@ if (import.meta.main) {
   // Background sweep for chat turns awaiting document ingestion
   Deno.cron("sweep-awaiting-turns", "* * * * *", async () => {
     await RagService.sweepAwaitingTurns();
+  });
+
+  // Background sweep for pending account deletions (idempotent, retries inside)
+  Deno.cron("sweep-account-deletions", "* * * * *", async () => {
+    await AccountDeletionService.sweepPendingJobs();
   });
 
   console.log(`

@@ -4,7 +4,7 @@ import { getEnv } from "./env.ts";
 export const ACCESS_TOKEN_COOKIE = "dokyudo_access_token";
 export const REFRESH_TOKEN_COOKIE = "dokyudo_refresh_token";
 
-const ACCESS_MAX_AGE = 60 * 60; // 1 hour
+const ACCESS_MAX_AGE = 60 * 60 * 24 * 7; // 7 days (604800 seconds)
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 interface CookieAttributes {

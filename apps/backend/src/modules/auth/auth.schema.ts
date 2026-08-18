@@ -348,3 +348,31 @@ export const VerifyEmailResponseSchema = z
     }),
   })
   .openapi("VerifyEmailResponse");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Account Deletion Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DeleteAccountParamsSchema = z.object({
+  userId: z.string().uuid(),
+  tenantId: z.string().uuid(),
+  clientIp: z.string().optional(),
+  userAgent: z.string().optional(),
+  requestId: z.string().optional(),
+  logContext: z.any().optional(),
+});
+
+export type DeleteAccountParams = z.infer<typeof DeleteAccountParamsSchema>;
+
+export const DeleteAccountResponseSchema = z
+  .object({
+    message: z.string().openapi({
+      description: "Deletion scheduled message",
+      example: "Account deletion scheduled. Your data will be purged shortly.",
+    }),
+    scheduled: z.boolean().openapi({ example: true }),
+    jobId: z.string().uuid().openapi({
+      description: "Identifier of the async deletion job",
+    }),
+  })
+  .openapi("DeleteAccountResponse");

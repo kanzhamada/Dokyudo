@@ -1,14 +1,12 @@
 <script lang="ts">
-	import {
-		type ColumnDef,
-		getCoreRowModel
-	} from '@tanstack/table-core';
+	import { type ColumnDef, getCoreRowModel } from '@tanstack/table-core';
 	import { createSvelteTable } from '$lib/components/ui/data-table/index.js';
 	import { FlexRender } from '$lib/components/ui/data-table/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { Eye, EyeOff } from 'lucide-svelte';
 	import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
 	import ChevronLastIcon from '@lucide/svelte/icons/chevron-last';
 	import { getColumns, type ActivityLog } from './columns.js';
@@ -26,6 +24,11 @@
 	} = $props();
 
 	const columns = getColumns();
+	let showAllIps = $state(false);
+	let rowIpVisibility = $state<Record<string, boolean>>({});
+	let allIpsVisible = $derived.by(() =>
+		data.every((activity) => !activity.ipAddress || isIpVisible(activity.id))
+	);
 
 	const table = createSvelteTable({
 		get data() {
@@ -68,10 +71,47 @@
 		triggerHaptic(15);
 		onPageChange(targetPage);
 	}
+
+	function isIpVisible(activityId: string): boolean {
+		return rowIpVisibility[activityId] ?? showAllIps;
+	}
+
+	function toggleAllIps() {
+		showAllIps = !allIpsVisible;
+		rowIpVisibility = {};
+		triggerHaptic(15);
+	}
+
+	function toggleIp(activityId: string) {
+		rowIpVisibility = {
+			...rowIpVisibility,
+			[activityId]: !isIpVisible(activityId)
+		};
+		triggerHaptic(15);
+	}
 </script>
 
 <Tooltip.Provider>
 	<div class="space-y-4">
+		<div class="flex justify-end">
+			<button
+				type="button"
+				aria-pressed={allIpsVisible}
+				aria-label={allIpsVisible ? 'Hide all IP addresses' : 'Show all IP addresses'}
+				title={allIpsVisible ? 'Hide all IP addresses' : 'Show all IP addresses'}
+				onclick={toggleAllIps}
+				class="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 bg-[#151515] px-2.5 text-xs text-[#969696] transition-colors select-none hover:border-white/20 hover:bg-white/[0.06] hover:text-[#F2F2F2] focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:outline-none"
+			>
+				{#if allIpsVisible}
+					<EyeOff class="size-3.5" strokeWidth={1.8} />
+					<span>Hide IPs</span>
+				{:else}
+					<Eye class="size-3.5" strokeWidth={1.8} />
+					<span>Show IPs</span>
+				{/if}
+			</button>
+		</div>
+
 		<!-- Table -->
 		<div class="overflow-hidden rounded-xl border border-[#302F2F]">
 			<Table.Root class="w-full">
@@ -106,10 +146,7 @@
 						{/each}
 					{:else if data.length === 0}
 						<Table.Row class="border-[#302F2F] hover:bg-transparent">
-							<Table.Cell
-								colspan={columns.length}
-								class="h-32 text-center"
-							>
+							<Table.Cell colspan={columns.length} class="h-32 text-center">
 								<div class="flex flex-col items-center gap-2 text-[#767676]">
 									<p class="text-sm">No activity recorded yet.</p>
 									<p class="text-xs">Actions like logins and document uploads will appear here.</p>
@@ -118,9 +155,7 @@
 						</Table.Row>
 					{:else}
 						{#each table.getRowModel().rows as row (row.id)}
-							<Table.Row
-								class="border-[#302F2F] transition-colors hover:bg-white/[0.02]"
-							>
+							<Table.Row class="border-[#302F2F] transition-colors hover:bg-white/[0.02]">
 								{#each row.getVisibleCells() as cell (cell.id)}
 									<Table.Cell class="px-4 py-3">
 										{@const value = cell.getValue()}
@@ -159,29 +194,42 @@
 													: cell.column.columnDef.cell
 												: null}
 											{#if cellData && typeof cellData === 'object' && 'display' in cellData}
-												{#if cellData.full}
-													<Tooltip.Root>
-														<Tooltip.Trigger>
-															{#snippet child({ props })}
-																<span
-																	{...props}
-																	class="cursor-default text-sm text-[#959595]"
-																>
-																	{cellData.display}
-																</span>
-															{/snippet}
-														</Tooltip.Trigger>
-												<Tooltip.Content
-													class="max-w-xs break-all rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-black shadow-md"
-												>
-													{cellData.full}
-												</Tooltip.Content>
-													</Tooltip.Root>
-												{:else}
+												<div class="flex min-w-0 flex-col gap-0.5">
+													<span class="text-sm text-[#959595]">{cellData.display}</span>
+													{#if cellData.details}
+														<span class="truncate text-xs text-[#767676]">{cellData.details}</span>
+													{/if}
+												</div>
+											{:else}
+												<span class="text-sm text-[#959595]">--</span>
+											{/if}
+										{:else if cell.column.id === 'ipAddress'}
+											{#if value}
+												<div class="flex items-center gap-2">
 													<span class="text-sm text-[#959595]">
-														{cellData.display}
+														{isIpVisible(row.original.id) ? value : '••••••••'}
 													</span>
-												{/if}
+													<button
+														type="button"
+														aria-label={isIpVisible(row.original.id)
+															? 'Hide IP address'
+															: 'Show IP address'}
+														title={isIpVisible(row.original.id)
+															? 'Hide IP address'
+															: 'Show IP address'}
+														onclick={(event) => {
+															event.stopPropagation();
+															toggleIp(row.original.id);
+														}}
+														class="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-[#767676] transition-colors hover:bg-white/[0.06] hover:text-[#F2F2F2] focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:outline-none"
+													>
+														{#if isIpVisible(row.original.id)}
+															<EyeOff class="size-3.5" strokeWidth={1.8} />
+														{:else}
+															<Eye class="size-3.5" strokeWidth={1.8} />
+														{/if}
+													</button>
+												</div>
 											{:else}
 												<span class="text-sm text-[#959595]">--</span>
 											{/if}
@@ -195,19 +243,16 @@
 												<Tooltip.Root>
 													<Tooltip.Trigger>
 														{#snippet child({ props })}
-															<span
-																{...props}
-																class="cursor-default text-sm text-[#959595]"
-															>
+															<span {...props} class="cursor-default text-sm text-[#959595]">
 																{cellData.relative}
 															</span>
 														{/snippet}
 													</Tooltip.Trigger>
-												<Tooltip.Content
-													class="rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-black shadow-md"
-												>
-													{cellData.full}
-												</Tooltip.Content>
+													<Tooltip.Content
+														class="rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-black shadow-md"
+													>
+														{cellData.full}
+													</Tooltip.Content>
 												</Tooltip.Root>
 											{:else}
 												<span class="text-sm text-[#959595]">{value}</span>
@@ -254,7 +299,7 @@
 											title="First page"
 											disabled={isLoading || currentPage === 1}
 											onclick={() => goToPage(1)}
-											class="flex size-9 cursor-pointer select-none items-center justify-center rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
+											class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
 										>
 											<ChevronFirstIcon class="size-4" />
 										</button>
@@ -264,7 +309,7 @@
 										<Pagination.Previous
 											onclick={previousPage}
 											disabled={isLoading || meta.page <= 1}
-											class="cursor-pointer select-none rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
+											class="cursor-pointer rounded-full text-white transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
 										/>
 									</Pagination.Item>
 
@@ -279,7 +324,7 @@
 													{page}
 													isActive={currentPage === page.value}
 													onclick={() => goToPage(page.value)}
-													class="cursor-pointer select-none rounded-full text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 data-[active=true]:border-white/45 data-[active=true]:bg-white/10 data-[active=true]:text-white"
+													class="cursor-pointer rounded-full text-white/75 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 data-[active=true]:border-white/45 data-[active=true]:bg-white/10 data-[active=true]:text-white"
 												>
 													{page.value}
 												</Pagination.Link>
@@ -291,7 +336,7 @@
 										<Pagination.Next
 											onclick={nextPage}
 											disabled={isLoading || meta.page >= meta.totalPages}
-											class="cursor-pointer select-none rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
+											class="cursor-pointer rounded-full text-white transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
 										/>
 									</Pagination.Item>
 
@@ -302,7 +347,7 @@
 											title="Last page"
 											disabled={isLoading || currentPage === meta.totalPages}
 											onclick={() => goToPage(meta.totalPages)}
-											class="flex size-9 cursor-pointer select-none items-center justify-center rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
+											class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
 										>
 											<ChevronLastIcon class="size-4" />
 										</button>

@@ -72,6 +72,13 @@ export interface UpdateTenantNameResponse {
 	message: string;
 }
 
+/** `DELETE /api/auth/account` response (deletion is scheduled, 202) */
+export interface DeleteAccountResponse {
+	message: string;
+	scheduled: boolean;
+	jobId: string;
+}
+
 /** Login request payload */
 export type LoginRequestPayload = {
 	email: string;

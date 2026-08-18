@@ -2,6 +2,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { scale } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
@@ -61,88 +62,6 @@
 	let isDeleting = $state(false);
 
 	let isUserMenuOpen = $state(false);
-	let activeConversationMenu = $state<{ item: ConversationItem; x: number; y: number } | null>(
-		null
-	);
-
-	function openConversationMenu(e: MouseEvent, item: ConversationItem) {
-		e.preventDefault();
-		e.stopPropagation();
-		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-		activeConversationMenu = {
-			item,
-			x: rect.left,
-			y: rect.top + rect.height
-		};
-	}
-
-	let longPressTimeout: ReturnType<typeof setTimeout> | null = null;
-	let longPressTriggered = $state(false);
-	let touchStartX = 0;
-	let touchStartY = 0;
-
-	function handleItemTouchStart(e: TouchEvent, item: ConversationItem) {
-		const touch = e.touches[0];
-		if (!touch) return;
-		touchStartX = touch.clientX;
-		touchStartY = touch.clientY;
-		longPressTriggered = false;
-
-		const currentTarget = e.currentTarget as HTMLElement;
-
-		longPressTimeout = setTimeout(() => {
-			longPressTriggered = true;
-			// Provide tactile haptic feedback if supported on the device
-			if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-				try {
-					navigator.vibrate(40);
-				} catch {
-					// Vibration API may be unsupported or restricted
-				}
-			}
-
-			const rect = currentTarget.getBoundingClientRect();
-			activeConversationMenu = {
-				item,
-				x: Math.min(touch.clientX, rect.right - 40),
-				y: rect.bottom
-			};
-		}, 500);
-	}
-
-	function handleItemTouchMove(e: TouchEvent) {
-		if (!longPressTimeout) return;
-		const touch = e.touches[0];
-		if (!touch) return;
-		const deltaX = Math.abs(touch.clientX - touchStartX);
-		const deltaY = Math.abs(touch.clientY - touchStartY);
-		// If scrolled more than 8px, cancel long-press so scrolling is uninterrupted
-		if (deltaX > 8 || deltaY > 8) {
-			clearTimeout(longPressTimeout);
-			longPressTimeout = null;
-		}
-	}
-
-	function handleItemTouchEnd(e: TouchEvent) {
-		if (longPressTimeout) {
-			clearTimeout(longPressTimeout);
-			longPressTimeout = null;
-		}
-		// If long-press fired, prevent navigation on finger release
-		if (longPressTriggered) {
-			e.preventDefault();
-			e.stopPropagation();
-			setTimeout(() => {
-				longPressTriggered = false;
-			}, 150);
-		}
-	}
-
-	function handleItemContextMenu(e: MouseEvent) {
-		if (sidebar.isMobile) {
-			e.preventDefault();
-		}
-	}
 
 	function sortConversations(list: ConversationItem[]): ConversationItem[] {
 		return [...list].sort((a, b) => {
@@ -228,49 +147,6 @@
 		return () => {
 			observer?.disconnect();
 			observer = null;
-		};
-	});
-
-	// Dismiss floating menus when clicking or tapping any empty area
-	$effect(() => {
-		if (!isUserMenuOpen && !activeConversationMenu) return;
-
-		const handleGlobalPointerDown = (event: PointerEvent | MouseEvent) => {
-			const target = event.target as HTMLElement | null;
-			if (!target) return;
-
-			// If clicking inside the active conversation menu container, keep open
-			const conversationMenuEl = document.getElementById('floating-conversation-menu');
-			if (conversationMenuEl && conversationMenuEl.contains(target)) {
-				return;
-			}
-
-			// If clicking inside the active user account menu container, keep open
-			const userMenuEl = document.getElementById('floating-user-menu');
-			if (userMenuEl && userMenuEl.contains(target)) {
-				return;
-			}
-
-			// If clicking the button that triggers the user menu, let the button handler manage toggle
-			const userMenuTrigger = document.getElementById('user-menu-trigger');
-			if (userMenuTrigger && userMenuTrigger.contains(target)) {
-				return;
-			}
-
-			// If clicking any action button that triggers conversation menu, let its handler manage it
-			if (target.closest('[data-conversation-menu-trigger]')) {
-				return;
-			}
-
-			// Dismiss floating menus on any empty space click or tap
-			if (isUserMenuOpen) isUserMenuOpen = false;
-			if (activeConversationMenu) activeConversationMenu = null;
-		};
-
-		window.addEventListener('pointerdown', handleGlobalPointerDown, true);
-
-		return () => {
-			window.removeEventListener('pointerdown', handleGlobalPointerDown, true);
 		};
 	});
 
@@ -646,42 +522,95 @@
 		<div class="mx-2 mb-2 md:mb-1.5 h-px bg-white/10"></div>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton
-					id="user-menu-trigger"
-					size="lg"
-					tooltipContent="Profile"
-					class="h-14! md:h-12! w-full cursor-pointer p-2 md:p-1.5 transition-all duration-150 hover:bg-sidebar-accent active:scale-[0.98] active:bg-sidebar-accent active:brightness-110"
-					onclick={() => (isUserMenuOpen = !isUserMenuOpen)}
-				>
-					<AvatarPrimitive.Root
-						class="size-8 md:size-7 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
+				<DropdownMenu.Root bind:open={isUserMenuOpen}>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Sidebar.MenuButton
+								{...props}
+								id="user-menu-trigger"
+								size="lg"
+								tooltipContent="Profile"
+								class="h-14! md:h-12! w-full cursor-pointer p-2 md:p-1.5 transition-all duration-150 hover:bg-sidebar-accent active:scale-[0.98] active:bg-sidebar-accent active:brightness-110"
+							>
+								<AvatarPrimitive.Root
+									class="size-8 md:size-7 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
+								>
+									{#if userProfile?.user?.profilePictureUrl}
+										<AvatarPrimitive.Image
+											src={userProfile.user.profilePictureUrl}
+											alt={displayName}
+											class="size-full object-cover"
+										/>
+									{/if}
+									<AvatarPrimitive.Fallback
+										class="flex size-full items-center justify-center rounded-md bg-sidebar-avatar font-geist text-xs font-medium text-sidebar"
+									>
+										{userInitials}
+									</AvatarPrimitive.Fallback>
+								</AvatarPrimitive.Root>
+								<div
+									class="ml-2 md:ml-1.5 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
+								>
+									<span class="truncate font-geist text-[14px] md:text-[13px] font-medium text-white">{displayName}</span>
+									<span class="truncate font-geist text-[12px] md:text-[11px] text-sidebar-muted-foreground">{subscriptionTier}</span>
+								</div>
+								<ChevronsUpDown
+									class="size-4 md:size-3.5 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
+								/>
+							</Sidebar.MenuButton>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content
+						side="top"
+						align="start"
+						sideOffset={8}
+						class="z-[70] w-56 min-w-56 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
-						{#if userProfile?.user?.profilePictureUrl}
-							<AvatarPrimitive.Image
-								src={userProfile.user.profilePictureUrl}
-								alt={displayName}
-								class="size-full object-cover"
-							/>
-						{/if}
-						<AvatarPrimitive.Fallback
-							class="flex size-full items-center justify-center rounded-md bg-sidebar-avatar font-geist text-xs font-medium text-sidebar"
+						<div class="px-2.5 py-1.5 font-sans text-xs font-semibold text-white/45">My Account</div>
+						<div class="my-1 h-px bg-white/10"></div>
+						<DropdownMenu.Item
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98] active:bg-white/15 active:text-white outline-none"
+							onSelect={() => {
+								if (sidebar.isMobile) sidebar.setOpenMobile(false);
+								openAccountPanel('settings');
+							}}
 						>
-							{userInitials}
-						</AvatarPrimitive.Fallback>
-					</AvatarPrimitive.Root>
-					<div
-						class="ml-2 md:ml-1.5 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
-					>
-						<span class="truncate font-geist text-[14px] md:text-[13px] font-medium text-white">{displayName}</span
+							<MxIcon name="settings-settings-outline" class="size-3.5 text-white/60" />
+							<span>Settings</span>
+						</DropdownMenu.Item>
+						<DropdownMenu.Item
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98] active:bg-white/15 active:text-white outline-none"
+							onSelect={() => {
+								if (sidebar.isMobile) sidebar.setOpenMobile(false);
+								openAccountPanel('billing');
+							}}
 						>
-						<span class="truncate font-geist text-[12px] md:text-[11px] text-sidebar-muted-foreground"
-							>{subscriptionTier}</span
+							<MxIcon name="card-linear" class="size-3.5 text-white/60" />
+							<span>Billing</span>
+						</DropdownMenu.Item>
+						<DropdownMenu.Item
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98] active:bg-white/15 active:text-white outline-none"
+							onSelect={() => {
+								if (sidebar.isMobile) sidebar.setOpenMobile(false);
+								openAccountPanel('shared-links');
+							}}
 						>
-					</div>
-					<ChevronsUpDown
-						class="size-4 md:size-3.5 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
-					/>
-				</Sidebar.MenuButton>
+							<Link2 class="size-3.5 text-white/60" />
+							<span>Shared links</span>
+						</DropdownMenu.Item>
+						<div class="my-1 h-px bg-white/10"></div>
+						<DropdownMenu.Item
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:scale-[0.98] active:bg-red-500/20 active:text-red-200 outline-none"
+							onSelect={() => {
+								if (sidebar.isMobile) sidebar.setOpenMobile(false);
+								isLogoutDialogOpen = true;
+							}}
+						>
+							<MxIcon name="logout3-bold" class="size-3.5 shrink-0 text-red-400" />
+							<span>Log out</span>
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Footer>
@@ -738,18 +667,7 @@
 					href="/app/chat/{item.id}"
 					{...props}
 					class={(props.class as string) + ' w-full overflow-hidden text-left transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent select-none'}
-					ontouchstart={(e) => handleItemTouchStart(e, item)}
-					ontouchmove={handleItemTouchMove}
-					ontouchend={handleItemTouchEnd}
-					ontouchcancel={handleItemTouchEnd}
-					oncontextmenu={handleItemContextMenu}
-					onclick={(e) => {
-						if (longPressTriggered) {
-							e.preventDefault();
-							e.stopPropagation();
-							longPressTriggered = false;
-							return;
-						}
+					onclick={() => {
 						if (sidebar.isMobile) sidebar.setOpenMobile(false);
 					}}
 					onmouseenter={() => conversationCache.prefetch(item.id)}
@@ -773,194 +691,83 @@
 			{/snippet}
 		</Sidebar.MenuButton>
 
-		<!-- Action Menu & Indicators (pin only — sharing is managed from the profile menu) -->
-		{#if item.isPinned}
-			<Sidebar.MenuAction
-				showOnHover={false}
-				data-conversation-menu-trigger="true"
-				class="top-2 md:top-1 cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80 size-6 md:size-5 flex items-center justify-center"
-				onclick={(e) => openConversationMenu(e, item)}
+		<!-- Action Menu & Indicators -->
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Sidebar.MenuAction
+						{...props}
+						showOnHover={!item.isPinned}
+						class="top-2 md:top-1 cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80 size-6 md:size-5 flex items-center justify-center"
+					>
+						{#if item.isPinned}
+							<div class="flex size-full items-center justify-center gap-1 group-hover/menu-item:hidden">
+								<MxIcon name="pin-bold" class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
+							</div>
+							<div class="hidden size-full items-center justify-center group-hover/menu-item:flex">
+								<MxIcon name="menu-dots-outline" class="size-4" />
+							</div>
+						{:else}
+							<MxIcon name="menu-dots-outline" class="size-4" />
+						{/if}
+					</Sidebar.MenuAction>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content
+				side="right"
+				align="start"
+				sideOffset={4}
+				class="z-[70] w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 			>
-				<div
-					class="flex size-full items-center justify-center gap-1 group-hover/menu-item:hidden"
-					class:hidden={activeConversationMenu?.item.id === item.id}
+				<DropdownMenu.Item
+					class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98] active:bg-white/15 active:text-white outline-none"
+					onSelect={() => {
+						if (sidebar.isMobile) sidebar.setOpenMobile(false);
+						openShareDialog(item);
+					}}
 				>
-					<MxIcon name="pin-bold" class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
-				</div>
-				<div
-					class="hidden size-full items-center justify-center group-hover/menu-item:flex"
-					class:flex={activeConversationMenu?.item.id === item.id}
+					<Share class="size-3.5 text-white/60" />
+					<span>Share</span>
+				</DropdownMenu.Item>
+				<DropdownMenu.Item
+					class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98] active:bg-white/15 active:text-white outline-none"
+					onSelect={() => {
+						if (sidebar.isMobile) sidebar.setOpenMobile(false);
+						openEditModal(item);
+					}}
 				>
-					<MxIcon name="menu-dots-outline" class="size-4" />
-				</div>
-			</Sidebar.MenuAction>
-		{:else}
-			<Sidebar.MenuAction
-				showOnHover={true}
-				data-conversation-menu-trigger="true"
-				class="top-2 md:top-1 cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80 size-6 md:size-5 flex items-center justify-center"
-				onclick={(e) => openConversationMenu(e, item)}
-			>
-				<MxIcon name="menu-dots-outline" class="size-4" />
-			</Sidebar.MenuAction>
-		{/if}
+					<MxIcon name="edit2-outline" class="size-3.5 text-white/60" />
+					<span>Edit</span>
+				</DropdownMenu.Item>
+				<DropdownMenu.Item
+					class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98] active:bg-white/15 active:text-white outline-none"
+					onSelect={() => {
+						handleTogglePin(item);
+					}}
+				>
+					{#if item.isPinned}
+						<MxIcon name="pin-bold" class="size-3.5 text-white/60" />
+						<span>Unpin</span>
+					{:else}
+						<MxIcon name="pin-outline" class="size-3.5 text-white/60" />
+						<span>Pin</span>
+					{/if}
+				</DropdownMenu.Item>
+				<div class="my-1 h-px bg-white/10"></div>
+				<DropdownMenu.Item
+					class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:scale-[0.98] active:bg-red-500/20 active:text-red-200 outline-none"
+					onSelect={() => {
+						if (sidebar.isMobile) sidebar.setOpenMobile(false);
+						openDeleteModal(item);
+					}}
+				>
+					<MxIcon name="trash-bin-minimalistic-outline" class="size-3.5 shrink-0 text-red-400" />
+					<span>Delete</span>
+				</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	</Sidebar.MenuItem>
 {/snippet}
-
-<!-- Floating User Account Menu -->
-{#if isUserMenuOpen}
-	<!-- Backdrop to capture click outside -->
-	<div
-		role="presentation"
-		class="fixed inset-0 z-[60] bg-transparent"
-		onpointerdown={(e) => {
-			e.stopPropagation();
-			isUserMenuOpen = false;
-		}}
-		onclick={() => (isUserMenuOpen = false)}
-		onkeydown={() => (isUserMenuOpen = false)}
-	></div>
-
-	<!-- Positioned Floating User Account Menu -->
-	<div
-		id="floating-user-menu"
-		transition:scale={{ duration: 150, start: 0.95 }}
-		class="fixed bottom-16 left-3 z-[60] w-56 min-w-56 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
-	>
-		<div class="px-2.5 py-1.5 font-sans text-xs font-semibold text-white/45">My Account</div>
-		<div class="my-1 h-px bg-white/10"></div>
-		<button
-			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
-			onclick={() => {
-				isUserMenuOpen = false;
-				if (sidebar.isMobile) sidebar.setOpenMobile(false);
-				openAccountPanel('settings');
-			}}
-		>
-			<MxIcon name="settings-settings-outline" class="size-3.5 text-white/60" />
-			<span>Settings</span>
-		</button>
-		<button
-			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
-			onclick={() => {
-				isUserMenuOpen = false;
-				if (sidebar.isMobile) sidebar.setOpenMobile(false);
-				openAccountPanel('billing');
-			}}
-		>
-			<MxIcon name="card-linear" class="size-3.5 text-white/60" />
-			<span>Billing</span>
-		</button>
-		<button
-			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
-			onclick={() => {
-				isUserMenuOpen = false;
-				if (sidebar.isMobile) sidebar.setOpenMobile(false);
-				openAccountPanel('shared-links');
-			}}
-		>
-			<Link2 class="size-3.5 text-white/60" />
-			<span>Shared links</span>
-		</button>
-		<div class="my-1 h-px bg-white/10"></div>
-		<button
-			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/20 active:text-red-200"
-			onclick={() => {
-				isUserMenuOpen = false;
-				if (sidebar.isMobile) sidebar.setOpenMobile(false);
-				isLogoutDialogOpen = true;
-			}}
-		>
-			<MxIcon name="logout3-bold" class="size-3.5 shrink-0 text-red-400" />
-			<span>Log out</span>
-		</button>
-	</div>
-{/if}
-
-<!-- Floating Conversation Action Menu -->
-{#if activeConversationMenu}
-	<!-- Backdrop to capture click outside -->
-	<div
-		role="presentation"
-		class="fixed inset-0 z-[60] bg-transparent"
-		onpointerdown={(e) => {
-			e.stopPropagation();
-			activeConversationMenu = null;
-		}}
-		onclick={() => (activeConversationMenu = null)}
-		onkeydown={() => (activeConversationMenu = null)}
-	></div>
-
-	<!-- Positioned Floating Menu -->
-	<div
-		id="floating-conversation-menu"
-		transition:scale={{ duration: 150, start: 0.95 }}
-		style={`position: fixed; top: ${Math.min(activeConversationMenu.y + 4, window.innerHeight - 170)}px; left: ${Math.min(Math.max(16, activeConversationMenu.x - 140), window.innerWidth - 200)}px;`}
-		class="z-[60] w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
-	>
-		<button
-			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
-			onclick={() => {
-				const item = activeConversationMenu?.item;
-				activeConversationMenu = null;
-				if (sidebar.isMobile) sidebar.setOpenMobile(false);
-				if (item) openShareDialog(item);
-			}}
-		>
-			<Share class="size-3.5 text-white/60" />
-			<span>Share</span>
-		</button>
-		<button
-			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
-			onclick={() => {
-				const item = activeConversationMenu?.item;
-				activeConversationMenu = null;
-				if (sidebar.isMobile) sidebar.setOpenMobile(false);
-				if (item) openEditModal(item);
-			}}
-		>
-			<MxIcon name="edit2-outline" class="size-3.5 text-white/60" />
-			<span>Edit</span>
-		</button>
-		<button
-			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] active:bg-white/15 active:text-white"
-			onclick={() => {
-				const item = activeConversationMenu?.item;
-				activeConversationMenu = null;
-				if (item) handleTogglePin(item);
-			}}
-		>
-			{#if activeConversationMenu.item.isPinned}
-				<MxIcon name="pin-bold" class="size-3.5 text-white/60" />
-				<span>Unpin</span>
-			{:else}
-				<MxIcon name="pin-outline" class="size-3.5 text-white/60" />
-				<span>Pin</span>
-			{/if}
-		</button>
-		<div class="my-1 h-px bg-white/10"></div>
-		<button
-			type="button"
-			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/20 active:text-red-200"
-			onclick={() => {
-				const item = activeConversationMenu?.item;
-				activeConversationMenu = null;
-				if (sidebar.isMobile) sidebar.setOpenMobile(false);
-				if (item) openDeleteModal(item);
-			}}
-		>
-			<MxIcon name="trash-bin-minimalistic-outline" class="size-3.5 shrink-0 text-red-400" />
-			<span>Delete</span>
-		</button>
-	</div>
-{/if}
 
 <!-- Confirmation Dialog for Logout -->
 <Dialog.Root bind:open={isLogoutDialogOpen}>

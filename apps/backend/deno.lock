@@ -26,6 +26,7 @@
     "npm:@upstash/vector@^1.2.0": "1.2.3",
     "npm:dotenv@*": "17.4.2",
     "npm:drizzle-kit@*": "0.31.10",
+    "npm:drizzle-kit@0.31.10": "0.31.10",
     "npm:drizzle-kit@~0.31.10": "0.31.10",
     "npm:drizzle-orm@~0.45.2": "0.45.2_@upstash+redis@1.38.0_postgres@3.4.9",
     "npm:hono@4": "4.12.25",

@@ -19,6 +19,8 @@ import {
 import * as AuthParams from "./auth.schema.ts";
 import { AuthConstants } from "../../shared/constants/auth.constant.ts";
 import { logActivity } from "../../shared/utils/activity.util.ts";
+import { provisionTenantForUser } from "./user_provision.util.ts";
+import { parseDeviceInfo } from "../../shared/utils/user-agent.util.ts";
 
 export class AuthService {
     static async registerUser(params: AuthParams.RegisterParams) {
@@ -92,26 +94,12 @@ export class AuthService {
             }
         }
 
-        // Step B.5: Check if email is already waiting for verification in Redis (to save Resend cost)
+        // Step B.5: Marker key used by login cleanup and the resend path.
+        // NOTE: no hard cooldown here anymore — a repeated registration for an
+        // unconfirmed email is the ONLY way the user can request a fresh
+        // verification link, and a hard block stranded re-registrations (e.g.
+        // after account deletion) with no way to verify.
         const redisUnverifiedKey = `unverified_email:${params.email}`;
-        let isUnverifiedCooldown = false;
-        try {
-            isUnverifiedCooldown =
-                (await redis.exists(redisUnverifiedKey)) === 1;
-        } catch (err: any) {
-            if (params.logContext) {
-                params.logContext.redisError = err.message;
-            }
-        }
-
-        if (isUnverifiedCooldown) {
-            throw new AppError({
-                code: "VALIDATION_ERROR",
-                message:
-                    "Account already registered. Please check your email inbox to verify your account.",
-                status: 400,
-            });
-        }
 
         // Step C: Create user and generate verification link via Supabase Auth Admin API
         const { data: linkData, error: signUpError } =
@@ -147,6 +135,60 @@ export class AuthService {
                     .includes("user already exists") ||
                 signUpError.status === 422
             ) {
+                // The email already has an auth user. If it is still
+                // UNCONFIRMED (the common case after re-registration), regenerate
+                // the signup link and resend the verification email instead of
+                // dead-ending the user — otherwise they can never verify and
+                // can never log in with that email again.
+                const { data: relink, error: relinkError } =
+                    await supabase.auth.admin.generateLink({
+                        type: "signup",
+                        email: params.email,
+                        password: params.password,
+                        options: {
+                            redirectTo: getEnv("FRONTEND_URL"),
+                        },
+                    });
+
+                const isStillUnconfirmed =
+                    relink?.user?.email_confirmed_at == null &&
+                    relink?.user?.id != null;
+
+                if (
+                    !relinkError &&
+                    isStillUnconfirmed &&
+                    relink?.properties?.hashed_token
+                ) {
+                    const verifyUrl = `${getEnv("FRONTEND_URL")}/auth/verify?token_hash=${relink.properties.hashed_token}&type=signup`;
+
+                    await sendVerificationEmail(
+                        params.email,
+                        verifyUrl,
+                        relink.user.id,
+                        params.requestId,
+                        params.logContext,
+                    );
+
+                    try {
+                        await redis.setex(redisUnverifiedKey, 86400, "1");
+                    } catch (err: any) {
+                        if (params.logContext) {
+                            params.logContext.redisError = err.message;
+                        }
+                    }
+
+                    if (params.logContext) {
+                        params.logContext.authEvent = "verification_link_resent";
+                    }
+
+                    throw new AppError({
+                        code: "VALIDATION_ERROR",
+                        message:
+                            "This email is registered but not verified yet. A new verification link has been sent — please check your inbox.",
+                        status: 400,
+                    });
+                }
+
                 throw new AppError({
                     code: "VALIDATION_ERROR",
                     message: "An account with this email already exists",
@@ -266,10 +308,22 @@ export class AuthService {
             params.logContext.userId = user.id;
         }
 
-        const [userRecord] = await db
+        // The handle_verified_user trigger normally creates the tenant + user
+        // row when email_confirmed_at is set. If it was missed, self-heal here.
+        let [userRecord] = await db
             .select({ tenantId: users.tenantId })
             .from(users)
             .where(eq(users.id, user.id));
+        if (!userRecord) {
+            const provisionedTenantId = await provisionTenantForUser({
+                userId: user.id,
+                email: user.email ?? "",
+                logContext: params.logContext,
+            });
+            if (provisionedTenantId) {
+                userRecord = { tenantId: provisionedTenantId };
+            }
+        }
 
         if (userRecord) {
             await logActivity({
@@ -463,6 +517,28 @@ export class AuthService {
         });
 
         if (authError || !authData?.session) {
+            // Supabase hides the real reason behind a generic message. Surface
+            // the "email not confirmed" case explicitly — it is the most common
+            // blocker after (re-)registration, e.g. an account that was deleted
+            // and then re-registered with the same email.
+            const isUnconfirmed =
+                authError?.code === "email_not_confirmed" ||
+                (authError?.message ?? "")
+                    .toLowerCase()
+                    .includes("not confirmed");
+
+            if (isUnconfirmed) {
+                if (params.logContext) {
+                    params.logContext.authEvent = "login_failed_email_not_confirmed";
+                }
+                throw new AppError({
+                    code: "VALIDATION_ERROR",
+                    message:
+                        "Your email is not verified yet. Check your inbox for the verification link, or try registering again to resend it.",
+                    status: 400,
+                });
+            }
+
             if (params.logContext) {
                 params.logContext.authEvent = "login_failed";
                 params.logContext.authEmail = params.email;
@@ -483,21 +559,75 @@ export class AuthService {
             params.logContext.userId = authData.user.id;
         }
 
-        const [userRecord] = await db
-            .select({ tenantId: users.tenantId })
+        // Deleted / deletion-pending accounts must never log back in. Supabase
+        // still accepts the password until the async purge deletes the auth
+        // identity, so reject at the application layer and revoke the session
+        // the moment it is created — otherwise the user gets a 200 login + valid
+        // cookies for an account that is already gone.
+        let [userRecord] = await db
+            .select({
+                tenantId: users.tenantId,
+                deletionStatus: users.deletionStatus,
+            })
             .from(users)
             .where(eq(users.id, authData.user.id));
-        if (userRecord) {
-            await logActivity({
-                tenantId: userRecord.tenantId,
+
+        // The handle_verified_user trigger may have been missed (late or never
+        // fired). Self-heal: provision the tenant + FREE subscription now, the
+        // same way the OAuth fallback does, so login never lands in "session
+        // exists but no tenant" limbo.
+        if (!userRecord) {
+            const provisionedTenantId = await provisionTenantForUser({
                 userId: authData.user.id,
-                action: "auth.login",
-                ipAddress: params.clientIp,
-                userAgent: params.userAgent,
-                requestId: params.requestId,
-                metadata: { provider: "email" },
-            }, params.logContext);
+                email: authData.user.email ?? params.email,
+                logContext: params.logContext,
+            });
+            if (!provisionedTenantId) {
+                throw new AppError({
+                    code: "INTERNAL_ERROR",
+                    message:
+                        "Failed to initialize your account. Please try again.",
+                    status: 500,
+                });
+            }
+            userRecord = {
+                tenantId: provisionedTenantId,
+                deletionStatus: "active",
+            };
         }
+
+        if (userRecord.deletionStatus !== "active") {
+            try {
+                await getSupabaseAdmin().auth.admin.signOut(
+                    authData.session.access_token,
+                    "global",
+                );
+            } catch (err: any) {
+                if (params.logContext) {
+                    params.logContext.authWarning =
+                        "Failed to revoke session for deleted account: " + err.message;
+                }
+            }
+            if (params.logContext) {
+                params.logContext.authEvent = "login_blocked_deleted_account";
+            }
+            throw new AppError({
+                code: "FORBIDDEN",
+                message:
+                    "This account has been deleted. Please register a new account.",
+                status: 403,
+            });
+        }
+
+        await logActivity({
+            tenantId: userRecord.tenantId,
+            userId: authData.user.id,
+            action: "auth.login",
+            ipAddress: params.clientIp,
+            userAgent: params.userAgent,
+            requestId: params.requestId,
+            metadata: { provider: "email" },
+        }, params.logContext);
 
         // Cleanup: Remove the unverified email cooldown cache since user is now verified and logged in
         try {
@@ -519,10 +649,13 @@ export class AuthService {
             return;
         }
         try {
+            const device = parseDeviceInfo(params.userAgent);
             await db.insert(loginAttempts).values({
                 emailAttempted: params.email,
                 ipAddress: params.ipAddress,
                 userAgent: params.userAgent,
+                deviceBrand: device.brand,
+                deviceModel: device.model,
                 isSuccess: params.isSuccess,
                 authProvider: params.authProvider ?? "email",
             });
@@ -535,9 +668,6 @@ export class AuthService {
 
     static async logoutUser(params: AuthParams.LogoutParams) {
         const supabase = getSupabaseAdmin();
-        const { data: userData } = await supabase.auth.getUser(
-            params.accessToken,
-        );
 
         const { error } = await supabase.auth.admin.signOut(
             params.accessToken,
@@ -574,20 +704,6 @@ export class AuthService {
 
         if (params.logContext) {
             params.logContext.authEvent = "logout_success";
-        }
-
-        if (userData?.user?.id) {
-            const [userRecord] = await db
-                .select({ tenantId: users.tenantId })
-                .from(users)
-                .where(eq(users.id, userData.user.id));
-            if (userRecord) {
-                await logActivity({
-                    tenantId: userRecord.tenantId,
-                    userId: userData.user.id,
-                    action: "auth.logout",
-                }, params.logContext);
-            }
         }
     }
 

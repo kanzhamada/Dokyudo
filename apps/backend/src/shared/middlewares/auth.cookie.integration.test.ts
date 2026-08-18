@@ -48,7 +48,7 @@ describe("Cookie-based auth flow", () => {
     const refresh = setCookie.find((c) => c.includes("dokyudo_refresh_token="));
     assertEquals(access?.includes("HttpOnly"), true);
     assertEquals(refresh?.includes("HttpOnly"), true);
-    assertEquals(access?.includes("Max-Age=3600"), true);
+    assertEquals(access?.includes("Max-Age=604800"), true);
     assertEquals(refresh?.includes("Max-Age=2592000"), true);
   });
 

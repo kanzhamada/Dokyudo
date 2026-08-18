@@ -45,12 +45,18 @@ export class PaymentsService {
 
         const externalId = `dokyudo-${tenantId}-${Date.now()}`;
 
-        // 2. Tenant Check
+        // 2. Tenant Check (must be an ACTIVE account — a deleted/deletion-pending
+        // tenant can never start a new checkout)
         const [tenant] = await withAuthDb(userId, async (tx) => {
             return await tx
                 .select()
                 .from(tenants)
-                .where(eq(tenants.id, tenantId));
+                .where(
+                    and(
+                        eq(tenants.id, tenantId),
+                        eq(tenants.deletionStatus, "active"),
+                    ),
+                );
         });
 
         if (!tenant) {
@@ -219,6 +225,21 @@ export class PaymentsService {
                         updatedAt: new Date(),
                     })
                     .where(eq(paymentTransactions.id, trx.id));
+
+                // 3.5 Guard: never provision a deleted / deletion-pending
+                // tenant. The payment is still recorded for the immutable
+                // ledger, but the account is terminal — no tier upgrade, no
+                // subscription binding, no email.
+                const [activeTenant] = await db
+                    .select({ deletionStatus: tenants.deletionStatus })
+                    .from(tenants)
+                    .where(eq(tenants.id, trx.tenantId));
+                if (!activeTenant || activeTenant.deletionStatus !== "active") {
+                    if (logContext) {
+                        logContext.webhookInfo = `Payment ${externalId} recorded but tenant ${trx.tenantId} is ${activeTenant?.deletionStatus ?? "missing"} — provisioning skipped`;
+                    }
+                    break;
+                }
 
                 // 4. Provision / Upgrade Tenant Subscription
                 const [sub] = await db

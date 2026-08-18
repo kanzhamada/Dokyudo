@@ -4,7 +4,7 @@ import { getCookie } from "hono/cookie";
 import { AppError } from "../utils/errors.util.ts";
 import { db } from "../../config/drizzle.ts";
 import { users } from "../models/db.model.ts";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { redis } from "../../config/redis.ts";
 import { getSupabaseAnon } from "../../config/supabase.ts";
 import {
@@ -19,6 +19,16 @@ export interface ResolvedSession {
   tenantId: string;
   email: string;
 }
+
+/**
+ * Redis tombstone key set during account deletion. A user whose account was
+ * deleted (or is mid-deletion) is rejected even while their short-lived access
+ * token is still cryptographically valid — Supabase does not invalidate
+ * already-issued tokens when a user is deleted. TTL matches the max access
+ * token lifetime; after it expires the token itself fails verification and the
+ * refresh token was already revoked by the deletion flow.
+ */
+const deletedUserTombstoneKey = (userId: string) => `deleted_user:${userId}`;
 
 /**
  * Resolves the current session from the httpOnly cookies (with Bearer header
@@ -85,6 +95,15 @@ export async function resolveSession(
   const userId = payload?.sub;
   if (!userId) return null;
 
+  // Reject deleted / deletion-pending accounts immediately, before any
+  // tenant resolution, so their still-valid JWTs cannot reach protected routes.
+  try {
+    const tombstoned = await redis.exists(deletedUserTombstoneKey(userId));
+    if (tombstoned === 1) return null;
+  } catch {
+    // Redis is best-effort here — the database check below is authoritative.
+  }
+
   // Resolve the tenant mapping (JWT claims → Redis cache → database).
   let tenantId = payload.app_metadata?.tenant_id ||
     payload.user_metadata?.tenant_id ||
@@ -104,7 +123,7 @@ export async function resolveSession(
       const result = await db
         .select({ tenantId: users.tenantId })
         .from(users)
-        .where(eq(users.id, userId))
+        .where(and(eq(users.id, userId), eq(users.deletionStatus, "active")))
         .limit(1);
 
       if (result.length > 0) {

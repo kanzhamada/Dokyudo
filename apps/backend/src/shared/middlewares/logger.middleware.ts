@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import { AppError } from "../utils/errors.util.ts";
 import { extractClientIp } from "../utils/ip.util.ts";
+import { getClientLocation } from "../utils/geo.util.ts";
 
 /**
  * Middleware that accumulates context for a Wide Event log.
@@ -16,6 +17,7 @@ export const loggerMiddleware: MiddlewareHandler = async (c, next) => {
         method: c.req.method,
         path: c.req.path,
         ip: extractClientIp(c.req.raw.headers),
+        clientLocation: getClientLocation(c.req.raw.headers),
     };
 
     c.set("logContext", logContext);

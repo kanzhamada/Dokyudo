@@ -10,6 +10,7 @@ import type {
 	UpdateTenantNameResponse,
 	VerifyEmailResponse,
 	SessionResponse,
+	DeleteAccountResponse,
 	LoginRequestPayload,
 	RegisterRequestPayload,
 	ForgotPasswordRequestPayload,
@@ -71,6 +72,11 @@ export function authUpdateTenantName(
 		method: 'PATCH',
 		body: params
 	});
+}
+
+/** Schedules permanent deletion of the authenticated account (202 accepted). */
+export function authDeleteAccount(): Promise<ApiResult<DeleteAccountResponse>> {
+	return apiRequest<DeleteAccountResponse>('/api/auth/account', { method: 'DELETE' });
 }
 
 export function authVerifyEmail(

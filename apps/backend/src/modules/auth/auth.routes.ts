@@ -468,3 +468,58 @@ authRoutes.openapi(
   }),
   authController.handleUpdateTenantName as any,
 );
+
+authRoutes.openapi(
+  createRoute({
+    method: "delete",
+    path: "/account",
+    tags: ["Auth"],
+    summary: "Permanently delete the authenticated account",
+    description:
+      "Schedules deletion of the authenticated account. Marks the user and tenant " +
+      "as deletion_pending, revokes all sessions, and enqueues an asynchronous purge " +
+      "job that deletes documents, chunks, vector embeddings, files, conversations, " +
+      "shares, tenant keys, and Redis state — while retaining payment history and " +
+      "audit logs. Re-registering with the same email afterwards creates a brand-new " +
+      "clean account. Returns 202 (accepted).",
+    middleware: [authMiddleware] as const,
+    request: {
+      // No body required — the authenticated session identifies the account.
+    },
+    responses: {
+      202: {
+        description: "Deletion scheduled",
+        content: {
+          "application/json": {
+            schema: AuthSchema.DeleteAccountResponseSchema,
+          },
+        },
+      },
+      401: {
+        description: "Unauthorized",
+        content: {
+          "application/json": {
+            schema: ErrorResponseSchema,
+          },
+        },
+      },
+      404: {
+        description: "Account not found or already deleted",
+        content: {
+          "application/json": {
+            schema: ErrorResponseSchema,
+          },
+        },
+      },
+      500: {
+        description: "Internal server error",
+        content: {
+          "application/json": {
+            schema: ErrorResponseSchema,
+          },
+        },
+      },
+    },
+  }),
+  authController.handleDeleteAccount as any,
+);

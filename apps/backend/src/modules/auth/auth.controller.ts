@@ -9,6 +9,7 @@ import {
   setSessionCookies,
 } from "../../config/cookie.ts";
 import { resolveSession } from "../../shared/middlewares/auth.middleware.ts";
+import { AccountDeletionService } from "../account_deletion/account_deletion.service.ts";
 
 export async function handleRegister(c: Context) {
   const extractor = new ContextExtractor(c);
@@ -244,4 +245,33 @@ export const handleUpdateTenantName = async (c: Context) => {
   });
 
   return c.json(result, 200);
+};
+
+export const handleDeleteAccount = async (c: Context) => {
+  const extractor = new ContextExtractor(c);
+  const { userId, tenantId, logContext } = extractor.extractAuthContext();
+  const { requestId, clientIp, userAgent } = extractor.extractAuditContext();
+
+  const result = await AccountDeletionService.requestAccountDeletion({
+    userId,
+    tenantId,
+    clientIp,
+    userAgent,
+    requestId,
+    logContext,
+  });
+
+  // The account is now deletion_pending — drop the local session cookies
+  // immediately so the client does not keep calling the API with a dead token.
+  clearSessionCookies(c);
+
+  return c.json(
+    {
+      message:
+        "Account deletion scheduled. Your data will be purged shortly.",
+      scheduled: result.scheduled,
+      jobId: result.jobId,
+    },
+    202,
+  );
 };

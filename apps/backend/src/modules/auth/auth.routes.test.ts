@@ -679,4 +679,37 @@ describe("Auth Module", () => {
       assertEquals(json.error.message, "Invalid or expired verification link.");
     });
   });
+
+  describe("DELETE /api/auth/account", () => {
+    it("negative: missing authorization header returns 401", async () => {
+      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
+        Math.floor(Math.random() * 255)
+      }`;
+      const req = new Request("http://localhost/api/auth/account", {
+        method: "DELETE",
+        headers: {
+          "X-Forwarded-For": randomIp,
+        },
+      });
+
+      const res = await app.fetch(req);
+      assertEquals(res.status, 401);
+      const json = await res.json();
+      assertEquals(json.error.code, "UNAUTHORIZED");
+    });
+
+    it("negative: invalid bearer token returns 401", async () => {
+      const req = new Request("http://localhost/api/auth/account", {
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer not-a-real-token",
+        },
+      });
+
+      const res = await app.fetch(req);
+      assertEquals(res.status, 401);
+      const json = await res.json();
+      assertEquals(json.error.code, "UNAUTHORIZED");
+    });
+  });
 });

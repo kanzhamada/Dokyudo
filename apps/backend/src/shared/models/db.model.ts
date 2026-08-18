@@ -11,6 +11,7 @@ import {
     primaryKey,
     text,
     timestamp,
+    uniqueIndex,
     uuid,
     varchar,
 } from "drizzle-orm/pg-core";
@@ -37,11 +38,38 @@ export const authUsers = authSchema.table("users", {
 });
 
 // ==============================================================================
+// ACCOUNT LIFECYCLE ENUMS
+// ==============================================================================
+// Tracks the account deletion lifecycle on users and tenants. 'active' is the
+// default; 'deletion_pending' blocks all access while the async purge runs;
+// 'deleted' is terminal — the row is kept (soft delete) for audit purposes but
+// is never reactivated and never reused by a new registration.
+export const deletionStatusEnum = pgEnum("deletion_status_enum", [
+    "active",
+    "deletion_pending",
+    "deleted",
+]);
+
+// State machine of the async purge job that executes account deletion.
+export const accountDeletionJobStatusEnum = pgEnum(
+    "account_deletion_job_status_enum",
+    ["pending", "purging", "completed", "failed"],
+);
+
+// ==============================================================================
 // 1. TENANTS TABLE (1 User = 1 Tenant)
 // ==============================================================================
 export const tenants = pgTable("tenants", {
     id: uuid("id").defaultRandom().primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
+    // Account lifecycle. 'deletion_pending' blocks all access while the async
+    // purge runs; 'deleted' is terminal. Soft-deleted tenants are never reused.
+    deletionStatus: deletionStatusEnum("deletion_status").notNull().default("active"),
+    deletedAt: timestamp("deleted_at", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    }),
     createdAt: timestamp("created_at", {
         mode: "date",
         precision: 3,
@@ -71,17 +99,27 @@ export const tenantKeys = pgTable("tenant_keys", {
 // ==============================================================================
 // 2. USERS TABLE
 // ==============================================================================
+// `id` is intentionally NOT a foreign key to auth.users anymore: when the
+// Supabase auth user is deleted (account deletion), this row survives in a
+// soft-deleted state for audit purposes. New registrations create a fresh
+// auth user AND a fresh public.users row — old rows are never reactivated.
 export const users = pgTable("users", {
-    id: uuid("id")
-        .primaryKey()
-        .references(() => authUsers.id, { onDelete: "cascade" }),
+    id: uuid("id").primaryKey(),
     tenantId: uuid("tenant_id")
         .notNull()
         .references(() => tenants.id, { onDelete: "restrict" }),
-    email: varchar("email", { length: 255 }).notNull().unique(),
+    email: varchar("email", { length: 255 }).notNull(),
     profilePictureUrl: text("profile_picture_url"),
     isLocked: boolean("is_locked").default(false),
     lockedUntil: timestamp("locked_until", {
+        mode: "date",
+        precision: 3,
+        withTimezone: true,
+    }),
+    deletionStatus: deletionStatusEnum("deletion_status")
+        .notNull()
+        .default("active"),
+    deletedAt: timestamp("deleted_at", {
         mode: "date",
         precision: 3,
         withTimezone: true,
@@ -96,7 +134,14 @@ export const users = pgTable("users", {
         precision: 3,
         withTimezone: true,
     }).defaultNow(),
-});
+}, (table) => ({
+    // Emails are only unique among ACTIVE accounts. Soft-deleted rows keep a
+    // row (with an anonymized email) without blocking re-registration of the
+    // same email address.
+    activeEmailIdx: uniqueIndex("idx_users_active_email")
+        .on(table.email)
+        .where(sql`deleted_at is null`),
+}));
 
 // ==============================================================================
 // ENUMS
@@ -145,6 +190,8 @@ export const loginAttempts = pgTable(
         emailAttempted: varchar("email_attempted", { length: 255 }).notNull(),
         ipAddress: inet("ip_address").notNull(),
         userAgent: text("user_agent"),
+        deviceBrand: varchar("device_brand", { length: 100 }),
+        deviceModel: varchar("device_model", { length: 200 }),
         isSuccess: boolean("is_success").default(false),
         authProvider: authProviderEnum("auth_provider").default("email"),
         attemptedAt: timestamp("attempted_at", {
@@ -539,6 +586,9 @@ export const activityActionEnum = pgEnum("activity_action_enum", [
     "billing.payment_failed",
     // Tenant
     "tenant.name_updated",
+    // Account deletion
+    "account.deletion_requested",
+    "account.deleted",
 ]);
 
 export const activityLogs = pgTable("activity_logs", {
@@ -549,8 +599,11 @@ export const activityLogs = pgTable("activity_logs", {
     resourceType: varchar("resource_type", { length: 100 }), // e.g. "document", "payment"
     resourceId: varchar("resource_id", { length: 255 }), // using varchar to support external IDs too
     metadata: jsonb("metadata"),
-    ipAddress: varchar("ip_address", { length: 45 }),
+    ipAddress: inet("ip_address"),
     userAgent: text("user_agent"),
+    operatingSystem: varchar("operating_system", { length: 100 }),
+    deviceType: varchar("device_type", { length: 32 }),
+    location: varchar("location", { length: 100 }),
     requestId: varchar("request_id", { length: 36 }),
     createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
 }, (table) => ({
@@ -558,3 +611,53 @@ export const activityLogs = pgTable("activity_logs", {
     tenantActionCreatedIdx: index("idx_activity_tenant_action_created").on(table.tenantId, table.action, table.createdAt.desc()),
     userCreatedIdx: index("idx_activity_user_created").on(table.userId, table.createdAt.desc()),
 }));
+
+// ==============================================================================
+// 12. ACCOUNT DELETION JOBS (Async Purge State Machine)
+// ==============================================================================
+// One row per requested account deletion. The endpoint marks the user/tenant
+// as 'deletion_pending' and enqueues a job; a background sweep (Deno.cron)
+// executes the purge in idempotent steps with retry, so a crash or a failing
+// external service (S3, Vector, Stripe, Supabase) never leaves the account in
+// a half-deleted state.
+export const accountDeletionJobs = pgTable(
+    "account_deletion_jobs",
+    {
+        id: uuid("id").defaultRandom().primaryKey(),
+        tenantId: uuid("tenant_id")
+            .notNull()
+            .references(() => tenants.id, { onDelete: "cascade" }),
+        userId: uuid("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        status: accountDeletionJobStatusEnum("status")
+            .notNull()
+            .default("pending"),
+        attemptCount: integer("attempt_count").notNull().default(0),
+        lastError: text("last_error"),
+        completedAt: timestamp("completed_at", {
+            mode: "date",
+            precision: 3,
+            withTimezone: true,
+        }),
+        createdAt: timestamp("created_at", {
+            mode: "date",
+            precision: 3,
+            withTimezone: true,
+        })
+            .defaultNow()
+            .notNull(),
+        updatedAt: timestamp("updated_at", {
+            mode: "date",
+            precision: 3,
+            withTimezone: true,
+        })
+            .defaultNow()
+            .notNull()
+            .$onUpdateFn(() => new Date()),
+    },
+    (table) => ({
+        statusIdx: index("idx_account_deletion_jobs_status").on(table.status),
+        tenantIdx: index("idx_account_deletion_jobs_tenant").on(table.tenantId),
+    }),
+);

@@ -8,12 +8,13 @@ import { db } from "../../../config/drizzle.ts";
 import {
     activityLogs,
     loginAttempts,
-    tenantSubscriptions,
-    tenants,
     users,
 } from "../../../shared/models/db.model.ts";
-import { and, count, eq, or } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { logActivity } from "../../../shared/utils/activity.util.ts";
+import { AccountDeletionService } from "../../account_deletion/account_deletion.service.ts";
+import { provisionTenantForUser } from "../user_provision.util.ts";
+import { parseDeviceInfo } from "../../../shared/utils/user-agent.util.ts";
 
 export interface OAuthCallbackResult {
     accessToken: string;
@@ -131,10 +132,13 @@ export class OAuthService {
             // Audit log: record the failed attempt for security visibility (prod only)
             if (getEnv("NODE_ENV") === "prod") {
                 try {
+                    const device = parseDeviceInfo(params.userAgent);
                     await db.insert(loginAttempts).values({
                         emailAttempted: user.email ?? "unknown",
                         ipAddress: params.clientIp,
                         userAgent: params.userAgent,
+                        deviceBrand: device.brand,
+                        deviceModel: device.model,
                         isSuccess: false,
                         authProvider: `oauth_${params.provider}`,
                     });
@@ -164,6 +168,34 @@ export class OAuthService {
                         err.message;
                 }
             }
+        }
+
+        // Deleted / deletion-pending accounts must never obtain a session via
+        // OAuth. The Supabase auth identity may still exist until the async
+        // purge deletes it, so reject at the application layer and revoke the
+        // just-created session immediately.
+        if (!(await AccountDeletionService.isUserActive(user.id))) {
+            try {
+                await getSupabaseAdmin().auth.admin.signOut(
+                    session.access_token,
+                    "global",
+                );
+            } catch (err: any) {
+                if (params.logContext) {
+                    params.logContext.authWarning =
+                        "Failed to revoke OAuth session for deleted account: " +
+                        err.message;
+                }
+            }
+            if (params.logContext) {
+                params.logContext.oauthBlockedDeletedAccount = true;
+            }
+            throw new AppError({
+                code: "FORBIDDEN",
+                message:
+                    "This account has been deleted. Please register a new account.",
+                status: 403,
+            });
         }
 
         // Resolve the tenant mapping. For a brand-new OAuth user the
@@ -255,18 +287,34 @@ export class OAuthService {
         logContext?: Record<string, any>;
     }): Promise<string | null> {
         const lookupTenantId = async (): Promise<string | null> => {
-            const [userRecord] = await db
+            // Only ACTIVE accounts count. A soft-deleted row must never be
+            // resurrected by matching the same email — a deleted account is
+            // terminal and re-registration provisions a brand-new tenant.
+            const [byId] = await db
                 .select({ tenantId: users.tenantId })
                 .from(users)
                 .where(
-                    params.email
-                        ? or(
-                              eq(users.id, params.userId),
-                              eq(users.email, params.email),
-                          )
-                        : eq(users.id, params.userId),
+                    and(
+                        eq(users.id, params.userId),
+                        eq(users.deletionStatus, "active"),
+                    ),
                 );
-            return userRecord?.tenantId ?? null;
+            if (byId) return byId.tenantId;
+
+            if (params.email) {
+                const [byEmail] = await db
+                    .select({ tenantId: users.tenantId })
+                    .from(users)
+                    .where(
+                        and(
+                            eq(users.email, params.email),
+                            eq(users.deletionStatus, "active"),
+                        ),
+                    );
+                if (byEmail) return byEmail.tenantId;
+            }
+
+            return null;
         };
 
         // 1. Retry briefly — the DB trigger may commit a moment after the
@@ -292,44 +340,12 @@ export class OAuthService {
         }
 
         try {
-            const provisionedTenantId = await db.transaction(async (tx) => {
-                const [tenant] = await tx
-                    .insert(tenants)
-                    .values({ name: params.email!.slice(0, 255) })
-                    .returning({ id: tenants.id });
-
-                const [insertedUser] = await tx
-                    .insert(users)
-                    .values({
-                        id: params.userId,
-                        tenantId: tenant.id,
-                        email: params.email!,
-                        profilePictureUrl: params.avatarUrl,
-                    })
-                    .onConflictDoNothing()
-                    .returning({ id: users.id });
-
-                if (!insertedUser) {
-                    // A concurrent request already provisioned this user.
-                    // Drop our tenant and reuse the existing mapping.
-                    await tx
-                        .delete(tenants)
-                        .where(eq(tenants.id, tenant.id));
-                    const [existing] = await tx
-                        .select({ tenantId: users.tenantId })
-                        .from(users)
-                        .where(eq(users.id, params.userId));
-                    return existing?.tenantId ?? null;
-                }
-
-                await tx
-                    .insert(tenantSubscriptions)
-                    .values({ tenantId: tenant.id });
-
-                return tenant.id;
+            return await provisionTenantForUser({
+                userId: params.userId,
+                email: params.email,
+                avatarUrl: params.avatarUrl,
+                logContext: params.logContext,
             });
-
-            return provisionedTenantId;
         } catch (err: any) {
             if (params.logContext) {
                 params.logContext.oauthProvisioningError = err.message;

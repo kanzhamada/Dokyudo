@@ -1,6 +1,5 @@
 import type { ColumnDef } from '@tanstack/table-core';
 import { renderComponent, renderSnippet } from '$lib/components/ui/data-table/index.js';
-import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
 /**
  * Activity log entry shape matching the backend API response.
@@ -13,6 +12,9 @@ export interface ActivityLog {
 	metadata: Record<string, unknown> | null;
 	ipAddress: string | null;
 	userAgent: string | null;
+	operatingSystem: string | null;
+	deviceType: string | null;
+	location: string | null;
 	createdAt: string;
 }
 
@@ -165,13 +167,22 @@ export function getColumns(): ColumnDef<ActivityLog, unknown>[] {
 			}
 		},
 		{
+			accessorKey: 'location',
+			header: 'Location',
+			cell: ({ row }) => {
+				return row.getValue('location') || '--';
+			}
+		},
+		{
 			accessorKey: 'userAgent',
 			header: 'Client',
 			cell: ({ row }) => {
 				const ua = row.getValue('userAgent') as string | null;
 				return {
 					display: truncateUserAgent(ua),
-					full: ua || null
+					details: [row.original.operatingSystem, row.original.deviceType]
+						.filter(Boolean)
+						.join(' · ')
 				};
 			}
 		},
