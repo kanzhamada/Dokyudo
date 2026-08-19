@@ -266,17 +266,49 @@ export class AccountDeletionService {
     }): Promise<void> {
         const { jobId, userId, tenantId } = params;
 
-        // ── 1. Cancel active Stripe subscription (best-effort) ─────────────
+        // ── 1. Cancel Stripe subscriptions (best-effort) ───────────────────
         const [sub] = await db
             .select()
             .from(tenantSubscriptions)
             .where(eq(tenantSubscriptions.tenantId, tenantId));
-        if (sub?.stripeSubscriptionId) {
+
+        const cancelSubscription = async (subscriptionId: string) => {
             try {
-                await stripe.subscriptions.cancel(sub.stripeSubscriptionId);
+                await stripe.subscriptions.cancel(subscriptionId);
             } catch {
-                // Subscription already canceled / expired — the webhook is the
-                // source of truth and the tenant is terminal anyway.
+                // Already canceled / expired / unknown — the terminal DB state
+                // below is what matters.
+            }
+        };
+
+        // 1a. The subscription we know about (normal path).
+        if (sub?.stripeSubscriptionId) {
+            await cancelSubscription(sub.stripeSubscriptionId);
+        }
+
+        // 1b. ANY other active subscription for this customer. Closes the race
+        // where a checkout was completed after the deletion request: its
+        // subscription id was never stored (provisioning is skipped for
+        // non-active tenants), so without this sweep the customer would keep
+        // being billed every period with no account behind it.
+        if (sub?.stripeCustomerId) {
+            try {
+                const { data: subscriptions } = await stripe.subscriptions.list({
+                    customer: sub.stripeCustomerId,
+                    limit: 100,
+                });
+                for (const subscription of subscriptions) {
+                    if (
+                        subscription.status === "active" ||
+                        subscription.status === "trialing" ||
+                        subscription.status === "past_due" ||
+                        subscription.status === "unpaid"
+                    ) {
+                        await cancelSubscription(subscription.id);
+                    }
+                }
+            } catch {
+                // Best-effort — the payment ledger below still records the trail.
             }
         }
 

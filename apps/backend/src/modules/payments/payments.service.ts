@@ -238,6 +238,25 @@ export class PaymentsService {
                     if (logContext) {
                         logContext.webhookInfo = `Payment ${externalId} recorded but tenant ${trx.tenantId} is ${activeTenant?.deletionStatus ?? "missing"} — provisioning skipped`;
                     }
+
+                    // Leave a billing trail for the account-deletion purge. Even
+                    // though provisioning is skipped, the subscription may exist
+                    // on Stripe — the purge cancels by customer id, and this
+                    // record makes the reference explicit for reconciliation.
+                    await db
+                        .update(paymentTransactions)
+                        .set({
+                            webhookPayload: {
+                                provisionSkipped: true,
+                                tenantStatus:
+                                    activeTenant?.deletionStatus ?? "missing",
+                                stripeSubscriptionId: session.subscription
+                                    ? (session.subscription as string)
+                                    : null,
+                            },
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(paymentTransactions.id, trx.id));
                     break;
                 }
 

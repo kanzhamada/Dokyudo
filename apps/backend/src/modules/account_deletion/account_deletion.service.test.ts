@@ -1,8 +1,10 @@
 import { describe, it, beforeEach, afterAll } from "jsr:@std/testing/bdd";
 import { assertEquals, assertRejects, assertExists } from "jsr:@std/assert";
+import { stub } from "jsr:@std/testing/mock";
 import { db } from "../../config/drizzle.ts";
 import { AccountDeletionService } from "./account_deletion.service.ts";
 import { AppError } from "../../shared/utils/errors.util.ts";
+import { stripe } from "../../config/stripe.ts";
 import {
     accountDeletionJobs,
     activityLogs,
@@ -344,6 +346,55 @@ describe("AccountDeletionService", () => {
                 await AccountDeletionService.isUserActive(crypto.randomUUID()),
                 false,
             );
+        });
+    });
+
+    describe("purge billing cleanup (checkout+delete race)", () => {
+        it("cancels ALL active subscriptions for the customer, not just the stored id", async () => {
+            await db.insert(tenants).values({ id: testTenantId, name: "Race Tenant" });
+            await db.insert(users).values({ id: testUserId, tenantId: testTenantId, email: testEmail });
+            await db.insert(tenantSubscriptions).values({
+                tenantId: testTenantId,
+                tier: "PRO",
+                stripeCustomerId: "cus_test_race",
+                stripeSubscriptionId: "sub_stored",
+            });
+
+            // The orphan: created by a checkout completed AFTER the deletion
+            // request, whose id was never stored (provisioning was skipped).
+            const fakeListSubscriptions = async (): Promise<any> => ({
+                data: [
+                    { id: "sub_orphan", status: "active" },
+                    { id: "sub_stored", status: "active" },
+                    { id: "sub_already_canceled", status: "canceled" },
+                ],
+            });
+            using listStub = stub(
+                stripe.subscriptions,
+                "list",
+                fakeListSubscriptions as any,
+            );
+            using cancelStub = stub(stripe.subscriptions, "cancel", () =>
+                Promise.resolve({ id: "sub" } as any),
+            );
+
+            const [job] = await db.insert(accountDeletionJobs)
+                .values({ tenantId: testTenantId, userId: testUserId })
+                .returning({ id: accountDeletionJobs.id });
+
+            try {
+                await AccountDeletionService.processJob(job.id);
+
+                const cancelledIds = cancelStub.calls.map((call) => call.args[0] as string);
+                // Stored subscription canceled (direct path).
+                assertEquals(cancelledIds.includes("sub_stored"), true);
+                // Orphan from the race canceled (customer sweep path).
+                assertEquals(cancelledIds.includes("sub_orphan"), true);
+                // Already-canceled subscriptions are left alone.
+                assertEquals(cancelledIds.includes("sub_already_canceled"), false);
+            } finally {
+                await cleanup();
+            }
         });
     });
 });
