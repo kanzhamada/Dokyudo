@@ -40,10 +40,7 @@
 			data-sidebar="sidebar"
 			data-slot="sidebar"
 			data-mobile="true"
-			class={cn(
-				'w-(--sidebar-width) border-r border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white backdrop-blur-[42px] [&>button]:hidden',
-				className
-			)}
+			class="w-auto max-w-none border-none bg-transparent p-2.5 sm:p-3 text-white shadow-none data-[side=left]:w-auto data-[side=left]:max-w-none data-[side=left]:border-none data-[side=left]:bg-transparent [&>button]:hidden"
 			style="--sidebar-width: {SIDEBAR_WIDTH_MOBILE};"
 			{side}
 		>
@@ -51,7 +48,11 @@
 				<Sheet.Title>Sidebar</Sheet.Title>
 				<Sheet.Description>Displays the mobile sidebar.</Sheet.Description>
 			</Sheet.Header>
-			<div class="flex h-full w-full flex-col">
+			<div
+				data-sidebar="sidebar"
+				data-slot="sidebar-inner"
+				class="flex h-full w-[280px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.1] bg-[#242322]/[0.92] text-white shadow-2xl shadow-black/50 backdrop-blur-[42px] sm:rounded-[18px]"
+			>
 				{@render children?.()}
 			</div>
 		</Sheet.Content>
