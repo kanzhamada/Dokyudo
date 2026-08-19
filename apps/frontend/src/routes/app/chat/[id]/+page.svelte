@@ -2624,9 +2624,15 @@
 											bind:this={editingTextInput}
 											bind:value={editingMessageValue}
 											rows={1}
+											maxlength={690}
 											class="min-h-20 w-full resize-none overflow-hidden rounded-md border border-white/20 bg-black/20 p-2 text-sm text-white outline-none"
 											aria-label="Edit question"
-											oninput={resizeEditingTextInput}
+											oninput={() => {
+												if (editingMessageValue.length > 690) {
+													editingMessageValue = editingMessageValue.slice(0, 690);
+												}
+												resizeEditingTextInput();
+											}}
 										></textarea>
 										<div class="mt-2 flex items-center justify-between gap-2">
 											<div

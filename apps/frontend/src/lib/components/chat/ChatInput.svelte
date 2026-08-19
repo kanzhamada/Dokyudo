@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { ChevronDown, X, Square, Check, Loader2, Sparkles } from 'lucide-svelte';
+	import { fly } from 'svelte/transition';
+	import { cubicOut, cubicIn } from 'svelte/easing';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -19,6 +21,8 @@
 	const MAX_DOCUMENT_MENTIONS = 5;
 	/** Per-submit cap for file attachments in the chat flow. */
 	const MAX_CHAT_ATTACHMENTS = 5;
+	/** Maximum character limit for prompt text (excluding document badge tokens). */
+	const MAX_PROMPT_CHARS = 690;
 
 	interface LlmOption {
 		name: string;
@@ -132,6 +136,8 @@
 			.filter((group) => group.options.length > 0);
 	});
 
+	let isEditorEmpty = $derived(!value || value.trim().length === 0);
+
 	// Focus on mount, and re-focus whenever the caller asks (refocusKey changes)
 	$effect(() => {
 		refocusKey;
@@ -205,9 +211,43 @@
 		}
 	}
 
+	function truncateToMaxStrippedLength(text: string, maxLen: number = MAX_PROMPT_CHARS): string {
+		if (mentionStrippedLength(text) <= maxLen) return text;
+		const segments = splitMentionSegments(text);
+		let currentLen = 0;
+		let truncated = '';
+		for (const seg of segments) {
+			if (seg.type === 'mention') {
+				truncated += seg.text;
+			} else {
+				const remaining = maxLen - currentLen;
+				if (remaining <= 0) continue;
+				const piece = seg.text.slice(0, remaining);
+				truncated += piece;
+				currentLen += piece.length;
+			}
+		}
+		return truncated;
+	}
+
 	function syncValue() {
 		if (editorEl) {
-			value = serializeEditor(editorEl);
+			const raw = serializeEditor(editorEl);
+			if (mentionStrippedLength(raw) > MAX_PROMPT_CHARS) {
+				const clamped = truncateToMaxStrippedLength(raw, MAX_PROMPT_CHARS);
+				value = clamped;
+				renderMarkdownToEditor(clamped);
+				const sel = window.getSelection();
+				if (sel && editorEl) {
+					const range = document.createRange();
+					range.selectNodeContents(editorEl);
+					range.collapse(false);
+					sel.removeAllRanges();
+					sel.addRange(range);
+				}
+			} else {
+				value = raw;
+			}
 		}
 	}
 
@@ -424,17 +464,49 @@
 			syncValue();
 			value = formatMentionsForPayload(value);
 			onsend();
+			return;
+		}
+
+		// Enforce hard character limit: prevent typing beyond MAX_PROMPT_CHARS (690)
+		if (
+			!e.ctrlKey &&
+			!e.metaKey &&
+			!e.altKey &&
+			e.key.length === 1
+		) {
+			const sel = window.getSelection();
+			const hasSelection = sel && !sel.isCollapsed && sel.toString().length > 0;
+			const currentLen = mentionStrippedLength(value);
+			if (currentLen >= MAX_PROMPT_CHARS && !hasSelection) {
+				e.preventDefault();
+				return;
+			}
 		}
 	}
 
 	function handlePaste(e: ClipboardEvent) {
 		e.preventDefault();
-		const text = e.clipboardData?.getData('text/plain') || '';
+		const pastedText = e.clipboardData?.getData('text/plain') || '';
+		if (!pastedText) return;
+
 		const sel = window.getSelection();
 		if (!sel || !sel.rangeCount) return;
 		const range = sel.getRangeAt(0);
+
+		// Calculate available character slots
+		const selectedText = sel.toString();
+		const currentStrippedLen = mentionStrippedLength(value);
+		const selectedStrippedLen = mentionStrippedLength(selectedText);
+		const availableSlots = Math.max(
+			0,
+			MAX_PROMPT_CHARS - (currentStrippedLen - selectedStrippedLen)
+		);
+
+		if (availableSlots <= 0) return;
+
+		const textToInsert = pastedText.slice(0, availableSlots);
 		range.deleteContents();
-		const textNode = document.createTextNode(text);
+		const textNode = document.createTextNode(textToInsert);
 		range.insertNode(textNode);
 		range.setStartAfter(textNode);
 		range.collapse(true);
@@ -601,8 +673,7 @@
 					tabindex="0"
 					aria-multiline="true"
 					aria-placeholder={placeholder}
-					data-placeholder={placeholder}
-					class="mention-editor relative max-h-32 min-h-[36px] w-full overflow-y-auto bg-transparent py-1.5 text-base leading-6 break-words whitespace-pre-wrap text-white caret-white outline-none selection:bg-white/15 md:text-sm md:leading-6"
+					class="mention-editor relative z-10 max-h-32 min-h-[36px] w-full overflow-y-auto bg-transparent py-1.5 text-base leading-6 break-words whitespace-pre-wrap text-white caret-white outline-none selection:bg-white/15 md:text-sm md:leading-6"
 					oninput={() => {
 						syncValue();
 						if (editorEl && (editorEl.innerHTML === '<br>' || editorEl.textContent === '')) {
@@ -615,6 +686,21 @@
 					onfocus={updateMentionState}
 					onblur={closeMention}
 				></div>
+
+				{#if isEditorEmpty}
+					<div class="pointer-events-none absolute inset-x-0 top-1.5 z-0 h-6 overflow-hidden select-none">
+						{#key placeholder}
+							<span
+								in:fly={{ x: 24, duration: 260, easing: cubicOut }}
+								out:fly={{ x: -24, duration: 200, easing: cubicIn }}
+								class="absolute inset-x-0 top-0 truncate text-base leading-6 text-white/40 md:text-sm md:leading-6"
+								aria-hidden="true"
+							>
+								{placeholder}
+							</span>
+						{/key}
+					</div>
+				{/if}
 			</div>
 
 			<!-- Model Switcher Dropdown -->
@@ -741,21 +827,6 @@
 </div>
 
 <style>
-	.mention-editor:empty::before {
-		content: attr(data-placeholder);
-		color: rgba(255, 255, 255, 0.4);
-		pointer-events: none;
-		position: absolute;
-		top: 6px;
-		left: 0;
-		right: 0;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		line-height: 24px;
-		height: 24px;
-	}
-
 	:global(button),
 	:global(a) {
 		-webkit-tap-highlight-color: rgba(255, 255, 255, 0.08);
