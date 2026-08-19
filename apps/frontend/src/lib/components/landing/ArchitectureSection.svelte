@@ -2,11 +2,11 @@
 </script>
 
 <!-- ============ 5. ARCHITECTURE DIAGRAM ============ -->
-<section class="section section--dark sec-cap" id="architecture">
+<section class="section section--white" id="architecture">
 	<div class="container">
 		<div class="shead" data-reveal>
 			<h2 class="t-h2">A grounded answer has a traceable path.</h2>
-			<p class="t-b1 shead__lead shead__lead--dark">
+			<p class="t-b1 shead__lead">
 				Inspect the two paths behind Dokyudo: hybrid retrieval on read, event-driven extraction on
 				write. Click any node to inspect its responsibilities.
 			</p>

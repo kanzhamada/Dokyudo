@@ -2206,17 +2206,6 @@
 /* ---------- architecture ---------- */
 .landing-root #architecture {
 	position: relative;
-	background-image:
-		linear-gradient(
-			180deg,
-			rgba(14, 14, 14, 1) 0%,
-			rgba(14, 14, 14, 0.9) 50%,
-			rgba(14, 14, 14, 1) 100%
-		),
-		url('/landing/arch-texture.webp');
-	background-size: cover;
-	background-position: center;
-	background-repeat: no-repeat;
 }
 
 .landing-root .arch {
@@ -2526,13 +2515,13 @@
 .landing-root .fhead__t {
 	margin: 0;
 	font: 400 clamp(1.4rem, 3vw, 2.1rem)/1 var(--font-display);
-	color: var(--color-offwhite);
+	color: var(--color-black);
 	flex: none;
 }
 .landing-root .fhead__rule {
 	flex: 1;
 	height: 1px;
-	background: var(--border-dark);
+	background: var(--border-fade);
 	transform: translateY(-3px);
 }
 .landing-root .fhead__hint {
@@ -2556,14 +2545,14 @@
 	overflow-x: auto;
 	overflow-y: visible;
 	scrollbar-width: thin;
-	scrollbar-color: var(--color-graphite) transparent;
+	scrollbar-color: var(--color-gray-light) transparent;
 	padding-bottom: 6px;
 }
 .landing-root .flow::-webkit-scrollbar {
 	height: 8px;
 }
 .landing-root .flow::-webkit-scrollbar-thumb {
-	background: var(--color-graphite);
+	background: var(--color-gray-light);
 	border-radius: var(--r-pill);
 }
 .landing-root .flow::-webkit-scrollbar-track {
@@ -2576,7 +2565,7 @@
 	right: 0;
 	bottom: 8px;
 	width: 54px;
-	background: linear-gradient(90deg, transparent, var(--color-black));
+	background: linear-gradient(90deg, transparent, var(--color-white));
 	pointer-events: none;
 	z-index: 5;
 }
@@ -2718,13 +2707,13 @@
 .landing-root .fn-cap strong {
 	display: block;
 	font: 500 0.82rem/1.2 var(--font-body);
-	color: var(--color-offwhite);
+	color: var(--color-black);
 }
 .landing-root .fn-cap p {
 	margin: 4px 0 0;
 	font: 400 0.66rem/1.35 var(--font-interface);
 	letter-spacing: 0.02em;
-	color: var(--color-warm-gray);
+	color: var(--color-gray);
 }
 
 /* ---------- mini screen schematics ---------- */
@@ -3013,12 +3002,12 @@
 /* ---------- connectors (SVG) ---------- */
 .landing-root .conn-line {
 	fill: none;
-	stroke: oklch(from var(--color-offwhite) l c h / 0.16);
+	stroke: oklch(from var(--color-black) l c h / 0.18);
 	stroke-width: 1;
 	transition: stroke var(--dur) var(--ease);
 }
 .landing-root .conn-arrow {
-	fill: oklch(from var(--color-offwhite) l c h / 0.3);
+	fill: oklch(from var(--color-black) l c h / 0.35);
 	transition: fill var(--dur) var(--ease);
 }
 .landing-root .conn-pulse {
@@ -3063,7 +3052,7 @@
 	transform: translate(-50%, -50%);
 	display: grid;
 	place-items: center;
-	background: var(--color-black);
+	background: var(--color-white);
 	border: 1px solid var(--color-terracotta);
 	color: var(--color-terracotta);
 	pointer-events: none;
@@ -3108,7 +3097,7 @@
 	margin: 34px auto 0;
 	max-width: 52rem;
 	text-align: center;
-	color: var(--color-warm-gray);
+	color: var(--color-gray);
 	font: 500 0.66rem/1.6 var(--font-interface);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
