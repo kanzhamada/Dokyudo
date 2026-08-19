@@ -395,21 +395,21 @@
 	let hoveredNavHref = $state<string | null>(null);
 </script>
 
-<Sidebar.Root collapsible="icon" class="border-none">
+<Sidebar.Root variant="floating" collapsible="icon" class="border-none">
 	<!-- HEADER -->
-	<Sidebar.Header class="group-data-[collapsible=icon]:hidden">
-		<div class="group/header flex items-center justify-between px-2.5 md:px-1.5 py-2.5 md:py-2">
-			<div class="flex items-center gap-1.5">
+	<Sidebar.Header class="group-data-[collapsible=icon]:hidden border-b border-white/[0.09] p-0">
+		<div class="group/header flex items-center justify-between px-4 py-3.5 sm:px-4.5 sm:py-3.5">
+			<div class="flex items-center gap-0.5">
 				<!-- Brand Logo -->
 				<div
-					class="flex size-7 items-center justify-center [&_path]:fill-sidebar-brand [&_svg]:h-8 [&_svg]:w-auto"
+					class="flex size-7.5 shrink-0 items-center justify-center [&_path]:fill-sidebar-brand [&_svg]:h-7.5 [&_svg]:w-auto"
 				>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html favicon}
 				</div>
 				<!-- Brand Text (Hidden when collapsed) -->
 				<span
-					class="font-sans text-[18px] font-medium tracking-tight text-sidebar-brand group-data-[collapsible=icon]:hidden"
+					class="font-sans text-[17px] font-medium tracking-tight text-sidebar-brand select-none group-data-[collapsible=icon]:hidden"
 				>
 					okyudo
 				</span>
@@ -419,7 +419,7 @@
 				class="transition-opacity group-hover/header:pointer-events-auto group-hover/header:opacity-100 group-data-[collapsible=icon]:hidden"
 			>
 				<Sidebar.Trigger
-					class="size-6 md:size-5 shrink-0 cursor-pointer text-sidebar-foreground/70 transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:scale-90 active:bg-sidebar-accent active:text-white"
+					class="size-7 md:size-6 shrink-0 cursor-pointer rounded-lg text-white/50 transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-90 active:bg-white/[0.12] active:text-white"
 				/>
 			</div>
 		</div>
@@ -429,12 +429,12 @@
 		<!-- CONTENT -->
 		<Sidebar.Content class="gap-0 overflow-hidden">
 			<!-- Main Navigation -->
-			<Sidebar.Group class="shrink-0 px-2.5 md:px-2 pt-2.5 md:pt-2 pb-1.5 md:pb-1">
+			<Sidebar.Group class="shrink-0 px-3 md:px-2.5 pt-3 md:pt-3 pb-1.5 md:pb-1.5">
 				<Sidebar.Menu class="gap-1.5 md:gap-1">
 					<!-- Collapsed mode logo injected directly into the menu structure -->
 					<Sidebar.MenuItem class="hidden group-data-[collapsible=icon]:block">
 						<Sidebar.MenuButton
-							class="h-10 md:h-9 px-3 md:px-2 font-geist text-[14px] md:text-[13px] transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent"
+							class="h-10 md:h-9 px-3 md:px-2 font-geist text-[14px] md:text-[13px] rounded-lg transition-all duration-150 active:scale-[0.98] hover:bg-white/[0.06] text-white/70 hover:text-white active:bg-white/[0.12]"
 							tooltipContent="Expand Sidebar (Ctrl + B)"
 						>
 							{#snippet child({ props })}
@@ -456,7 +456,7 @@
 											{@html favicon}
 										</div>
 										<!-- Expand Icon (Visible on hover) -->
-										<PanelLeft class="hidden size-[18px] group-hover/logo:block" />
+										<PanelLeft class="hidden size-[18px] text-white/70 group-hover/logo:block" />
 									</div>
 								</a>
 							{/snippet}
@@ -475,7 +475,7 @@
 				class="min-h-0 flex-1 overflow-hidden px-2.5 md:px-2 pt-2 md:pt-2 pb-1.5 md:pb-1 group-data-[collapsible=icon]:hidden"
 			>
 				<Sidebar.GroupLabel
-					class="mb-2 md:mb-1 mt-1 md:mt-0 h-6 shrink-0 px-2.5 md:px-2 font-geist text-[11px] md:text-[10px] font-medium tracking-[0.08em] text-sidebar-muted"
+					class="mb-2 md:mb-1 mt-1 md:mt-0 h-6 shrink-0 px-2.5 md:px-2 font-geist text-[11px] md:text-[10px] font-medium tracking-[0.08em] text-white/45 uppercase"
 				>
 					Recent Chats
 				</Sidebar.GroupLabel>
@@ -493,7 +493,7 @@
 								</Sidebar.MenuItem>
 							{/each}
 						{:else if (conversationsStore.list.length > 0 ? conversationsStore.list : conversations).length === 0}
-							<div class="px-2.5 py-2 md:px-2 md:py-1.5 font-geist text-[12px] md:text-[11px] text-sidebar-muted-foreground/60">
+							<div class="px-2.5 py-2 md:px-2 md:py-1.5 font-geist text-[12px] md:text-[11px] text-white/40">
 								No recent chats
 							</div>
 						{:else}
@@ -518,8 +518,8 @@
 	</div>
 
 	<!-- FOOTER -->
-	<Sidebar.Footer class="pb-3 px-2.5 md:px-2">
-		<div class="mx-2 mb-2 md:mb-1.5 h-px bg-white/10"></div>
+	<Sidebar.Footer class="pb-2.5 px-2.5 md:px-2">
+		<div class="mx-2 mb-2 md:mb-1.5 h-px bg-white/[0.09]"></div>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<DropdownMenu.Root bind:open={isUserMenuOpen}>
@@ -530,10 +530,10 @@
 								id="user-menu-trigger"
 								size="lg"
 								tooltipContent="Profile"
-								class="h-14! md:h-12! w-full cursor-pointer p-2 md:p-1.5 transition-all duration-150 hover:bg-sidebar-accent active:scale-[0.98] active:bg-sidebar-accent active:brightness-110"
+								class="h-14! md:h-12! w-full cursor-pointer rounded-xl p-2 md:p-1.5 transition-all duration-150 hover:bg-white/[0.05] active:scale-[0.98] active:bg-white/[0.1]"
 							>
 								<AvatarPrimitive.Root
-									class="size-8 md:size-7 shrink-0 overflow-hidden rounded-full border-none bg-sidebar-avatar"
+									class="size-8 md:size-7 shrink-0 overflow-hidden rounded-full border-none bg-white/[0.07]"
 								>
 									{#if userProfile?.user?.profilePictureUrl}
 										<AvatarPrimitive.Image
@@ -543,7 +543,7 @@
 										/>
 									{/if}
 									<AvatarPrimitive.Fallback
-										class="flex size-full items-center justify-center rounded-md bg-sidebar-avatar font-geist text-xs font-medium text-sidebar"
+										class="flex size-full items-center justify-center rounded-md bg-white/[0.07] font-geist text-xs font-medium text-white/80"
 									>
 										{userInitials}
 									</AvatarPrimitive.Fallback>
@@ -552,10 +552,10 @@
 									class="ml-2 md:ml-1.5 flex flex-1 flex-col items-start justify-center gap-0.5 overflow-hidden group-data-[collapsible=icon]:hidden"
 								>
 									<span class="truncate font-geist text-[14px] md:text-[13px] font-medium text-white">{displayName}</span>
-									<span class="truncate font-geist text-[12px] md:text-[11px] text-sidebar-muted-foreground">{subscriptionTier}</span>
+									<span class="truncate font-geist text-[12px] md:text-[11px] text-white/45">{subscriptionTier}</span>
 								</div>
 								<ChevronsUpDown
-									class="size-4 md:size-3.5 shrink-0 text-white opacity-50 group-data-[collapsible=icon]:hidden"
+									class="size-4 md:size-3.5 shrink-0 text-white/45 group-data-[collapsible=icon]:hidden"
 								/>
 							</Sidebar.MenuButton>
 						{/snippet}
@@ -564,10 +564,10 @@
 						side="top"
 						align="start"
 						sideOffset={8}
-						class="z-[70] w-56 min-w-56 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+						class="z-[70] w-56 min-w-56 rounded-xl border border-white/10 bg-[#242322]/[0.85] p-1 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px]"
 					>
 						<div class="px-2.5 py-1.5 font-sans text-xs font-semibold text-white/45">My Account</div>
-						<div class="my-1 h-px bg-white/10"></div>
+						<div class="my-1 h-px bg-white/[0.09]"></div>
 						<DropdownMenu.Item
 							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98] active:bg-white/15 active:text-white outline-none"
 							onSelect={() => {
@@ -598,7 +598,7 @@
 							<Link2 class="size-3.5 text-white/60" />
 							<span>Shared links</span>
 						</DropdownMenu.Item>
-						<div class="my-1 h-px bg-white/10"></div>
+						<div class="my-1 h-px bg-white/[0.09]"></div>
 						<DropdownMenu.Item
 							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
 							onSelect={() => {
@@ -614,9 +614,6 @@
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Footer>
-
-	<!-- Exact edge trigger for opening the collapsed sidebar. -->
-	<Sidebar.Rail class="after:hidden" />
 </Sidebar.Root>
 
 {#snippet navItem(item: (typeof navItems)[0])}
@@ -624,13 +621,15 @@
 		<Sidebar.MenuButton
 			isActive={item.active}
 			tooltipContent={item.label}
-			class="h-10 md:h-9 px-3 md:px-2 font-geist text-[14px] md:text-[13px] transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white"
+			class="h-10 md:h-9 px-3 md:px-2.5 font-geist text-[14px] md:text-[13px] rounded-lg transition-all duration-150 select-none active:scale-[0.98] {item.active
+				? 'bg-white/[0.1] text-white shadow-xs ring-1 ring-white/10 font-medium'
+				: 'text-white/60 hover:bg-white/[0.05] hover:text-white active:bg-white/[0.12]'}"
 		>
 			{#snippet child({ props })}
 				<a
 					href={item.href}
 					{...props}
-					class={(props.class as string) + ' transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent'}
+					class={(props.class as string) + ' transition-all duration-150 active:scale-[0.98] select-none'}
 					onclick={() => {
 						if (sidebar.isMobile) sidebar.setOpenMobile(false);
 					}}
@@ -641,13 +640,13 @@
 						{#if mxBoldName(item.icon) && (item.active || hoveredNavHref === item.href)}
 							<MxIcon
 								name={mxBoldName(item.icon)!}
-								class="mr-3 md:mr-2.5 size-4.5 md:size-4 group-data-[collapsible=icon]:mr-0"
+								class="mr-3 md:mr-2.5 size-4.5 md:size-4 {item.active ? 'text-white' : 'text-white/60'} group-data-[collapsible=icon]:mr-0"
 							/>
 						{:else}
-							<MxIcon name={item.icon} class="mr-3 md:mr-2.5 size-4.5 md:size-4 group-data-[collapsible=icon]:mr-0" />
+							<MxIcon name={item.icon} class="mr-3 md:mr-2.5 size-4.5 md:size-4 {item.active ? 'text-white' : 'text-white/60'} group-data-[collapsible=icon]:mr-0" />
 						{/if}
 					{:else}
-						<item.icon class="mr-3 md:mr-2.5 size-4.5 md:size-4 group-data-[collapsible=icon]:mr-0" />
+						<item.icon class="mr-3 md:mr-2.5 size-4.5 md:size-4 {item.active ? 'text-white' : 'text-white/60'} group-data-[collapsible=icon]:mr-0" />
 					{/if}
 					<span class="group-data-[collapsible=icon]:hidden">{item.label}</span>
 				</a>
@@ -657,16 +656,19 @@
 {/snippet}
 
 {#snippet recentChatItem(item: ConversationItem)}
+	{@const isCurrentActive = $page.url.pathname === `/app/chat/${item.id}`}
 	<Sidebar.MenuItem>
 		<Sidebar.MenuButton
-			isActive={$page.url.pathname === `/app/chat/${item.id}`}
-			class="h-9.5 md:h-7 cursor-pointer px-3 md:px-2 font-geist text-[13.5px] md:text-xs text-sidebar-muted-foreground transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent active:text-white select-none"
+			isActive={isCurrentActive}
+			class="h-9.5 md:h-7.5 cursor-pointer px-3 md:px-2.5 font-geist text-[13.5px] md:text-xs rounded-lg transition-all duration-150 select-none active:scale-[0.98] {isCurrentActive
+				? 'bg-white/[0.1] text-white shadow-xs ring-1 ring-white/10 font-medium'
+				: 'text-white/60 hover:bg-white/[0.04] hover:text-white active:bg-white/[0.1]'}"
 		>
 			{#snippet child({ props })}
 				<a
 					href="/app/chat/{item.id}"
 					{...props}
-					class={(props.class as string) + ' w-full overflow-hidden text-left transition-all duration-150 active:scale-[0.98] active:bg-sidebar-accent select-none'}
+					class={(props.class as string) + ' w-full overflow-hidden text-left transition-all duration-150 active:scale-[0.98] select-none'}
 					onclick={() => {
 						if (sidebar.isMobile) sidebar.setOpenMobile(false);
 					}}
@@ -698,26 +700,28 @@
 					<Sidebar.MenuAction
 						{...props}
 						showOnHover={!item.isPinned}
-						class="top-2 md:top-1 cursor-pointer transition-all duration-150 active:scale-90 active:bg-sidebar-accent/80 size-6 md:size-5 flex items-center justify-center"
+						aria-label={item.title ? `${item.title} options` : 'Conversation options'}
+						class="top-2 md:top-1 cursor-pointer rounded-md transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-90 size-6 md:size-5 flex items-center justify-center text-white/50"
 					>
 						{#if item.isPinned}
 							<div class="flex size-full items-center justify-center gap-1 group-hover/menu-item:hidden">
-								<MxIcon name="pin-bold" class="size-3.5 rotate-45 text-sidebar-muted-foreground/70" />
+								<MxIcon name="pin-bold" class="size-3.5 rotate-45 text-white/60" />
 							</div>
 							<div class="hidden size-full items-center justify-center group-hover/menu-item:flex">
-								<MxIcon name="menu-dots-outline" class="size-4" />
+								<MxIcon name="menu-dots-outline" class="size-4 text-white/70" />
 							</div>
 						{:else}
-							<MxIcon name="menu-dots-outline" class="size-4" />
+							<MxIcon name="menu-dots-outline" class="size-4 text-white/60" />
 						{/if}
+						<span class="sr-only">Conversation options</span>
 					</Sidebar.MenuAction>
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content
 				side="right"
 				align="start"
-				sideOffset={4}
-				class="z-[70] w-48 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+				sideOffset={6}
+				class="z-[70] w-48 rounded-xl border border-white/10 bg-[#242322]/[0.85] p-1 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px]"
 			>
 				<DropdownMenu.Item
 					class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98] active:bg-white/15 active:text-white outline-none"
@@ -753,7 +757,7 @@
 						<span>Pin</span>
 					{/if}
 				</DropdownMenu.Item>
-				<div class="my-1 h-px bg-white/10"></div>
+				<div class="my-1 h-px bg-white/[0.09]"></div>
 				<DropdownMenu.Item
 					class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
 					onSelect={() => {
@@ -772,7 +776,7 @@
 <!-- Confirmation Dialog for Logout -->
 <Dialog.Root bind:open={isLogoutDialogOpen}>
 	<Dialog.Content
-		class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md"
+		class="rounded-2xl sm:rounded-[18px] border border-white/10 bg-[#242322]/[0.85] text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-md"
 	>
 		<Dialog.Header>
 			<Dialog.Title class="text-lg font-semibold text-white">Log out</Dialog.Title>

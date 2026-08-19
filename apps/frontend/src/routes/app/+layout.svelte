@@ -72,31 +72,33 @@
 	});
 </script>
 
-<Sidebar.Provider>
-	<AppSidebar />
-	<main
-		style="view-transition-name: app-main;"
-		class="relative flex h-svh max-h-svh w-full min-w-0 flex-1 flex-col overflow-hidden bg-[#1F1E1D]"
-	>
-		<!-- Decorative Background Circle -->
-		<div
-			class="pointer-events-none absolute z-0 rounded-full opacity-7"
-			style="width: 1190px; height: 1190px; left: -295px; top: -318px; background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
-		></div>
+<div class="relative flex h-svh max-h-svh w-full min-w-0 overflow-hidden bg-[#1F1E1D]">
+	<!-- Decorative Background Circle (Full screen cover behind sidebar and main) -->
+	<div
+		class="pointer-events-none absolute z-0 rounded-full"
+		style="width: 1190px; height: 1190px; left: -295px; top: -318px; background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px); opacity: 0.07;"
+	></div>
 
-		<div class="relative z-10 flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-			{#if !page.url.pathname.startsWith('/app/chat/') && !mobileHeaderState.hidden}
-				<MobileHeader />
-			{/if}
-
-			<!-- Main Content Layer -->
+	<Sidebar.Provider class="relative z-10 size-full min-h-svh bg-transparent">
+		<AppSidebar />
+		<main
+			style="view-transition-name: app-main;"
+			class="relative flex h-full max-h-svh w-full min-w-0 flex-1 flex-col overflow-hidden bg-transparent"
+		>
 			<div class="relative z-10 flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-				<!-- Note: We intentionally do not place the SidebarTrigger here
-				     as it is housed within the AppSidebar header per design requirements -->
-				{@render children()}
+				{#if !page.url.pathname.startsWith('/app/chat/') && !mobileHeaderState.hidden}
+					<MobileHeader />
+				{/if}
+
+				<!-- Main Content Layer -->
+				<div class="relative z-10 flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+					<!-- Note: We intentionally do not place the SidebarTrigger here
+					     as it is housed within the AppSidebar header per design requirements -->
+					{@render children()}
+				</div>
 			</div>
-		</div>
-	</main>
-</Sidebar.Provider>
+		</main>
+	</Sidebar.Provider>
+</div>
 
 <SessionExpiredDialog />

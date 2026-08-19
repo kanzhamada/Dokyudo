@@ -318,8 +318,8 @@
 		</div>
 	{/snippet}
 
-	<!-- Background Video (Cloudinary, fe-poc hero style) -->
-	<div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+	<!-- Background Video (Cloudinary, full-screen cover including behind sidebar) -->
+	<div class="pointer-events-none fixed inset-0 z-0 h-screen w-screen overflow-hidden" aria-hidden="true">
 		<video
 			class="h-full w-full object-cover object-center"
 			autoplay
@@ -328,21 +328,17 @@
 			playsinline
 			poster="https://res.cloudinary.com/mnkj9dve/image/upload/v1786330131/flower_background_chat-webp_adbufh.webp"
 		>
-			<source
-				src="https://res.cloudinary.com/mnkj9dve/video/upload/f_auto,q_auto/9737873-uhd_3840_2160_24fps_nknbst"
-				type="video/webm"
-			/>
-			<source
-				src="https://res.cloudinary.com/mnkj9dve/video/upload/f_auto,q_auto/9737873-uhd_3840_2160_24fps_br3frg"
-				type="video/mp4"
-			/>
+	 <source src="https://res.cloudinary.com/mnkj9dve/video/upload/f_auto,q_auto/hero-bg-webm" type="video/webm" />
+
+        <!-- Format MP4 untuk Safari & iOS -->
+        <source src="https://res.cloudinary.com/mnkj9dve/video/upload/f_auto,q_auto/hero-bg-mp4" type="video/mp4" />
 		</video>
 		<!-- Dark overlay for readability, adapted from fe-poc's hero__video-overlay -->
 		<div
 			class="absolute inset-0"
 			style="background:
-				linear-gradient(180deg, rgba(14,14,14,0.40) 0%, rgba(14,14,14,0.10) 45%, rgba(14,14,14,0.52) 100%),
-				radial-gradient(ellipse at 20% 50%, rgba(14,14,14,0.55) 0%, rgba(14,14,14,0.25) 65%, transparent 100%);"
+				linear-gradient(180deg, rgba(14,14,14,0.42) 0%, rgba(14,14,14,0.69) 45%, rgba(14,14,14,0.42) 100%),
+				radial-gradient(ellipse at 68% 69%, rgba(14,14,14,0.69) 0%, rgba(14,14,14,0.42) 65%, transparent 100%);"
 		></div>
 	</div>
 

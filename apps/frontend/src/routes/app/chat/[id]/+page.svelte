@@ -2123,7 +2123,7 @@
 	})}
 </svelte:head>
 
-<div class="relative flex h-full w-full overflow-hidden bg-[#1F1E1D] font-sans text-white">
+<div class="relative flex h-full w-full overflow-hidden bg-transparent font-sans text-white">
 	{#if citationPreview}
 		<!-- Mobile: full-screen preview -->
 		<div class="fixed inset-0 z-[60] h-full w-full bg-[#1F1E1D] md:hidden">
@@ -2160,13 +2160,7 @@
 </div>
 
 {#snippet chatContent()}
-	<div class="relative flex h-full w-full flex-col overflow-hidden">
-		<!-- Ambient Background Glow Circle (Matching App Shell Layout) -->
-		<div
-			class="pointer-events-none absolute -top-[318px] -left-[295px] z-0 h-[1190px] w-[1190px] rounded-full opacity-[0.07]"
-			style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
-		></div>
-
+	<div class="relative flex h-full w-full flex-col overflow-hidden bg-transparent">
 		<!-- Reusable Mobile Floating Header Capsule -->
 		<MobileHeader>
 			{#snippet leading()}
@@ -2364,7 +2358,7 @@
 
 		<!-- Desktop Conversation Header -->
 		<div
-			class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-28 bg-gradient-to-b from-[#1F1E1D] via-[#1F1E1D]/95 via-65% to-transparent md:block"
+			class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-20 bg-transparent md:block"
 		>
 			<div class="pointer-events-auto grid h-16 w-full grid-cols-3 items-center px-4 md:px-8">
 				<div class="flex justify-start">
@@ -3341,9 +3335,9 @@
 			</div>
 		</div>
 
-		<!-- Bottom Area: Floating Input Capsule with Gradient Mask -->
+		<!-- Bottom Area: Floating Input Capsule -->
 		<div
-			class="pointer-events-none absolute right-0 bottom-0 left-0 z-30 flex flex-col items-center justify-end bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent pt-6 pb-4"
+			class="pointer-events-none absolute right-0 bottom-0 left-0 z-30 flex flex-col items-center justify-end bg-transparent pt-6 pb-4"
 			style="font-family: 'Inter', sans-serif;"
 		>
 			<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">

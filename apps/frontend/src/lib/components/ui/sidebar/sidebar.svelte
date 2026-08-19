@@ -41,7 +41,7 @@
 			data-slot="sidebar"
 			data-mobile="true"
 			class={cn(
-				'w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden',
+				'w-(--sidebar-width) border-r border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white backdrop-blur-[42px] [&>button]:hidden',
 				className
 			)}
 			style="--sidebar-width: {SIDEBAR_WIDTH_MOBILE};"
@@ -96,7 +96,12 @@
 			<div
 				data-sidebar="sidebar"
 				data-slot="sidebar-inner"
-				class="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
+				class={cn(
+					'flex size-full flex-col',
+					variant === 'floating'
+						? 'overflow-hidden rounded-2xl sm:rounded-[18px] border border-white/[0.1] bg-[#242322]/[0.85] shadow-2xl shadow-black/40 backdrop-blur-[42px]'
+						: 'bg-sidebar'
+				)}
 			>
 				{@render children?.()}
 			</div>
