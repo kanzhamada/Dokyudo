@@ -20,7 +20,6 @@ import * as AuthParams from "./auth.schema.ts";
 import { AuthConstants } from "../../shared/constants/auth.constant.ts";
 import { logActivity } from "../../shared/utils/activity.util.ts";
 import { provisionTenantForUser } from "./user_provision.util.ts";
-import { parseDeviceInfo } from "../../shared/utils/user-agent.util.ts";
 
 export class AuthService {
     static async registerUser(params: AuthParams.RegisterParams) {
@@ -649,13 +648,10 @@ export class AuthService {
             return;
         }
         try {
-            const device = parseDeviceInfo(params.userAgent);
             await db.insert(loginAttempts).values({
                 emailAttempted: params.email,
                 ipAddress: params.ipAddress,
                 userAgent: params.userAgent,
-                deviceBrand: device.brand,
-                deviceModel: device.model,
                 isSuccess: params.isSuccess,
                 authProvider: params.authProvider ?? "email",
             });

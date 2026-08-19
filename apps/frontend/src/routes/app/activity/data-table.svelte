@@ -194,12 +194,26 @@
 													: cell.column.columnDef.cell
 												: null}
 											{#if cellData && typeof cellData === 'object' && 'display' in cellData}
-												<div class="flex min-w-0 flex-col gap-0.5">
-													<span class="text-sm text-[#959595]">{cellData.display}</span>
-													{#if cellData.details}
-														<span class="truncate text-xs text-[#767676]">{cellData.details}</span>
-													{/if}
-												</div>
+												{#if cellData.full}
+													<Tooltip.Root>
+														<Tooltip.Trigger>
+															{#snippet child({ props })}
+																<span {...props} class="cursor-default text-sm text-[#959595]">
+																	{cellData.display}
+																</span>
+															{/snippet}
+														</Tooltip.Trigger>
+														<Tooltip.Content
+															class="max-w-xs rounded-md bg-white px-2.5 py-1.5 text-xs font-medium break-all text-black shadow-md"
+														>
+															{cellData.full}
+														</Tooltip.Content>
+													</Tooltip.Root>
+												{:else}
+													<span class="text-sm text-[#959595]">
+														{cellData.display}
+													</span>
+												{/if}
 											{:else}
 												<span class="text-sm text-[#959595]">--</span>
 											{/if}

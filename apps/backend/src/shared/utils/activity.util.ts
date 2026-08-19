@@ -1,6 +1,5 @@
 import { db } from "../../config/drizzle.ts";
 import { activityLogs, activityActionEnum } from "../models/db.model.ts";
-import { parseUserAgent } from "./user-agent.util.ts";
 
 export type ActivityAction = typeof activityActionEnum.enumValues[number];
 
@@ -14,9 +13,6 @@ export interface LogActivityParams {
     requestId?: string;
     ipAddress?: string;
     userAgent?: string;
-    operatingSystem?: string;
-    deviceType?: string;
-    location?: string;
 }
 
 /**
@@ -30,13 +26,7 @@ export async function logActivity(
     logContext?: Record<string, any>,
 ): Promise<void> {
     try {
-        const clientDetails = parseUserAgent(params.userAgent);
-        await db.insert(activityLogs).values({
-            ...params,
-            operatingSystem: clientDetails.operatingSystem,
-            deviceType: clientDetails.deviceType,
-            location: params.location ?? logContext?.clientLocation ?? null,
-        });
+        await db.insert(activityLogs).values(params);
     } catch (err: any) {
         if (logContext) {
             logContext.activityLogWriteError = err.message;

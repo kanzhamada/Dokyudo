@@ -2,7 +2,6 @@ import { db } from "../../config/drizzle.ts";
 import { activityLogs } from "../../shared/models/db.model.ts";
 import { and, count, desc, eq, gte, lte, like, sql } from "drizzle-orm";
 import { AppError } from "../../shared/utils/errors.util.ts";
-import { parseUserAgent } from "../../shared/utils/user-agent.util.ts";
 
 export class ActivitiesService {
     static async getActivities(params: {
@@ -41,7 +40,7 @@ export class ActivitiesService {
         if (search && search.trim()) {
             const searchPattern = `%${search.trim().toLowerCase()}%`;
             conditions.push(
-                sql`(LOWER(${activityLogs.action}::text) LIKE ${searchPattern} OR LOWER(COALESCE(${activityLogs.metadata}::text, '')) LIKE ${searchPattern} OR LOWER(COALESCE(${activityLogs.ipAddress}::text, '')) LIKE ${searchPattern} OR LOWER(COALESCE(${activityLogs.userAgent}, '')) LIKE ${searchPattern} OR LOWER(COALESCE(${activityLogs.operatingSystem}, '')) LIKE ${searchPattern} OR LOWER(COALESCE(${activityLogs.deviceType}, '')) LIKE ${searchPattern} OR LOWER(COALESCE(${activityLogs.location}, '')) LIKE ${searchPattern})`
+                sql`(LOWER(${activityLogs.action}::text) LIKE ${searchPattern} OR LOWER(COALESCE(${activityLogs.metadata}::text, '')) LIKE ${searchPattern} OR LOWER(COALESCE(${activityLogs.ipAddress}::text, '')) LIKE ${searchPattern})`
             );
         }
 
@@ -65,9 +64,6 @@ export class ActivitiesService {
                     metadata: activityLogs.metadata,
                     ipAddress: activityLogs.ipAddress,
                     userAgent: activityLogs.userAgent,
-                    operatingSystem: activityLogs.operatingSystem,
-                    deviceType: activityLogs.deviceType,
-                    location: activityLogs.location,
                     createdAt: activityLogs.createdAt,
                 })
                 .from(activityLogs)
@@ -77,15 +73,10 @@ export class ActivitiesService {
                 .offset(offset);
 
             return {
-                data: activities.map(a => {
-                    const clientDetails = parseUserAgent(a.userAgent);
-                    return {
-                        ...a,
-                        operatingSystem: a.operatingSystem ?? clientDetails.operatingSystem,
-                        deviceType: a.deviceType ?? clientDetails.deviceType,
-                        createdAt: a.createdAt?.toISOString() ?? new Date().toISOString(),
-                    };
-                }),
+                data: activities.map(a => ({
+                    ...a,
+                    createdAt: a.createdAt?.toISOString() ?? new Date().toISOString(),
+                })),
                 meta: {
                     page,
                     limit,

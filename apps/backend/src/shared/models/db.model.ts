@@ -190,8 +190,6 @@ export const loginAttempts = pgTable(
         emailAttempted: varchar("email_attempted", { length: 255 }).notNull(),
         ipAddress: inet("ip_address").notNull(),
         userAgent: text("user_agent"),
-        deviceBrand: varchar("device_brand", { length: 100 }),
-        deviceModel: varchar("device_model", { length: 200 }),
         isSuccess: boolean("is_success").default(false),
         authProvider: authProviderEnum("auth_provider").default("email"),
         attemptedAt: timestamp("attempted_at", {
@@ -601,9 +599,6 @@ export const activityLogs = pgTable("activity_logs", {
     metadata: jsonb("metadata"),
     ipAddress: inet("ip_address"),
     userAgent: text("user_agent"),
-    operatingSystem: varchar("operating_system", { length: 100 }),
-    deviceType: varchar("device_type", { length: 32 }),
-    location: varchar("location", { length: 100 }),
     requestId: varchar("request_id", { length: 36 }),
     createdAt: timestamp("created_at", { mode: "date", precision: 3, withTimezone: true }).defaultNow(),
 }, (table) => ({

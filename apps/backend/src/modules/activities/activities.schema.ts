@@ -37,9 +37,6 @@ export const ActivityItemSchema = z.object({
     metadata: z.any().nullable().optional(),
     ipAddress: z.string().nullable().optional(),
     userAgent: z.string().nullable().optional(),
-    operatingSystem: z.string().nullable().optional(),
-    deviceType: z.string().nullable().optional(),
-    location: z.string().nullable().optional(),
     createdAt: z.string().datetime().openapi({
         example: "2024-01-01T00:00:00Z",
     }),

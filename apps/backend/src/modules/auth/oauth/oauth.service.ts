@@ -14,7 +14,6 @@ import { and, count, eq } from "drizzle-orm";
 import { logActivity } from "../../../shared/utils/activity.util.ts";
 import { AccountDeletionService } from "../../account_deletion/account_deletion.service.ts";
 import { provisionTenantForUser } from "../user_provision.util.ts";
-import { parseDeviceInfo } from "../../../shared/utils/user-agent.util.ts";
 
 export interface OAuthCallbackResult {
     accessToken: string;
@@ -132,13 +131,10 @@ export class OAuthService {
             // Audit log: record the failed attempt for security visibility (prod only)
             if (getEnv("NODE_ENV") === "prod") {
                 try {
-                    const device = parseDeviceInfo(params.userAgent);
                     await db.insert(loginAttempts).values({
                         emailAttempted: user.email ?? "unknown",
                         ipAddress: params.clientIp,
                         userAgent: params.userAgent,
-                        deviceBrand: device.brand,
-                        deviceModel: device.model,
                         isSuccess: false,
                         authProvider: `oauth_${params.provider}`,
                     });

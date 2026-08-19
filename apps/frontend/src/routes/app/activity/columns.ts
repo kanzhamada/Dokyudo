@@ -12,9 +12,6 @@ export interface ActivityLog {
 	metadata: Record<string, unknown> | null;
 	ipAddress: string | null;
 	userAgent: string | null;
-	operatingSystem: string | null;
-	deviceType: string | null;
-	location: string | null;
 	createdAt: string;
 }
 
@@ -167,22 +164,13 @@ export function getColumns(): ColumnDef<ActivityLog, unknown>[] {
 			}
 		},
 		{
-			accessorKey: 'location',
-			header: 'Location',
-			cell: ({ row }) => {
-				return row.getValue('location') || '--';
-			}
-		},
-		{
 			accessorKey: 'userAgent',
 			header: 'Client',
 			cell: ({ row }) => {
 				const ua = row.getValue('userAgent') as string | null;
 				return {
 					display: truncateUserAgent(ua),
-					details: [row.original.operatingSystem, row.original.deviceType]
-						.filter(Boolean)
-						.join(' · ')
+					full: ua || null
 				};
 			}
 		},
