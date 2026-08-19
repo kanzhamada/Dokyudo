@@ -25,10 +25,10 @@ export class MobileHeaderState {
 		}, duration);
 	}
 
-	showSuccess(title: string, msg: string, duration = 4000) {
+	showSuccess(title: string, msg: string = '', duration = 4000) {
 		this.type = 'success';
 		this.title = title;
-		this.message = msg;
+		this.message = msg || null;
 
 		if (this.timeoutId) {
 			clearTimeout(this.timeoutId);
@@ -41,10 +41,10 @@ export class MobileHeaderState {
 		}, duration);
 	}
 
-	showInfo(title: string, msg: string, duration = 4000) {
+	showInfo(title: string, msg: string = '', duration = 4000) {
 		this.type = 'info';
 		this.title = title;
-		this.message = msg;
+		this.message = msg || null;
 
 		if (this.timeoutId) {
 			clearTimeout(this.timeoutId);

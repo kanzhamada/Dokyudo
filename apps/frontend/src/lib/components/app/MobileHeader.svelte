@@ -39,7 +39,9 @@
 			<MxIcon name="danger-triangle-outline" class="mt-0.5 size-5 shrink-0 text-red-400" />
 			<div class="flex flex-col">
 				<span class="text-sm font-semibold text-white">{mobileHeaderState.title || 'Error'}</span>
-				<span class="text-sm leading-snug text-red-200">{mobileHeaderState.message}</span>
+				{#if mobileHeaderState.message}
+					<span class="text-sm leading-snug text-red-200">{mobileHeaderState.message}</span>
+				{/if}
 			</div>
 		</div>
 	{:else if mobileHeaderState.type === 'success'}
@@ -47,7 +49,9 @@
 			<CircleCheck class="mt-0.5 size-5 shrink-0 text-green-400" />
 			<div class="flex flex-col">
 				<span class="text-sm font-semibold text-white">{mobileHeaderState.title || 'Success'}</span>
-				<span class="text-sm leading-snug text-green-200">{mobileHeaderState.message}</span>
+				{#if mobileHeaderState.message}
+					<span class="text-sm leading-snug text-green-200">{mobileHeaderState.message}</span>
+				{/if}
 			</div>
 		</div>
 	{:else if mobileHeaderState.type === 'info'}
@@ -55,7 +59,9 @@
 			<Info class="mt-0.5 size-5 shrink-0 text-blue-400" />
 			<div class="flex flex-col">
 				<span class="text-sm font-semibold text-white">{mobileHeaderState.title || 'Info'}</span>
-				<span class="text-sm leading-snug text-blue-200">{mobileHeaderState.message}</span>
+				{#if mobileHeaderState.message}
+					<span class="text-sm leading-snug text-blue-200">{mobileHeaderState.message}</span>
+				{/if}
 			</div>
 		</div>
 	{:else if children}
@@ -74,7 +80,7 @@
 						variant="ghost"
 						size="icon"
 						class="-ml-2 cursor-pointer text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 active:bg-white/15 active:text-white"
-						onclick={() => sidebar.toggle()}
+						onclick={() => sidebar?.toggle()}
 					>
 						<MxIcon name="hamburger-menu-outline" class="size-6" />
 						<span class="sr-only">Toggle Sidebar</span>

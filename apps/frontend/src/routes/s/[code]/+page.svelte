@@ -14,6 +14,8 @@
 	import { renderMarkdown } from '$lib/utils/markdown';
 	import { splitMentionSegments, stripMentionTokens } from '$lib/utils/doc-mentions';
 	import { continueShare, getPublicShare } from '$lib/api/rag';
+	import MobileHeader from '$lib/components/app/MobileHeader.svelte';
+	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { toast } from 'svelte-sonner';
 	import { mount, unmount, untrack } from 'svelte';
@@ -116,6 +118,30 @@
 		});
 	});
 
+	function showError(msg: string) {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showError(msg);
+		} else {
+			toast.error('Error', { description: msg });
+		}
+	}
+
+	function showSuccess(title: string, msg: string = '') {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showSuccess(title, msg);
+		} else {
+			toast.success(title, { description: msg || undefined });
+		}
+	}
+
+	function showInfo(title: string, msg: string = '') {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showInfo(title, msg);
+		} else {
+			toast.info(title, { description: msg || undefined });
+		}
+	}
+
 	async function copyToClipboard(text: string, id: string) {
 		// Strip inline citation tags ([Doc N: Page X]) and document mention tokens (e.g. @[title](id))
 		// so copied questions or answers don't carry source reference markers or mention tokens.
@@ -123,12 +149,12 @@
 		try {
 			await navigator.clipboard.writeText(cleanText);
 			copiedMessageId = id;
-			toast.success('Copied to clipboard');
+			showSuccess('Copied to clipboard');
 			setTimeout(() => {
 				if (copiedMessageId === id) copiedMessageId = null;
 			}, 2000);
 		} catch {
-			// clipboard unavailable — silently ignore on public pages
+			showError('Failed to copy to clipboard');
 		}
 	}
 
@@ -137,12 +163,12 @@
 		try {
 			await navigator.clipboard.writeText(window.location.href);
 			copiedLink = true;
-			toast.success('Share link copied to clipboard');
+			showSuccess('Share link copied to clipboard');
 			setTimeout(() => {
 				copiedLink = false;
 			}, 1500);
 		} catch {
-			// clipboard unavailable — silently ignore on public pages
+			showError('Failed to copy share link');
 		}
 	}
 
@@ -162,7 +188,10 @@
 				await goto(`/login?redirect=/s/${share.code}`);
 			} else {
 				notFound = true;
+				showError('Failed to continue chat');
 			}
+		} catch {
+			showError('Failed to continue chat');
 		} finally {
 			isContinuing = false;
 		}
@@ -212,50 +241,61 @@
 		style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
 	></div>
 
-	<!-- ================= Mobile Header (documents-style capsule, logo left, title centered) ================= -->
-	<div
-		class="pointer-events-auto fixed inset-x-4 top-4 z-50 grid h-14 grid-cols-[auto_1fr_auto] items-center overflow-hidden rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.40] px-4 shadow-lg backdrop-blur-[42px] transition-all duration-500 md:hidden"
-	>
-		<a href="/" class="flex shrink-0 items-center gap-0.5" aria-label="Dokyudo home">
-			<div class="flex items-center [&_path]:fill-white [&>svg]:size-6">
-				{@html faviconRaw}
-			</div>
-			<span class="font-geist text-lg font-bold tracking-tight text-white">okyudo</span>
-		</a>
+	<!-- ================= Mobile Header (reusable MobileHeader capsule) ================= -->
+	<MobileHeader>
+		{#snippet leading()}
+			<a
+				href="/"
+				class="flex shrink-0 items-center gap-0.5 rounded-lg text-white transition-opacity hover:opacity-85"
+				aria-label="Dokyudo home"
+			>
+				<div class="flex items-center [&_path]:fill-white [&>svg]:size-6">
+					{@html faviconRaw}
+				</div>
+				<span class="font-geist text-lg font-bold tracking-tight text-white">okyudo</span>
+			</a>
+		{/snippet}
 
-		<div class="flex min-w-0 items-center justify-center px-2">
-			<span class="max-w-full truncate text-xs font-medium text-white/75" title={share?.title}>
-				{share?.title ?? 'Shared conversation'}
-			</span>
-		</div>
-
-		<Tooltip.Provider delayDuration={100}>
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<button
-							{...props}
-							type="button"
-							class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-							onclick={copyShareLink}
-							aria-label="Copy share link"
-						>
-							{#if copiedLink}
-								<Check class="size-4 text-green-400" />
-							{:else}
-								<MxIcon name="share-outline" class="size-4" />
-							{/if}
-						</button>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content
-					class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+		{#snippet center()}
+			<div class="flex max-w-[45%] min-w-0 items-center justify-center px-2">
+				<span
+					class="max-w-full truncate text-xs font-medium text-white/75"
+					title={share?.title ?? 'Shared conversation'}
 				>
-					<p>{copiedLink ? 'Copied!' : 'Copy link'}</p>
-				</Tooltip.Content>
-			</Tooltip.Root>
-		</Tooltip.Provider>
-	</div>
+					{share?.title ?? 'Shared conversation'}
+				</span>
+			</div>
+		{/snippet}
+
+		{#snippet trailing()}
+			<Tooltip.Provider delayDuration={100}>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<button
+								{...props}
+								type="button"
+								class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/55 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 active:bg-white/20 active:text-white"
+								onclick={copyShareLink}
+								aria-label="Copy share link"
+							>
+								{#if copiedLink}
+									<Check class="size-4 text-green-400" />
+								{:else}
+									<MxIcon name="share-outline" class="size-4" />
+								{/if}
+							</button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content
+						class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+					>
+						<p>{copiedLink ? 'Copied!' : 'Copy link'}</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			</Tooltip.Provider>
+		{/snippet}
+	</MobileHeader>
 
 	<!-- ================= Desktop Header (Gradient Bar — same as chat page) ================= -->
 	<div
