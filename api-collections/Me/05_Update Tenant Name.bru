@@ -1,11 +1,11 @@
 meta {
   name: Update Tenant Name
   type: http
-  seq: 11
+  seq: 5
 }
 
 patch {
-  url: {{baseUrl}}/api/auth/tenant/name
+  url: {{baseUrl}}/api/me/tenant/name
   body: json
   auth: none
 }
@@ -16,7 +16,7 @@ headers {
 
 body:json {
   {
-    "name": "Kacrut"
+    "name": "Acme Workspace"
   }
 }
 

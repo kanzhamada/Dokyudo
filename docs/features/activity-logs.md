@@ -7,11 +7,14 @@
 The Activity Logs system provides a comprehensive audit trail and user activity feed for all significant operations within a tenant's workspace. It records authentication events, document operations, payment transactions, and system failures, enabling workspace members and administrators to monitor account security, verify background tasks, and maintain compliance.
 
 ### Key Capabilities
-1. **Audit Context Extraction**: Every backend controller extracts client IP addresses (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`), user-agent strings, and request IDs via `ContextExtractor.extractAuditContext()` and passes them down to the service layer.
+1. **Audit Context Extraction**: Every backend controller extracts client IP addresses (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`), user-agent strings, and request IDs via `ContextExtractor.extractAuditContext()` and passes them down to the service layer. IP addresses are validated (`isValidIpAddress` in `shared/utils/ip.util.ts`) before they reach the database so the `ip_address` column can be stored as the PostgreSQL `inet` type.
 2. **Denormalization via Metadata (JSONB)**: Specific event snapshot metadata (e.g., file names, subscription tiers, payment amounts, failure reasons) is stored in a JSONB column at event emission time, guaranteeing log immutability even if the target resource is deleted later.
 3. **Selective Business Failure Audit Logging**: In addition to successful operations (`document.uploaded`, `billing.payment_completed`), business-level processing failures (`document.failed`, `document.quota_exhausted`, `billing.payment_failed`) are recorded so users have visibility into background pipeline outcomes.
 4. **Tenant Isolation & SQL-Indexed Filtering**: Every query is strictly scoped to `tenant_id` to enforce multi-tenancy data isolation. Supports server-side dynamic SQL filtering by category (`auth`, `document`, `billing`, `tenant`), date range (`startDate`, `endDate`), and search query (`action`, `metadata`, `ipAddress`) backed by a composite index `(tenant_id, action, created_at DESC)`.
-5. **Interactive Frontend Presentation**: The Svelte 5 frontend renders logs using TanStack Table and shadcn-svelte `Table` primitives, complete with a filter toolbar (Search input, category buttons, date range inputs, reset trigger), parsed User-Agent strings, relative timestamps with tooltips, and status dot indicators.
+5. **Interactive Frontend Presentation**: The Svelte 5 frontend renders logs using TanStack Table and shadcn-svelte `Table` primitives, complete with a filter toolbar (Search input, category buttons, date range inputs, reset trigger), relative timestamps with tooltips, and status dot indicators.
+6. **IP Privacy Controls**: The UI offers a global `Hide IPs` / `Show IPs` toggle above the table plus a per-row eye button, so users can mask every IP address at once or reveal a single row. Masked IPs render as `••••••••`; the per-row state is keyed by activity ID and survives pagination.
+7. **Billing Keeps the Client Context**: `billing.payment_completed` / `billing.payment_failed` rows retain the `user_agent` (the browser/API client UA) and IP just like document/auth/workspace events — there is no special stripping for billing actions.
+8. **Logout Is Not Recorded**: `auth.logout` is intentionally **not** written to `activity_logs`. Logout only flips the wide-event `authEvent` on the request log; a dedicated logout row is unnecessary because login already provides the audit trail.
 
 ---
 
@@ -62,27 +65,29 @@ sequenceDiagram
 |---|---|
 | `apps/frontend/src/routes/app/activity/+page.svelte` | Main Activity Log page component. Configures breadcrumbs, header, and filter toolbar (Search bar, Category buttons, Date Range inputs, Reset button). Handles reactive server-side search and URL param sync. |
 | `apps/frontend/src/routes/app/activity/+page.ts` | Page load script setting `export const ssr = false;` for client-side API fetching with bearer auth tokens. |
-| `apps/frontend/src/routes/app/activity/columns.ts` | TanStack ColumnDef definitions. Defines event dot color mappings (`bg-emerald-400`, `bg-[#DB8F5E]`, `bg-red-400`, `bg-amber-400`), User-Agent parser, relative timestamp calculator, and tooltip formatting helpers. |
-| `apps/frontend/src/routes/app/activity/data-table.svelte` | Reactive TanStack Table component wrapping shadcn-svelte `Table.*` primitives (`Table.Root`, `Table.Header`, `Table.Row`, `Table.Cell`). Renders skeleton loaders, empty states, and pagination controls. |
+| `apps/frontend/src/routes/app/activity/columns.ts` | TanStack ColumnDef definitions. Defines event dot color mappings (`bg-emerald-400`, `bg-[#DB8F5E]`, `bg-red-400`, `bg-amber-400`), a User-Agent parser that renders the browser/client name, and relative timestamp + tooltip helpers. |
+| `apps/frontend/src/routes/app/activity/data-table.svelte` | Reactive TanStack Table component wrapping shadcn-svelte `Table.*` primitives (`Table.Root`, `Table.Header`, `Table.Row`, `Table.Cell`). Renders skeleton loaders, empty states, and pagination controls. Hosts the global and per-row IP visibility controls (eye toggles + `••••••••` masking). |
 
 ### Backend Files (`apps/backend/`)
 | File | Purpose / Changes |
 |---|---|
-| `apps/backend/src/shared/models/db.model.ts` | Updated `activityActionEnum` with `document.failed`, `document.quota_exhausted`, and `billing.payment_failed`. Added composite index `idx_activity_tenant_action_created` on `(tenantId, action, createdAt DESC)`. |
-| `apps/backend/src/shared/utils/activity.util.ts` | Fixed `activityActionEnum` import from `import type` to value import. Exports `logActivity()` helper function. |
+| `apps/backend/src/shared/models/db.model.ts` | Updated `activityActionEnum` with `document.failed`, `document.quota_exhausted`, and `billing.payment_failed`. Added composite index `idx_activity_tenant_action_created` on `(tenantId, action, createdAt DESC)`. `ip_address` is stored as the PostgreSQL `inet` type (validated in `ip.util.ts`). No OS/device/geolocation columns are stored. |
+| `apps/backend/src/shared/utils/activity.util.ts` | Fixed `activityActionEnum` import from `import type` to value import. Exports `logActivity()` helper function that inserts audit rows. |
 | `apps/backend/src/shared/utils/context.util.ts` | Provides `ContextExtractor.extractAuditContext()` to parse client IP headers (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`), user agents, and request IDs from Hono context. |
+| `apps/backend/src/shared/utils/ip.util.ts` | Validates client IPs (`isValidIpAddress` — IPv4 + IPv6) before they are stored, so the `inet` column never receives proxy-header garbage. Falls back through `X-Forwarded-For` → `X-Real-IP` → `CF-Connecting-IP` → `0.0.0.0`. |
 | `apps/backend/src/modules/activities/activities.schema.ts` | Updated `GetActivitiesQuerySchema` with optional `category`, `startDate`, `endDate`, and `search` query parameters. |
 | `apps/backend/src/modules/activities/activities.controller.ts` | Updated `handleGetActivities` to extract and pass query filters to `ActivitiesService.getActivities()`. |
-| `apps/backend/src/modules/activities/activities.service.ts` | Updated `getActivities` to construct dynamic Drizzle SQL `WHERE` clauses (`and()`, `like()`, `gte()`, `lte()`, `sql`) for category, date range, and text search while respecting tenant isolation. |
+| `apps/backend/src/modules/activities/activities.service.ts` | Updated `getActivities` to construct dynamic Drizzle SQL `WHERE` clauses (`and()`, `like()`, `gte()`, `lte()`, `sql`) for category, date range, and text search while respecting tenant isolation. Does **not** strip `userAgent` for `billing.*` actions. |
 | `apps/backend/src/modules/documents/documents.schema.ts` | Added optional `clientIp` and `userAgent` fields to `ConfirmUploadParamsSchema`, `DeleteDocumentParamsSchema`, and `BatchDeleteDocumentsParamsSchema`. |
 | `apps/backend/src/modules/documents/documents.controller.ts` | Extracted audit context via `extractor.extractAuditContext()` in `handleConfirmUpload`, `handleDeleteDocument`, and `handleBatchDeleteDocuments`. |
 | `apps/backend/src/modules/documents/documents.service.ts` | Passed `clientIp` and `userAgent` into `logActivity()` calls for `document.uploaded` and `document.deleted`. Added `logActivity` for `document.failed` inside `markDocumentFailed()`. Added `document.renamed` logging in `updateDocumentTitle` (PATCH /{id}). |
 | `apps/backend/src/modules/auth/auth.schema.ts` | Added `clientIp` and `userAgent` to `UpdateTenantNameParamsSchema`. |
 | `apps/backend/src/modules/auth/auth.controller.ts` | Extracted audit context in `handleUpdateTenantName`. |
-| `apps/backend/src/modules/auth/auth.service.ts` | Passed `clientIp` and `userAgent` to `logActivity()` for `tenant.name_updated`. Updated `updateTenantName` signature to use `AuthParams.UpdateTenantNameParams`. |
+| `apps/backend/src/modules/auth/auth.service.ts` | Passed `clientIp` and `userAgent` to `logActivity()` for `tenant.name_updated`. Updated `updateTenantName` signature to use `AuthParams.UpdateTenantNameParams`. Logout no longer writes an `auth.logout` activity row. |
 | `apps/backend/src/modules/payments/payments.controller.ts` | Extracted audit context in `handleCheckout`, `handleWebhook`, and `handlePortal`. |
-| `apps/backend/src/modules/payments/payments.service.ts` | Added `clientIp` and `userAgent` params to `handleWebhook`. Fixed payment status enum values (`SUCCEEDED`) and added webhook handlers for `checkout.session.async_payment_failed` and `invoice.payment_failed` to log `billing.payment_failed`. |
-| `api-collections/Activities/1_Get Activities.bru` | Updated Bruno collection request for Activity Logs to include query params (`category`, `startDate`, `endDate`, `search`). |
+| `apps/backend/src/modules/payments/payments.service.ts` | Added `clientIp` and `userAgent` params to `handleWebhook`. Fixed payment status enum values (`SUCCEEDED`) and added webhook handlers for `checkout.session.async_payment_failed` and `invoice.payment_failed` to log `billing.payment_failed` with the request user-agent. |
+| `drizzle/migrations/0030_activity_log_client_details.sql` | Converts `activity_logs.ip_address` from `varchar` to `inet`. Uses a PL/pgSQL `DO` block that probes every non-empty value with a real cast and nulls out anything `inet` cannot represent — avoiding `pg_input_is_valid` (PostgreSQL 17+ only, unavailable on Supabase PG 15). |
+| `api-collections/Activities/1_Get Activities.bru` | Bruno collection request for Activity Logs including query params (`category`, `startDate`, `endDate`, `search`). |
 
 ---
 
@@ -98,5 +103,9 @@ sequenceDiagram
 
 1. **Option 1 Backend SQL Filtering & Composite Indexing**: Server-side pagination mandates that date range, category, and search filters execute in SQL. Client-side filtering on a paginated 10-15 row subset would produce broken pagination counts and incomplete search results.
 2. **Composite Indexing**: Added `idx_activity_tenant_action_created` on `(tenantId, action, createdAt DESC)` to support prefix category filtering (`action LIKE 'auth.%'`) without triggering full table scans.
-3. **Option 1 Frontend UI Presentation**: Parses raw User-Agent strings into recognizable browser/client names (`Firefox 152.0`, `Bruno 3.4.2`) and hides full timestamps / raw user-agents inside hover tooltips.
-4. **Selective Business Failure Audit Logging**: Logged business-level outcome failures (`document.failed`, `document.quota_exhausted`, `billing.payment_failed`) in `activity_logs` while keeping generic 4xx/5xx errors out of PostgreSQL to prevent disk exhaustion.
+3. **`inet` Column with Pre-Insert Validation**: The `ip_address` column is stored as PostgreSQL `inet` for correct typing and CIDR-queryability. Because `inet` rejects invalid input, every extracted IP is validated in `ip.util.ts` (`isValidIpAddress`) before logging, and the migration nulls out any legacy invalid values instead of failing. `pg_input_is_valid` (PG 17+) is deliberately avoided for PG 15 compatibility.
+4. **UI IP Masking**: Raw IPs are sensitive, so the table defaults to showing them but provides a global hide-all toggle and a per-row eye toggle. Masking is purely presentational (client state); the raw value remains in the API response.
+5. **No Client-Context Enrichment Columns**: OS, device type, and geolocation columns were prototyped (`operating_system`, `device_type`, `location`) and then removed — they added storage and parsing complexity for marginal audit value. The raw `user_agent` string remains the single source of truth for client identification.
+6. **Billing Keeps Client Context**: Unlike an earlier implementation, billing rows are not stripped of `user_agent`/`ip` — a payment audit trail is more useful when it records who initiated it.
+7. **Logout Omitted**: `auth.logout` is not persisted to `activity_logs`; login rows already establish the audit trail, and a logout row added no security signal while inflating the table.
+8. **Selective Business Failure Audit Logging**: Logged business-level outcome failures (`document.failed`, `document.quota_exhausted`, `billing.payment_failed`) in `activity_logs` while keeping generic 4xx/5xx errors out of PostgreSQL to prevent disk exhaustion.

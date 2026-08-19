@@ -7,7 +7,7 @@ import { resend } from "../../config/resend.ts";
 import { db } from "../../config/drizzle.ts";
 import { paymentTransactions } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
-import { getSupabaseAdmin } from "../../config/supabase.ts";
+import { getSupabaseAdmin, getSupabaseAnon } from "../../config/supabase.ts";
 import { users } from "../../shared/models/db.model.ts";
 
 /** Helper: make a request to the test app */
@@ -67,17 +67,16 @@ describe("Payments Routes", () => {
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         // 2. Login to get the JWT
-        const loginRes = await makeRequest("/api/auth/login", "POST", {
+        const authClient = getSupabaseAnon();
+        const { data: authData, error: signInError } = await authClient.auth.signInWithPassword({
             email: testEmail,
             password: testPassword,
-            recaptchaToken: "bypass",
         });
 
-        if (loginRes.status === 200) {
-            const json = await loginRes.json();
-            validAccessToken = json.accessToken;
+        if (signInError || !authData?.session) {
+            console.warn(`[WARN] Login for test user failed: ${signInError?.message}`);
         } else {
-            console.warn(`[WARN] Login for test user failed with status ${loginRes.status}`);
+            validAccessToken = authData.session.access_token;
         }
 
         // Resolve the tenantId bound to the test user's JWT (auth middleware reads users.tenantId).
@@ -367,7 +366,7 @@ describe("Payments Routes", () => {
                         id: "cs_test_email_flow",
                         amount_total: 58000,
                         currency: "idr",
-                        customer: "cus_test_email",
+                        customer: `cus_test_email_${Date.now()}`,
                         metadata: {
                             tenantId: tenantIdForTest,
                             externalId,

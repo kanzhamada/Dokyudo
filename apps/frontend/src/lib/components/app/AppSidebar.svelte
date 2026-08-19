@@ -600,7 +600,7 @@
 						</DropdownMenu.Item>
 						<div class="my-1 h-px bg-white/10"></div>
 						<DropdownMenu.Item
-							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:scale-[0.98] active:bg-red-500/20 active:text-red-200 outline-none"
+							class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
 							onSelect={() => {
 								if (sidebar.isMobile) sidebar.setOpenMobile(false);
 								isLogoutDialogOpen = true;
@@ -755,7 +755,7 @@
 				</DropdownMenu.Item>
 				<div class="my-1 h-px bg-white/10"></div>
 				<DropdownMenu.Item
-					class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 active:scale-[0.98] active:bg-red-500/20 active:text-red-200 outline-none"
+					class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
 					onSelect={() => {
 						if (sidebar.isMobile) sidebar.setOpenMobile(false);
 						openDeleteModal(item);

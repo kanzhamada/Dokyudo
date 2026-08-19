@@ -1,5 +1,6 @@
 import { createApp } from "../config/hono.ts";
 import { authRoutes } from "../modules/auth/mod.ts";
+import { oauthRoutes } from "../modules/oauth/mod.ts";
 import { authMiddleware } from "../shared/middlewares/auth.middleware.ts";
 import { documentsRoutes } from "../modules/documents/mod.ts";
 import { searchRoutes } from "../modules/search/mod.ts";
@@ -12,7 +13,7 @@ import { meRoutes } from "../modules/me/mod.ts";
 
 const router = createApp();
 
-// Apply auth middleware to all API routes EXCEPT the auth module
+// Apply auth middleware to all API routes EXCEPT public endpoints (auth, oauth, webhooks)
 router.use("*", async (c, next) => {
     // Bypass auth middleware for public endpoints. Only the GET read of a
     // share link is public — POST /shares/{code}/continue and DELETE routes
@@ -22,6 +23,7 @@ router.use("*", async (c, next) => {
         /^\/api\/rag\/shares\/[^/]+$/.test(c.req.path);
     if (
         c.req.path.startsWith("/api/auth") ||
+        c.req.path.startsWith("/api/oauth") ||
         c.req.path === "/api/payments/webhook" ||
         isPublicShareRead
     ) {
@@ -31,6 +33,7 @@ router.use("*", async (c, next) => {
 });
 
 router.route("/auth", authRoutes);
+router.route("/oauth", oauthRoutes);
 router.route("/me", meRoutes);
 router.route("/documents", documentsRoutes);
 router.route("/search", searchRoutes);

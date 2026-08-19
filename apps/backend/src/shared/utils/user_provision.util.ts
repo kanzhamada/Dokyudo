@@ -1,5 +1,5 @@
 import { db } from "../../config/drizzle.ts";
-import { tenantSubscriptions, tenants, users } from "../../shared/models/db.model.ts";
+import { tenantSubscriptions, tenants, users } from "../models/db.model.ts";
 import { eq } from "drizzle-orm";
 
 /**

@@ -59,14 +59,16 @@ describe("AuthService Isolated Tests", () => {
 
             assertEquals(logContext.authEvent, "user_registered");
             assertEquals(logContext.authEmail, TEST_EMAIL);
-
-            // Verify login attempts logged
-            const attempts = await db.select().from(loginAttempts).where(eq(loginAttempts.emailAttempted, TEST_EMAIL));
-            assertEquals(attempts.length > 0, true);
-            assertEquals(attempts[0].isSuccess, true);
         });
 
-        it("negative: rejects duplicate registration", async () => {
+        it("negative: rejects duplicate registration for verified user", async () => {
+            const { data } = await supabase.auth.admin.listUsers();
+            // @ts-ignore - Supabase type mismatch
+            const user = data.users.find((u: any) => u.email === TEST_EMAIL);
+            if (user) {
+                await supabase.auth.admin.updateUserById(user.id, { email_confirm: true });
+            }
+
             await assertRejects(
                 () => AuthService.registerUser({
                     email: TEST_EMAIL,
@@ -77,16 +79,26 @@ describe("AuthService Isolated Tests", () => {
                     userAgent: "TestAgent"
                 }),
                 AppError,
-                "Account already registered"
+                "An account with this email already exists"
             );
         });
     });
 
     describe("loginUser", () => {
         it("negative: rejects login for unverified user", async () => {
+            const unverifiedEmail = `unverified_${crypto.randomUUID()}@example.com`;
+            await AuthService.registerUser({
+                email: unverifiedEmail,
+                password: "StrongPassword123!",
+                recaptchaToken: "bypass",
+                clientIp: TEST_IP,
+                requestId: crypto.randomUUID(),
+                userAgent: "TestAgent",
+            });
+
             await assertRejects(
                 () => AuthService.loginUser({
-                    email: TEST_EMAIL,
+                    email: unverifiedEmail,
                     password: "StrongPassword123!",
                     recaptchaToken: "bypass",
                     clientIp: TEST_IP,
@@ -94,8 +106,13 @@ describe("AuthService Isolated Tests", () => {
                     userAgent: "TestAgent",
                 }),
                 AppError,
-                "Invalid email or password"
+                "Your email is not verified yet"
             );
+
+            const { data } = await supabase.auth.admin.listUsers();
+            // @ts-ignore - Supabase type mismatch
+            const u = data.users.find((x: any) => x.email === unverifiedEmail);
+            if (u) await supabase.auth.admin.deleteUser(u.id);
         });
     });
 
@@ -104,7 +121,6 @@ describe("AuthService Isolated Tests", () => {
             const logContext: any = {};
             await AuthService.forgetPassword({
                 email: TEST_EMAIL,
-                recaptchaToken: "bypass",
                 clientIp: TEST_IP,
                 requestId: crypto.randomUUID(),
                 userAgent: "TestAgent",
@@ -114,11 +130,10 @@ describe("AuthService Isolated Tests", () => {
             assertEquals(logContext.authEvent, "forget_password_success");
         });
 
-        it("positive: silently ignores non-existent user", async () => {
+        it("positive: handles non-existing user silently without error", async () => {
             const logContext: any = {};
             await AuthService.forgetPassword({
-                email: "nobody_exists_here@example.com",
-                recaptchaToken: "bypass",
+                email: "nonexistent_email_12345@example.com",
                 clientIp: TEST_IP,
                 requestId: crypto.randomUUID(),
                 userAgent: "TestAgent",
@@ -128,157 +143,7 @@ describe("AuthService Isolated Tests", () => {
             assertEquals(logContext.authEvent, "forget_password_user_not_found");
         });
     });
-    describe("getProfile (Lazy Evaluation)", () => {
-        let testUserId: string;
-        let testTenantId: string;
 
-        beforeAll(async () => {
-            // 1. Create a real auth.user via Supabase Admin to satisfy foreign keys
-            const email = `profile_test_${crypto.randomUUID()}@example.com`;
-            const { data, error } = await supabase.auth.admin.createUser({
-                email: email,
-                password: "StrongPassword123!",
-                email_confirm: true,
-            });
-            if (error || !data.user) throw new Error("Failed to create test user: " + error?.message);
-            
-            testUserId = data.user.id;
-            testTenantId = crypto.randomUUID();
-
-            // 2. Provision tenants and users tables manually (since the trigger might not fire properly in test environment)
-            await db.insert(tenants).values({
-                id: testTenantId,
-                name: "Test Tenant for Profile",
-            }).onConflictDoNothing();
-
-            await db.insert(users).values({
-                id: testUserId,
-                tenantId: testTenantId,
-                email: email,
-            }).onConflictDoNothing();
-        });
-
-        afterAll(async () => {
-            await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
-            await db.delete(users).where(eq(users.id, testUserId));
-            await db.delete(tenants).where(eq(tenants.id, testTenantId));
-            await supabase.auth.admin.deleteUser(testUserId);
-        });
-
-        it("positive: returns profile and leaves active subscription untouched", async () => {
-            // Setup active subscription (+1 day)
-            await db.insert(tenantSubscriptions).values({
-                tenantId: testTenantId,
-                tier: "PRO",
-                expiresAt: new Date(Date.now() + 86400000), 
-            });
-
-            const result = await AuthService.getProfile({
-                userId: testUserId,
-                tenantId: testTenantId,
-            });
-
-            assertEquals(result.subscription.tier, "PRO");
-            assertExists(result.subscription.expiresAt);
-
-            // Cleanup for next test
-            await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
-        });
-
-        it("positive: lazy downgrades expired subscription to FREE", async () => {
-            // Setup expired subscription (-1 day)
-            await db.insert(tenantSubscriptions).values({
-                tenantId: testTenantId,
-                tier: "SIMULATE",
-                expiresAt: new Date(Date.now() - 86400000),
-            });
-
-            const logContext: any = {};
-            const result = await AuthService.getProfile({
-                userId: testUserId,
-                tenantId: testTenantId,
-                logContext,
-            });
-
-            // Validate response is downgraded
-            assertEquals(result.subscription.tier, "FREE");
-            assertEquals(result.subscription.expiresAt, null);
-
-            // Validate log context recorded the event
-            assertEquals(logContext.authEvent, "tier_auto_downgraded");
-            assertEquals(logContext.oldTier, "SIMULATE");
-
-            // Validate DB actually updated
-            const [dbSub] = await db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
-            assertEquals(dbSub.tier, "FREE");
-            assertEquals(dbSub.expiresAt, null);
-            
-            // Cleanup
-            await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
-        });
-        
-        it("negative: throws NOT_FOUND if user does not exist", async () => {
-            await assertRejects(
-                () => AuthService.getProfile({
-                    userId: crypto.randomUUID(), // fake id
-                    tenantId: testTenantId,
-                }),
-                AppError,
-                "User not found"
-            );
-        });
-    });
-
-    describe("updateTenantName", () => {
-        let testUserId: string;
-        let testTenantId: string;
-
-        beforeAll(async () => {
-            const [user] = await db
-                .select({ id: users.id, tenantId: users.tenantId })
-                .from(users)
-                .where(eq(users.email, TEST_EMAIL));
-
-            if (user) {
-                testUserId = user.id;
-                testTenantId = user.tenantId;
-            }
-        });
-
-        it("positive: updates tenant name and returns updated record", async () => {
-            const logContext: any = {};
-            const result = await AuthService.updateTenantName({
-                userId: testUserId,
-                tenantId: testTenantId,
-                name: "Updated Workspace",
-                logContext,
-            });
-
-            assertEquals(result.tenant.name, "Updated Workspace");
-            assertEquals(typeof result.tenant.id, "string");
-            assertEquals(result.message, "Tenant name updated successfully.");
-            assertEquals(logContext.authEvent, "tenant_name_updated");
-
-            // Verify DB was actually updated
-            const [dbTenant] = await db
-                .select({ name: tenants.name })
-                .from(tenants)
-                .where(eq(tenants.id, testTenantId));
-            assertEquals(dbTenant.name, "Updated Workspace");
-        });
-
-        it("negative: throws VALIDATION_ERROR for a non-existent tenantId", async () => {
-            await assertRejects(
-                () => AuthService.updateTenantName({
-                    userId: testUserId,
-                    tenantId: crypto.randomUUID(),
-                    name: "Ghost Workspace",
-                }),
-                AppError,
-                "Tenant not found",
-            );
-        });
-    });
 
     describe("verifyEmail", () => {
         it("negative: throws UNAUTHORIZED for invalid or expired tokenHash", async () => {

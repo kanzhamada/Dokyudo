@@ -1,7 +1,7 @@
 import { describe, it } from "jsr:@std/testing/bdd";
 import { assertEquals, assertRejects, assertExists } from "jsr:@std/assert";
 import { OAuthService } from "./oauth.service.ts";
-import { AppError } from "../../../shared/utils/errors.util.ts";
+import { AppError } from "../../shared/utils/errors.util.ts";
 
 describe("OAuthService Isolated Tests", () => {
     describe("initiateOAuth", () => {
@@ -21,7 +21,7 @@ describe("OAuthService Isolated Tests", () => {
     describe("handleOAuthCallback", () => {
         it("negative: throws on missing code", async () => {
             await assertRejects(
-                () => OAuthService.handleOAuthCallback({ code: "", provider: "google" }),
+                () => OAuthService.handleOAuthCallback({ code: "", provider: "google", clientIp: "127.0.0.1" }),
                 AppError,
                 "Missing authorization code"
             );
@@ -30,7 +30,7 @@ describe("OAuthService Isolated Tests", () => {
         it("negative: throws on invalid code exchange", async () => {
             // "dummy-code" should fail against real Supabase
             await assertRejects(
-                () => OAuthService.handleOAuthCallback({ code: "dummy-code", provider: "google" }),
+                () => OAuthService.handleOAuthCallback({ code: "dummy-code", provider: "google", clientIp: "127.0.0.1" }),
                 AppError,
                 "OAuth code exchange failed"
             );

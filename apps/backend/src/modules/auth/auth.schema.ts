@@ -27,12 +27,9 @@ export const RegisterBodySchema = z
         description: "User password (min 8 chars, strong)",
         example: "Secure@123",
       }),
-    recaptchaToken: z
-      .string()
-      .min(1, "reCAPTCHA token is required")
-      .openapi({
-        description: "Google reCAPTCHA v3 token from client-side execute()",
-      }),
+    recaptchaToken: z.string().min(1, "reCAPTCHA token is required").openapi({
+      description: "Google reCAPTCHA v3 token from client-side execute()",
+    }),
   })
   .openapi("RegisterBody");
 export type RegisterBody = z.infer<typeof RegisterBodySchema>;
@@ -76,12 +73,9 @@ export const LoginBodySchema = z
       .min(1, "Password is required")
       .max(72, "Password is too long")
       .openapi({ description: "User password" }),
-    recaptchaToken: z
-      .string()
-      .min(1, "reCAPTCHA token is required")
-      .openapi({
-        description: "Google reCAPTCHA v3 token from client-side execute()",
-      }),
+    recaptchaToken: z.string().min(1, "reCAPTCHA token is required").openapi({
+      description: "Google reCAPTCHA v3 token from client-side execute()",
+    }),
   })
   .openapi("LoginBody");
 export type LoginBody = z.infer<typeof LoginBodySchema>;
@@ -155,12 +149,9 @@ export const ForgetPasswordBodySchema = z
       description: "User email address",
       example: "user@example.com",
     }),
-    recaptchaToken: z
-      .string()
-      .min(1, "reCAPTCHA token is required")
-      .openapi({
-        description: "Google reCAPTCHA v3 token",
-      }),
+    recaptchaToken: z.string().min(1, "reCAPTCHA token is required").openapi({
+      description: "Google reCAPTCHA v3 token",
+    }),
   })
   .openapi("ForgetPasswordBody");
 export type ForgetPasswordBody = z.infer<typeof ForgetPasswordBodySchema>;
@@ -227,86 +218,6 @@ export const ResetPasswordResponseSchema = z
   })
   .openapi("ResetPasswordResponse");
 
-export const UpdatePasswordBodySchema = z
-  .object({
-    newPassword: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .max(72, "Password is too long")
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$/,
-        "Must contain uppercase, lowercase, number, and symbol (e.g. Secure@123)",
-      )
-      .openapi({
-        description: "New user password",
-        example: "Secure@123",
-      }),
-  })
-  .openapi("UpdatePasswordBody");
-export type UpdatePasswordBody = z.infer<typeof UpdatePasswordBodySchema>;
-
-const UpdatePasswordParamsSchema = UpdatePasswordBodySchema.extend({
-  accessToken: z.string(),
-  logContext: z.any().optional(),
-});
-
-export type UpdatePasswordParams = z.infer<typeof UpdatePasswordParamsSchema>;
-
-export const UpdatePasswordResponseSchema = z
-  .object({
-    message: z.string().openapi({
-      description: "Success message",
-      example: "Password successfully updated. Please log in again.",
-    }),
-  })
-  .openapi("UpdatePasswordResponse");
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Update Tenant Name Schemas
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const UpdateTenantNameBodySchema = z
-  .object({
-    name: z
-      .string()
-      .min(2, "Name must be at least 2 characters")
-      .max(255, "Name is too long")
-      .trim()
-      .openapi({
-        description: "New display name for the tenant workspace",
-        example: "Acme Corporation",
-      }),
-  })
-  .openapi("UpdateTenantNameBody");
-
-export type UpdateTenantNameBody = z.infer<typeof UpdateTenantNameBodySchema>;
-
-const UpdateTenantNameParamsSchema = UpdateTenantNameBodySchema.extend({
-  tenantId: z.string().uuid(),
-  userId: z.string().uuid(),
-  clientIp: z.string().optional(),
-  userAgent: z.string().optional(),
-  logContext: z.any().optional(),
-});
-
-export type UpdateTenantNameParams = z.infer<
-  typeof UpdateTenantNameParamsSchema
->;
-
-export const UpdateTenantNameResponseSchema = z
-  .object({
-    tenant: z.object({
-      id: z.string().uuid().openapi({
-        example: "9462a645-c164-4878-8171-8b35d26ace4f",
-      }),
-      name: z.string().openapi({ example: "Acme Corporation" }),
-    }),
-    message: z.string().openapi({
-      example: "Tenant name updated successfully.",
-    }),
-  })
-  .openapi("UpdateTenantNameResponse");
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Verify Email Schemas
 // ─────────────────────────────────────────────────────────────────────────────
@@ -348,31 +259,3 @@ export const VerifyEmailResponseSchema = z
     }),
   })
   .openapi("VerifyEmailResponse");
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Account Deletion Schemas
-// ─────────────────────────────────────────────────────────────────────────────
-
-const DeleteAccountParamsSchema = z.object({
-  userId: z.string().uuid(),
-  tenantId: z.string().uuid(),
-  clientIp: z.string().optional(),
-  userAgent: z.string().optional(),
-  requestId: z.string().optional(),
-  logContext: z.any().optional(),
-});
-
-export type DeleteAccountParams = z.infer<typeof DeleteAccountParamsSchema>;
-
-export const DeleteAccountResponseSchema = z
-  .object({
-    message: z.string().openapi({
-      description: "Deletion scheduled message",
-      example: "Account deletion scheduled. Your data will be purged shortly.",
-    }),
-    scheduled: z.boolean().openapi({ example: true }),
-    jobId: z.string().uuid().openapi({
-      description: "Identifier of the async deletion job",
-    }),
-  })
-  .openapi("DeleteAccountResponse");

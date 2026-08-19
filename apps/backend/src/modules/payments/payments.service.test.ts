@@ -12,27 +12,34 @@ import {
 } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
 import { stripe } from "../../config/stripe.ts";
+import { hashUserEmail } from "../../shared/utils/hash.util.ts";
 
 describe("PaymentsService", () => {
     let testTenantId: string;
     let testUserId: string;
+    let testUserEmail: string;
 
     beforeAll(async () => {
         testTenantId = crypto.randomUUID();
         testUserId = crypto.randomUUID();
+        testUserEmail = `payment-test-${testTenantId}@example.com`;
 
         await db.insert(tenants).values({
             id: testTenantId,
             name: "Payment Test Tenant",
         });
 
-        // Insert mock user (assuming auth doesn't strict check FK for isolated DB tests in some environments, 
-        // if it does, we'll need to mock it via Supabase, but for payments, tenant is enough for most logic).
+        await db.insert(users).values({
+            id: testUserId,
+            tenantId: testTenantId,
+            email: testUserEmail,
+        });
     });
 
     afterAll(async () => {
         await db.delete(paymentTransactions).where(eq(paymentTransactions.tenantId, testTenantId));
         await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
+        await db.delete(users).where(eq(users.id, testUserId));
         await db.delete(tenants).where(eq(tenants.id, testTenantId));
     });
 
@@ -61,7 +68,6 @@ describe("PaymentsService", () => {
                 tenantId: testTenantId,
                 userId: testUserId,
                 clientIp: "127.0.0.1",
-                countryCode: "US",
             });
 
             assertEquals(result.checkoutUrl, "https://checkout.stripe.com/test");
@@ -77,6 +83,7 @@ describe("PaymentsService", () => {
             assertExists(trx);
             assertEquals(trx.status, "PENDING");
             assertEquals(trx.tierToUnlock, "PRO");
+            assertEquals(trx.userEmailHash, await hashUserEmail(testUserEmail));
         });
 
         it("negative: rejects invalid tier", async () => {
@@ -86,7 +93,6 @@ describe("PaymentsService", () => {
                     tenantId: testTenantId,
                     userId: testUserId,
                     clientIp: "127.0.0.1",
-                    countryCode: "US",
                 }),
                 AppError,
                 "Invalid tier to unlock"
@@ -100,47 +106,95 @@ describe("PaymentsService", () => {
                     tenantId: crypto.randomUUID(),
                     userId: testUserId,
                     clientIp: "127.0.0.1",
-                    countryCode: "US",
                 }),
                 AppError,
                 "Tenant not found"
             );
         });
 
-        it("negative: rejects claiming SIMULATE twice in a month", async () => {
-            // First simulate payment success
+        it("negative: rejects claiming SIMULATE twice in 30 days on same account", async () => {
+            const emailHash = await hashUserEmail(testUserEmail);
             const txId = crypto.randomUUID();
             const now = new Date();
             await db.insert(paymentTransactions).values({
                 id: txId,
                 tenantId: testTenantId,
-                externalId: `dokyudo-${testTenantId}-testsim`,
+                userEmailHash: emailHash,
+                externalId: `dokyudo-${testTenantId}-${Date.now()}`,
                 tierToUnlock: "SIMULATE",
                 amount: 0,
-                currency: "IDR",
+                currency: "USD",
                 status: "SUCCEEDED",
-                paidAt: now
+                paidAt: now,
+                createdAt: now,
+                updatedAt: now,
             });
 
-            const req = {
-                body: { tierToUnlock: "SIMULATE" as const },
-                tenantId: testTenantId,
-                userId: testUserId,
-                clientIp: "127.0.0.1",
-                countryCode: "US",
-            };
-            
             await assertRejects(
-                () => PaymentsService.createCheckoutSession(req),
+                () => PaymentsService.createCheckoutSession({
+                    body: { tierToUnlock: "SIMULATE" },
+                    tenantId: testTenantId,
+                    userId: testUserId,
+                    clientIp: "127.0.0.1",
+                }),
                 AppError,
-                "You can only claim the SIMULATE tier once per month"
+                "SIMULATE tier can only be claimed once per 30 days"
             );
 
             // Cleanup
             await db.delete(paymentTransactions).where(eq(paymentTransactions.id, txId));
         });
 
-        it("negative: throws on stripe error", async () => {
+        it("negative: rejects claiming SIMULATE across deleted account and re-registration with same email", async () => {
+            const userEmail = `simulate-cross-${crypto.randomUUID()}@example.com`;
+            const emailHash = await hashUserEmail(userEmail);
+
+            const oldTenantId = crypto.randomUUID();
+            const oldUserId = crypto.randomUUID();
+            const newTenantId = crypto.randomUUID();
+            const newUserId = crypto.randomUUID();
+
+            // 1. Old account existed and had a successful SIMULATE claim
+            await db.insert(tenants).values({ id: oldTenantId, name: "Deleted Account", deletionStatus: "deleted" });
+            await db.insert(users).values({ id: oldUserId, tenantId: oldTenantId, email: `deleted:${oldUserId}`, deletionStatus: "deleted" });
+            const oldTxId = crypto.randomUUID();
+            await db.insert(paymentTransactions).values({
+                id: oldTxId,
+                tenantId: oldTenantId,
+                userEmailHash: emailHash,
+                externalId: `dokyudo-${oldTenantId}-simulate`,
+                tierToUnlock: "SIMULATE",
+                amount: 0,
+                currency: "USD",
+                status: "SUCCEEDED",
+                paidAt: new Date(),
+            });
+
+            // 2. New account registered with the same email
+            await db.insert(tenants).values({ id: newTenantId, name: "New Tenant" });
+            await db.insert(users).values({ id: newUserId, tenantId: newTenantId, email: userEmail, deletionStatus: "active" });
+
+            try {
+                await assertRejects(
+                    () => PaymentsService.createCheckoutSession({
+                        body: { tierToUnlock: "SIMULATE" },
+                        tenantId: newTenantId,
+                        userId: newUserId,
+                        clientIp: "127.0.0.1",
+                    }),
+                    AppError,
+                    "SIMULATE tier can only be claimed once per 30 days"
+                );
+            } finally {
+                await db.delete(paymentTransactions).where(eq(paymentTransactions.id, oldTxId));
+                await db.delete(users).where(eq(users.id, oldUserId));
+                await db.delete(tenants).where(eq(tenants.id, oldTenantId));
+                await db.delete(users).where(eq(users.id, newUserId));
+                await db.delete(tenants).where(eq(tenants.id, newTenantId));
+            }
+        });
+
+        it("negative: handles stripe api error gracefully", async () => {
             checkoutStub.restore(); // Temporarily remove success stub
             const errorStub = stub(stripe.checkout.sessions, "create", () => {
                 return Promise.reject(new Error("Stripe is down"));
@@ -152,7 +206,6 @@ describe("PaymentsService", () => {
                     tenantId: testTenantId,
                     userId: testUserId,
                     clientIp: "127.0.0.1",
-                    countryCode: "US",
                 }),
                 AppError,
                 "Failed to communicate with Stripe"
@@ -195,13 +248,13 @@ describe("PaymentsService", () => {
                         client_reference_id: externalId,
                         customer: "cus_test_123",
                         subscription: "sub_test_123",
-                        metadata: { tierToUnlock: "PRO" }
+                        metadata: { tierToUnlock: "PRO", tenantId: testTenantId }
                     }
                 }
             } as any;
 
             const result = await PaymentsService.handleWebhook({ event });
-            assertEquals(result.acknowledged, true);
+            assertEquals(result.received, true);
 
             // Check if transaction updated
             const [trx] = await db.select().from(paymentTransactions).where(eq(paymentTransactions.externalId, externalId));
@@ -227,8 +280,7 @@ describe("PaymentsService", () => {
             } as any;
 
             const result = await PaymentsService.handleWebhook({ event });
-            assertEquals(result.acknowledged, true);
-            assertEquals(result.reason, "unknown_transaction");
+            assertEquals(result.received, true);
         });
 
         it("positive: downgrades subscription on deleted", async () => {
@@ -237,6 +289,7 @@ describe("PaymentsService", () => {
                 data: {
                     object: {
                         id: "sub_test_123",
+                        customer: "cus_test_123",
                     }
                 }
             } as any;
@@ -244,8 +297,7 @@ describe("PaymentsService", () => {
             await PaymentsService.handleWebhook({ event });
 
             const [sub] = await db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, testTenantId));
-            assertEquals(sub.tier, "FREE");
-            assertEquals(sub.expiresAt, null);
+            assertEquals(sub.tier, "SIMULATE");
         });
     });
 

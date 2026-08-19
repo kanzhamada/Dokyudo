@@ -141,9 +141,73 @@ sequenceDiagram
 
 ---
 
+## Update 2026-08-19 — Pseudonymized Email Hash Ledger for SIMULATE Rate Limiting across Account Lifecycles
+
+**Completion Timestamp**: 2026-08-19T13:45:11+07:00 (WIB)
+
+### Core Logic
+To prevent promo and trial tier abuse (`SIMULATE` sandbox tier) across account deletions and subsequent re-registrations with the same email/OAuth identity, the system implements a **Pseudonymized Email Hash Ledger**:
+1. When an active user requests a checkout for the `SIMULATE` tier, the user's raw email is extracted from `users` and normalized (`email.trim().toLowerCase()`).
+2. An HMAC-SHA256 signature is calculated using the server-secret pepper `EMAIL_HASH_PEPPER`.
+3. The system queries the permanent `payment_transactions` ledger for any existing transaction matching `user_email_hash = emailHash AND tier_to_unlock = 'SIMULATE' AND status = 'SUCCEEDED' AND paid_at >= (NOW() - 30 days)`.
+4. If a prior successful transaction is found within 30 days, the request is rejected with `400 VALIDATION_ERROR` ("SIMULATE tier can only be claimed once per 30 days.").
+5. Upon account deletion (`MeService.purgeTenant`), `payment_transactions` is retained as an immutable financial audit trail. Because only `user_email_hash` (and not plaintext PII) is stored, privacy and GDPR Right to Erasure requirements remain strictly satisfied while maintaining anti-abuse protections.
+
+### Flow Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / Client
+    participant Frontend as SvelteKit UI
+    participant Backend as PaymentsService
+    participant Util as hashUserEmail (HMAC-SHA256)
+    participant DB as PostgreSQL (payment_transactions)
+    participant Stripe as Stripe API
+
+    User->>Frontend: Click "Access Sandbox" (SIMULATE)
+    Frontend->>Backend: POST /api/payments/checkout { tierToUnlock: "SIMULATE" }
+    Backend->>Backend: Extract authenticated userId & active tenant
+    Backend->>Util: hashUserEmail(user.email)
+    Util-->>Backend: Return 64-char hex userEmailHash
+
+    Backend->>DB: SELECT id FROM payment_transactions WHERE user_email_hash = hash AND tier = 'SIMULATE' AND status = 'SUCCEEDED' AND paid_at >= (NOW() - 30 days)
+    
+    alt Existing Successful Claim in Last 30 Days (Current or Past Deleted Account)
+        DB-->>Backend: Found existing transaction
+        Backend-->>Frontend: 400 VALIDATION_ERROR ("SIMULATE tier can only be claimed once per 30 days.")
+        Frontend-->>User: Display error notification
+    else No Successful Claim in Last 30 Days
+        DB-->>Backend: Empty result (0 rows)
+        Backend->>Stripe: Create Stripe Checkout Session
+        Stripe-->>Backend: Return session URL
+        Backend->>DB: INSERT INTO payment_transactions (tenantId, userEmailHash, status: 'PENDING')
+        Backend-->>Frontend: Return checkoutUrl
+        Frontend-->>User: Redirect to Stripe Checkout
+    end
+```
+
+### File Mapping
+
+- **Database Model**: `apps/backend/src/shared/models/db.model.ts` (added `userEmailHash: varchar("user_email_hash", { length: 64 })` and composite index `emailTierClaimIdx` on `[userEmailHash, tierToUnlock, status, paidAt]`).
+- **Database Migration**: `apps/backend/drizzle/migrations/0033_payment_user_email_hash.sql`.
+- **Environment Configuration**: `apps/backend/src/config/env.ts` & `apps/backend/.env.example` (added `EMAIL_HASH_PEPPER` with fallback default).
+- **Utility**: `apps/backend/src/shared/utils/hash.util.ts` (`hashUserEmail`) & `apps/backend/src/shared/utils/hash.util.test.ts`.
+- **Payments Service**: `apps/backend/src/modules/payments/payments.service.ts` (`createCheckoutSession` validation and insert, resilient webhook resolution).
+- **Unit & Integration Tests**: `apps/backend/src/modules/payments/payments.service.test.ts` (added test for cross-account deletion & re-registration abuse rejection).
+- **API Collection**: `api-collections/Payments & Subscriptions/01_Checkout Session.bru`.
+
+### Architectural Decisions
+
+1. **Pseudonymized Hash over Plaintext**: Storing plaintext emails in financial transaction tables after an account deletion violates GDPR deletion mandates. Using an HMAC-SHA256 hash keyed with a server-side pepper satisfies the Legitimate Interest clause for fraud prevention while guaranteeing irreversibility.
+2. **Rolling 30-Day Window**: Replaced calendar month comparison (`startOfMonth`) with a rolling 30-day window (`NOW() - 30 days`) to prevent exploitation at month boundaries (e.g. claiming on the 31st and immediately claiming again on the 1st).
+3. **Cross-Tenant Ledger Query**: The check directly queries `payment_transactions` via the superuser DB connection because fraud prevention must bridge across the soft-deleted tenant boundary of a previously purged account.
+
+---
+
 ## Connections
 
-- **Database**: Separated between `payment_transactions` (immutable transaction ledger) and `tenant_subscriptions` (current active tier state).
+- **Database**: Separated between `payment_transactions` (immutable transaction ledger with pseudonymized `user_email_hash`) and `tenant_subscriptions` (current active tier state).
 - **Stripe API**: Connected via official `stripe-node` SDK using dashboard-configured `price_id` references.
 - **Audit Logging**: Webhook and checkout handlers extract `clientIp` and `userAgent` metadata to record `billing.payment_completed` or `billing.payment_failed` activity logs.
 
@@ -155,3 +219,4 @@ sequenceDiagram
 2. **Dashboard-Driven Pricing**: Amounts and currency codes are read directly from Stripe event payloads (`amount_total`, `currency`) and saved into database records and activity log metadata.
 3. **Resilient Status Tracking**: `paymentTransactions.status` enum strictly uses `"PENDING" | "SUCCEEDED" | "FAILED" | "CANCELED" | "EXPIRED"`.
 4. **Audit Context Extraction**: Webhook and portal controllers call `ContextExtractor.extractAuditContext()` to attach IP and client user-agent metadata to billing logs.
+

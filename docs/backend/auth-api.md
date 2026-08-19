@@ -52,6 +52,21 @@ sequenceDiagram
 - `apps/backend/src/shared/utils/errors.util.ts`: Standard `AppError` envelope.
 - `apps/backend/src/shared/middlewares/request.middleware.ts`: Request ID and IP extraction.
 - `apps/backend/src/shared/types/app.types.ts` & `apps/backend/src/config/hono.ts`: Hono context types and app factory.
+- `apps/backend/src/modules/me/me.service.ts`: Async account purge (documents, chunks, vectors, files, conversations, Stripe cancellation, Supabase admin delete).
+- `apps/backend/src/modules/auth/user_provision.util.ts`: `provisionTenantForUser` — re-provisions a brand-new tenant on login/verify-email/OAuth when none exists (re-registration path).
+- `apps/backend/src/main.ts`: `Deno.cron("sweep-account-deletions", "* * * * *")`.
+
+## Endpoints
+
+### DELETE /api/me/account (auth required)
+
+Schedules permanent account deletion. Lives in the `Me` module (`me.routes.ts` / `me.service.ts`). Marks the user and tenant `deletion_pending`, revokes all sessions, and enqueues an async purge job. Returns `202` with `{ message, deletionScheduledAt }`. Idempotent — a second call returns `404` if the account is already deleted. Re-registering with the same email later creates a brand-new clean account (old tenant is never reused, so billing/audit history stays isolated).
+
+## Login Guards for Deleted Accounts
+
+- **Login** (`POST /api/auth/login`): after Supabase `signInWithPassword` succeeds, `isUserActive` is checked. If the account is `deletion_pending`/`deleted`, the session is revoked (global sign-out) and `403` is returned with `This account has been deleted. Please register a new account.` — prevents a deleted account from resurrecting itself.
+- **OAuth callback**: same guard after userinfo fetch.
+- **Unverified email** (`email_not_confirmed`): GoTrue blocks login until email verification; the error is mapped to a clear `400` message instructing the user to check their inbox / resend the verification email. Registration retry re-sends the verification email and (re-)provisions the tenant.
 
 ## Connections
 - **Frontend/Client**: Calls endpoints with `recaptchaToken` obtained via `grecaptcha.execute`.

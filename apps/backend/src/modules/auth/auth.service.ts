@@ -19,7 +19,7 @@ import {
 import * as AuthParams from "./auth.schema.ts";
 import { AuthConstants } from "../../shared/constants/auth.constant.ts";
 import { logActivity } from "../../shared/utils/activity.util.ts";
-import { provisionTenantForUser } from "./user_provision.util.ts";
+import { provisionTenantForUser } from "../../shared/utils/user_provision.util.ts";
 
 export class AuthService {
     static async registerUser(params: AuthParams.RegisterParams) {
@@ -904,130 +904,5 @@ export class AuthService {
                 metadata: { type: "otp_reset" },
             }, params.logContext);
         }
-    }
-
-    static async updatePassword(params: AuthParams.UpdatePasswordParams) {
-        const supabase = getSupabaseAnon();
-
-        // Validate the provided access token
-        const { data, error } = await supabase.auth.getUser(params.accessToken);
-
-        if (error || !data.user) {
-            throw new AppError({
-                code: "UNAUTHORIZED",
-                message: "Invalid or expired session. Please log in again.",
-                status: 401,
-            });
-        }
-
-        const adminSupabase = getSupabaseAdmin();
-
-        // Update the user's password
-        try {
-            const { error: updateError } =
-                await adminSupabase.auth.admin.updateUserById(data.user.id, {
-                    password: params.newPassword,
-                });
-
-            if (updateError) {
-                if (params.logContext) {
-                    params.logContext.authError = updateError.message;
-                }
-                throw new AppError({
-                    code: "INTERNAL_ERROR",
-                    message: "Failed to update password.",
-                    status: 500,
-                });
-            }
-        } catch (e: any) {
-            if (e instanceof AppError) throw e;
-            if (params.logContext) {
-                params.logContext.authError = e.message;
-            }
-            throw new AppError({
-                code: "INTERNAL_ERROR",
-                message: "Failed to update password.",
-                status: 500,
-            });
-        }
-
-        // Force re-login: Invalidate all sessions globally for this user
-        try {
-            await adminSupabase.auth.admin.signOut(
-                params.accessToken,
-                "global",
-            );
-        } catch (signOutErr: any) {
-            if (params.logContext) {
-                params.logContext.authWarning =
-                    "Failed to sign out after password update: " +
-                    signOutErr.message;
-            }
-        }
-
-        if (params.logContext) {
-            params.logContext.authEvent = "update_password_success";
-            params.logContext.userId = data.user.id;
-        }
-
-        const [userRecord] = await db
-            .select({ tenantId: users.tenantId })
-            .from(users)
-            .where(eq(users.id, data.user.id));
-        if (userRecord) {
-            await logActivity({
-                tenantId: userRecord.tenantId,
-                userId: data.user.id,
-                action: "auth.password_reset",
-                metadata: { type: "update_password" },
-            }, params.logContext);
-        }
-    }
-
-    static async updateTenantName(params: AuthParams.UpdateTenantNameParams) {
-        const updated = await withAuthDb(params.userId, async (tx) => {
-            const [existing] = await tx
-                .select({ id: tenants.id })
-                .from(tenants)
-                .where(eq(tenants.id, params.tenantId));
-
-            if (!existing) {
-                throw new AppError({
-                    code: "VALIDATION_ERROR",
-                    message: "Tenant not found",
-                    status: 404,
-                });
-            }
-
-            const [result] = await tx
-                .update(tenants)
-                .set({ name: params.name, updatedAt: new Date() })
-                .where(eq(tenants.id, params.tenantId))
-                .returning({ id: tenants.id, name: tenants.name });
-
-            return result;
-        });
-
-        if (params.logContext) {
-            params.logContext.authEvent = "tenant_name_updated";
-        }
-
-        await logActivity({
-            tenantId: params.tenantId,
-            userId: params.userId,
-            action: "tenant.name_updated",
-            metadata: { newName: updated.name },
-            ipAddress: params.clientIp,
-            userAgent: params.userAgent,
-            requestId: params.logContext?.requestId,
-        }, params.logContext);
-
-        return {
-            tenant: {
-                id: updated.id,
-                name: updated.name,
-            },
-            message: "Tenant name updated successfully.",
-        };
     }
 }

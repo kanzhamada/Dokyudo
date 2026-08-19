@@ -6,20 +6,14 @@ import type {
 	LogoutResponse,
 	ForgotPasswordResponse,
 	ResetPasswordResponse,
-	UpdatePasswordResponse,
-	UpdateTenantNameResponse,
 	VerifyEmailResponse,
 	SessionResponse,
-	DeleteAccountResponse,
 	LoginRequestPayload,
 	RegisterRequestPayload,
 	ForgotPasswordRequestPayload,
 	ResetPasswordRequestPayload,
-	UpdatePasswordRequestPayload,
-	UpdateTenantNameRequestPayload,
 	VerifyEmailRequestPayload
 } from '../types/auth.types';
-import { PUBLIC_API_URL } from '$env/static/public';
 
 /** Hydrates the current auth state from the httpOnly session cookies. */
 export function getSession(): Promise<ApiResult<SessionResponse>> {
@@ -56,29 +50,6 @@ export function authResetPassword(
 	});
 }
 
-export function authUpdatePassword(
-	params: UpdatePasswordRequestPayload
-): Promise<ApiResult<UpdatePasswordResponse>> {
-	return apiRequest<UpdatePasswordResponse>('/api/auth/update-password', {
-		method: 'PUT',
-		body: params
-	});
-}
-
-export function authUpdateTenantName(
-	params: UpdateTenantNameRequestPayload
-): Promise<ApiResult<UpdateTenantNameResponse>> {
-	return apiRequest<UpdateTenantNameResponse>('/api/auth/tenant/name', {
-		method: 'PATCH',
-		body: params
-	});
-}
-
-/** Schedules permanent deletion of the authenticated account (202 accepted). */
-export function authDeleteAccount(): Promise<ApiResult<DeleteAccountResponse>> {
-	return apiRequest<DeleteAccountResponse>('/api/auth/account', { method: 'DELETE' });
-}
-
 export function authVerifyEmail(
 	params: VerifyEmailRequestPayload
 ): Promise<ApiResult<VerifyEmailResponse>> {
@@ -88,16 +59,5 @@ export function authVerifyEmail(
 	});
 }
 
-/** Initiates the Google OAuth flow via a full-page redirect. */
-export function initiateGoogleOAuth(): void {
-	const url = `${PUBLIC_API_URL}/api/auth/oauth/google`;
-	console.log(`[OAuthDebug] Initiating Google OAuth -> ${url}`);
-	window.location.href = url;
-}
-
-/** Initiates the GitHub OAuth flow via a full-page redirect. */
-export function initiateGithubOAuth(): void {
-	const url = `${PUBLIC_API_URL}/api/auth/oauth/github`;
-	console.log(`[OAuthDebug] Initiating GitHub OAuth -> ${url}`);
-	window.location.href = url;
-}
+export { updatePassword as authUpdatePassword, updateTenantName as authUpdateTenantName } from './me';
+export { initiateGoogleOAuth, initiateGithubOAuth } from './oauth';

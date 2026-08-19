@@ -1,0 +1,19 @@
+meta {
+  name: OAuth GitHub Initiate
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/oauth/github
+  body: none
+  auth: none
+}
+
+docs {
+  Initiates the GitHub OAuth flow via Supabase's built-in Server-Side PKCE.
+  Returns HTTP 302 redirecting to GitHub's authorization page.
+  The redirect_to points to {API_URL}/api/oauth/github/callback.
+  Best executed in a real browser.
+  Internal classification: PUBLIC (no auth token required).
+}

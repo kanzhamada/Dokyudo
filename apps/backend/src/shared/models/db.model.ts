@@ -547,6 +547,8 @@ export const paymentTransactions = pgTable(
         
         status: paymentStatusEnum("status").notNull().default("PENDING"),
         
+        userEmailHash: varchar("user_email_hash", { length: 64 }), // Pseudonymized HMAC-SHA256 of email for fraud/tier abuse prevention
+        
         webhookPayload: jsonb("webhook_payload"),
         
         paidAt: timestamp("paid_at", { mode: "date", precision: 3, withTimezone: true }),
@@ -557,6 +559,12 @@ export const paymentTransactions = pgTable(
         tenantStatusIdx: index("idx_payment_trx_tenant_status").on(table.tenantId, table.status),
         externalIdIdx: index("idx_payment_trx_external_id").on(table.externalId),
         stripeSessionIdx: index("idx_payment_trx_stripe_session").on(table.stripeSessionId),
+        emailTierClaimIdx: index("idx_payment_trx_email_tier_claim").on(
+            table.userEmailHash,
+            table.tierToUnlock,
+            table.status,
+            table.paidAt,
+        ),
     })
 );
 // ==============================================================================

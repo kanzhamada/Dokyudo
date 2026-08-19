@@ -1,7 +1,7 @@
-import { createApp } from "../../../config/hono.ts";
-import { createRoute, z } from "@hono/zod-openapi";
+import { createApp } from "../../config/hono.ts";
+import { createRoute } from "@hono/zod-openapi";
 import * as oauthController from "./oauth.controller.ts";
-import { ErrorResponseSchema } from "../../../shared/schemas/shared.schema.ts";
+import { ErrorResponseSchema } from "../../shared/schemas/shared.schema.ts";
 import { OAuthCallbackQuerySchema } from "./oauth.schema.ts";
 
 export const oauthRoutes = createApp();
@@ -13,8 +13,8 @@ export const oauthRoutes = createApp();
 oauthRoutes.openapi(
     createRoute({
         method: "get",
-        path: "/oauth/google",
-        tags: ["Auth - OAuth"],
+        path: "/google",
+        tags: ["OAuth"],
         summary: "Initiate Google OAuth login",
         description:
             "Redirects the user to Google's consent screen via Supabase's Server-Side PKCE flow. " +
@@ -39,8 +39,8 @@ oauthRoutes.openapi(
 oauthRoutes.openapi(
     createRoute({
         method: "get",
-        path: "/oauth/google/callback",
-        tags: ["Auth - OAuth"],
+        path: "/google/callback",
+        tags: ["OAuth"],
         summary: "Handle Google OAuth callback",
         description:
             "Receives the authorization code from Google, exchanges it for a Supabase session, " +
@@ -66,8 +66,8 @@ oauthRoutes.openapi(
 oauthRoutes.openapi(
     createRoute({
         method: "get",
-        path: "/oauth/github",
-        tags: ["Auth - OAuth"],
+        path: "/github",
+        tags: ["OAuth"],
         summary: "Initiate GitHub OAuth login",
         description:
             "Redirects the user to GitHub's authorization page via Supabase's Server-Side PKCE flow. " +
@@ -92,8 +92,8 @@ oauthRoutes.openapi(
 oauthRoutes.openapi(
     createRoute({
         method: "get",
-        path: "/oauth/github/callback",
-        tags: ["Auth - OAuth"],
+        path: "/github/callback",
+        tags: ["OAuth"],
         summary: "Handle GitHub OAuth callback",
         description:
             "Receives the authorization code from GitHub, exchanges it for a Supabase session, " +

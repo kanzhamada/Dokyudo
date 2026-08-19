@@ -1,0 +1,25 @@
+meta {
+  name: Delete Account
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/api/me/account
+  body: none
+  auth: none
+}
+
+docs {
+  Permanently delete the authenticated account. Schedules deletion: marks the user and
+  tenant as deletion_pending, revokes all Supabase sessions, and enqueues an asynchronous
+  purge job that deletes documents, chunks, vector embeddings, files, conversations,
+  shares, tenant keys, and Redis state — while retaining payment history and audit logs.
+  Re-registering with the same email afterwards creates a brand-new clean account.
+
+  AUTH IS COOKIE-BASED: the session cookie is sent automatically by the Cookie Jar — no
+  Authorization header needed. No request body required.
+
+  Returns 202 (accepted) with { "scheduled": true, "jobId": "..." }.
+  While the purge runs, the user's still-valid JWTs are rejected via a Redis tombstone.
+}

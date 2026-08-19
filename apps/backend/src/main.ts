@@ -9,7 +9,7 @@ import rootRouter from "./api/router.ts";
 import { cryptoPuzzleMiddleware } from "./shared/middlewares/crypto_puzzle.middleware.ts";
 import { createApp } from "./config/hono.ts";
 import { RagService } from "./modules/rag/rag.service.ts";
-import { AccountDeletionService } from "./modules/account_deletion/account_deletion.service.ts";
+import { MeService } from "./modules/me/me.service.ts";
 
 const app = createApp();
 
@@ -40,7 +40,9 @@ app.use("/api/*", async (c, next) => {
     return await next();
   }
 
-  const isCallback = c.req.path.startsWith("/api/auth/oauth") ||
+  const isCallback =
+    c.req.path.startsWith("/api/oauth") ||
+    c.req.path.startsWith("/api/auth/oauth") ||
     c.req.path === "/api/payments/webhook";
   if (isCallback) {
     return await next();
@@ -146,7 +148,7 @@ if (import.meta.main) {
 
   // Background sweep for pending account deletions (idempotent, retries inside)
   Deno.cron("sweep-account-deletions", "* * * * *", async () => {
-    await AccountDeletionService.sweepPendingJobs();
+    await MeService.sweepPendingJobs();
   });
 
   console.log(`

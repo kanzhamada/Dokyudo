@@ -72,6 +72,7 @@
 		"lucide-svelte": "^1.0.1",
 		"marked": "^18.0.7",
 		"mermaid": "^11.16.1",
-		"mx-icons": "^1.1.1"
+		"mx-icons": "^1.1.1",
+		"ogygia": "^0.6.1"
 	}
 }

@@ -1,14 +1,16 @@
-# Dedicated Me & Usage Endpoints Documentation
+# Dedicated Me Module (`/api/me`) Endpoints Documentation
 
-**Completion Timestamp**: 2026-08-03T09:36:00+07:00 (WIB)
+**Completion Timestamp**: 2026-08-19T13:45:34+07:00
 
 ## Core Logic
 
-The user profile endpoint (`GET /api/auth/me`) has been refactored and moved to a dedicated backend module `me` mounted at `GET /api/me`. To optimize P95 latency and adhere to the Single Responsibility Principle, usage statistics (`uploadsCount`, `searchesCount`, `qaCount`, `storageUsedBytes`) were extracted into a separate endpoint `GET /api/me/usage`.
+The `me` module (`apps/backend/src/modules/me/`) serves as the single self-service account and tenant management domain for authenticated users. Mounted under `/api/me`, it encapsulates the following operations:
 
-- **`GET /api/me`**: Returns essential user identity, tenant workspace info, and subscription tier status. Automatically handles lazy evaluation to auto-downgrade expired subscriptions to `FREE`.
-- **`GET /api/me/usage`**: Returns realtime usage statistics (`uploadsCount`, `searchesCount`, `qaCount`, `storageUsedBytes`) for the authenticated tenant using `withAuthDb` for multi-tenant data isolation. Sejak 2026-08-12 response juga menyertakan **`expiresAt`** (ISO string atau `null`) yang dibaca langsung dari kolom `tenant_subscriptions.expires_at` — dipakai UI Billing untuk menampilkan masa akses tier berbayar (FREE/plan permanen → `null`).
-- **Frontend Tier Limits**: Hardcoded in `$lib/constants/tiers.constant.ts` matching backend `TIER_LIMITS`. The Chat page (`/app/chat`) fetches `/api/me/usage` on mount to populate realtime counters, looking up limits locally without extra server payload.
+1. **`GET /api/me`**: Returns essential user identity (`id`, `email`, `profilePictureUrl`), tenant workspace info (`id`, `name`), and subscription tier status (`tier`, `expiresAt`). Automatically performs lazy auto-downgrade if the subscription expired.
+2. **`GET /api/me/usage`**: Returns realtime tenant usage statistics (`uploadsCount`, `searchesCount`, `qaCount`, `storageUsedBytes`, `expiresAt`) using `withAuthDb` for multi-tenant data isolation.
+3. **`DELETE /api/me/account`**: Enqueues asynchronous account and tenant deletion, sets state to `deletion_pending`, revokes sessions, and clears session cookies immediately (202 Accepted).
+4. **`PUT /api/me/update-password`**: Updates the user's password via Supabase Admin API, revokes active sessions globally, and clears session cookies to enforce re-login.
+5. **`PATCH /api/me/tenant/name`**: Updates the display name of the tenant workspace inside a `withAuthDb` transaction and logs `tenant.name_updated` to `activity_logs`.
 
 ---
 
@@ -17,26 +19,28 @@ The user profile endpoint (`GET /api/auth/me`) has been refactored and moved to 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Client / Browser
-    participant Sidebar as AppSidebar Component
-    participant ChatPage as Chat Page (/app/chat)
-    participant Router as API Gateway (/api)
-    participant MeModule as Me Module (Controller/Service)
-    participant DB as Postgres DB (withAuthDb)
+    actor User as Authenticated User
+    participant Frontend as SvelteKit Client
+    participant Router as API Gateway (/api/me)
+    participant MeModule as Me Controller & Service
+    participant Supabase as Supabase Admin Auth
+    participant DB as Postgres (withAuthDb)
 
-    par Layout Initial Load
-        Sidebar->>Router: GET /api/me
-        Router->>MeModule: handleGetProfile()
-        MeModule->>DB: Query users, tenants, tenant_subscriptions
-        DB-->>MeModule: User & Tenant Record
-        MeModule-->>Sidebar: 200 OK { user, tenant, subscription: { tier, expiresAt } }
-    and Chat Page Load
-        ChatPage->>Router: GET /api/me/usage
-        Router->>MeModule: handleGetUsage()
-        MeModule->>DB: withAuthDb(userId) — Query tenant_subscriptions
-        DB-->>MeModule: { tier, expiresAt, uploadsCount, searchesCount, qaCount, storageUsedBytes }
-        MeModule-->>ChatPage: 200 OK { tier, expiresAt, uploadsCount, searchesCount, qaCount, storageUsedBytes }
-        ChatPage->>ChatPage: Match tier with TIER_LIMITS constant for local limit validation
+    alt Update Password
+        User->>Frontend: Submit new password
+        Frontend->>Router: PUT /api/me/update-password { newPassword }
+        Router->>MeModule: handleUpdatePassword()
+        MeModule->>Supabase: admin.updateUserById(userId, { password })
+        MeModule->>Supabase: admin.signOut(accessToken, "global")
+        MeModule-->>Frontend: 200 OK + Clear Session Cookies
+    else Update Tenant Name
+        User->>Frontend: Rename workspace
+        Frontend->>Router: PATCH /api/me/tenant/name { name }
+        Router->>MeModule: handleUpdateTenantName()
+        MeModule->>DB: withAuthDb(userId) UPDATE tenants SET name = :name
+        DB-->>MeModule: Updated tenant record
+        MeModule->>DB: INSERT INTO activity_logs (tenant.name_updated)
+        MeModule-->>Frontend: 200 OK { tenant: { id, name }, message }
     end
 ```
 
@@ -46,37 +50,35 @@ sequenceDiagram
 
 | File | Purpose / Changes |
 |---|---|
-| `apps/backend/src/modules/me/me.schema.ts` | Created `ProfileResponseSchema` and `UsageResponseSchema`; `UsageResponseSchema` menyertakan `expiresAt` (nullable). |
-| `apps/backend/src/modules/me/me.service.ts` | Implemented `MeService.getProfile()` and `MeService.getUsage()` with `withAuthDb`; `getUsage` select + serialize `expiresAt` dari `tenant_subscriptions.expires_at`. |
-| `apps/backend/src/modules/me/me.controller.ts` | Implemented `handleGetProfile` and `handleGetUsage` with `ContextExtractor`. |
-| `apps/backend/src/modules/me/me.routes.ts` | Defined OpenAPI routes `GET /` and `GET /usage` under `/api/me`. |
-| `apps/backend/src/modules/me/mod.ts` | Re-exported `meRoutes`, `MeService`, and `MeSchema`. |
-| `apps/backend/src/api/router.ts` | Mounted `meRoutes` at `/me`. |
-| `apps/backend/src/modules/me/me.service.test.ts` | Isolated service unit tests for `getProfile` and `getUsage`. |
-| `apps/backend/src/modules/me/me.routes.test.ts` | BDD route integration tests for `GET /api/me` and `GET /api/me/usage`. |
-| `apps/frontend/src/lib/constants/tiers.constant.ts` | Created frontend `TIER_LIMITS` matching backend configuration. |
-| `apps/frontend/src/lib/api/me.ts` | Created `getMe()` and `getMeUsage()` client functions. |
-| `apps/frontend/src/lib/types/auth.types.ts` | Updated `UserProfileResponse` and `UserUsageResponse`. |
-| `apps/frontend/src/lib/components/app/AppSidebar.svelte` | Updated to call `getMe()` from `$lib/api/me`. |
-| `apps/frontend/src/routes/app/chat/+page.svelte` | Calls `getMeUsage()` on mount and calculates tier constraints via `TIER_LIMITS`. |
-| `api-collections/Me/01_Get Profile.bru` | Updated request URL to `GET {{baseUrl}}/api/me`. |
-| `api-collections/Me/02_Get Realtime Usage.bru` | Added request file for `GET {{baseUrl}}/api/me/usage`. |
-| `tests-report/unit-test.md` | Updated with test suite execution results for the `Me` module. |
+| `apps/backend/src/modules/me/me.schema.ts` | Zod schemas for `ProfileResponseSchema`, `UsageResponseSchema`, `DeleteAccountResponseSchema`, `UpdatePasswordBodySchema`, `UpdatePasswordResponseSchema`, `UpdateTenantNameBodySchema`, and `UpdateTenantNameResponseSchema`. |
+| `apps/backend/src/modules/me/me.service.ts` | Implemented `getProfile`, `getUsage`, `requestAccountDeletion`, `updatePassword`, and `updateTenantName`. |
+| `apps/backend/src/modules/me/me.controller.ts` | HTTP controller handlers for all `/api/me/*` endpoints using `ContextExtractor`. |
+| `apps/backend/src/modules/me/me.routes.ts` | OpenAPI route definitions for `GET /`, `GET /usage`, `DELETE /account`, `PUT /update-password`, and `PATCH /tenant/name`. |
+| `apps/backend/src/modules/me/mod.ts` | Module re-exports for routes, service, and schemas. |
+| `apps/backend/src/modules/me/me.routes.test.ts` | BDD route integration tests covering authentication and input validation for all `/api/me` endpoints. |
+| `apps/backend/src/modules/me/me.service.test.ts` | Isolated unit tests for profile, usage, tenant update, and password update logic. |
+| `apps/backend/src/modules/auth/auth.routes.ts` | Removed `/update-password` and `/tenant/name` from `auth` module. |
+| `apps/backend/src/modules/auth/auth.service.ts` | Removed `updatePassword` and `updateTenantName` from `AuthService`. |
+| `apps/backend/src/modules/auth/auth.controller.ts` | Removed handlers for password and tenant name updates from `auth` controller. |
+| `apps/backend/src/modules/auth/auth.schema.ts` | Cleaned up unused password/tenant update schemas. |
+| `apps/frontend/src/lib/api/me.ts` | Added `updatePassword` and `updateTenantName` API client functions. |
+| `apps/frontend/src/lib/api/auth.ts` | Re-exported `updatePassword as authUpdatePassword` and `updateTenantName as authUpdateTenantName` for backwards compatibility. |
+| `apps/frontend/src/lib/components/app/AccountPanelDialog.svelte` | Account panel settings dialog consuming `/api/me/*` endpoints. |
+| `api-collections/Me/04_Update Password.bru` | Bruno request for `PUT {{baseUrl}}/api/me/update-password`. |
+| `api-collections/Me/05_Update Tenant Name.bru` | Bruno request for `PATCH {{baseUrl}}/api/me/tenant/name`. |
 
 ---
 
 ## Connections
 
-- **Database Isolation**: `MeService.getUsage` wraps Drizzle queries inside `withAuthDb(userId)` to enforce Supabase RLS and tenant data isolation.
-- **Server Gateway**: `router.ts` mounts `meRoutes` at `/me`. Authentication is automatically enforced by global `authMiddleware`.
-- **Frontend Integration**: Layout/Sidebar fetches light profile data from `/api/me`, while `/app/chat` fetches realtime counts from `/api/me/usage` and evaluates limit thresholds using local `$lib/constants/tiers.constant.ts`.
+- **Multi-Tenancy Isolation**: All tenant-modifying operations use `withAuthDb(userId)` or enforce explicit `tenantId` checking to guarantee tenant data isolation.
+- **Global Invalidation**: When a user changes their password via `PUT /api/me/update-password`, `adminSupabase.auth.admin.signOut(token, 'global')` revokes all issued tokens across devices, while `clearSessionCookies(c)` clears the caller's local cookies.
+- **Audit Logging**: Successful mutations (`tenant.name_updated`, `auth.password_reset`) emit structured activity log events with client IP and User-Agent.
 
 ---
 
 ## Architectural Decisions
 
-1. **Endpoint Separation for P95 Performance**: Separating general profile information from realtime usage counts prevents unnecessary database payload transfers when rendering global layout elements like the sidebar.
-2. **Local Tier Limits Constant**: Keeping `TIER_LIMITS` in `$lib/constants/tiers.constant.ts` allows instantaneous client-side file upload and storage validation without needing redundant network calls for static limit thresholds.
-3. **Module Independence**: Extracted all profile and usage operations into a dedicated `me` module (`apps/backend/src/modules/me/`) out of `auth`, maintaining clean domain boundaries.
-4. **expiresAt pada usage**: kolom `expires_at` di `tenant_subscriptions` sudah ada (dipakai lazy auto-downgrade di `getProfile`); `getUsage` kini juga men-serialize-nya agar UI Billing bisa menampilkan masa akses tanpa panggilan tambahan.
-5. **Client cache (2026-08-12)**: `$lib/state/me-cache.store.svelte.ts` men-cache `/api/me` & `/api/me/usage` dengan TTL 30s (SWR) — dipakai `AppSidebar`, halaman chat/documents, dan `AccountPanelDialog` agar navigasi `/app/*` tidak menembak endpoint yang sama berulang. `invalidateMeCache()` dipanggil setelah update nama tenant.
+1. **Self-Service Encapsulation in `me` Module**: Consolidating user profile (`GET /api/me`), usage stats (`GET /api/me/usage`), account deletion (`DELETE /api/me/account`), password changes (`PUT /api/me/update-password`), and tenant workspace renaming (`PATCH /api/me/tenant/name`) under `/api/me` leaves `/api/auth` focused solely on initial authentication lifecycle (login, register, logout, OTP password recovery, email verification).
+2. **Backwards-Compatible Frontend Exports**: `apps/frontend/src/lib/api/auth.ts` re-exports `authUpdatePassword` and `authUpdateTenantName` from `./me.ts` so existing components function smoothly without breaking changes.
+3. **Session Invalidation on Password Mutation**: Immediate server-side global session revocation prevents unauthorized continued access on leaked credentials or stale sessions.

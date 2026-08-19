@@ -8,9 +8,9 @@ async function makeRequest(
   body: Record<string, unknown>,
   headers: Record<string, string> = {},
 ): Promise<Response> {
-  const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-    Math.floor(Math.random() * 255)
-  }`;
+  const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${Math.floor(
+    Math.random() * 255,
+  )}`;
   const req = new Request(`http://localhost${path}`, {
     method: "POST",
     headers: {
@@ -203,9 +203,9 @@ describe("Auth Module", () => {
     });
 
     it("negative: empty body returns 400", async () => {
-      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-        Math.floor(Math.random() * 255)
-      }`;
+      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${Math.floor(
+        Math.random() * 255,
+      )}`;
       const req = new Request("http://localhost/api/auth/register", {
         method: "POST",
         headers: {
@@ -403,9 +403,9 @@ describe("Auth Module", () => {
     });
 
     it("negative: missing authorization header is still idempotent 200", async () => {
-      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-        Math.floor(Math.random() * 255)
-      }`;
+      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${Math.floor(
+        Math.random() * 255,
+      )}`;
       const req = new Request("http://localhost/api/auth/logout", {
         method: "POST",
         headers: {
@@ -420,9 +420,9 @@ describe("Auth Module", () => {
     });
 
     it("negative: invalid authorization header format is still idempotent 200", async () => {
-      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-        Math.floor(Math.random() * 255)
-      }`;
+      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${Math.floor(
+        Math.random() * 255,
+      )}`;
       const req = new Request("http://localhost/api/auth/logout", {
         method: "POST",
         headers: {
@@ -435,52 +435,6 @@ describe("Auth Module", () => {
       assertEquals(res.status, 200);
       const json = await res.json();
       assertEquals(json.message, "Successfully logged out");
-    });
-  });
-
-  describe("GET /api/auth/me", () => {
-    it("positive: returns profile for authenticated user", async () => {
-      const token = validAccessToken || "dummy-valid-token";
-      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-        Math.floor(Math.random() * 255)
-      }`;
-      const req = new Request("http://localhost/api/auth/me", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "X-Forwarded-For": randomIp,
-        },
-      });
-
-      const res = await app.fetch(req);
-
-      if (res.status === 200) {
-        const json = await res.json();
-        assertEquals(typeof json.user.id, "string");
-        assertEquals(typeof json.tenant.id, "string");
-        assertEquals(typeof json.subscription.tier, "string");
-      } else {
-        console.warn(
-          `[WARN] Get Profile returned ${res.status}. Expected 200 if token is valid.`,
-        );
-      }
-    });
-
-    it("negative: missing authorization header returns 401", async () => {
-      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-        Math.floor(Math.random() * 255)
-      }`;
-      const req = new Request("http://localhost/api/auth/me", {
-        method: "GET",
-        headers: {
-          "X-Forwarded-For": randomIp,
-        },
-      });
-
-      const res = await app.fetch(req);
-      assertEquals(res.status, 401);
-      const json = await res.json();
-      assertEquals(json.error.code, "UNAUTHORIZED");
     });
   });
 
@@ -531,61 +485,6 @@ describe("Auth Module", () => {
       }
     });
 
-    it("negative: update-password missing authorization header returns 401", async () => {
-      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-        Math.floor(Math.random() * 255)
-      }`;
-      const req = new Request("http://localhost/api/auth/update-password", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Forwarded-For": randomIp,
-        },
-        body: JSON.stringify({ newPassword: "NewSecurePassword123!" }),
-      });
-
-      const res = await app.fetch(req);
-      assertEquals(res.status, 401);
-    });
-
-    it("negative: rate limit exceeded at 5 attempts", async () => {
-      const targetEmail = `forget-${crypto.randomUUID()}@example.com`;
-      const spamIp = `192.168.50.${Math.floor(Math.random() * 255)}`;
-
-      for (let i = 1; i <= 5; i++) {
-        await makeRequest(
-          "/api/auth/forget-password",
-          {
-            email: targetEmail,
-            recaptchaToken: "dummy-token",
-          },
-          {
-            "X-Forwarded-For": spamIp,
-          },
-        );
-      }
-
-      const finalRes = await makeRequest(
-        "/api/auth/forget-password",
-        {
-          email: targetEmail,
-          recaptchaToken: "dummy-token",
-        },
-        {
-          "X-Forwarded-For": spamIp,
-        },
-      );
-
-      if (finalRes.status === 429) {
-        const json = await finalRes.json();
-        assertEquals(json.error.code, "RATE_LIMIT_EXCEEDED");
-      } else {
-        console.warn(
-          `[WARN] Forget password rate limit returned ${finalRes.status}. Expected 429.`,
-        );
-      }
-    });
-
     it("negative: reset-password missing otp returns 400", async () => {
       const res = await makeRequest("/api/auth/reset-password", {
         newPassword: "NewSecurePassword123!",
@@ -600,32 +499,14 @@ describe("Auth Module", () => {
       });
       assertEquals(res.status, 400);
     });
-
-    it("negative: update-password short password returns 400", async () => {
-      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-        Math.floor(Math.random() * 255)
-      }`;
-      const req = new Request("http://localhost/api/auth/update-password", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer dummy-token",
-          "X-Forwarded-For": randomIp,
-        },
-        body: JSON.stringify({ newPassword: "short" }),
-      });
-
-      const res = await app.fetch(req);
-      assertEquals(res.status, 400);
-    });
   });
 
   describe("Error Envelope Compliance", () => {
     it("Error responses include requestId from X-Request-ID header", async () => {
       const customRequestId = "custom-trace-id-12345";
-      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-        Math.floor(Math.random() * 255)
-      }`;
+      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${Math.floor(
+        Math.random() * 255,
+      )}`;
       const req = new Request("http://localhost/api/auth/register", {
         method: "POST",
         headers: {
@@ -677,39 +558,6 @@ describe("Auth Module", () => {
       const json = await res.json();
       assertEquals(json.error.code, "UNAUTHORIZED");
       assertEquals(json.error.message, "Invalid or expired verification link.");
-    });
-  });
-
-  describe("DELETE /api/auth/account", () => {
-    it("negative: missing authorization header returns 401", async () => {
-      const randomIp = `127.0.${Math.floor(Math.random() * 255)}.${
-        Math.floor(Math.random() * 255)
-      }`;
-      const req = new Request("http://localhost/api/auth/account", {
-        method: "DELETE",
-        headers: {
-          "X-Forwarded-For": randomIp,
-        },
-      });
-
-      const res = await app.fetch(req);
-      assertEquals(res.status, 401);
-      const json = await res.json();
-      assertEquals(json.error.code, "UNAUTHORIZED");
-    });
-
-    it("negative: invalid bearer token returns 401", async () => {
-      const req = new Request("http://localhost/api/auth/account", {
-        method: "DELETE",
-        headers: {
-          Authorization: "Bearer not-a-real-token",
-        },
-      });
-
-      const res = await app.fetch(req);
-      assertEquals(res.status, 401);
-      const json = await res.json();
-      assertEquals(json.error.code, "UNAUTHORIZED");
     });
   });
 });

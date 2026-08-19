@@ -1,0 +1,27 @@
+meta {
+  name: OAuth Google Callback
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/oauth/google/callback?code=AUTH_CODE_HERE
+  body: none
+  auth: none
+}
+
+params:query {
+  code: AUTH_CODE_HERE
+  ~error: access_denied
+  ~error_description: User denied access
+}
+
+docs {
+  Handles the redirect from Google with the authorization code.
+  Exchanges the code with Supabase for user session tokens via PKCE.
+  Sets access_token and refresh_token as httpOnly cookies scoped to the shared domain,
+  then redirects to {FRONTEND_URL}/app/chat (or {FRONTEND_URL}/login?oauth_error=... on failure).
+  Email verification gate: rejects and logs out unverified email profiles immediately.
+  NOTE: This endpoint is normally called by the browser redirect from Google, not directly.
+  Internal classification: PUBLIC (no auth token required).
+}

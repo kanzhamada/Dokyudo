@@ -1,6 +1,6 @@
 import { describe, it } from "jsr:@std/testing/bdd";
 import { assertEquals } from "jsr:@std/assert";
-import app from "../../../main.ts";
+import app from "../../main.ts";
 
 /** Helper: make a GET request to the test app */
 async function makeGetRequest(path: string): Promise<Response> {
@@ -18,9 +18,9 @@ async function makeGetRequest(path: string): Promise<Response> {
 }
 
 describe("OAuth Routes", () => {
-    describe("GET /auth/oauth/google", () => {
+    describe("GET /oauth/google", () => {
         it("positive: redirects to Supabase Google OAuth URL", async () => {
-            const res = await makeGetRequest("/api/auth/oauth/google");
+            const res = await makeGetRequest("/api/oauth/google");
             assertEquals(res.status, 302);
             
             const location = res.headers.get("Location");
@@ -29,9 +29,9 @@ describe("OAuth Routes", () => {
         });
     });
 
-    describe("GET /auth/oauth/github", () => {
+    describe("GET /oauth/github", () => {
         it("positive: redirects to Supabase GitHub OAuth URL", async () => {
-            const res = await makeGetRequest("/api/auth/oauth/github");
+            const res = await makeGetRequest("/api/oauth/github");
             assertEquals(res.status, 302);
             
             const location = res.headers.get("Location");
@@ -40,9 +40,9 @@ describe("OAuth Routes", () => {
         });
     });
 
-    describe("GET /auth/oauth/google/callback", () => {
+    describe("GET /oauth/google/callback", () => {
         it("negative: missing code redirects to frontend with error", async () => {
-            const res = await makeGetRequest("/api/auth/oauth/google/callback");
+            const res = await makeGetRequest("/api/oauth/google/callback");
             assertEquals(res.status, 302);
             
             const location = res.headers.get("Location");
@@ -51,7 +51,7 @@ describe("OAuth Routes", () => {
         });
 
         it("negative: user denied consent (error param) redirects to frontend with error", async () => {
-            const res = await makeGetRequest("/api/auth/oauth/google/callback?error=access_denied&error_description=User%20denied%20consent");
+            const res = await makeGetRequest("/api/oauth/google/callback?error=access_denied&error_description=User%20denied%20consent");
             assertEquals(res.status, 302);
             
             const location = res.headers.get("Location");
@@ -60,7 +60,7 @@ describe("OAuth Routes", () => {
         });
 
         it("negative: invalid code redirects to frontend with auth failure error", async () => {
-            const res = await makeGetRequest("/api/auth/oauth/google/callback?code=invalid_dummy_code_123");
+            const res = await makeGetRequest("/api/oauth/google/callback?code=invalid_dummy_code_123");
             assertEquals(res.status, 302);
             
             const location = res.headers.get("Location");
@@ -70,9 +70,9 @@ describe("OAuth Routes", () => {
         });
     });
 
-    describe("GET /auth/oauth/github/callback", () => {
+    describe("GET /oauth/github/callback", () => {
         it("negative: missing code redirects to frontend with error", async () => {
-            const res = await makeGetRequest("/api/auth/oauth/github/callback");
+            const res = await makeGetRequest("/api/oauth/github/callback");
             assertEquals(res.status, 302);
             
             const location = res.headers.get("Location");
@@ -81,7 +81,7 @@ describe("OAuth Routes", () => {
         });
 
         it("negative: user denied consent (error param) redirects to frontend with error", async () => {
-            const res = await makeGetRequest("/api/auth/oauth/github/callback?error=access_denied&error_description=User%20denied%20consent");
+            const res = await makeGetRequest("/api/oauth/github/callback?error=access_denied&error_description=User%20denied%20consent");
             assertEquals(res.status, 302);
             
             const location = res.headers.get("Location");
@@ -90,7 +90,7 @@ describe("OAuth Routes", () => {
         });
 
         it("negative: invalid code redirects to frontend with auth failure error", async () => {
-            const res = await makeGetRequest("/api/auth/oauth/github/callback?code=invalid_dummy_code_123");
+            const res = await makeGetRequest("/api/oauth/github/callback?code=invalid_dummy_code_123");
             assertEquals(res.status, 302);
             
             const location = res.headers.get("Location");

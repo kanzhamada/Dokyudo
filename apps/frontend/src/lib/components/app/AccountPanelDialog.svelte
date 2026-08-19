@@ -27,7 +27,8 @@
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
-	import { authUpdatePassword, authUpdateTenantName, authDeleteAccount } from '$lib/api/auth';
+	import { authUpdatePassword, authUpdateTenantName } from '$lib/api/auth';
+	import { deleteMyAccount } from '$lib/api/me';
 	import {
 		getMeCached,
 		getMeUsageCached,
@@ -159,7 +160,7 @@
 		deletingAccount = true;
 		deleteError = '';
 		try {
-			const result = await authDeleteAccount();
+			const result = await deleteMyAccount();
 			if (result.ok) {
 				accountPanel.open = false;
 				sessionStore.clear();

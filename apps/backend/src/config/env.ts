@@ -34,6 +34,8 @@ const OPTIONAL_ENV_VARS_WITH_DEFAULTS: Record<string, string> = {
   GROQ_API_KEY: "",
   SAMBANOVA_API_KEY: "",
   COHERE_API_KEY: "",
+  // Pepper key used for pseudonymized email hashing (anti-abuse / promo limits)
+  EMAIL_HASH_PEPPER: "dokyudo-email-hash-default-pepper-secret",
 };
 
 /**

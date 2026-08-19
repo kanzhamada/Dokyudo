@@ -13,6 +13,7 @@ import { CreateCheckoutBody, VerifyCheckoutSessionParams, VerifyCheckoutSessionR
 import { eq, and, gte } from "drizzle-orm";
 import type Stripe from "npm:stripe@^15.5.0";
 import { getEnv } from "../../config/env.ts";
+import { hashUserEmail } from "../../shared/utils/hash.util.ts";
 
 export class PaymentsService {
     /**
@@ -45,8 +46,8 @@ export class PaymentsService {
 
         const externalId = `dokyudo-${tenantId}-${Date.now()}`;
 
-        // 2. Tenant Check (must be an ACTIVE account — a deleted/deletion-pending
-        // tenant can never start a new checkout)
+        // 1. User & Tenant Checks (must be an ACTIVE account — a deleted/deletion-pending
+        // account can never start a new checkout)
         const [tenant] = await withAuthDb(userId, async (tx) => {
             return await tx
                 .select()
@@ -67,32 +68,51 @@ export class PaymentsService {
             });
         }
 
-        // 2.5 SIMULATE Tier Monthly Constraint
-        if (body.tierToUnlock === "SIMULATE") {
-            const startOfMonth = new Date();
-            startOfMonth.setDate(1);
-            startOfMonth.setHours(0, 0, 0, 0);
+        const [userRecord] = await withAuthDb(userId, async (tx) => {
+            return await tx
+                .select({ email: users.email })
+                .from(users)
+                .where(
+                    and(
+                        eq(users.id, userId),
+                        eq(users.deletionStatus, "active"),
+                    ),
+                );
+        });
 
-            const [existingSimulate] = await withAuthDb(userId, async (tx) => {
-                return await tx
-                    .select()
-                    .from(paymentTransactions)
-                    .where(
-                        and(
-                            eq(paymentTransactions.tenantId, tenantId),
-                            eq(paymentTransactions.tierToUnlock, "SIMULATE"),
-                            eq(paymentTransactions.status, "SUCCEEDED"),
-                            gte(paymentTransactions.paidAt, startOfMonth)
-                        )
-                    )
-                    .limit(1);
+        if (!userRecord) {
+            throw new AppError({
+                code: "NOT_FOUND",
+                status: 404,
+                message: "User not found",
             });
+        }
+
+        const userEmailHash = await hashUserEmail(userRecord.email);
+
+        // 2.5 SIMULATE Tier 30-Day Rolling Constraint (Fraud / Promo Abuse Prevention)
+        // Uses pseudonymized email hash so the limit survives account deletion and re-registration
+        if (body.tierToUnlock === "SIMULATE") {
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+            const [existingSimulate] = await db
+                .select({ id: paymentTransactions.id })
+                .from(paymentTransactions)
+                .where(
+                    and(
+                        eq(paymentTransactions.userEmailHash, userEmailHash),
+                        eq(paymentTransactions.tierToUnlock, "SIMULATE"),
+                        eq(paymentTransactions.status, "SUCCEEDED"),
+                        gte(paymentTransactions.paidAt, thirtyDaysAgo),
+                    ),
+                )
+                .limit(1);
 
             if (existingSimulate) {
                 throw new AppError({
                     code: "VALIDATION_ERROR",
                     status: 400,
-                    message: "You can only claim the SIMULATE tier once per month.",
+                    message: "SIMULATE tier can only be claimed once per 30 days.",
                 });
             }
         }
@@ -150,6 +170,7 @@ export class PaymentsService {
                 .insert(paymentTransactions)
                 .values({
                     tenantId,
+                    userEmailHash,
                     externalId,
                     stripeSessionId: session.id,
                     tierToUnlock: body.tierToUnlock as any,
@@ -184,18 +205,16 @@ export class PaymentsService {
             case "checkout.session.completed": {
                 const session = event.data.object as Stripe.Checkout.Session;
 
-                // 1. Validate custom metadata attached during checkout session creation
+                // 1. Validate externalId attached during checkout session creation
                 // Fall back to client_reference_id for resilience (some test fixtures omit metadata).
-                const tenantId = session.metadata?.tenantId;
                 const externalId =
                     session.metadata?.externalId ??
                     (typeof session.client_reference_id === "string"
                         ? session.client_reference_id
                         : undefined);
-                const tierToUnlock = session.metadata?.tierToUnlock;
 
-                if (!tenantId || !externalId || !tierToUnlock) {
-                    if (logContext) logContext.webhookWarning = "Missing metadata in checkout.session.completed";
+                if (!externalId) {
+                    if (logContext) logContext.webhookWarning = "Missing externalId in checkout.session.completed";
                     break;
                 }
 
@@ -209,6 +228,9 @@ export class PaymentsService {
                     if (logContext) logContext.webhookWarning = `Payment transaction not found for externalId: ${externalId}`;
                     break;
                 }
+
+                const tenantId = session.metadata?.tenantId ?? trx.tenantId;
+                const tierToUnlock = session.metadata?.tierToUnlock ?? trx.tierToUnlock;
 
                 if (trx.status === "SUCCEEDED") {
                     if (logContext) logContext.webhookInfo = `Payment transaction ${externalId} already completed. Skipping.`;
@@ -350,7 +372,12 @@ export class PaymentsService {
             }
             case "customer.subscription.deleted": {
                 const subscription = event.data.object as Stripe.Subscription;
-                const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+                const customerId =
+                    typeof subscription.customer === "string"
+                        ? subscription.customer
+                        : subscription.customer?.id;
+
+                if (!customerId) break;
 
                 // Revert to FREE / SIMULATE tier upon cancellation expiration
                 await db

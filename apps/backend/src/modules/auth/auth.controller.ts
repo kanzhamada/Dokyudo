@@ -9,12 +9,11 @@ import {
   setSessionCookies,
 } from "../../config/cookie.ts";
 import { resolveSession } from "../../shared/middlewares/auth.middleware.ts";
-import { AccountDeletionService } from "../account_deletion/account_deletion.service.ts";
 
 export async function handleRegister(c: Context) {
   const extractor = new ContextExtractor(c);
-  const { requestId, clientIp, userAgent, logContext } = extractor
-    .extractAuditContext();
+  const { requestId, clientIp, userAgent, logContext } =
+    extractor.extractAuditContext();
   const body = extractor.extractValidJson<AuthSchema.RegisterBody>();
 
   const params: AuthSchema.RegisterParams = {
@@ -40,8 +39,8 @@ export async function handleRegister(c: Context) {
 
 export async function handleVerifyEmail(c: Context) {
   const extractor = new ContextExtractor(c);
-  const { requestId, clientIp, userAgent, logContext } = extractor
-    .extractAuditContext();
+  const { requestId, clientIp, userAgent, logContext } =
+    extractor.extractAuditContext();
   const body = extractor.extractValidJson<AuthSchema.VerifyEmailBody>();
 
   const params: AuthSchema.VerifyEmailParams = {
@@ -74,8 +73,8 @@ export async function handleVerifyEmail(c: Context) {
 
 export async function handleLogin(c: Context) {
   const extractor = new ContextExtractor(c);
-  const { requestId, clientIp, userAgent, logContext } = extractor
-    .extractAuditContext();
+  const { requestId, clientIp, userAgent, logContext } =
+    extractor.extractAuditContext();
   const body = extractor.extractValidJson<AuthSchema.LoginBody>();
 
   const params: AuthSchema.LoginParams = {
@@ -155,8 +154,8 @@ export async function handleSession(c: Context) {
 
 export async function handleForgetPassword(c: Context) {
   const extractor = new ContextExtractor(c);
-  const { requestId, clientIp, userAgent, logContext } = extractor
-    .extractAuditContext();
+  const { requestId, clientIp, userAgent, logContext } =
+    extractor.extractAuditContext();
   const body = extractor.extractValidJson<AuthSchema.ForgetPasswordBody>();
 
   const params: AuthSchema.ForgetPasswordParams = {
@@ -178,8 +177,8 @@ export async function handleForgetPassword(c: Context) {
 
 export async function handleResetPassword(c: Context) {
   const extractor = new ContextExtractor(c);
-  const { requestId, clientIp, userAgent, logContext } = extractor
-    .extractAuditContext();
+  const { requestId, clientIp, userAgent, logContext } =
+    extractor.extractAuditContext();
   const body = extractor.extractValidJson<AuthSchema.ResetPasswordBody>();
 
   const params: AuthSchema.ResetPasswordParams = {
@@ -200,78 +199,3 @@ export async function handleResetPassword(c: Context) {
   );
 }
 
-export async function handleUpdatePassword(c: Context) {
-  const extractor = new ContextExtractor(c);
-  const { logContext } = extractor.extractBaseContext();
-
-  const authHeader = c.req.header("Authorization");
-  const accessToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.substring(7)
-    : (getCookie(c, ACCESS_TOKEN_COOKIE) ?? "");
-
-  const body = extractor.extractValidJson<AuthSchema.UpdatePasswordBody>();
-
-  const params: AuthSchema.UpdatePasswordParams = {
-    accessToken,
-    newPassword: body.newPassword,
-    logContext,
-  };
-
-  await AuthService.updatePassword(params);
-
-  // Force re-login: clear the session cookies (the service already revokes
-  // the Supabase session globally).
-  clearSessionCookies(c);
-
-  return c.json(
-    { message: "Password successfully updated. Please log in again." },
-    200,
-  );
-}
-
-export const handleUpdateTenantName = async (c: Context) => {
-  const extractor = new ContextExtractor(c);
-  const { userId, tenantId, logContext } = extractor.extractAuthContext();
-  const { clientIp, userAgent } = extractor.extractAuditContext();
-  const body = extractor.extractValidJson<AuthSchema.UpdateTenantNameBody>();
-
-  const result = await AuthService.updateTenantName({
-    userId,
-    tenantId,
-    name: body.name,
-    clientIp,
-    userAgent,
-    logContext,
-  });
-
-  return c.json(result, 200);
-};
-
-export const handleDeleteAccount = async (c: Context) => {
-  const extractor = new ContextExtractor(c);
-  const { userId, tenantId, logContext } = extractor.extractAuthContext();
-  const { requestId, clientIp, userAgent } = extractor.extractAuditContext();
-
-  const result = await AccountDeletionService.requestAccountDeletion({
-    userId,
-    tenantId,
-    clientIp,
-    userAgent,
-    requestId,
-    logContext,
-  });
-
-  // The account is now deletion_pending — drop the local session cookies
-  // immediately so the client does not keep calling the API with a dead token.
-  clearSessionCookies(c);
-
-  return c.json(
-    {
-      message:
-        "Account deletion scheduled. Your data will be purged shortly.",
-      scheduled: result.scheduled,
-      jobId: result.jobId,
-    },
-    202,
-  );
-};

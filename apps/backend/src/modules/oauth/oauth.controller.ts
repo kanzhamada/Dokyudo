@@ -1,8 +1,8 @@
 import { type Context } from "hono";
-import { getEnv } from "../../../config/env.ts";
+import { getEnv } from "../../config/env.ts";
 import { OAuthService } from "./oauth.service.ts";
-import { ContextExtractor } from "../../../shared/utils/context.util.ts";
-import { setSessionCookies } from "../../../config/cookie.ts";
+import { ContextExtractor } from "../../shared/utils/context.util.ts";
+import { setSessionCookies } from "../../config/cookie.ts";
 import * as OAuthSchema from "./oauth.schema.ts";
 
 export async function handleGoogleRedirect(c: Context) {
