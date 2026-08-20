@@ -3,11 +3,6 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Input } from '$lib/components/ui/input';
-	import {
-		Mail,
-		UserRound,
-		X
-	} from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { toast } from 'svelte-sonner';
 	import { addShareInvitees, createShare } from '$lib/api/rag';
@@ -488,9 +483,9 @@
 
 					<div class="flex items-center gap-2">
 						<div class="relative min-w-0 flex-1">
-							<Mail
+							<MxIcon
+								name="sms-outline"
 								class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/35"
-								strokeWidth={1.8}
 							/>
 							<Input
 								bind:value={recipientInput}
@@ -531,7 +526,7 @@
 									<div
 										class="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/[0.08]"
 									>
-										<UserRound class="size-3.5 text-white/45" strokeWidth={1.8} />
+										<MxIcon name="user-rounded-outline" class="size-3.5 text-white/45" />
 									</div>
 									<span class="min-w-0 flex-1 truncate text-xs text-white/75">{email}</span>
 									<button
@@ -540,7 +535,7 @@
 										aria-label={`Remove ${email}`}
 										onclick={() => removeRecipient(email)}
 									>
-										<X class="size-3" strokeWidth={2} />
+										<MxIcon name="close-circle-linear" class="size-3" />
 									</button>
 								</div>
 							{/each}

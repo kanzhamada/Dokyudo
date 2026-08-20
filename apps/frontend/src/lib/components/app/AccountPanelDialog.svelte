@@ -12,11 +12,8 @@
 		FileText,
 		HardDrive,
 		MessageCircle,
-		RefreshCw,
-		RotateCw,
 		Search,
-		Settings2,
-		UserRound
+		Settings2
 	} from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { untrack } from 'svelte';
@@ -820,7 +817,7 @@
 								<div
 									class="flex size-7 shrink-0 items-center justify-center rounded-md bg-white/[0.07]"
 								>
-									<UserRound class="size-3.5 text-white/45" strokeWidth={1.8} />
+									<MxIcon name="user-rounded-outline" class="size-3.5 text-white/45" />
 								</div>
 								<div class="min-w-0 flex-1">
 									<h2 id="profile-details-title" class="text-sm font-medium text-white/80">
@@ -1082,9 +1079,9 @@
 										loadUsage();
 									}}
 								>
-									<RefreshCw
+									<MxIcon
+										name="arrows-refresh-outline"
 										class="size-3 {billingLoading ? 'animate-spin' : ''}"
-										strokeWidth={1.8}
 									/>
 									Refresh
 								</button>
@@ -1372,7 +1369,7 @@
 											resetConfigureKey();
 										}}
 									>
-										<RotateCw class="size-3.5" />
+										<MxIcon name="rotate-left-outline" class="size-3.5" />
 										<span>{isResettingKey ? 'Resetting...' : 'Reset Key'}</span>
 									</button>
 								</div>
@@ -1471,9 +1468,9 @@
 										loadShares();
 									}}
 								>
-									<RefreshCw
+									<MxIcon
+										name="arrows-refresh-outline"
 										class="size-3 {sharesLoading ? 'animate-spin' : ''}"
-										strokeWidth={1.8}
 									/>
 									Refresh
 								</button>
@@ -1488,7 +1485,7 @@
 										}}
 									>
 										{#if isDeletingAll}
-											<RefreshCw class="size-3 animate-spin" strokeWidth={1.8} />
+											<MxIcon name="arrows-refresh-outline" class="size-3 animate-spin" />
 										{:else}
 											<MxIcon name="trash-bin-minimalistic-outline" class="size-3" />
 										{/if}
@@ -1579,7 +1576,7 @@
 												}}
 											>
 												{#if deletingConversationId === group.conversationId}
-													<RefreshCw class="size-3 animate-spin" strokeWidth={1.8} />
+													<MxIcon name="arrows-refresh-outline" class="size-3 animate-spin" />
 												{:else}
 													<MxIcon name="trash-bin-minimalistic-outline" class="size-3" />
 												{/if}

@@ -2,7 +2,7 @@
 	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import AlertTriangleIcon from '@lucide/svelte/icons/triangle-alert';
-	import XIcon from '@lucide/svelte/icons/x';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
 	interface Props {
 		/** Document URL (signed S3 URL) to render inside the PDF viewer */
@@ -236,7 +236,7 @@
 								}}
 								aria-label="Close document preview"
 							>
-								<XIcon class="size-4" strokeWidth={1.8} />
+								<MxIcon name="close-circle-linear" class="size-4" />
 							</button>
 						{/snippet}
 					</Tooltip.Trigger>

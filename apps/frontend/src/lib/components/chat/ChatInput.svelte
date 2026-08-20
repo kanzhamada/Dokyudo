@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { X, Square, Loader2, Sparkles } from 'lucide-svelte';
+	import { Loader2 } from 'lucide-svelte';
 	import { fly } from 'svelte/transition';
 	import { cubicOut, cubicIn } from 'svelte/easing';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
@@ -591,7 +591,7 @@
 							}}
 							aria-label="Remove file"
 						>
-							<X class="size-3.5" />
+							<MxIcon name="close-circle-linear" class="size-3.5" />
 						</button>
 					</div>
 				{/each}
@@ -618,7 +618,7 @@
 									sparkleActive = !sparkleActive;
 								}}
 							>
-								<Sparkles class="size-5" />
+								<MxIcon name="sparkle-linear" class="size-5" />
 							</Tooltip.Trigger>
 							<Tooltip.Content
 								class="border-white/[0.16] bg-offblack text-white"
@@ -816,7 +816,7 @@
 				{#if isUploading}
 					<Loader2 class="size-5 animate-spin" />
 				{:else if isGenerating}
-					<Square class="size-4" />
+					<MxIcon name="video-stop-twotone" class="size-4" />
 				{:else}
 					<span class="group-hover/send:hidden"><MxIcon name="send1-outline" class="size-5 -rotate-45" /></span>
 					<span class="hidden group-hover/send:block"><MxIcon name="send1-bold" class="size-5 -rotate-45" /></span>

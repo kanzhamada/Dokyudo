@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Square, ShieldAlert } from 'lucide-svelte';
+	import { ShieldAlert } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import type { TurnStatus } from '$lib/types/rag.types';
 
@@ -33,7 +33,7 @@
 		class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 	>
 		{#if status === 'stopped'}
-			<Square class="size-3" />
+			<MxIcon name="video-stop-twotone" class="size-3" />
 		{:else if status === 'failed'}
 			<MxIcon name="danger-triangle-outline" class="size-3" />
 		{:else}

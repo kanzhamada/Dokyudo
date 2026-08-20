@@ -6,7 +6,7 @@
 	import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
 	import type { ComponentProps } from "svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import XIcon from '@lucide/svelte/icons/x';
+	import MxIcon from "$lib/components/icons/MxIcon.svelte";
 
 	let {
 		ref = $bindable(null),
@@ -43,7 +43,7 @@
 						{...props}
 						class="absolute top-4 right-4 cursor-pointer text-white/50 hover:bg-white/10 hover:text-white focus-visible:ring-0 focus-visible:outline-none"
 					>
-						<XIcon />
+						<MxIcon name="close-circle-linear" />
 						<span class="sr-only">Close</span>
 					</Button>
 				{/snippet}

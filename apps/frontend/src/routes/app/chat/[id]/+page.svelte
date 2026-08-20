@@ -4,16 +4,6 @@
 	import { backOut } from 'svelte/easing';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import {
-		X,
-		Sparkles,
-		ThumbsUp,
-		ThumbsDown,
-		Volume2,
-		RotateCw,
-		Square,
-		Plus
-	} from 'lucide-svelte';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -2192,7 +2182,7 @@
 									onclick={() => goto('/app/chat')}
 									aria-label="New chat"
 								>
-									<Plus class="size-5" />
+									<MxIcon name="add-outline" class="size-5" />
 								</button>
 							{/snippet}
 						</Tooltip.Trigger>
@@ -2378,7 +2368,7 @@
 											goto('/app/chat');
 										}}
 									>
-										<Plus class="size-4" />
+										<MxIcon name="add-outline" class="size-4" />
 										<span>New chat</span>
 									</button>
 								{/snippet}
@@ -3113,7 +3103,7 @@
 									<div
 										class="mt-2 inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 py-1 pr-1.5 pl-3"
 									>
-										<Volume2 class="size-3.5 shrink-0 animate-pulse text-white/60" />
+										<MxIcon name="volume-high-outline" class="size-3.5 shrink-0 animate-pulse text-white/60" />
 										<span class="text-xs font-medium text-white/60">Reading aloud…</span>
 										<button
 											type="button"
@@ -3121,7 +3111,7 @@
 											onclick={stopSpeaking}
 											aria-label="Stop reading"
 										>
-											<Square class="size-3" />
+											<MxIcon name="video-stop-twotone" class="size-3" />
 											<span>Stop</span>
 										</button>
 									</div>
@@ -3184,7 +3174,7 @@
 																onclick={() => toggleFeedback(msg, 'good')}
 																aria-label="Helpful"
 															>
-																<ThumbsUp class="size-3.5" />
+																<MxIcon name="like-like-outline" class="size-3.5" />
 															</Button>
 														{/snippet}
 													</Tooltip.Trigger>
@@ -3211,7 +3201,7 @@
 																onclick={() => toggleFeedback(msg, 'bad')}
 																aria-label="Not helpful"
 															>
-																<ThumbsDown class="size-3.5" />
+																<MxIcon name="dislike-outline" class="size-3.5" />
 															</Button>
 														{/snippet}
 													</Tooltip.Trigger>
@@ -3238,7 +3228,7 @@
 																				class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white/40 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.88]"
 																				aria-label="Retry response"
 																			>
-																				<RotateCw class="size-3.5" />
+																				<MxIcon name="rotate-left-outline" class="size-3.5" />
 																			</button>
 																		{/snippet}
 																	</DropdownMenu.Trigger>
@@ -3262,7 +3252,7 @@
 																retryMessage(msg, messages[msgIndex - 1]);
 															}}
 														>
-															<RotateCw class="size-3.5 text-white/70" />
+															<MxIcon name="rotate-left-outline" class="size-3.5 text-white/70" />
 															<span>Try Again</span>
 														</DropdownMenu.Item>
 													</DropdownMenu.Content>
@@ -3561,7 +3551,7 @@
 				if (msgIndex !== null) toggleReadAloud(msgIndex);
 			}}
 		>
-			<Volume2 class="size-3.5 text-white/70" />
+			<MxIcon name="volume-high-outline" class="size-3.5 text-white/70" />
 			<span
 				>{speakingMessageId === messages[activeResponseMenuMsgIndex!]?.id
 					? 'Stop reading'

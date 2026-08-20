@@ -4,7 +4,6 @@
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
-	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import Info from '@lucide/svelte/icons/info';
 	import favicon from '$lib/assets/favicon.svg?raw';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
@@ -47,7 +46,7 @@
 		</div>
 	{:else if mobileHeaderState.type === 'success'}
 		<div class="flex w-full items-center gap-3">
-			<CircleCheck class="size-5 shrink-0 text-green-400" />
+			<MxIcon name="check-circle-outline" class="size-5 shrink-0 text-green-400" />
 			<div class="flex min-w-0 flex-col">
 				<span class="truncate text-sm font-semibold text-white">{mobileHeaderState.title || 'Success'}</span>
 				{#if mobileHeaderState.message}

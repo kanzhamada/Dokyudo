@@ -26,24 +26,14 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 
 	/* ── Icons ── */
-	import PlusIcon from '@lucide/svelte/icons/plus';
-	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
-	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
-	import XIcon from '@lucide/svelte/icons/x';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
 	import ChevronLastIcon from '@lucide/svelte/icons/chevron-last';
-	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import FilesIcon from '@lucide/svelte/icons/files';
 	import FileStackIcon from '@lucide/svelte/icons/file-stack';
 	import ArrowDownAZIcon from '@lucide/svelte/icons/arrow-down-a-z';
 import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
-	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
-	import ListIcon from '@lucide/svelte/icons/list';
-	import ListXIcon from '@lucide/svelte/icons/list-x';
-	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { createZipArchive } from '$lib/utils/zip';
 
@@ -981,7 +971,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 									}}
 									class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:cursor-wait disabled:opacity-60 md:size-9"
 								>
-									<RefreshCwIcon class="size-4 {isRefreshing ? 'animate-spin' : ''}" />
+									<MxIcon name="arrows-refresh-outline" class="size-4 {isRefreshing ? 'animate-spin' : ''}" />
 								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
@@ -999,7 +989,8 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 							uploadDialogOpen = true;
 						}}
 					>
-						<PlusIcon
+						<MxIcon
+							name="add-outline"
 							data-icon="inline-start"
 							class="transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:rotate-90"
 						/>
@@ -1022,7 +1013,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 
 				<div class="rounded-2xl border border-white/10 bg-offblack/[0.53] p-3.5 md:p-4">
 					<div class="flex items-center gap-2 text-xs font-medium text-warm-gray">
-						<ArrowUpIcon class="size-4 text-white/60" />
+						<MxIcon name="arrow-up3-outline" class="size-4 text-white/60" />
 						<span>Max Upload</span>
 					</div>
 					<p class="mt-2.5 text-2xl font-semibold tracking-[-0.03em] text-white md:mt-3">
@@ -1104,7 +1095,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 									<Tooltip.Trigger>
 										{#snippet child({ props })}
 											<div {...props} class="flex h-full w-full items-center justify-center">
-												<BookOpenIcon class="size-3.5" />
+												<MxIcon name="book1-outline" class="size-3.5" />
 											</div>
 										{/snippet}
 									</Tooltip.Trigger>
@@ -1157,7 +1148,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 								class="flex size-5 cursor-pointer select-none items-center justify-center rounded-full text-white/50 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90"
 								aria-label="Clear search"
 							>
-								<XIcon class="size-3.5" />
+								<MxIcon name="close-circle-linear" class="size-3.5" />
 							</button>
 						{/if}
 					</div>
@@ -1283,9 +1274,9 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 							<ArrowDownAZIcon class="size-3.5 text-white/60" />
 							<span>Alphabet</span>
 							{#if table.getColumn('name')?.getIsSorted() === 'asc'}
-								<ArrowUpIcon class="ml-auto size-3.5 text-white/60" />
+								<MxIcon name="arrow-up3-outline" class="ml-auto size-3.5 text-white/60" />
 							{:else if table.getColumn('name')?.getIsSorted() === 'desc'}
-								<ArrowDownIcon class="ml-auto size-3.5 text-white/60" />
+								<MxIcon name="arrow-down1-linear" class="ml-auto size-3.5 text-white/60" />
 							{/if}
 						</button>
 						<button
@@ -1296,9 +1287,9 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 							<MxIcon name="calendar2-outline" class="size-3.5 text-white/60" />
 							<span>Date Uploaded</span>
 							{#if table.getColumn('uploadedAt')?.getIsSorted() === 'asc'}
-								<ArrowUpIcon class="ml-auto size-3.5 text-white/60" />
+								<MxIcon name="arrow-up3-outline" class="ml-auto size-3.5 text-white/60" />
 							{:else if table.getColumn('uploadedAt')?.getIsSorted() === 'desc'}
-								<ArrowDownIcon class="ml-auto size-3.5 text-white/60" />
+								<MxIcon name="arrow-down1-linear" class="ml-auto size-3.5 text-white/60" />
 							{/if}
 						</button>
 						<button
@@ -1309,9 +1300,9 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 							<HardDriveIcon class="size-3.5 text-white/60" />
 							<span>Size</span>
 							{#if table.getColumn('size')?.getIsSorted() === 'asc'}
-								<ArrowUpIcon class="ml-auto size-3.5 text-white/60" />
+								<MxIcon name="arrow-up3-outline" class="ml-auto size-3.5 text-white/60" />
 							{:else if table.getColumn('size')?.getIsSorted() === 'desc'}
-								<ArrowDownIcon class="ml-auto size-3.5 text-white/60" />
+								<MxIcon name="arrow-down1-linear" class="ml-auto size-3.5 text-white/60" />
 							{/if}
 						</button>
 					</div>
@@ -1546,7 +1537,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 								<div
 									class="mt-2 flex animate-pulse items-center gap-2 text-sm font-normal text-white/50 italic"
 								>
-									<SparklesIcon class="size-3.5 shrink-0 text-white/70" />
+									<MxIcon name="sparkle-linear" class="size-3.5 shrink-0 text-white/70" />
 									<span>Generating summary with AI...</span>
 								</div>
 							{:else if doc.status === 'quota_exhausted' && (!doc.description || doc.description === 'No description provided.')}
@@ -1634,7 +1625,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 											<Tooltip.Trigger>
 												{#snippet child({ props })}
 													<div {...props} class="page-reference select-none">
-														<BookOpenIcon class="size-3.5 text-terracotta" strokeWidth={1.7} />
+														<MxIcon name="book1-outline" class="size-3.5 text-terracotta" />
 														<span
 															>Page{pages.length > 1 ? 's' : ''}
 															{pages.slice(0, 3).join(', ')}{pages.length > 3 ? '…' : ''}</span
@@ -1656,7 +1647,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 									<div
 										class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/90 transition-all duration-150"
 									>
-										<SparklesIcon class="size-3.5 animate-pulse text-white" />
+										<MxIcon name="sparkle-linear" class="size-3.5 animate-pulse text-white" />
 										<span class="tracking-wide">Preparing…</span>
 									</div>
 								{:else if doc.status === 'quota_exhausted'}
@@ -1682,14 +1673,14 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 									<div
 										class="inline-flex select-none items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
 									>
-										<XIcon class="size-3.5 text-red-400" />
+										<MxIcon name="close-circle-linear" class="size-3.5 text-red-400" />
 										<span class="font-medium tracking-wide">Failed Vectorizing</span>
 									</div>
 								{:else if doc.status === 'failed'}
 									<div
 										class="inline-flex select-none items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
 									>
-										<XIcon class="size-3.5 text-red-400" />
+										<MxIcon name="close-circle-linear" class="size-3.5 text-red-400" />
 										<span class="font-medium tracking-wide">Processing Failed</span>
 									</div>
 								{/if}

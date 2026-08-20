@@ -2,10 +2,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import XIcon from '@lucide/svelte/icons/x';
-	import CheckCircle2Icon from '@lucide/svelte/icons/check-circle-2';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
-	import PlusIcon from '@lucide/svelte/icons/plus';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
@@ -544,7 +541,7 @@
 						<div
 							class="absolute -right-2 -bottom-2 flex h-6 w-6 items-center justify-center rounded-full border border-black bg-terracotta shadow-md"
 						>
-							<PlusIcon class="size-4 text-white" />
+							<MxIcon name="add-outline" class="size-4 text-white" />
 						</div>
 					</div>
 				</div>
@@ -601,7 +598,7 @@
 															}}
 															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
 														>
-															<XIcon class="size-5" />
+															<MxIcon name="close-circle-linear" class="size-5" />
 														</button>
 													{/snippet}
 												</Tooltip.Trigger>
@@ -635,7 +632,7 @@
 									</div>
 									<div class="flex shrink-0 items-center gap-3 sm:gap-4">
 										<span class="text-sm font-bold text-white">100%</span>
-										<CheckCircle2Icon class="size-5 text-emerald-400" />
+										<MxIcon name="check-circle-outline" class="size-5 text-emerald-400" />
 										<Tooltip.Provider delayDuration={100}>
 											<Tooltip.Root>
 												<Tooltip.Trigger>
@@ -722,7 +719,7 @@
 															}}
 															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
 														>
-															<XIcon class="size-5" />
+															<MxIcon name="close-circle-linear" class="size-5" />
 														</button>
 													{/snippet}
 												</Tooltip.Trigger>
@@ -781,7 +778,7 @@
 															}}
 															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
 														>
-															<XIcon class="size-5" />
+															<MxIcon name="close-circle-linear" class="size-5" />
 														</button>
 													{/snippet}
 												</Tooltip.Trigger>

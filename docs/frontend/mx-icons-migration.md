@@ -200,6 +200,22 @@ Note: `mxBoldName` in the data file is hand-maintained logic (it rewrites the `o
 | Link | `text-formatting-link-outline` / `text-formatting-link-bold` | |
 | Lock | `lock1-outline` / `lock1-bold` | |
 | Lock keyhole | `lock-keyhole-minimalistic-outline` / `lock-keyhole-minimalistic-bold` | |
+| Mail | `sms-outline` / `sms-bold` | |
+| Plus | `add-outline` / `add-bold` | |
+| RefreshCw | `arrows-refresh-outline` / `arrows-refresh-bold` | |
+| RotateCw | `rotate-left-outline` / `rotate-left-bold` | note `rotate-left`, not `rotate-cw` |
+| Square (stop) | `video-stop-twotone` / `video-stop-bold` | |
+| ThumbsUp | `like-like-outline` / `like-like-bold` | |
+| ThumbsDown | `dislike-outline` / `dislike-bold` | |
+| UserRound | `user-rounded-outline` / `user-rounded-bold` | |
+| Volume2 | `volume-high-outline` / `volume-high-bold` | |
+| X / close | `close-circle-linear` / `close-circle-bold` | |
+| ArrowDown | `arrow-down1-linear` / `arrow-down1-bold` | note `arrow-down1`, not `arrow-down` |
+| ArrowUp | `arrow-up3-outline` / `arrow-up3-bold` | note `arrow-up3`, not `arrow-up` |
+| BookOpen | `book1-outline` / `book1-bold` | |
+| CheckCircle / circle-check | `check-circle-outline` / `check-circle-bold` | |
+| LayoutGrid (dashboard) | `home-smile-outline` / `home-smile-bold` | |
+| Sparkles | `sparkle-linear` / `sparkle-bold` | no `sparkle-outline` — use linear |
 
 ### Variant conventions
 

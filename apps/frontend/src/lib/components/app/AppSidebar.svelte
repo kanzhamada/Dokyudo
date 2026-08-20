@@ -10,13 +10,11 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 
 	// Icons
-	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { mxBoldName } from '$lib/components/icons/mx-icons-data';
 	import type { MxIconName } from '$lib/components/icons/mx-icons-data';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import PanelLeft from '@lucide/svelte/icons/panel-left';
-	import Share from '@lucide/svelte/icons/share';
 
 	// Brand Logo
 	import favicon from '$lib/assets/favicon.svg?raw';
@@ -373,13 +371,13 @@
 
 	const navItems: {
 		label: string;
-		icon: MxIconName | typeof LayoutGrid;
+		icon: MxIconName;
 		active: boolean;
 		href: string;
 	}[] = $derived([
 		{
 			label: 'Dashboard',
-			icon: LayoutGrid,
+			icon: 'home-smile-outline',
 			active: $page.url.pathname.startsWith('/app/dashboard'),
 			href: '/app/dashboard'
 		},
@@ -667,17 +665,13 @@
 					onmouseenter={() => (hoveredNavHref = item.href)}
 					onmouseleave={() => (hoveredNavHref = null)}
 				>
-					{#if typeof item.icon === 'string'}
-						{#if mxBoldName(item.icon) && (item.active || hoveredNavHref === item.href)}
-							<MxIcon
-								name={mxBoldName(item.icon)!}
-								class="mr-3 md:mr-2.5 size-4.5 md:size-4 {item.active ? 'text-white' : 'text-white/60'} group-data-[collapsible=icon]:mr-0"
-							/>
-						{:else}
-							<MxIcon name={item.icon} class="mr-3 md:mr-2.5 size-4.5 md:size-4 {item.active ? 'text-white' : 'text-white/60'} group-data-[collapsible=icon]:mr-0" />
-						{/if}
+					{#if mxBoldName(item.icon) && (item.active || hoveredNavHref === item.href)}
+						<MxIcon
+							name={mxBoldName(item.icon)!}
+							class="mr-3 md:mr-2.5 size-4.5 md:size-4 {item.active ? 'text-white' : 'text-white/60'} group-data-[collapsible=icon]:mr-0"
+						/>
 					{:else}
-						<item.icon class="mr-3 md:mr-2.5 size-4.5 md:size-4 {item.active ? 'text-white' : 'text-white/60'} group-data-[collapsible=icon]:mr-0" />
+						<MxIcon name={item.icon} class="mr-3 md:mr-2.5 size-4.5 md:size-4 {item.active ? 'text-white' : 'text-white/60'} group-data-[collapsible=icon]:mr-0" />
 					{/if}
 					<span class="group-data-[collapsible=icon]:hidden">{item.label}</span>
 				</a>
@@ -761,7 +755,7 @@
 						openShareDialog(item);
 					}}
 				>
-					<Share class="size-3.5 text-white/60" />
+					<MxIcon name="share-outline" class="size-3.5 text-white/60" />
 					<span>Share</span>
 				</DropdownMenu.Item>
 				<DropdownMenu.Item

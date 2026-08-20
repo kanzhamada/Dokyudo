@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { BookOpen } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -30,7 +29,7 @@
 {#if references.length > 0}
 	<div class="mt-2 border-t border-white/10 pt-3">
 		<div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/60">
-			<BookOpen class="size-3.5 text-white/60" />
+			<MxIcon name="book1-outline" class="size-3.5 text-white/60" />
 			<span>Source References ({references.length})</span>
 		</div>
 		<div class="flex flex-wrap gap-2">
