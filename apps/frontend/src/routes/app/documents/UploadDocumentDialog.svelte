@@ -11,6 +11,7 @@
 
 	import { apiRequest } from '$lib/api/client.js';
 	import { toast } from 'svelte-sonner';
+	import { documentsStore } from '$lib/state/documents.store.svelte';
 
 	let {
 		open = $bindable(false),
@@ -261,6 +262,7 @@
 			item.status = 'success';
 			item.progress = 100;
 			toast.success('Document uploaded', { description: item.name });
+			documentsStore.invalidate();
 			onSuccess?.();
 		} else {
 			item.status = 'failed';
@@ -291,6 +293,7 @@
 				'[Upload Clean] Deleting cancelled/failed document from backend:',
 				item.documentId
 			);
+			documentsStore.remove(item.documentId);
 			await apiRequest('/api/documents/batch-delete', {
 				method: 'POST',
 				body: { documentIds: [item.documentId] }
@@ -318,6 +321,8 @@
 
 		if (docIds.length > 0) {
 			console.log('[Upload Clean] Cancelling all backend documents:', docIds);
+			docIds.forEach((id) => documentsStore.remove(id));
+			documentsStore.invalidate();
 			await apiRequest('/api/documents/batch-delete', {
 				method: 'POST',
 				body: { documentIds: docIds }
@@ -333,6 +338,7 @@
 	function finishAndClose() {
 		open = false;
 		if (hasSuccessfulUploads) {
+			documentsStore.invalidate();
 			onSuccess?.();
 		}
 		uploadFiles = [];

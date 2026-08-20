@@ -13,6 +13,7 @@
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
 	import { documentsStore } from '$lib/state/documents.store.svelte';
+	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { accountPanel, openAccountPanel } from '$lib/state/account-panel.store.svelte';
 	import { mentionStrippedLength } from '$lib/utils/doc-mentions';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
@@ -92,6 +93,14 @@
 		const maxMB = (maxStorage / (1024 * 1024)).toFixed(0);
 		return `${usedMB}/${maxMB}MB`;
 	});
+
+	function showError(msg: string) {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showError(msg);
+		} else {
+			toast.error('Error', { description: msg });
+		}
+	}
 
 	onMount(async () => {
 		// Warm the document mention cache — idempotent, and the `@` popover also
@@ -189,7 +198,7 @@
 				const uploadRes = await uploadFilesAsDocuments(attachedFiles);
 				isUploading = false;
 				if (!uploadRes.ok) {
-					toast.error('Upload failed', { description: uploadRes.error });
+					showError(uploadRes.error || 'Upload failed');
 					return;
 				}
 				attachmentDocuments = uploadRes.attachments;
@@ -348,7 +357,7 @@
 			{llmOptions}
 			placeholder={activeMode === 'search'
 				? 'Search documents using semantic search...'
-				: 'Ask a question about your documents...'}
+				: 'Ask a question, or type @ to mention documents...'}
 			showModelSelector={activeMode === 'chat'}
 			refocusKey={activeMode}
 			transparent

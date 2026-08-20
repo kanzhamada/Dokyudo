@@ -1,3 +1,7 @@
+@import './gambetta.css';
+@import './plus-jakarta-sans.css';
+@import './chillax.css';
+
 /* ==========================================================
    Dokyudo Visual Identity v1.0
    Tokens, type, and constraints sourced from DESIGN.md.
@@ -54,9 +58,9 @@
 	--border-dark: oklch(from var(--color-offwhite) l c h / 0.14);
 
 	/* typography: licensed families first, approved fallbacks after */
-	--font-display: 'Reckless Standard', 'Newsreader', Georgia, 'Times New Roman', serif;
-	--font-interface: 'FG Futurist', 'Space Grotesk', 'Trebuchet MS', sans-serif;
-	--font-body: 'Ease Standard', 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+	--font-display: 'Gambetta', 'Gambetta-Variable', 'Newsreader', Georgia, 'Times New Roman', serif;
+	--font-interface: 'Chillax', 'Chillax-Variable', 'Space Grotesk', 'Trebuchet MS', sans-serif;
+	--font-body: 'Plus Jakarta Sans', 'PlusJakartaSans-Variable', 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
 
 	/* motion */
 	--ease: cubic-bezier(0.37, 0, 0.63, 1);

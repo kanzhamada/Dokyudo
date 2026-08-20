@@ -4,6 +4,9 @@
 	import { ScrollTrigger } from 'gsap/ScrollTrigger';
 	import { ScrollSmoother } from 'gsap/ScrollSmoother';
 
+	import '$lib/assets/gambetta.css';
+	import '$lib/assets/plus-jakarta-sans.css';
+	import '$lib/assets/chillax.css';
 	import '$lib/assets/landing.css';
 	import { initLanding } from '$lib/components/landing/landing-init';
 
@@ -112,7 +115,7 @@
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link
-		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;1,600&display=swap"
+		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
 		rel="stylesheet"
 	/>
 

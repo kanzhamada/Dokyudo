@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn-svelte/tailwind.css';
+@import '../lib/assets/gambetta.css';
+@import '../lib/assets/plus-jakarta-sans.css';
+@import '../lib/assets/chillax.css';
 @import '@fontsource-variable/inter';
 @import '@fontsource/playfair-display/500-italic.css';
 @import '@fontsource/playfair-display/500.css';
@@ -78,12 +81,12 @@
 	--dk-max-width: 1280px;
 
 	/* Melius Typography Tokens (Font Family) */
-	--font-display: 'Playfair Display', Georgia, serif;
+	--font-display: 'Gambetta', 'Gambetta-Variable', 'Playfair Display', Georgia, serif;
 	--font-subhead: 'Geist Sans', sans-serif;
 	--font-body: 'Inter Variable', sans-serif;
-	--font-auth-display: 'Reckless Standard', 'Newsreader', Georgia, 'Times New Roman', serif;
-	--font-auth-interface: 'FG Futurist', 'Space Grotesk', 'Trebuchet MS', sans-serif;
-	--font-auth-body: 'Ease Standard', 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+	--font-auth-display: 'Gambetta', 'Gambetta-Variable', 'Newsreader', Georgia, 'Times New Roman', serif;
+	--font-auth-interface: 'Chillax', 'Chillax-Variable', 'Space Grotesk', 'Trebuchet MS', sans-serif;
+	--font-auth-body: 'Plus Jakarta Sans', 'PlusJakartaSans-Variable', 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
 
 	/* Melius Typography Scale */
 	--t-h-1: 3.5rem;
@@ -138,6 +141,9 @@
 	--font-sans: 'Inter Variable', sans-serif;
 	--font-playfair: 'Playfair Display', serif;
 	--font-geist: 'Geist Sans', sans-serif;
+	--font-gambetta: 'Gambetta', serif;
+	--font-jakarta: 'Plus Jakarta Sans', sans-serif;
+	--font-chillax: 'Chillax', sans-serif;
 
 	/* Dokyudo Theme Color Tokens (Refined OKLCH Palette) */
 	--color-dk-bg: #1c1b1b;

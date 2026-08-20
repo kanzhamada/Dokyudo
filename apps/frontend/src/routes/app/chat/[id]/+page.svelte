@@ -683,7 +683,7 @@
 				console.log(
 					`[Chat Detail] Conversation ID ${id} not found in DB. Redirecting to /app/chat`
 				);
-				toast.error('Conversation not found');
+				showError('Conversation not found');
 				await goto('/app/chat');
 				return;
 			}
@@ -1063,26 +1063,26 @@
 	}
 
 	function showError(msg: string) {
-		if (window.matchMedia('(max-width: 767px)').matches) {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
 			mobileHeaderState.showError(msg);
 		} else {
 			toast.error('Error', { description: msg });
 		}
 	}
 
-	function showSuccess(title: string, msg: string) {
-		if (window.matchMedia('(max-width: 767px)').matches) {
+	function showSuccess(title: string, msg: string = '') {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
 			mobileHeaderState.showSuccess(title, msg);
 		} else {
-			toast.success(title, { description: msg });
+			toast.success(title, msg ? { description: msg } : undefined);
 		}
 	}
 
-	function showInfo(title: string, msg: string) {
-		if (window.matchMedia('(max-width: 767px)').matches) {
+	function showInfo(title: string, msg: string = '') {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
 			mobileHeaderState.showInfo(title, msg);
 		} else {
-			toast.info(title, { description: msg });
+			toast.info(title, msg ? { description: msg } : undefined);
 		}
 	}
 
@@ -3359,7 +3359,7 @@
 					bind:attachedFiles
 					bind:selectedModel
 					{llmOptions}
-					placeholder="Ask a follow-up question..."
+					placeholder="Ask a follow-up, or type @ to mention documents..."
 					transparent
 					{isGenerating}
 					isUploading={isUploadingAttachments}

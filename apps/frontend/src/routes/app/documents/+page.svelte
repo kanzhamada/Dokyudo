@@ -64,6 +64,7 @@
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { supabase } from '$lib/supabase/client.js';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
+	import { documentsStore } from '$lib/state/documents.store.svelte';
 	import { columns } from './columns.js';
 	import type { Document } from './data.js';
 	import DocumentCardActions from './document-card-actions.svelte';
@@ -175,6 +176,8 @@
 			if (res.ok) {
 				documentsList = documentsList.filter((d) => d.id !== target.id);
 				totalDocumentCount = Math.max(0, totalDocumentCount - 1);
+				documentsStore.remove(target.id);
+				documentsStore.invalidate();
 				void loadUsage();
 				if (previewDocument?.id === target.id) {
 					previewDocument = null;
@@ -622,6 +625,8 @@
 
 		if (res.ok) {
 			const count = selectedDocIds.length;
+			selectedDocIds.forEach((id) => documentsStore.remove(id));
+			documentsStore.invalidate();
 			documentsList = documentsList.filter((d) => !selectedDocIds.includes(d.id));
 			totalDocumentCount = Math.max(0, totalDocumentCount - count);
 			void loadUsage();

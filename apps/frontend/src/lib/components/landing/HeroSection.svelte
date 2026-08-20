@@ -227,7 +227,7 @@
 	}
 
 	/* ── Buttons (POC theme: DESIGN.md button contract) ──
-	   Font: Instrument Sans (--font-body) · 0.95rem/500 · radius 8px (--r-ctl)
+	   Font: Plus Jakarta Sans (--font-body) · 0.95rem/500 · radius 8px (--r-ctl)
 	   Primary: terracotta (#--color-terracotta) on black text · 200ms ease. */
 	.btn-primary {
 		display: inline-flex;
@@ -235,7 +235,7 @@
 		justify-content: center;
 		gap: 9px;
 		text-decoration: none;
-		font-family: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+		font-family: 'Plus Jakarta Sans', 'PlusJakartaSans-Variable', 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
 		font-size: 0.95rem;
 		font-weight: 500;
 		letter-spacing: -0.01em;
@@ -267,7 +267,7 @@
 		justify-content: center;
 		gap: 9px;
 		text-decoration: none;
-		font-family: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+		font-family: 'Plus Jakarta Sans', 'PlusJakartaSans-Variable', 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
 		font-size: 0.95rem;
 		font-weight: 500;
 		letter-spacing: -0.01em;
@@ -518,10 +518,10 @@
 		pointer-events: auto;
 	}
 
-	/* ── Hero Headline (POC display: t-h-1 token, DESIGN.md typography) ──
-	   Newsreader (Reckless Standard fallback) · weight 400 · lh 1 · -0.02em */
+	/* ── Hero Headline (POC display: t-h-1 token, Gambetta typography) ──
+	   Gambetta · weight 400 · lh 1 · -0.02em */
 	.hero-headline {
-		font-family: 'Newsreader', Georgia, 'Times New Roman', serif;
+		font-family: 'Gambetta', 'Gambetta-Variable', 'Newsreader', Georgia, 'Times New Roman', serif;
 		font-weight: 400;
 		font-size: clamp(2.5rem, 1.5rem + 2.8vw, 3.5rem); /* t-h-1 */
 		color: oklch(94.5% 0.014 85); /* --color-offwhite */
@@ -532,7 +532,7 @@
 	}
 
 	.highlight-meaning {
-		font-family: 'Newsreader', Georgia, 'Times New Roman', serif;
+		font-family: 'Gambetta', 'Gambetta-Variable', 'Newsreader', Georgia, 'Times New Roman', serif;
 		font-weight: 400;
 		color: oklch(67.4% 0.15 52); /* --color-terracotta */
 	}

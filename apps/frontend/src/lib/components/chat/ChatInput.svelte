@@ -42,7 +42,7 @@
 		attachedFiles = $bindable([] as File[]),
 		selectedModel = $bindable({ name: '', provider: 'auto', model: 'auto', icon: '' } as LlmOption),
 		llmOptions = [] as LlmOption[],
-		placeholder = 'Ask a follow-up question...',
+		placeholder = 'Ask a follow-up, or type @ to mention documents...',
 		showModelSelector = true,
 		isGenerating = false,
 		/** True while attached files are being uploaded before the turn is sent. */
@@ -529,7 +529,7 @@
 			tabindex="-1"
 			onmousedown={(e) => e.preventDefault()}
 		>
-			<div class="max-h-64 overflow-y-auto p-1.5">
+			<div class="custom-scrollbar max-h-64 overflow-y-auto p-1.5">
 				{#if isMentionLimitReached}
 					<div class="flex items-center gap-2 px-3 py-2.5 text-sm text-white/60">
 						<MxIcon name="danger-triangle-outline" class="size-4 shrink-0 text-white/40" />

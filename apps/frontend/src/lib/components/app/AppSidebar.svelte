@@ -40,6 +40,7 @@
 	import { openAccountPanel } from '$lib/state/account-panel.store.svelte';
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import { conversationsStore } from '$lib/state/conversations.store.svelte';
+	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import type { UserProfileResponse } from '$lib/types/auth.types';
 	import type { ConversationItem } from '$lib/types/rag.types';
 
@@ -150,6 +151,22 @@
 		};
 	});
 
+	function showMobileOrToastSuccess(title: string, msg: string = '') {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showSuccess(title, msg);
+		} else {
+			toast.success(title, msg ? { description: msg } : undefined);
+		}
+	}
+
+	function showMobileOrToastError(msg: string) {
+		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+			mobileHeaderState.showError(msg);
+		} else {
+			toast.error(msg);
+		}
+	}
+
 	function openEditModal(item: ConversationItem) {
 		editingConversation = item;
 		editTitle = item.title;
@@ -183,7 +200,7 @@
 
 			if (result.ok) {
 				console.log('[Auth Conversations] Update success:', result.data);
-				toast.success('Conversation title updated');
+				showMobileOrToastSuccess('Conversation title updated');
 				editingConversation = null;
 			} else {
 				console.error('[Auth Conversations] Update failed, reverting:', result.error);
@@ -191,7 +208,7 @@
 					conversations.map((c) => (c.id === targetId ? { ...c, title: oldTitle } : c))
 				);
 				conversationsStore.addOrUpdate(targetId, oldTitle);
-				toast.error(result.error.message);
+				showMobileOrToastError(result.error.message);
 			}
 		} catch (err) {
 			console.error('[Auth Conversations] Update Catch Error, reverting:', err);
@@ -199,7 +216,7 @@
 				conversations.map((c) => (c.id === targetId ? { ...c, title: oldTitle } : c))
 			);
 			conversationsStore.addOrUpdate(targetId, oldTitle);
-			toast.error('Failed to update conversation title');
+			showMobileOrToastError('Failed to update conversation title');
 		} finally {
 			isUpdating = false;
 		}
@@ -228,14 +245,14 @@
 			const result = await updateConversation(item.id, { isPinned: newPinnedState });
 			if (result.ok) {
 				console.log('[Auth Conversations] Pin toggle backend response:', result.data);
-				toast.success(newPinnedState ? 'Conversation pinned' : 'Conversation unpinned');
+				showMobileOrToastSuccess(newPinnedState ? 'Conversation pinned' : 'Conversation unpinned');
 			} else {
 				console.error('[Auth Conversations] Pin toggle failed, reverting:', result.error);
 				conversations = sortConversations(
 					conversations.map((c) => (c.id === item.id ? { ...c, isPinned: item.isPinned } : c))
 				);
 				conversationsStore.togglePin(item.id, item.isPinned);
-				toast.error(result.error.message);
+				showMobileOrToastError(result.error.message);
 			}
 		} catch (err) {
 			console.error('[Auth Conversations] Pin toggle catch error, reverting:', err);
@@ -243,7 +260,7 @@
 				conversations.map((c) => (c.id === item.id ? { ...c, isPinned: item.isPinned } : c))
 			);
 			conversationsStore.togglePin(item.id, item.isPinned);
-			toast.error('Failed to update pin status');
+			showMobileOrToastError('Failed to update pin status');
 		}
 	}
 
@@ -277,19 +294,19 @@
 
 			if (result.ok) {
 				console.log('[Auth Conversations] Delete success:', result.data);
-				toast.success('Conversation deleted');
+				showMobileOrToastSuccess('Conversation deleted');
 				if ($page.url.pathname === `/app/chat/${deletedId}`) {
 					await goto('/app/chat');
 				}
 				deletingConversation = null;
 			} else {
 				console.error('[Auth Conversations] Delete failed, reverting:', result.error);
-				toast.error(result.error.message);
+				showMobileOrToastError(result.error.message);
 				await fetchConversations();
 			}
 		} catch (err) {
 			console.error('[Auth Conversations] Delete Catch Error, reverting:', err);
-			toast.error('Failed to delete conversation');
+			showMobileOrToastError('Failed to delete conversation');
 			await fetchConversations();
 		} finally {
 			isDeleting = false;
@@ -395,7 +412,7 @@
 	let hoveredNavHref = $state<string | null>(null);
 </script>
 
-<Sidebar.Root variant="floating" collapsible="icon" class="border-none">
+<Sidebar.Root variant="floating" collapsible="icon" class="border-none z-20">
 	<!-- HEADER -->
 	<Sidebar.Header class="group-data-[collapsible=icon]:hidden border-b border-white/[0.09] p-0">
 		<div class="group/header flex items-center justify-between px-4 py-3.5 sm:px-4.5 sm:py-3.5">

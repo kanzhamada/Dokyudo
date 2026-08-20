@@ -9,19 +9,22 @@ export class MobileHeaderState {
 		this.hidden = value;
 	}
 
-	showError(msg: string, duration = 4000) {
+	showError(title: string, msg: string = '', duration = 4000) {
 		this.type = 'error';
-		this.title = 'Error';
-		this.message = msg;
+		if (msg) {
+			this.title = title;
+			this.message = msg;
+		} else {
+			this.title = title;
+			this.message = null;
+		}
 
 		if (this.timeoutId) {
 			clearTimeout(this.timeoutId);
 		}
 
 		this.timeoutId = setTimeout(() => {
-			this.type = 'default';
-			this.title = null;
-			this.message = null;
+			this.reset();
 		}, duration);
 	}
 
@@ -35,9 +38,7 @@ export class MobileHeaderState {
 		}
 
 		this.timeoutId = setTimeout(() => {
-			this.type = 'default';
-			this.title = null;
-			this.message = null;
+			this.reset();
 		}, duration);
 	}
 
@@ -51,10 +52,18 @@ export class MobileHeaderState {
 		}
 
 		this.timeoutId = setTimeout(() => {
-			this.type = 'default';
-			this.title = null;
-			this.message = null;
+			this.reset();
 		}, duration);
+	}
+
+	reset() {
+		this.type = 'default';
+		this.title = null;
+		this.message = null;
+		if (this.timeoutId) {
+			clearTimeout(this.timeoutId);
+			this.timeoutId = null;
+		}
 	}
 }
 

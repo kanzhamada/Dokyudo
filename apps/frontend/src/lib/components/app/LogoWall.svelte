@@ -105,9 +105,9 @@
 </div>
 
 <style>
-	/* --font-interface (Space Grotesk) — DESIGN.md interface face for labels */
+	/* --font-interface (Chillax) — interface face for labels */
 	.logowall-label {
-		font-family: 'Space Grotesk', 'Trebuchet MS', sans-serif;
+		font-family: 'Chillax', 'Chillax-Variable', 'Space Grotesk', 'Trebuchet MS', sans-serif;
 	}
 	.logo-image {
 		filter: grayscale(100%);
