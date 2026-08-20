@@ -39,7 +39,7 @@
 					<button
 						{...props}
 						type="button"
-						class="absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer rounded p-1 text-[#B9B9B9] transition-colors hover:text-white"
+						class="absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer rounded p-1 text-warm-gray transition-colors hover:text-white"
 						onclick={() => (showPassword = !showPassword)}
 						aria-label={showPassword ? 'Hide password' : 'Show password'}
 					>
@@ -80,8 +80,8 @@
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content
-				class="border-white/[0.16] bg-[#3E3E3E] text-white"
-				arrowClasses="bg-[#3E3E3E] border-none"
+				class="border-white/[0.16] bg-graphite text-white"
+				arrowClasses="bg-graphite border-none"
 				>{showPassword ? 'Hide Password' : 'Show Password'}</Tooltip.Content
 			>
 		</Tooltip.Root>

@@ -38,7 +38,7 @@
 </script>
 
 <Button
-	class="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-[#DB8F5E] px-4 text-sm font-medium text-black hover:bg-[#E39B6D] disabled:cursor-not-allowed disabled:opacity-40"
+	class="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-terracotta px-4 text-sm font-medium text-black hover:bg-terracotta-deep disabled:cursor-not-allowed disabled:opacity-40"
 	disabled={isContinuing}
 	onclick={handleContinue}
 >

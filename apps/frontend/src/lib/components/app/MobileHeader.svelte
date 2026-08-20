@@ -32,8 +32,8 @@
 			: mobileHeaderState.type === 'info'
 				? 'h-auto min-h-14 border-blue-500/50 bg-blue-950/[0.60] px-4 py-3'
 				: bottom
-					? 'h-auto min-h-14 border-white/[0.16] bg-[#232323]/[0.40] px-3'
-					: 'h-14 border-white/[0.16] bg-[#232323]/[0.40] px-4'} {className}"
+					? 'h-auto min-h-14 border-white/[0.16] bg-offblack/[0.40] px-3'
+					: 'h-14 border-white/[0.16] bg-offblack/[0.40] px-4'} {className}"
 >
 	{#if mobileHeaderState.type === 'error'}
 		<div class="flex w-full items-center gap-3">

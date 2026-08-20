@@ -284,8 +284,8 @@
 					{/if}
 				</Tooltip.Trigger>
 				<Tooltip.Content
-					class="border-white/[0.16] bg-[#232323] text-white"
-					arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+					class="border-white/[0.16] bg-offblack text-white"
+					arrowClasses="bg-offblack border-white/[0.16] border-b border-r"
 				>
 					<p>{tooltipText}</p>
 				</Tooltip.Content>
@@ -391,8 +391,8 @@
 											value="chat"
 											onclick={() => triggerHaptic(20)}
 											class="flex cursor-pointer select-none items-center gap-2 rounded-full px-4 py-1.5 transition-all duration-150 active:scale-[0.96]
-												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-[#B8B5B5]/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
-												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-[#232323]/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-[#B8B5B5]/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
+												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-warm-gray/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
+												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-offblack/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-warm-gray/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
 										>
 											{#if activeMode === 'chat'}
 												<MxIcon name="chat-round-line-bold" class="size-4" />
@@ -404,8 +404,8 @@
 									{/snippet}
 								</Tooltip.Trigger>
 								<Tooltip.Content
-									class="border-white/[0.16] bg-[#232323] text-white"
-									arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+									class="border-white/[0.16] bg-offblack text-white"
+									arrowClasses="bg-offblack border-white/[0.16] border-b border-r"
 								>
 									<p>Chat with your documents</p>
 								</Tooltip.Content>
@@ -421,8 +421,8 @@
 											value="search"
 											onclick={() => triggerHaptic(20)}
 											class="flex cursor-pointer select-none items-center gap-2 rounded-full px-4 py-1.5 transition-all duration-150 active:scale-[0.96]
-												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-[#B8B5B5]/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
-												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-[#232323]/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-[#B8B5B5]/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
+												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-warm-gray/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
+												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-offblack/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-warm-gray/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
 										>
 											{#if activeMode === 'search'}
 												<MxIcon name="receipt-search-bold" class="size-4" />
@@ -434,8 +434,8 @@
 									{/snippet}
 								</Tooltip.Trigger>
 								<Tooltip.Content
-									class="border-white/[0.16] bg-[#232323] text-white"
-									arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+									class="border-white/[0.16] bg-offblack text-white"
+									arrowClasses="bg-offblack border-white/[0.16] border-b border-r"
 								>
 									<p>Search across your documents</p>
 								</Tooltip.Content>
@@ -449,7 +449,7 @@
 			<div class="flex items-center gap-2 @3xl:gap-3">
 				<!-- Character Count Indicator Capsule -->
 				<div
-					class="flex shrink-0 select-none items-center gap-1.5 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {mentionStrippedLength(
+					class="flex shrink-0 select-none items-center gap-1.5 rounded-full border border-white/[0.16] bg-offblack/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {mentionStrippedLength(
 						inputValue
 					) >= 690
 						? 'text-red-400'
@@ -464,7 +464,7 @@
 
 				<!-- Usage Info Capsule (Desktop) -->
 				<div
-					class="hidden shrink-0 select-none items-center gap-4 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-4 py-1.5 text-xs text-white/[0.40] backdrop-blur-[42px] transition-colors @3xl:flex"
+					class="hidden shrink-0 select-none items-center gap-4 rounded-full border border-white/[0.16] bg-offblack/[0.40] px-4 py-1.5 text-xs text-white/[0.40] backdrop-blur-[42px] transition-colors @3xl:flex"
 				>
 					{@render desktopUsageMetric(
 						'document-upload-outline',
@@ -501,12 +501,14 @@
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger
 							onclick={() => triggerHaptic(15)}
-							class="flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-white/[0.16] bg-[#232323]/[0.40] text-white/[0.40] backdrop-blur-[42px] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-[0.90] focus:outline-none"
+							class="flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-white/[0.16] bg-offblack/[0.40] text-white/[0.40] backdrop-blur-[42px] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-[0.90] focus:outline-none"
 						>
 							<MxIcon name="diagram-up-bold" class="size-4" />
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Content
-							class="w-56 border border-white/[0.16] bg-[#232323]/40 p-3 text-white backdrop-blur-[42px]"
+							class="w-56 border border-white/[0.16] bg-offblack/40 p-3 text-white backdrop-blur-[42px]"
+							align="end"
+						>
 							align="end"
 						>
 							<div class="mb-3 text-xs font-medium text-white/[0.69]">Usage Information</div>

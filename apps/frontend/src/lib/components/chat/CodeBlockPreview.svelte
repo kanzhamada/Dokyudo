@@ -33,23 +33,23 @@
 				themeVariables: {
 					darkMode: true,
 					background: 'transparent',
-					mainBkg: '#2B2A29',
-					secondBkg: '#232323',
-					lineColor: '#DB8F5E',
-					border1: '#DB8F5E',
-					border2: '#E59C6D',
-					arrowheadColor: '#DB8F5E',
+					mainBkg: '#262220',
+					secondBkg: '#262220',
+					lineColor: '#db8f5e',
+					border1: '#db8f5e',
+					border2: '#8f5d4d',
+					arrowheadColor: '#db8f5e',
 					fontFamily: 'Inter, system-ui, sans-serif',
 					fontSize: '13px',
-					primaryColor: '#2B2A29',
+					primaryColor: '#262220',
 					primaryTextColor: '#FFFFFF',
-					primaryBorderColor: '#DB8F5E',
-					nodeBorder: '#DB8F5E',
-					clusterBkg: '#1F1E1D',
-					clusterBorder: '#DB8F5E',
-					defaultLinkColor: '#DB8F5E',
+					primaryBorderColor: '#db8f5e',
+					nodeBorder: '#db8f5e',
+					clusterBkg: '#171615',
+					clusterBorder: '#db8f5e',
+					defaultLinkColor: '#db8f5e',
 					titleColor: '#FFFFFF',
-					edgeLabelBackground: '#232323'
+					edgeLabelBackground: '#262220'
 				}
 			});
 
@@ -78,13 +78,13 @@
 	}
 </script>
 
-<div class="my-4 overflow-hidden rounded-xl border border-white/15 bg-[#1C1B1A] shadow-xl backdrop-blur-md">
+<div class="my-4 overflow-hidden rounded-xl border border-white/15 bg-black shadow-xl backdrop-blur-md">
 	<!-- Header Bar -->
-	<div class="flex items-center justify-between border-b border-white/10 bg-[#252423] px-3.5 py-2">
+	<div class="flex items-center justify-between border-b border-white/10 bg-offblack px-3.5 py-2">
 		<!-- Left: Language Badge -->
 		<div class="flex items-center gap-2 text-xs font-medium tracking-wider text-white/70 uppercase">
 			{#if language === 'mermaid'}
-				<Workflow class="size-3.5 text-[#DB8F5E]" />
+				<Workflow class="size-3.5 text-terracotta" />
 				<span>Mermaid Diagram</span>
 			{:else}
 				<Code2 class="size-3.5 text-white/50" />
@@ -98,7 +98,7 @@
 				<button
 					type="button"
 					class="flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors {activeTab === 'diagram'
-						? 'bg-[#DB8F5E] font-medium text-black shadow-xs'
+						? 'bg-terracotta font-medium text-black shadow-xs'
 						: 'text-white/60 hover:text-white'}"
 					onclick={() => (activeTab = 'diagram')}
 				>
@@ -108,7 +108,7 @@
 				<button
 					type="button"
 					class="flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors {activeTab === 'code'
-						? 'bg-[#DB8F5E] font-medium text-black shadow-xs'
+						? 'bg-terracotta font-medium text-black shadow-xs'
 						: 'text-white/60 hover:text-white'}"
 					onclick={() => (activeTab = 'code')}
 				>
@@ -136,7 +136,7 @@
 
 	<!-- Content View -->
 	{#if language === 'mermaid' && activeTab === 'diagram'}
-		<div class="flex min-h-[160px] items-center justify-center overflow-x-auto bg-[#161514] p-6">
+		<div class="flex min-h-[160px] items-center justify-center overflow-x-auto bg-black p-6">
 			{#if mermaidError}
 				<div class="max-w-md text-center text-xs text-red-400/90">
 					<p class="font-medium">Diagram Syntax Error</p>
@@ -148,7 +148,7 @@
 				</div>
 			{:else}
 				<div class="flex items-center gap-2 text-xs text-white/40">
-					<div class="size-3.5 animate-spin rounded-full border-2 border-white/20 border-t-[#DB8F5E]"></div>
+					<div class="size-3.5 animate-spin rounded-full border-2 border-white/20 border-t-terracotta"></div>
 					<span>Rendering diagram...</span>
 				</div>
 			{/if}

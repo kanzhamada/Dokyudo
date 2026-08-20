@@ -522,8 +522,8 @@
 	{#if mentionOpen}
 		<div
 			class="absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden rounded-2xl border border-white/[0.16] text-white shadow-2xl backdrop-blur-[42px] {transparent
-				? 'bg-[#232323]/[0.40]'
-				: 'bg-[#232323]/[0.85]'}"
+				? 'bg-offblack/[0.40]'
+				: 'bg-offblack/[0.85]'}"
 			role="listbox"
 			aria-label="Documents"
 			tabindex="-1"
@@ -572,15 +572,15 @@
 	<!-- Main Input Capsule -->
 	<div
 		class="group relative flex w-full flex-col gap-1 rounded-[24px] border border-white/[0.16] px-4 py-2 backdrop-blur-[42px] transition-all {transparent
-			? 'bg-[#232323]/[0.40]'
-			: 'bg-[#232323]/[0.85] shadow-2xl'}"
+			? 'bg-offblack/[0.40]'
+			: 'bg-offblack/[0.85] shadow-2xl'}"
 	>
 		<!-- Row 1: Attached Files -->
 		{#if attachedFiles.length > 0}
 			<div class="flex flex-wrap gap-2 pt-1 pb-1">
 				{#each attachedFiles as file, index}
 					<div
-						class="flex items-center gap-2 rounded-full bg-[#121212]/[0.80] py-1.5 pr-2 pl-3 text-sm text-white/[0.80] backdrop-blur-[20px] transition-all"
+						class="flex items-center gap-2 rounded-full bg-black/[0.80] py-1.5 pr-2 pl-3 text-sm text-white/[0.80] backdrop-blur-[20px] transition-all"
 					>
 						<span class="max-w-[200px] truncate">{file.name}</span>
 						<button
@@ -609,7 +609,7 @@
 						<Tooltip.Root>
 							<Tooltip.Trigger
 								class="flex cursor-pointer select-none items-center transition-all duration-150 active:scale-[0.90] focus:outline-none {sparkleActive
-									? 'text-[#DB8F5E]'
+									? 'text-terracotta'
 									: 'text-white/[0.40] hover:text-white/[0.69]'}"
 								aria-label={sparkleActive ? 'AI search active' : 'Enable AI search'}
 								aria-pressed={sparkleActive}
@@ -621,8 +621,8 @@
 								<Sparkles class="size-5" />
 							</Tooltip.Trigger>
 							<Tooltip.Content
-								class="border-white/[0.16] bg-[#232323] text-white"
-								arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+								class="border-white/[0.16] bg-offblack text-white"
+								arrowClasses="bg-offblack border-white/[0.16] border-b border-r"
 							>
 								<p>{sparkleActive ? 'AI search active' : 'Enable AI search'}</p>
 							</Tooltip.Content>
@@ -642,8 +642,8 @@
 								<MxIcon name="attach-circle-outline" class="size-5" />
 							</Tooltip.Trigger>
 							<Tooltip.Content
-								class="flex flex-col gap-1 border-white/[0.16] bg-[#232323] text-white"
-								arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+								class="flex flex-col gap-1 border-white/[0.16] bg-offblack text-white"
+								arrowClasses="bg-offblack border-white/[0.16] border-b border-r"
 							>
 								<p>Attach Document (PDF, DOCX, MD, and TXT)</p>
 								<p class="text-xs text-white/[0.69]">
@@ -726,8 +726,8 @@
 						{#if onconfigure}
 							<DropdownMenu.Content
 								class="w-80 border border-white/[0.16] p-0 text-white backdrop-blur-[42px] {transparent
-									? 'bg-[#232323]/[0.40]'
-									: 'bg-[#232323]/[0.85]'}"
+									? 'bg-offblack/[0.40]'
+									: 'bg-offblack/[0.85]'}"
 							>
 								<div class="max-h-72 overflow-y-auto px-1 py-1">
 									<Input
@@ -756,7 +756,7 @@
 												/>
 												<span class="min-w-0 flex-1 truncate">{option.name}</span>
 												{#if selectedModel.provider === option.provider && selectedModel.model === option.model}
-													<Check class="size-3.5 text-[#DB8F5E]" />
+													<Check class="size-3.5 text-terracotta" />
 												{/if}
 											</DropdownMenu.Item>
 										{/each}
@@ -778,8 +778,8 @@
 						{:else}
 							<DropdownMenu.Content
 								class="max-h-60 w-64 overflow-y-auto border border-white/[0.16] text-white backdrop-blur-[42px] {transparent
-									? 'bg-[#232323]/[0.40]'
-									: 'bg-[#232323]/[0.85]'}"
+									? 'bg-offblack/[0.40]'
+									: 'bg-offblack/[0.85]'}"
 							>
 								{#each llmOptions as option}
 									<DropdownMenu.Item

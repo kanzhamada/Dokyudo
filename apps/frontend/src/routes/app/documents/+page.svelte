@@ -945,13 +945,13 @@
 		>
 			<!-- Row 1: Breadcrumb -->
 			<Breadcrumb.Root class="mt-16 md:mt-0">
-				<Breadcrumb.List class="text-sm text-[#767676]">
+				<Breadcrumb.List class="text-sm text-warm-gray">
 					<Breadcrumb.Item>
-						<Breadcrumb.Link href="/app/dashboard" class="text-[#767676] hover:text-white/70">
+						<Breadcrumb.Link href="/app/dashboard" class="text-warm-gray hover:text-white/70">
 							Home
 						</Breadcrumb.Link>
 					</Breadcrumb.Item>
-					<Breadcrumb.Separator class="text-[#767676]" />
+					<Breadcrumb.Separator class="text-warm-gray" />
 					<Breadcrumb.Item>
 						<Breadcrumb.Page class="font-medium text-white">Document Library</Breadcrumb.Page>
 					</Breadcrumb.Item>
@@ -964,7 +964,7 @@
 					<h1 class="text-[28px] leading-tight font-semibold text-white md:text-4xl">
 						Document Library
 					</h1>
-					<p class="mt-1 max-w-3xl text-sm font-normal text-[#767676] md:text-base">
+					<p class="mt-1 max-w-3xl text-sm font-normal text-warm-gray md:text-base">
 						Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
 					</p>
 				</div>
@@ -983,7 +983,7 @@
 										triggerHaptic(15);
 										refreshPage();
 									}}
-									class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white active:scale-[0.90] disabled:cursor-wait disabled:opacity-60 md:size-9"
+									class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:cursor-wait disabled:opacity-60 md:size-9"
 								>
 									<RefreshCwIcon class="size-4 {isRefreshing ? 'animate-spin' : ''}" />
 								</Button>
@@ -997,7 +997,7 @@
 					</Tooltip.Root>
 
 					<Button
-						class="group h-11 flex-1 cursor-pointer select-none rounded-full bg-[#DB8F5E] px-4 font-normal text-white transition-all duration-150 hover:bg-[#C47D4E] active:scale-[0.96] sm:flex-none md:h-9"
+						class="group h-11 flex-1 cursor-pointer select-none rounded-full bg-terracotta px-4 font-normal text-black transition-all duration-150 hover:bg-terracotta-deep active:scale-[0.96] sm:flex-none md:h-9"
 						onclick={() => {
 							triggerHaptic(20);
 							uploadDialogOpen = true;
@@ -1014,8 +1014,8 @@
 
 			<!-- Usage Summary -->
 			<div class="grid grid-cols-1 gap-2.5 min-[380px]:grid-cols-2 sm:grid-cols-3 sm:gap-3">
-				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-3.5 md:p-4">
-					<div class="flex items-center gap-2 text-xs font-medium text-[#959595]">
+				<div class="rounded-2xl border border-white/10 bg-offblack/[0.53] p-3.5 md:p-4">
+					<div class="flex items-center gap-2 text-xs font-medium text-warm-gray">
 						<FilesIcon class="size-4 text-white/60" />
 						<span>Total Documents</span>
 					</div>
@@ -1024,8 +1024,8 @@
 					</p>
 				</div>
 
-				<div class="rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-3.5 md:p-4">
-					<div class="flex items-center gap-2 text-xs font-medium text-[#959595]">
+				<div class="rounded-2xl border border-white/10 bg-offblack/[0.53] p-3.5 md:p-4">
+					<div class="flex items-center gap-2 text-xs font-medium text-warm-gray">
 						<ArrowUpIcon class="size-4 text-white/60" />
 						<span>Max Upload</span>
 					</div>
@@ -1035,8 +1035,8 @@
 					<p class="mt-1 text-xs text-white/40">Reset in {uploadResetCountdown}</p>
 				</div>
 
-				<div class="col-span-1 rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-3.5 min-[380px]:col-span-2 md:p-4 sm:col-span-1">
-					<div class="flex items-center gap-2 text-xs font-medium text-[#959595]">
+				<div class="col-span-1 rounded-2xl border border-white/10 bg-offblack/[0.53] p-3.5 min-[380px]:col-span-2 md:p-4 sm:col-span-1">
+					<div class="flex items-center gap-2 text-xs font-medium text-warm-gray">
 						<HardDriveIcon class="size-4 text-white/60" />
 						<span>Total Storage</span>
 					</div>
@@ -1145,7 +1145,7 @@
 					<!-- Loading Spinner or Clear Button on the right -->
 					<div class="absolute top-1/2 right-3 z-10 flex -translate-y-1/2 items-center gap-1.5">
 						{#if isSemanticSearching}
-							<Loader2Icon class="size-4 animate-spin text-[#DB8F5E]" />
+							<Loader2Icon class="size-4 animate-spin text-terracotta" />
 						{:else if (searchMode === 'keyword' && globalFilter) || (searchMode === 'semantic' && semanticSearchQuery)}
 							<button
 								type="button"
@@ -1175,7 +1175,7 @@
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white md:size-9"
+								class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-warm-gray/[0.40] aria-expanded:text-white md:size-9"
 								onclick={toggleFilterMenu}
 								aria-haspopup="menu"
 								aria-expanded={filterMenuOpen}
@@ -1203,7 +1203,7 @@
 						use:teleport
 						transition:scale={{ duration: 150, start: 0.95 }}
 						style={`position: fixed; top: ${filterMenuPos.y}px; left: ${filterMenuPos.x}px;`}
-						class="z-50 w-52 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+						class="z-50 w-52 rounded-xl border border-white/15 bg-offblack/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
 						<button
 							type="button"
@@ -1249,7 +1249,7 @@
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white md:size-9"
+								class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-warm-gray/[0.40] aria-expanded:text-white md:size-9"
 								onclick={toggleSortMenu}
 								aria-haspopup="menu"
 								aria-expanded={sortMenuOpen}
@@ -1277,7 +1277,7 @@
 						use:teleport
 						transition:scale={{ duration: 150, start: 0.95 }}
 						style={`position: fixed; top: ${sortMenuPos.y}px; left: ${sortMenuPos.x}px;`}
-						class="z-50 w-44 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+						class="z-50 w-44 rounded-xl border border-white/15 bg-offblack/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
 						<button
 							type="button"
@@ -1328,9 +1328,9 @@
 							<Button
 								{...props}
 								variant="ghost"
-								class="h-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white active:scale-[0.90] aria-expanded:border-white/[0.80] aria-expanded:bg-[#B8B5B5]/[0.40] aria-expanded:text-white md:h-9 {selectedCount >
+								class="h-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] aria-expanded:border-white/[0.80] aria-expanded:bg-warm-gray/[0.40] aria-expanded:text-white md:h-9 {selectedCount >
 								0
-									? 'border-white/[0.80] bg-[#B8B5B5]/[0.40] px-2.5'
+									? 'border-white/[0.80] bg-warm-gray/[0.40] px-2.5'
 									: 'flex w-11 items-center justify-center p-0 md:w-9'}"
 								onclick={toggleSelectMenu}
 								aria-haspopup="menu"
@@ -1364,7 +1364,7 @@
 						use:teleport
 						transition:scale={{ duration: 150, start: 0.95 }}
 						style={`position: fixed; top: ${selectMenuPos.y}px; left: ${selectMenuPos.x}px;`}
-						class="z-50 w-60 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+						class="z-50 w-60 rounded-xl border border-white/15 bg-offblack/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 					>
 						<button
 							type="button"
@@ -1447,29 +1447,29 @@
 					<!-- Hybrid search skeleton: mirrors the document card -->
 					{#each [0, 1, 2] as _skeleton (_skeleton)}
 						<div
-							class="flex animate-pulse flex-col gap-3 rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53] p-4 md:p-5"
+							class="flex animate-pulse flex-col gap-3 rounded-2xl border border-white/10 bg-offblack/[0.53] p-4 md:p-5"
 							aria-hidden="true"
 						>
 							<!-- Header -->
 							<div class="flex items-start justify-between gap-3">
 								<div class="flex min-w-0 flex-1 items-center gap-3">
-									<div class="size-4.5 shrink-0 rounded-md bg-[#302F2F]"></div>
-									<div class="h-3.5 w-44 max-w-full rounded-full bg-[#302F2F]"></div>
+									<div class="size-4.5 shrink-0 rounded-md bg-white/10"></div>
+									<div class="h-3.5 w-44 max-w-full rounded-full bg-white/10"></div>
 								</div>
 								<div class="flex shrink-0 items-center gap-3">
-									<div class="h-5 w-20 rounded-full bg-[#DB8F5E]/15"></div>
-									<div class="size-7 rounded-full bg-[#302F2F]"></div>
+									<div class="h-5 w-20 rounded-full bg-terracotta/15"></div>
+									<div class="size-7 rounded-full bg-white/10"></div>
 								</div>
 							</div>
 							<!-- Description -->
 							<div class="flex flex-col gap-2">
-								<div class="h-3 w-full rounded-full bg-[#302F2F]"></div>
-								<div class="h-3 w-2/3 rounded-full bg-[#302F2F]"></div>
+								<div class="h-3 w-full rounded-full bg-white/10"></div>
+								<div class="h-3 w-2/3 rounded-full bg-white/10"></div>
 							</div>
 							<!-- "Why this matched" box -->
-							<div class="rounded-lg border border-[#DB8F5E]/20 bg-[#1A1512] p-3.5">
+							<div class="rounded-lg border border-terracotta/20 bg-black p-3.5">
 								<div class="flex items-center gap-1.5">
-									<div class="h-3 w-24 rounded-full bg-[#DB8F5E]/20"></div>
+									<div class="h-3 w-24 rounded-full bg-terracotta/20"></div>
 								</div>
 								<div class="mt-2.5 flex flex-col gap-1.5">
 									<div class="h-3 w-full rounded-full bg-white/10"></div>
@@ -1477,7 +1477,7 @@
 								</div>
 							</div>
 							<!-- Meta -->
-							<div class="h-3 w-48 rounded-full bg-[#302F2F]"></div>
+							<div class="h-3 w-48 rounded-full bg-white/10"></div>
 						</div>
 					{/each}
 				{:else}
@@ -1491,7 +1491,7 @@
 							onkeydown={(e) => e.key === 'Enter' && toggleSelectDoc(doc.id)}
 							class="group relative cursor-pointer select-none overflow-hidden rounded-2xl border p-3.5 transition-all duration-150 active:scale-[0.985] md:p-5 {isSelected
 								? 'selected-card-glass border-white/45 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] ring-1 ring-white/10'
-								: 'border-[#302F2F] bg-[#191919]/[0.53] hover:border-[#949494] hover:bg-[#525252]/[0.53]'} {deselectedCardIds.includes(
+								: 'border-white/10 bg-offblack/[0.53] hover:border-white/20 hover:bg-offblack/80'} {deselectedCardIds.includes(
 								doc.id
 							)
 								? 'deselected-card-glass'
@@ -1500,7 +1500,7 @@
 							<!-- Card Row 1: Header -->
 							<div class="flex items-start justify-between gap-3">
 								<div class="flex min-w-0 flex-1 items-center gap-3">
-									<MxIcon name="document-outline" class="size-4.5 shrink-0 text-[#C5937B]" />
+									<MxIcon name="document-outline" class="size-4.5 shrink-0 text-terracotta" />
 									<span
 										class="min-w-0 flex-1 truncate text-sm font-medium text-white md:text-base"
 										title={doc.name}
@@ -1528,7 +1528,7 @@
 												{/snippet}
 											</Tooltip.Trigger>
 											<Tooltip.Content
-												class="rounded-lg border border-white/10 bg-[#202020] px-2.5 py-1.5 text-xs font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
+												class="rounded-lg border border-white/10 bg-offblack px-2.5 py-1.5 text-xs font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
 											>
 												<p>How well this document matches your question</p>
 											</Tooltip.Content>
@@ -1628,7 +1628,7 @@
 							<!-- Card Row 3: Metadata & Real-time Status Badge -->
 							<div class="mt-2.5 flex items-center justify-between gap-2">
 								<div class="flex items-center gap-2.5">
-									<p class="text-xs font-normal text-[#959595]">
+									<p class="text-xs font-normal text-warm-gray">
 										Uploaded {doc.uploadedAt} · {doc.size}
 									</p>
 
@@ -1638,7 +1638,7 @@
 											<Tooltip.Trigger>
 												{#snippet child({ props })}
 													<div {...props} class="page-reference select-none">
-														<BookOpenIcon class="size-3.5 text-[#DB8F5E]" strokeWidth={1.7} />
+														<BookOpenIcon class="size-3.5 text-terracotta" strokeWidth={1.7} />
 														<span
 															>Page{pages.length > 1 ? 's' : ''}
 															{pages.slice(0, 3).join(', ')}{pages.length > 3 ? '…' : ''}</span
@@ -1647,7 +1647,7 @@
 												{/snippet}
 											</Tooltip.Trigger>
 											<Tooltip.Content
-												class="rounded-lg border border-white/10 bg-[#202020] px-2.5 py-1.5 text-xs font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
+												class="rounded-lg border border-white/10 bg-offblack px-2.5 py-1.5 text-xs font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
 											>
 												<p>Found on page{pages.length > 1 ? 's' : ''}: {pages.join(', ')}</p>
 											</Tooltip.Content>
@@ -1701,9 +1701,9 @@
 						</div>
 					{:else}
 						<div
-							class="flex h-32 items-center justify-center rounded-2xl border border-[#302F2F] bg-[#191919]/[0.53]"
+							class="flex h-32 items-center justify-center rounded-2xl border border-white/10 bg-offblack/[0.53]"
 						>
-							<p class="text-sm text-[#959595]">No documents found.</p>
+							<p class="text-sm text-warm-gray">No documents found.</p>
 						</div>
 					{/each}
 				{/if}
@@ -1712,7 +1712,7 @@
 			<!-- Bottom: Pagination -->
 			{#if totalFilteredRows > 0}
 				<div class="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
-					<p class="px-1 text-xs text-[#767676]">
+					<p class="px-1 text-xs text-warm-gray">
 						{paginationRange.start}–{paginationRange.end} of {totalFilteredRows}
 						{totalFilteredRows === 1 ? 'document' : 'documents'}
 					</p>
@@ -1811,7 +1811,7 @@
 			{@render mainList()}
 		</div>
 		{#if previewDocument}
-			<div class="fixed inset-0 z-[60] h-full w-full bg-[#1F1E1D]">
+			<div class="fixed inset-0 z-[60] h-full w-full bg-black">
 				<PdfPreviewPanel
 					src={previewDocument.url ?? ''}
 					name={previewDocument.name}
@@ -1829,7 +1829,7 @@
 				</Resizable.Pane>
 				<Resizable.Handle
 					withHandle
-					class="w-1 bg-white/10 hover:bg-[#DB8F5E]/50 active:bg-[#DB8F5E]"
+					class="w-1 bg-white/10 hover:bg-terracotta/50 active:bg-terracotta"
 				/>
 				<Resizable.Pane defaultSize={40}>
 					<PdfPreviewPanel
@@ -1863,11 +1863,11 @@
 <!-- Rename Document Dialog -->
 <Dialog.Root bind:open={renameDialogOpen}>
 	<Dialog.Content
-		class="border-[#302F2F] bg-[#191919]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md sm:rounded-[22px]"
+		class="border-white/10 bg-offblack/[0.85] text-white backdrop-blur-[42px] sm:max-w-md sm:rounded-[22px]"
 	>
 		<Dialog.Header class="gap-2">
 			<Dialog.Title class="text-xl font-semibold text-white">Rename Document</Dialog.Title>
-			<Dialog.Description class="text-sm text-[#767676]">
+			<Dialog.Description class="text-sm text-warm-gray">
 				{#if documentToRename}
 					Current title: <span class="break-all text-white/80">{documentToRename.name}</span>
 					<br />The file extension is fixed — only the name part can be edited.
@@ -1920,7 +1920,7 @@
 					confirmRename();
 				}}
 				disabled={isRenaming}
-				class="cursor-pointer select-none bg-[#DB8F5E] text-white transition-all duration-150 hover:bg-[#C47D4E] active:scale-[0.96] disabled:opacity-50"
+				class="cursor-pointer select-none bg-terracotta text-black transition-all duration-150 hover:bg-terracotta-deep active:scale-[0.96] disabled:opacity-50"
 			>
 				{#if isRenaming}
 					<Loader2Icon class="mr-2 size-4 animate-spin" />
@@ -1936,14 +1936,14 @@
 <!-- Batch Delete Confirmation Modal -->
 <Dialog.Root bind:open={showBatchDeleteModal}>
 	<Dialog.Content
-		class="border-[#302F2F] bg-[#191919]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md sm:rounded-[22px]"
+		class="border-white/10 bg-offblack/[0.85] text-white backdrop-blur-[42px] sm:max-w-md sm:rounded-[22px]"
 	>
 		<Dialog.Header class="gap-2">
 			<Dialog.Title class="text-xl font-semibold text-white">
 				Delete {selectedCount}
 				{selectedCount === 1 ? 'Document' : 'Documents'}?
 			</Dialog.Title>
-			<Dialog.Description class="text-sm text-[#767676]">
+			<Dialog.Description class="text-sm text-warm-gray">
 				This action will permanently delete {selectedCount} selected {selectedCount === 1
 					? 'document'
 					: 'documents'}, their vector embeddings, and storage files. This process cannot be undone.
@@ -1984,10 +1984,10 @@
 
 <style>
 	.match-highlight {
-		background: rgb(217 142 104 / 0.28);
+		background: color-mix(in oklch, var(--color-terracotta) 30%, transparent);
 		border-radius: 3px;
 		padding: 0 2px;
-		color: #f4e6d4;
+		color: var(--color-offwhite);
 		box-decoration-break: clone;
 		-webkit-box-decoration-break: clone;
 	}
@@ -2001,8 +2001,8 @@
 		background: linear-gradient(
 			135deg,
 			rgba(255, 255, 255, 0.075) 0%,
-			rgba(30, 30, 30, 0.84) 54%,
-			rgba(219, 143, 94, 0.07) 100%
+			rgba(38, 34, 32, 0.84) 54%,
+			color-mix(in oklch, var(--color-terracotta) 8%, transparent) 100%
 		);
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 		transition:
@@ -2011,7 +2011,7 @@
 	}
 
 	.semantic-match-panel:hover {
-		border-color: rgba(219, 143, 94, 0.34);
+		border-color: color-mix(in oklch, var(--color-terracotta) 35%, transparent);
 		transform: translateY(-1px);
 	}
 
@@ -2033,7 +2033,7 @@
 
 	.semantic-match-trigger:focus-visible {
 		outline: none;
-		box-shadow: inset 0 0 0 1px rgba(219, 143, 94, 0.72);
+		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-terracotta) 70%, transparent);
 	}
 
 	.semantic-match-action {
@@ -2057,9 +2057,9 @@
 	}
 
 	.semantic-match-trigger:hover .semantic-match-action {
-		border-color: rgba(219, 143, 94, 0.42);
-		background: rgba(219, 143, 94, 0.12);
-		color: #db8f5e;
+		border-color: color-mix(in oklch, var(--color-terracotta) 45%, transparent);
+		background: color-mix(in oklch, var(--color-terracotta) 15%, transparent);
+		color: var(--color-terracotta);
 		transform: translateX(1px);
 	}
 
@@ -2099,13 +2099,13 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.35rem;
-		border: 1px solid rgba(219, 143, 94, 0.34);
+		border: 1px solid color-mix(in oklch, var(--color-terracotta) 35%, transparent);
 		border-radius: 999px;
-		background: rgba(219, 143, 94, 0.1);
+		background: color-mix(in oklch, var(--color-terracotta) 10%, transparent);
 		padding: 0.3rem 0.55rem;
 		font-size: 0.6875rem;
 		font-weight: 600;
-		color: #db8f5e;
+		color: var(--color-terracotta);
 		white-space: nowrap;
 		transition:
 			background-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
@@ -2114,8 +2114,8 @@
 	}
 
 	.match-score:hover {
-		border-color: rgba(219, 143, 94, 0.62);
-		background: rgba(219, 143, 94, 0.16);
+		border-color: color-mix(in oklch, var(--color-terracotta) 65%, transparent);
+		background: color-mix(in oklch, var(--color-terracotta) 18%, transparent);
 		transform: translateY(-1px);
 	}
 
@@ -2123,7 +2123,7 @@
 		height: 0.35rem;
 		width: 0.35rem;
 		border-radius: 999px;
-		background: #db8f5e;
+		background: var(--color-terracotta);
 	}
 
 	.match-score-label {
@@ -2131,7 +2131,7 @@
 		font-weight: 500;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		color: rgba(244, 230, 212, 0.62);
+		color: color-mix(in oklch, var(--color-offwhite) 65%, transparent);
 	}
 
 	.page-reference {
@@ -2154,8 +2154,8 @@
 	}
 
 	.page-reference:hover {
-		border-color: rgba(219, 143, 94, 0.42);
-		background: rgba(219, 143, 94, 0.09);
+		border-color: color-mix(in oklch, var(--color-terracotta) 45%, transparent);
+		background: color-mix(in oklch, var(--color-terracotta) 10%, transparent);
 		color: rgba(255, 255, 255, 0.86);
 		transform: translateY(-1px);
 	}

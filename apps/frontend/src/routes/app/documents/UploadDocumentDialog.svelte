@@ -375,7 +375,7 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content
-		class="flex max-h-[calc(100dvh-1rem)] max-w-[calc(100%-1rem)] flex-col overflow-hidden rounded-[16px] border-[#302F2F] bg-[#191919]/[0.85] p-0 text-white backdrop-blur-[42px] sm:max-w-4xl sm:rounded-[22px]"
+		class="flex max-h-[calc(100dvh-1rem)] max-w-[calc(100%-1rem)] flex-col overflow-hidden rounded-[16px] border-white/10 bg-offblack/[0.85] p-0 text-white backdrop-blur-[42px] sm:max-w-4xl sm:rounded-[22px]"
 	>
 		<div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-5 sm:gap-5 sm:p-8 sm:pb-0 md:p-10 md:pb-0">
 			<!-- Header Section -->
@@ -383,7 +383,7 @@
 				<Dialog.Title class="text-[28px] leading-tight font-semibold text-white md:text-4xl">
 					Upload Documents
 				</Dialog.Title>
-				<Dialog.Description class="mx-auto max-w-full px-2 text-sm leading-relaxed font-normal text-[#767676] md:text-base">
+				<Dialog.Description class="mx-auto max-w-full px-2 text-sm leading-relaxed font-normal text-warm-gray md:text-base">
 					Add important project documents. Supported types: PDF, TXT, DOCX, and MD. (keep files under 25MB)
 				</Dialog.Description>
 			</div>
@@ -396,8 +396,8 @@
 				ondragleave={handleDragLeave}
 				ondrop={handleDrop}
 				class="flex w-full min-w-0 flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-4 py-8 transition-colors sm:px-6 sm:py-10 {isDragOver
-					? 'border-[#DB8F5E] bg-[#2A2A2A]/80'
-					: 'border-white/20 bg-[#2A2A2A]/40 hover:bg-[#2A2A2A]/60'}"
+					? 'border-terracotta bg-graphite/80'
+					: 'border-white/20 bg-graphite/40 hover:bg-graphite/60'}"
 			>
 				<!-- Illustrative Composition -->
 				<div class="relative mb-4 flex h-20 w-28 items-center justify-center sm:mb-6 sm:h-24 sm:w-32">
@@ -450,53 +450,7 @@
 					</div>
 					<!-- DOCX Icon (Back Left) -->
 					<div
-						class="absolute top-2 left-2 flex h-16 w-12 -rotate-6 transform flex-col items-center justify-center rounded opacity-80 shadow-lg"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							shape-rendering="geometricPrecision"
-							text-rendering="geometricPrecision"
-							image-rendering="optimizeQuality"
-							fill-rule="evenodd"
-							clip-rule="evenodd"
-							viewBox="0 0 421 511.605"
-						>
-							<path
-								fill="#4A4744"
-								d="M95.705.014h199.094L421 136.548v317.555c0 31.54-25.961 57.502-57.502 57.502H95.705c-31.55 0-57.502-25.873-57.502-57.502V57.515C38.203 25.886 64.076.014 95.705.014z"
-							/>
-							<path
-								fill="#3A3735"
-								d="M341.028 133.408h-.019L421 188.771v-52.066h-54.357c-9.458-.15-17.998-1.274-25.615-3.297z"
-							/>
-							<path
-								fill="#B8B5B5"
-								d="M294.8 0L421 136.533v.172h-54.357c-45.068-.718-69.33-23.397-71.843-61.384V0z"
-							/>
-							<path
-								fill="#3A3735"
-								fill-rule="nonzero"
-								d="M0 431.901V253.404l.028-1.261c.668-16.446 14.333-29.706 30.936-29.706h7.238v50.589h354.304c12.862 0 23.373 10.51 23.373 23.371v135.504c0 12.83-10.543 23.373-23.373 23.373H23.373C10.541 455.274 0 444.75 0 431.901z"
-							/>
-							<path
-								fill="#6B6865"
-								fill-rule="nonzero"
-								d="M143.448 240.364a8.496 8.496 0 01-8.496-8.497 8.496 8.496 0 018.496-8.497h163.176a8.496 8.496 0 018.496 8.497 8.496 8.496 0 01-8.496 8.497H143.448zm0-59.176a8.496 8.496 0 010-16.993h172.304a8.496 8.496 0 110 16.993H143.448z"
-							/>
-							<path
-								fill="#F1EEEB"
-								fill-rule="nonzero"
-								d="M11.329 276.171v154.728c0 7.793 6.38 14.178 14.179 14.178h365.996c7.799 0 14.178-6.379 14.178-14.178V297.405c0-7.798-6.392-14.178-14.178-14.178H37.892c-12.618-.096-19.586-1.638-26.563-7.056z"
-							/>
-							<path
-								fill="#2A2522"
-								fill-rule="nonzero"
-								d="M56.707 401.572v-81.894h36.689c14.764 0 24.896 3.145 30.4 9.435 5.502 6.289 8.255 16.794 8.255 31.512 0 14.72-2.753 25.223-8.255 31.513-5.504 6.29-15.636 9.434-30.4 9.434H56.707zm37.083-60.929H82.913v39.965H93.79c3.582 0 6.179-.416 7.795-1.244 1.616-.831 2.426-2.732 2.426-5.701v-26.075c0-2.969-.81-4.87-2.426-5.699-1.616-.83-4.213-1.246-7.795-1.246zm43.501 20.049c0-14.939 2.796-25.835 8.386-32.692 5.591-6.857 15.681-10.287 30.269-10.287 14.587 0 24.676 3.43 30.266 10.287 5.592 6.857 8.388 17.753 8.388 32.692 0 7.424-.591 13.671-1.771 18.736-1.177 5.067-3.209 9.477-6.092 13.234-2.882 3.758-6.858 6.508-11.923 8.255-5.067 1.747-11.356 2.621-18.868 2.621-7.513 0-13.802-.874-18.87-2.621-5.065-1.747-9.04-4.497-11.924-8.255-2.881-3.757-4.913-8.167-6.092-13.234-1.178-5.065-1.769-11.312-1.769-18.736zm28.171-13.629v34.069h10.877c3.58 0 6.179-.415 7.795-1.246 1.616-.828 2.426-2.729 2.426-5.699v-34.068h-11.008c-3.494 0-6.048.415-7.665 1.245-1.616.829-2.425 2.73-2.425 5.699zm112.687 31.055l1.965 22.014c-5.504 2.271-12.403 3.406-20.703 3.406-8.298 0-14.958-.874-19.983-2.621-5.022-1.747-8.974-4.497-11.857-8.255-2.882-3.757-4.892-8.167-6.027-13.234-1.136-5.065-1.704-11.312-1.704-18.736 0-7.427.568-13.693 1.704-18.803 1.135-5.11 3.145-9.543 6.027-13.301 5.591-7.248 15.854-10.875 30.793-10.875 3.318 0 7.227.328 11.727.983 4.498.655 7.84 1.464 10.023 2.425l-3.93 20.047c-5.68-1.223-10.876-1.835-15.594-1.835-4.716 0-7.991.437-9.826 1.31-1.835.874-2.753 2.62-2.753 5.241v34.33c3.408.7 6.859 1.048 10.353 1.048 7.424 0 14.02-1.048 19.785-3.144zm34.33-58.44l9.041 21.884h1.31l9.04-21.884h28.434l-18.214 39.571 18.214 42.323h-29.089l-9.826-23.585h-1.18l-9.695 23.585h-27.78l17.821-41.535-17.821-40.359h29.745z"
-							/>
-						</svg>
-					</div>
-					<div
-						class="relative z-10 flex h-20 w-16 flex-col items-center justify-center rounded shadow-xl"
+						class="absolute top-2 left-2 flex h-16 w-12 -rotate-6 transform items-center justify-center opacity-80 shadow-lg"
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -532,7 +486,54 @@
 							<path
 								fill="#F1EEEB"
 								fill-rule="nonzero"
-								d="M11.329 276.171v154.728c0 7.793 6.38 14.178 14.179 14.178h354.667c7.799 0 14.178-6.379 14.178-14.178V297.405c0-7.798-6.388-14.178-14.178-14.178H37.892c-12.618-.096-19.586-1.638-26.563-7.056z"
+								d="M11.329 276.171v154.728c0 7.793 6.38 14.178 14.179 14.178H380.175c7.799 0 14.178-6.379 14.178-14.178V297.405c0-7.798-6.388-14.178-14.178-14.178H37.892c-12.618-.096-19.586-1.638-26.563-7.056z"
+							/>
+							<path
+								fill="#2A2522"
+								fill-rule="nonzero"
+								d="M141.249 381.787h-14.471v19.785H100.57v-81.894h40.679c14.629 0 24.634 3.012 29.936 9.041 5.301 6.096 7.95 16.53 7.95 31.314 0 14.786-2.649 25.285-7.95 31.512-5.302 6.228-15.307 9.242-29.936 9.242zm25.968-41.276c0-2.84-.793-4.672-2.384-5.503-1.589-.83-4.148-1.244-7.662-1.244h-15.922v39.965h15.922c3.514 0 6.073-.416 7.662-1.244 1.591-.83 2.384-2.732 2.384-5.701v-26.273zm99.645-40.618c14.565 0 24.569 3.012 30.003 9.041 5.432 6.096 8.148 16.53 8.148 31.314 0 14.786-2.716 25.285-8.148 31.512-5.434 6.228-15.438 9.242-30.003 9.242-14.631 0-24.635-3.014-30.07-9.242-5.432-6.227-8.147-16.726-8.147-31.512 0-14.784 2.715-25.218 8.147-31.314 5.435-6.029 15.439-9.041 30.07-9.041zm0 60.929c3.511 0 6.07-.416 7.66-1.244 1.592-.83 2.385-2.732 2.385-5.701v-26.273c0-2.84-.793-4.672-2.385-5.503-1.59-.83-4.149-1.244-7.66-1.244-3.579 0-6.141.414-7.73 1.244-1.589.831-2.383 2.663-2.383 5.503v26.273c0 2.969.794 4.871 2.383 5.701 1.589.828 4.151 1.244 7.73 1.244zm62.484 20.354h-26.208v-81.894h40.68c14.63 0 24.633 3.012 29.935 9.041 5.301 6.096 7.95 16.53 7.95 31.314 0 14.786-2.649 25.285-7.95 31.512-5.302 6.228-15.305 9.242-29.935 9.242h-14.472v-19.785h-14.472v20.57zm0-41.87v22.093h15.922c3.513 0 6.072-.416 7.662-1.244 1.591-.83 2.384-2.732 2.384-5.701v-8.215c0-2.84-.793-4.672-2.384-5.503-1.59-.83-4.149-1.244-7.662-1.244h-15.922v-.186z"
+							/>
+						</svg>
+					</div>
+					<!-- PDF Icon (Front and Center) -->
+					<div
+						class="relative z-10 flex h-20 w-16 items-center justify-center drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)]"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							shape-rendering="geometricPrecision"
+							text-rendering="geometricPrecision"
+							image-rendering="optimizeQuality"
+							fill-rule="evenodd"
+							clip-rule="evenodd"
+							viewBox="0 0 421 511.605"
+						>
+							<path
+								fill="#4A4744"
+								d="M95.705.014h199.094L421 136.548v317.555c0 31.54-25.961 57.502-57.502 57.502H95.705c-31.55 0-57.502-25.873-57.502-57.502V57.515C38.203 25.886 64.076.014 95.705.014z"
+							/>
+							<path
+								fill="#3A3735"
+								d="M341.028 133.408h-.019L421 188.771v-52.066h-54.357c-9.458-.15-17.998-1.274-25.615-3.297z"
+							/>
+							<path
+								fill="#B8B5B5"
+								d="M294.8 0L421 136.533v.172h-54.357c-45.068-.718-69.33-23.397-71.843-61.384V0z"
+							/>
+							<path
+								fill="#3A3735"
+								fill-rule="nonzero"
+								d="M0 431.901V253.404l.028-1.261c.668-16.446 14.333-29.706 30.936-29.706h7.238v50.589h342.975c12.862 0 23.373 10.51 23.373 23.371v135.504c0 12.83-10.543 23.373-23.373 23.373H23.373C10.541 455.274 0 444.75 0 431.901z"
+							/>
+							<path
+								fill="#6B6865"
+								fill-rule="nonzero"
+								d="M143.448 240.364a8.496 8.496 0 01-8.496-8.497 8.496 8.496 0 018.496-8.497h163.176a8.496 8.496 0 018.496 8.497 8.496 8.496 0 01-8.496 8.497H143.448zm0-59.176a8.496 8.496 0 010-16.993h172.304a8.496 8.496 0 110 16.993H143.448z"
+							/>
+							<path
+								fill="#F1EEEB"
+								fill-rule="nonzero"
+								d="M11.329 276.171v154.728c0 7.793 6.38 14.178 14.179 14.178H380.175c7.799 0 14.178-6.379 14.178-14.178V297.405c0-7.798-6.388-14.178-14.178-14.178H37.892c-12.618-.096-19.586-1.638-26.563-7.056z"
 							/>
 							<path
 								fill="#2A2522"
@@ -541,7 +542,7 @@
 							/>
 						</svg>
 						<div
-							class="absolute -right-2 -bottom-2 flex h-6 w-6 items-center justify-center rounded-full border border-[#191919] bg-[#DB8F5E] shadow-md"
+							class="absolute -right-2 -bottom-2 flex h-6 w-6 items-center justify-center rounded-full border border-black bg-terracotta shadow-md"
 						>
 							<PlusIcon class="size-4 text-white" />
 						</div>
@@ -549,14 +550,14 @@
 				</div>
 
 				<h3 class="mb-2 text-center text-lg font-bold text-white">Drop your files here</h3>
-				<p class="mb-5 text-center text-sm text-[#767676]">Or choose another option:</p>
+				<p class="mb-5 text-center text-sm text-warm-gray">Or choose another option:</p>
 
 				<Button
 					onclick={() => {
 						triggerHaptic(15);
 						fileInputEl?.click();
 					}}
-					class="relative cursor-pointer select-none overflow-hidden rounded-[8px] border-t border-white/20 bg-[#302F2F] px-8 font-medium text-white shadow-[0_2px_4px_rgba(0,0,0,0.4)] transition-all duration-150 hover:bg-[#404040] active:scale-[0.96]"
+					class="relative cursor-pointer select-none overflow-hidden rounded-[8px] border-t border-white/20 bg-graphite px-8 font-medium text-white shadow-[0_2px_4px_rgba(0,0,0,0.4)] transition-all duration-150 hover:bg-graphite/80 active:scale-[0.96]"
 				>
 					Browse files...
 				</Button>
@@ -570,7 +571,7 @@
 							{#if item.status === 'staged'}
 								<!-- Row (Staged - Pre-upload) -->
 								<div
-									class="flex min-w-0 items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-3 py-3 sm:px-4"
+									class="flex min-w-0 items-center justify-between rounded-xl border border-transparent bg-black/50 px-3 py-3 sm:px-4"
 								>
 									<div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
 										<div
@@ -580,7 +581,7 @@
 										</div>
 										<div class="min-w-0 flex flex-col">
 											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
-											<span class="text-xs text-[#959595]"
+											<span class="text-xs text-warm-gray"
 												>{item.sizeFormatted} -
 												<span class="text-white/60">ready to upload</span></span
 											>
@@ -598,7 +599,7 @@
 																triggerHaptic(15);
 																removeItem(item);
 															}}
-															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-white active:scale-90"
+															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
 														>
 															<XIcon class="size-5" />
 														</button>
@@ -616,25 +617,25 @@
 							{:else if item.status === 'success'}
 								<!-- Row (Success) -->
 								<div
-									class="flex min-w-0 items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-3 py-3 sm:px-4"
+									class="flex min-w-0 items-center justify-between rounded-xl border border-transparent bg-black/50 px-3 py-3 sm:px-4"
 								>
 									<div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
 										<div
-											class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#3b82f6]/10 text-[#3b82f6]"
+											class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-400/10 text-sky-400"
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
 										<div class="min-w-0 flex flex-col">
 											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
-											<span class="text-xs text-[#959595]"
+											<span class="text-xs text-warm-gray"
 												>{item.sizeFormatted} -
-												<span class="text-[#22c55e]">successful upload</span></span
+												<span class="text-emerald-400">successful upload</span></span
 											>
 										</div>
 									</div>
 									<div class="flex shrink-0 items-center gap-3 sm:gap-4">
 										<span class="text-sm font-bold text-white">100%</span>
-										<CheckCircle2Icon class="size-5 text-[#22c55e]" />
+										<CheckCircle2Icon class="size-5 text-emerald-400" />
 										<Tooltip.Provider delayDuration={100}>
 											<Tooltip.Root>
 												<Tooltip.Trigger>
@@ -646,7 +647,7 @@
 																triggerHaptic(15);
 																removeItem(item);
 															}}
-															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-[#ef4444] active:scale-90"
+															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-red-400 active:scale-90"
 														>
 															<MxIcon name="trash-bin-minimalistic-outline" class="size-5" />
 														</button>
@@ -664,19 +665,19 @@
 							{:else if item.status === 'failed'}
 								<!-- Row (Failed) -->
 								<div
-									class="flex min-w-0 items-center justify-between rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/5 px-3 py-3 shadow-[0_0_15px_rgba(239,68,68,0.1)] sm:px-4"
+									class="flex min-w-0 items-center justify-between rounded-xl border border-red-500/30 bg-red-500/5 px-3 py-3 shadow-[0_0_15px_rgba(239,68,68,0.1)] sm:px-4"
 								>
 									<div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
 										<div
-											class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#ef4444]/10 text-[#ef4444]"
+											class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-400"
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
 										<div class="min-w-0 flex flex-col">
 											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
-											<span class="text-xs text-[#959595]"
+											<span class="text-xs text-warm-gray"
 												>{item.sizeFormatted} -
-												<span class="font-bold text-[#ef4444]"
+												<span class="font-bold text-red-400"
 													>{item.errorMessage || 'upload failed'}</span
 												></span
 											>
@@ -695,7 +696,7 @@
 																triggerHaptic(15);
 																retryItem(item);
 															}}
-															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-white active:scale-90"
+															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
 														>
 															<RotateCcwIcon class="size-5" />
 														</button>
@@ -719,7 +720,7 @@
 																triggerHaptic(15);
 																removeItem(item);
 															}}
-															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-white active:scale-90"
+															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
 														>
 															<XIcon class="size-5" />
 														</button>
@@ -737,7 +738,7 @@
 							{:else}
 								<!-- Row (Uploading / Requesting / Confirming) -->
 								<div
-									class="flex min-w-0 items-center justify-between rounded-xl border border-transparent bg-[#2A2A2A]/50 px-3 py-3 sm:px-4"
+									class="flex min-w-0 items-center justify-between rounded-xl border border-transparent bg-black/50 px-3 py-3 sm:px-4"
 								>
 									<div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
 										<div
@@ -747,7 +748,7 @@
 										</div>
 										<div class="min-w-0 flex flex-col">
 											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
-											<span class="text-xs text-[#959595]"
+											<span class="text-xs text-warm-gray"
 												>{item.sizeFormatted} -
 												<span class="font-medium text-white/80">
 													{#if item.status === 'requesting'}
@@ -778,7 +779,7 @@
 																triggerHaptic(15);
 																removeItem(item);
 															}}
-															class="cursor-pointer select-none text-[#767676] transition-all duration-150 hover:text-white active:scale-90"
+															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
 														>
 															<XIcon class="size-5" />
 														</button>
@@ -799,7 +800,7 @@
 
 					<!-- Real-time Summary Bar -->
 					<div
-						class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-white/10 bg-[#222222]/70 px-3 py-2.5 text-xs text-[#959595] sm:px-4"
+						class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-white/10 bg-graphite/70 px-3 py-2.5 text-xs text-warm-gray sm:px-4"
 					>
 						<div class="flex items-center gap-2">
 							<span class="font-medium text-white/60">Total:</span>
@@ -824,7 +825,7 @@
 
 		<!-- Footer Section -->
 		<div
-			class="flex shrink-0 flex-col gap-3 border-t border-white/10 bg-[#1F1E1D] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-5 sm:rounded-b-[22px]"
+			class="flex shrink-0 flex-col gap-3 border-t border-white/10 bg-black px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-5 sm:rounded-b-[22px]"
 		>
 			<div class="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-3">
 				{#if hasFailedUploads}
@@ -837,7 +838,7 @@
 							retryAllFailed();
 						}}
 						disabled={isAnyUploading}
-						class="cursor-pointer select-none border border-[#DB8F5E]/40 bg-[#DB8F5E]/10 text-sm font-medium text-[#DB8F5E] transition-all duration-150 hover:bg-[#DB8F5E]/20 hover:text-white active:scale-[0.96] disabled:opacity-40"
+						class="cursor-pointer select-none border border-terracotta/40 bg-terracotta/10 text-sm font-medium text-terracotta transition-all duration-150 hover:bg-terracotta/20 hover:text-white active:scale-[0.96] disabled:opacity-40"
 					>
 						<RotateCcwIcon class="mr-2 size-4" />
 						Retry Failed ({failedCount})
@@ -896,7 +897,7 @@
 											}
 										}}
 										disabled={uploadFiles.length === 0 || isAnyUploading || hasFailedUploads}
-										class="relative max-w-full cursor-pointer select-none bg-[#DB8F5E] font-medium text-white transition-all duration-150 hover:bg-[#C47D4E] active:scale-[0.96] disabled:bg-[#DB8F5E]/40 disabled:text-white/50 disabled:opacity-100"
+										class="relative max-w-full cursor-pointer select-none bg-terracotta font-medium text-black transition-all duration-150 hover:bg-terracotta-deep active:scale-[0.96] disabled:bg-terracotta/40 disabled:text-black/50 disabled:opacity-100"
 									>
 										{#if isAnyUploading}
 											<Loader2Icon class="mr-2 size-4 animate-spin" />
@@ -910,7 +911,7 @@
 										{#if hasFailedUploads}
 											<!-- Notification Badge -->
 											<div
-												class="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#1F1E1D] bg-[#ef4444] text-[10px] font-bold text-white"
+												class="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-black bg-red-500 text-[10px] font-bold text-white"
 											>
 												{failedCount}
 											</div>

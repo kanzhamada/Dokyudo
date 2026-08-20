@@ -756,7 +756,7 @@
 >
 	<Dialog.Content
 		showCloseButton={true}
-		class="flex h-[85vh] max-h-[680px] min-h-[480px] w-[calc(100%-1.5rem)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:h-[660px] sm:max-h-[min(660px,calc(100vh-2rem))] sm:min-h-0 sm:w-full sm:max-w-[880px] sm:rounded-[18px] lg:max-w-[940px]"
+		class="flex h-[85vh] max-h-[680px] min-h-[480px] w-[calc(100%-1.5rem)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border border-white/[0.1] bg-offblack/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:h-[660px] sm:max-h-[min(660px,calc(100vh-2rem))] sm:min-h-0 sm:w-full sm:max-w-[880px] sm:rounded-[18px] lg:max-w-[940px]"
 	>
 		<Dialog.Header
 			class="shrink-0 border-b border-white/[0.09] px-4 py-3.5 pr-12 sm:px-5 sm:py-4 sm:pr-14"
@@ -865,7 +865,7 @@
 									<Button
 										type="submit"
 										disabled={profileLoading || savingName || !profile}
-										class="h-9 w-full cursor-pointer rounded-lg bg-[#DB8F5E] px-4 text-xs font-medium text-black transition-all duration-150 select-none hover:bg-[#E59C6D] active:scale-[0.98] active:brightness-95 disabled:opacity-40 sm:w-auto"
+										class="h-9 w-full cursor-pointer rounded-lg bg-terracotta px-4 text-xs font-medium text-black transition-all duration-150 select-none hover:bg-terracotta-deep active:scale-[0.98] active:brightness-95 disabled:opacity-40 sm:w-auto"
 									>
 										{#if savingName}
 											<Spinner class="mr-1.5 size-3.5" />
@@ -979,7 +979,7 @@
 									<Button
 										type="submit"
 										disabled={updatingPassword}
-										class="h-9 w-full cursor-pointer rounded-lg bg-[#DB8F5E] px-4 text-xs font-medium text-black transition-all duration-150 select-none hover:bg-[#E59C6D] active:scale-[0.98] active:brightness-95 disabled:opacity-40 sm:w-auto"
+										class="h-9 w-full cursor-pointer rounded-lg bg-terracotta px-4 text-xs font-medium text-black transition-all duration-150 select-none hover:bg-terracotta-deep active:scale-[0.98] active:brightness-95 disabled:opacity-40 sm:w-auto"
 									>
 										{#if updatingPassword}
 											<Spinner class="mr-1.5 size-3.5" />
@@ -1281,7 +1281,7 @@
 													triggerHaptic(20);
 													openSandboxCheckout();
 												}}
-												class="mt-3 inline-flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-xs font-medium text-[#1B1B1B] transition-all duration-150 select-none hover:bg-white/85 active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+												class="mt-3 inline-flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-xs font-medium text-black transition-all duration-150 select-none hover:bg-white/85 active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
 											>
 												{#if isCheckoutLoading}
 													<Spinner class="size-3.5" />
@@ -1300,7 +1300,7 @@
 											>
 												Unavailable
 												<span
-													class="absolute inset-0 flex items-center justify-center bg-[#242322]/70"
+													class="absolute inset-0 flex items-center justify-center bg-offblack/70"
 												>
 													<LockKeyhole class="size-3.5 text-white/55" strokeWidth={1.8} />
 												</span>
@@ -1331,7 +1331,7 @@
 									type="button"
 									class="flex min-w-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center transition-all duration-150 select-none active:scale-[0.97] sm:flex-row sm:justify-start sm:gap-2 sm:px-2.5 sm:py-2 sm:text-left {provider ===
 									providerOption.id
-										? 'border-[#DB8F5E]/60 bg-[#DB8F5E]/15 text-white shadow-xs ring-1 ring-[#DB8F5E]/30'
+										? 'border-terracotta/60 bg-terracotta/15 text-white shadow-xs ring-1 ring-terracotta/30'
 										: 'border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.08] hover:text-white/80 active:bg-white/[0.08]'}"
 									onclick={() => {
 										triggerHaptic(20);
@@ -1388,7 +1388,7 @@
 									bind:value={apiKey}
 									placeholder={BYOK_PROVIDER_OPTIONS.find((item) => item.id === provider)
 										?.placeholder}
-									class="h-10 border-white/15 bg-black/20 text-sm text-white placeholder:text-white/25 focus-visible:border-[#DB8F5E]/60 focus-visible:ring-[#DB8F5E]/20"
+									class="h-10 border-white/15 bg-black/20 text-sm text-white placeholder:text-white/25 focus-visible:border-terracotta/60 focus-visible:ring-terracotta/20"
 									autocomplete="new-password"
 								/>
 							{/if}
@@ -1426,7 +1426,7 @@
 												{#snippet child({ props })}
 													<span {...props} class="inline-flex w-full sm:w-auto">
 														<Button
-															class="h-9 w-full cursor-pointer rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black select-none hover:bg-[#E59C6D] active:scale-[0.98] disabled:opacity-50 sm:w-auto"
+															class="h-9 w-full cursor-pointer rounded-lg bg-terracotta px-3 text-xs font-medium text-black select-none hover:bg-terracotta-deep active:scale-[0.98] disabled:opacity-50 sm:w-auto"
 															disabled={true}
 														>
 															Save key
@@ -1443,7 +1443,7 @@
 									</Tooltip.Provider>
 								{:else}
 									<Button
-										class="h-9 w-full cursor-pointer rounded-lg bg-[#DB8F5E] px-3 text-xs font-medium text-black transition-all duration-150 select-none hover:bg-[#E59C6D] active:scale-[0.98] active:brightness-95 disabled:opacity-50 sm:w-auto"
+										class="h-9 w-full cursor-pointer rounded-lg bg-terracotta px-3 text-xs font-medium text-black transition-all duration-150 select-none hover:bg-terracotta-deep active:scale-[0.98] active:brightness-95 disabled:opacity-50 sm:w-auto"
 										disabled={!apiKey.trim() || isSavingKey || isResettingKey || !testResult?.valid}
 										onclick={() => {
 											triggerHaptic(20);

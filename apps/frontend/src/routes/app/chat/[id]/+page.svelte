@@ -2126,7 +2126,7 @@
 <div class="relative flex h-full w-full overflow-hidden bg-transparent font-sans text-white">
 	{#if citationPreview}
 		<!-- Mobile: full-screen preview -->
-		<div class="fixed inset-0 z-[60] h-full w-full bg-[#1F1E1D] md:hidden">
+		<div class="fixed inset-0 z-[60] h-full w-full bg-black md:hidden">
 			<PdfPreviewPanel
 				src={citationPreview.src}
 				name={citationPreview.name}
@@ -2142,7 +2142,7 @@
 				</Resizable.Pane>
 				<Resizable.Handle
 					withHandle
-					class="w-1 bg-white/10 hover:bg-[#DB8F5E]/50 active:bg-[#DB8F5E]"
+					class="w-1 bg-white/10 hover:bg-terracotta/50 active:bg-terracotta"
 				/>
 				<Resizable.Pane defaultSize={40} minSize={25}>
 					<PdfPreviewPanel
@@ -2198,7 +2198,7 @@
 									onclick={() => goto('/app/chat')}
 									aria-label="New chat"
 								>
-									<Plus class="size-4" />
+									<Plus class="size-5" />
 								</button>
 							{/snippet}
 						</Tooltip.Trigger>
@@ -2212,19 +2212,25 @@
 			{/snippet}
 
 			{#snippet center()}
-				<button
-					type="button"
-					class="flex max-w-[45%] min-w-0 cursor-pointer items-center justify-center gap-1.5 truncate rounded-lg px-2 py-1 text-xs font-medium text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-95 active:bg-white/15 active:text-white"
-					onclick={toggleMobileTitleActions}
-					aria-label="Conversation actions"
-				>
-					{#if isPinned}
-						<MxIcon name="pin-bold" class="size-3.5 shrink-0 rotate-45 text-white/60" />
-					{/if}
-					<span class="truncate">
-						{isTitleLoading ? 'Generating title...' : conversationTitle || 'New Conversation'}
-					</span>
-				</button>
+				<div class="flex items-center gap-1">
+					<button
+						type="button"
+						class="flex min-w-0 max-w-[200px] cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 transition-all duration-150 hover:bg-white/10 active:scale-95 sm:max-w-xs"
+						onclick={() => (isMobileTitleActionsOpen = !isMobileTitleActionsOpen)}
+					>
+						{#if isPinned}
+							<MxIcon name="pin-bold" class="size-3.5 shrink-0 rotate-45 text-white/60" />
+						{/if}
+						<span class="truncate text-sm font-semibold tracking-tight text-white">
+							{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
+						</span>
+						<ChevronDown
+							class="size-3.5 shrink-0 text-white/45 transition-transform duration-200 {isMobileTitleActionsOpen
+								? 'rotate-180'
+								: ''}"
+						/>
+					</button>
+				</div>
 			{/snippet}
 
 			{#snippet trailing()}
@@ -2266,7 +2272,7 @@
 									<MxIcon name="document-outline" class="size-4" />
 									{#if conversationReferences.length > 0}
 										<span
-											class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
+											class="absolute top-0 right-0 flex size-3.5 items-center justify-center rounded-full bg-terracotta text-[9px] font-semibold text-black"
 										>
 											{conversationReferences.length}
 										</span>
@@ -2291,7 +2297,7 @@
 					>
 						<button
 							type="button"
-							class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-white/[0.16] bg-[#232323]/[0.40] text-white/65 backdrop-blur-[42px] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-90"
+							class="flex size-10 cursor-pointer items-center justify-center rounded-full border border-white/[0.16] bg-offblack/[0.40] text-white/65 backdrop-blur-[42px] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-90"
 							onclick={() => {
 								isMobileTitleActionsOpen = false;
 								openTitleEditDialog();
@@ -2304,7 +2310,7 @@
 							type="button"
 							class="flex size-10 cursor-pointer items-center justify-center rounded-full border {isPinned
 								? 'border-amber-400/40 bg-amber-400/10 text-amber-400 active:bg-amber-400/25'
-								: 'border-white/[0.16] bg-[#232323]/[0.40] text-white/65 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:bg-white/20'} backdrop-blur-[42px] transition-all duration-150 active:scale-90"
+								: 'border-white/[0.16] bg-offblack/[0.40] text-white/65 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:bg-white/20'} backdrop-blur-[42px] transition-all duration-150 active:scale-90"
 							onclick={() => {
 								isMobileTitleActionsOpen = false;
 								togglePinConversation();
@@ -2358,21 +2364,38 @@
 
 		<!-- Desktop Conversation Header -->
 		<div
-			class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-28 bg-gradient-to-b from-[#1F1E1D] via-[#1F1E1D]/95 via-65% to-transparent md:block"
+			class="pointer-events-none absolute top-4 inset-x-4 md:inset-x-6 lg:inset-x-8 z-20 hidden md:block"
 		>
-			<div class="pointer-events-auto grid h-16 w-full grid-cols-3 items-center px-4 md:px-8">
+			<div
+				class="pointer-events-auto grid h-14 w-full grid-cols-3 items-center rounded-[24px] border border-white/[0.16] bg-offblack/[0.40] px-4 shadow-lg backdrop-blur-[42px] transition-all"
+			>
 				<div class="flex justify-start">
-					<button
-						type="button"
-						class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
-						onclick={() => {
-							triggerHaptic(15);
-							goto('/app/chat');
-						}}
-					>
-						<Plus class="size-4" />
-						<span>New chat</span>
-					</button>
+					<Tooltip.Provider delayDuration={100}>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										type="button"
+										class="flex cursor-pointer select-none items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-sm text-white/[0.60] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-[0.94]"
+										onclick={() => {
+											triggerHaptic(15);
+											goto('/app/chat');
+										}}
+									>
+										<Plus class="size-4" />
+										<span>New chat</span>
+									</button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content
+								class="border-white/[0.16] bg-offblack text-white"
+								arrowClasses="bg-offblack border-white/[0.16] border-b border-r"
+							>
+								<p>Start New Chat</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
 				</div>
 
 				<div class="flex min-w-0 justify-center">
@@ -2384,7 +2407,7 @@
 										<button
 											{...props}
 											type="button"
-											class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+											class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-sm text-white/[0.80] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] focus:outline-none active:scale-[0.97]"
 											onclick={openTitleMenu}
 										>
 											{#if isPinned}
@@ -2400,7 +2423,8 @@
 									{/snippet}
 								</Tooltip.Trigger>
 								<Tooltip.Content
-									class="max-w-xs rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+									class="max-w-xs border-white/[0.16] bg-offblack text-white"
+									arrowClasses="bg-offblack border-white/[0.16] border-b border-r"
 								>
 									<p>{conversationTitle}</p>
 								</Tooltip.Content>
@@ -2409,7 +2433,7 @@
 					{:else}
 						<button
 							type="button"
-							class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+							class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-sm text-white/[0.80] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] focus:outline-none active:scale-[0.97]"
 							onclick={openTitleMenu}
 						>
 							{#if isPinned}
@@ -2423,7 +2447,7 @@
 					{/if}
 				</div>
 
-				<div class="flex justify-end gap-1">
+				<div class="flex justify-end gap-1.5">
 					<Tooltip.Provider delayDuration={100}>
 						<Tooltip.Root>
 							<Tooltip.Trigger>
@@ -2431,7 +2455,7 @@
 									<button
 										{...props}
 										type="button"
-										class="flex size-8 cursor-pointer select-none items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+										class="flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-transparent text-white/[0.60] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-[0.90] disabled:cursor-not-allowed disabled:opacity-40"
 										onclick={() => {
 											triggerHaptic(15);
 											shareConversation();
@@ -2444,7 +2468,8 @@
 								{/snippet}
 							</Tooltip.Trigger>
 							<Tooltip.Content
-								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
+								class="border-white/[0.16] bg-offblack text-white"
+								arrowClasses="bg-offblack border-white/[0.16] border-b border-r"
 							>
 								<p>Share Conversation</p>
 							</Tooltip.Content>
@@ -2452,22 +2477,45 @@
 					</Tooltip.Provider>
 
 					<DropdownMenu.Root>
-						<DropdownMenu.Trigger
-							class="relative flex size-8 cursor-pointer select-none items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
-							aria-label="Conversation references"
-						>
-							<MxIcon name="document-outline" class="size-4" />
-							{#if conversationReferences.length > 0}
-								<span
-									class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
+						<Tooltip.Provider delayDuration={100}>
+							<Tooltip.Root>
+								<Tooltip.Trigger>
+									{#snippet child({ props: tooltipProps })}
+										<DropdownMenu.Trigger>
+											{#snippet child({ props: dropdownProps })}
+												<button
+													{...tooltipProps}
+													{...dropdownProps}
+													type="button"
+													onclick={() => triggerHaptic(15)}
+													class="relative flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-transparent text-white/[0.60] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] focus:outline-none active:scale-[0.90]"
+													aria-label="Conversation references"
+												>
+													<MxIcon name="document-outline" class="size-4" />
+													{#if conversationReferences.length > 0}
+														<span
+															class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-terracotta text-[9px] font-semibold text-black"
+														>
+															{conversationReferences.length}
+														</span>
+													{/if}
+												</button>
+											{/snippet}
+										</DropdownMenu.Trigger>
+									{/snippet}
+								</Tooltip.Trigger>
+								<Tooltip.Content
+									class="border-white/[0.16] bg-offblack text-white"
+									arrowClasses="bg-offblack border-white/[0.16] border-b border-r"
 								>
-									{conversationReferences.length}
-								</span>
-							{/if}
-						</DropdownMenu.Trigger>
+									<p>Conversation References</p>
+								</Tooltip.Content>
+							</Tooltip.Root>
+						</Tooltip.Provider>
+
 						<DropdownMenu.Content
 							align="end"
-							class="w-72 border-white/10 bg-[#232323] p-1 text-white"
+							class="w-72 border border-white/[0.16] bg-offblack/[0.40] p-1 text-white backdrop-blur-[42px]"
 						>
 							<div class="px-2.5 py-2 text-xs font-medium text-white/45">
 								Conversation references
@@ -2479,7 +2527,7 @@
 							{:else}
 								{#each conversationReferences as reference (reference.id)}
 									<DropdownMenu.Item
-										class="flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-2 text-xs text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98]"
+										class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/75 transition-all duration-150 hover:bg-white/[0.12] hover:text-white focus:bg-white/[0.16] focus:text-white active:scale-[0.98]"
 										onclick={() => {
 											triggerHaptic(15);
 											openCitationPreview(reference.id, reference.name, reference.pages ?? []);
@@ -2515,7 +2563,7 @@
 							type="button"
 							class="h-0.5 shrink-0 cursor-pointer rounded-full transition-all duration-300 select-none active:scale-95 {checkpoint.id ===
 							currentCheckpointId
-								? 'w-4.5 bg-[#DB8F5E]'
+								? 'w-4.5 bg-terracotta'
 								: 'w-3 bg-white/25 hover:w-4.5 hover:bg-white/50'}"
 							onclick={() => scrollToCheckpoint(checkpoint.id)}
 							aria-label={`Jump to checkpoint: ${checkpoint.content}`}
@@ -2525,7 +2573,7 @@
 				</div>
 
 				<div
-					class="pointer-events-none absolute top-1/2 right-0 w-64 translate-x-2 -translate-y-1/2 rounded-2xl border border-white/[0.16] bg-[#232323]/[0.40] p-2 opacity-0 shadow-2xl backdrop-blur-[42px] transition-all duration-300 group-hover/checkpoints:pointer-events-auto group-hover/checkpoints:translate-x-0 group-hover/checkpoints:opacity-100"
+					class="pointer-events-none absolute top-1/2 right-0 w-64 translate-x-2 -translate-y-1/2 rounded-2xl border border-white/[0.16] bg-offblack/[0.40] p-2 opacity-0 shadow-2xl backdrop-blur-[42px] transition-all duration-300 group-hover/checkpoints:pointer-events-auto group-hover/checkpoints:translate-x-0 group-hover/checkpoints:opacity-100"
 				>
 					<div class="max-h-64 overflow-y-auto">
 						{#each conversationCheckpoints as checkpoint (checkpoint.id)}
@@ -2533,14 +2581,14 @@
 								type="button"
 								class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-all duration-150 select-none hover:bg-white/10 active:scale-[0.98] {checkpoint.id ===
 								currentCheckpointId
-									? 'text-[#E59C6D]'
+									? 'text-terracotta'
 									: 'text-white/55'}"
 								onclick={() => scrollToCheckpoint(checkpoint.id)}
 							>
 								<span class="min-w-0 flex-1 truncate">{checkpoint.content}</span>
 								<span
 									class="h-0.5 w-3 shrink-0 rounded-full {checkpoint.id === currentCheckpointId
-										? 'bg-[#DB8F5E]'
+										? 'bg-terracotta'
 										: 'bg-white/20'}"
 								></span>
 							</button>
@@ -2578,7 +2626,7 @@
 									/>
 								{/if}
 								<div
-									class="rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md {editingMessageId ===
+									class="rounded-2xl border border-white/15 bg-offblack px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md {editingMessageId ===
 									msg.id
 										? 'w-full'
 										: 'w-fit'} {pulseCheckpointId === msg.id ? 'checkpoint-pulse' : ''}"
@@ -3210,7 +3258,7 @@
 													</Tooltip.Provider>
 													<DropdownMenu.Content
 														align="start"
-														class="w-36 border border-white/[0.16] bg-[#232323]/[0.40] p-1 text-white backdrop-blur-[42px]"
+														class="w-36 border border-white/[0.16] bg-offblack/[0.40] p-1 text-white backdrop-blur-[42px]"
 													>
 														<DropdownMenu.Item
 															class="flex cursor-pointer select-none items-center gap-2 rounded-md text-xs text-white/80 transition-all duration-150 hover:bg-white/[0.12] hover:text-white focus:bg-white/[0.16] focus:text-white focus:outline-none active:scale-[0.98]"
@@ -3307,7 +3355,7 @@
 
 		<!-- Bottom Area: Floating Input Capsule -->
 		<div
-			class="pointer-events-none absolute right-0 bottom-0 left-0 z-30 flex flex-col items-center justify-end bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/85 via-50% to-transparent pt-10 pb-4"
+			class="pointer-events-none absolute right-0 bottom-0 left-0 z-30 flex flex-col items-center justify-end bg-gradient-to-t from-black via-black/85 via-50% to-transparent pt-10 pb-4"
 			style="font-family: 'Inter', sans-serif;"
 		>
 			<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">
@@ -3342,7 +3390,7 @@
 
 					<!-- Keyboard length counter -->
 					<div
-						class="flex shrink-0 select-none items-center gap-1.5 rounded-full border border-white/[0.16] bg-[#232323]/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {mentionStrippedLength(
+						class="flex shrink-0 select-none items-center gap-1.5 rounded-full border border-white/[0.16] bg-offblack/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {mentionStrippedLength(
 							inputValue
 						) >= 690
 							? 'text-red-400'
@@ -3390,7 +3438,7 @@
 
 <Dialog.Root bind:open={isDeleteResponseDialogOpen}>
 	<Dialog.Content
-		class="border border-white/[0.16] bg-[#232323]/[0.40] text-white backdrop-blur-[42px] sm:max-w-md"
+		class="border border-white/[0.16] bg-offblack/[0.40] text-white backdrop-blur-[42px] sm:max-w-md"
 	>
 		<Dialog.Header>
 			<Dialog.Title class="text-lg font-semibold text-white">Delete response?</Dialog.Title>
@@ -3436,7 +3484,7 @@
 	<div
 		transition:scale={{ duration: 150, start: 0.95 }}
 		style={`position: fixed; top: ${titleMenuPos.y + 8}px; left: ${Math.min(Math.max(16, titleMenuPos.x - 96), window.innerWidth - 208)}px;`}
-		class="z-50 w-48 rounded-2xl border border-white/[0.16] bg-[#232323]/[0.40] p-1 text-white shadow-2xl backdrop-blur-[42px]"
+		class="z-50 w-48 rounded-2xl border border-white/[0.16] bg-offblack/[0.40] p-1 text-white shadow-2xl backdrop-blur-[42px]"
 	>
 		<button
 			type="button"
@@ -3495,7 +3543,7 @@
 	<div
 		transition:scale={{ duration: 150, start: 0.95 }}
 		style={`position: fixed; top: ${responseMenuPos.y + 6}px; left: ${Math.min(Math.max(16, responseMenuPos.x), window.innerWidth - 208)}px;`}
-		class="z-50 w-48 rounded-2xl border border-white/[0.16] bg-[#232323]/[0.40] p-1 text-white shadow-2xl backdrop-blur-[42px]"
+		class="z-50 w-48 rounded-2xl border border-white/[0.16] bg-offblack/[0.40] p-1 text-white shadow-2xl backdrop-blur-[42px]"
 	>
 		<button
 			type="button"

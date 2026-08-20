@@ -107,7 +107,7 @@
 		use:teleport
 		transition:scale={{ duration: 150, start: 0.95 }}
 		style={`position: fixed; top: ${menuPos.y}px; left: ${menuPos.x}px;`}
-		class="z-50 w-40 rounded-xl border border-white/15 bg-[#232323]/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
+		class="z-50 w-40 rounded-xl border border-white/15 bg-offblack/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 	>
 		<button
 			type="button"

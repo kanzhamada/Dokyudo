@@ -44,8 +44,8 @@
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content
-				class="border-white/[0.16] bg-[#3E3E3E] text-white"
-				arrowClasses="bg-[#3E3E3E] border-none">Sign in / Register with Google</Tooltip.Content
+				class="border-white/[0.16] bg-graphite text-white"
+				arrowClasses="bg-graphite border-none">Sign in / Register with Google</Tooltip.Content
 			>
 		</Tooltip.Root>
 	</Tooltip.Provider>
@@ -61,7 +61,7 @@
 						onclick={initiateGithubOAuth}
 					>
 						<svg
-							class="mr-2 text-[#FAFAFA]"
+							class="mr-2 text-white"
 							width="20"
 							height="20"
 							viewBox="0 0 24 24"
@@ -76,8 +76,8 @@
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content
-				class="border-white/[0.16] bg-[#3E3E3E] text-white"
-				arrowClasses="bg-[#3E3E3E] border-none">Sign in / Register with GitHub</Tooltip.Content
+				class="border-white/[0.16] bg-graphite text-white"
+				arrowClasses="bg-graphite border-none">Sign in / Register with GitHub</Tooltip.Content
 			>
 		</Tooltip.Root>
 	</Tooltip.Provider>

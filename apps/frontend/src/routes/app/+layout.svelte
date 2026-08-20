@@ -80,11 +80,11 @@
 	});
 </script>
 
-<div class="relative flex h-svh max-h-svh w-full min-w-0 overflow-hidden bg-[#1F1E1D]">
+<div class="relative flex h-svh max-h-svh w-full min-w-0 overflow-hidden bg-black text-white">
 	<!-- Decorative Background Circle (Full screen cover behind sidebar and main) -->
 	<div
 		class="pointer-events-none absolute z-0 rounded-full"
-		style="width: 1190px; height: 1190px; left: -295px; top: -318px; background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px); opacity: 0.07;"
+		style="width: 1190px; height: 1190px; left: -295px; top: -318px; background: linear-gradient(180deg, var(--color-white) 0%, var(--color-terracotta-deep) 100%); filter: blur(99px); opacity: 0.07;"
 	></div>
 
 	<Sidebar.Provider class="relative z-10 size-full min-h-svh bg-transparent">

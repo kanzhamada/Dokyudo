@@ -595,7 +595,7 @@
 						side="top"
 						align="start"
 						sideOffset={8}
-						class="z-[70] w-56 min-w-56 rounded-xl border border-white/10 bg-[#242322]/[0.85] p-1 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px]"
+						class="z-[70] w-56 min-w-56 rounded-xl border border-white/10 bg-offblack/[0.85] p-1 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px]"
 					>
 						<div class="px-2.5 py-1.5 font-sans text-xs font-semibold text-white/45">My Account</div>
 						<div class="my-1 h-px bg-white/[0.09]"></div>
@@ -753,7 +753,7 @@
 				side="right"
 				align="start"
 				sideOffset={6}
-				class="z-[70] w-48 rounded-xl border border-white/10 bg-[#242322]/[0.85] p-1 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px]"
+				class="z-[70] w-48 rounded-xl border border-white/10 bg-offblack/[0.85] p-1 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px]"
 			>
 				<DropdownMenu.Item
 					class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98] active:bg-white/15 active:text-white outline-none"
@@ -808,7 +808,7 @@
 <!-- Confirmation Dialog for Logout -->
 <Dialog.Root bind:open={isLogoutDialogOpen}>
 	<Dialog.Content
-		class="rounded-2xl sm:rounded-[18px] border border-white/10 bg-[#242322]/[0.85] text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-md"
+		class="rounded-2xl sm:rounded-[18px] border border-white/10 bg-offblack/[0.85] text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-md"
 	>
 		<Dialog.Header>
 			<Dialog.Title class="text-lg font-semibold text-white">Log out</Dialog.Title>
@@ -894,7 +894,7 @@
 <style>
 	:global(.cursor-expand),
 	.cursor-expand {
-		cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='%23242322' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'/%3E%3Cpath d='M9 3v18'/%3E%3Cpath d='m14 9 3 3-3 3'/%3E%3C/svg%3E") 11 11, e-resize;
+		cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='%23262220' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'/%3E%3Cpath d='M9 3v18'/%3E%3Cpath d='m14 9 3 3-3 3'/%3E%3C/svg%3E") 11 11, e-resize;
 	}
 
 	:global([data-slot="sidebar"] button),

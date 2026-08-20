@@ -111,19 +111,19 @@
 		preference: 'dark',
 		dark: {
 			background: {
-				app: '#191919',
-				surface: '#2A2A2A',
-				surfaceAlt: '#1F1E1D',
-				elevated: '#2A2A2A',
+				app: 'oklch(17.5% 0.01 65)',
+				surface: 'oklch(26% 0.02 68)',
+				surfaceAlt: 'oklch(17.5% 0.01 65)',
+				elevated: 'oklch(26% 0.02 68)',
 				overlay: 'rgba(0, 0, 0, 0.5)',
 				input: 'rgba(255, 255, 255, 0.05)'
 			},
 			foreground: {
-				primary: '#ffffff',
+				primary: 'oklch(98.3% 0.005 87)',
 				secondary: 'rgba(255, 255, 255, 0.6)',
-				muted: 'rgba(255, 255, 255, 0.4)',
+				muted: 'oklch(69.8% 0.03 68)',
 				disabled: 'rgba(255, 255, 255, 0.2)',
-				onAccent: '#ffffff'
+				onAccent: 'oklch(17.5% 0.01 65)'
 			},
 			border: {
 				default: 'rgba(255, 255, 255, 0.1)',
@@ -131,27 +131,27 @@
 				strong: 'rgba(255, 255, 255, 0.2)'
 			},
 			accent: {
-				primary: '#DB8F5E',
-				primaryHover: '#E59C6D',
-				primaryActive: '#F0AA81',
-				primaryLight: '#4a2f20',
-				primaryForeground: '#ffffff'
+				primary: 'oklch(67.4% 0.15 52)',
+				primaryHover: 'oklch(53.2% 0.134 48)',
+				primaryActive: 'oklch(60% 0.14 50)',
+				primaryLight: 'oklch(38% 0.028 66)',
+				primaryForeground: 'oklch(17.5% 0.01 65)'
 			},
 			interactive: {
 				hover: 'rgba(255, 255, 255, 0.1)',
 				active: 'rgba(255, 255, 255, 0.15)',
-				selected: 'rgba(219, 143, 94, 0.2)',
-				focus: '#DB8F5E',
-				focusRing: 'rgba(219, 143, 94, 0.5)'
+				selected: 'oklch(from oklch(67.4% 0.15 52) l c h / 0.2)',
+				focus: 'oklch(67.4% 0.15 52)',
+				focusRing: 'oklch(from oklch(67.4% 0.15 52) l c h / 0.5)'
 			},
 			state: {
-				error: '#ef4444',
+				error: 'oklch(68% 0.16 28)',
 				errorLight: 'rgba(239, 68, 68, 0.1)',
-				warning: '#eab308',
+				warning: 'oklch(76% 0.08 82)',
 				warningLight: 'rgba(234, 179, 8, 0.1)',
-				success: '#22c55e',
+				success: 'oklch(76% 0.07 128)',
 				successLight: 'rgba(34, 197, 94, 0.1)',
-				info: '#3b82f6',
+				info: 'oklch(76% 0.04 235)',
 				infoLight: 'rgba(59, 130, 246, 0.1)'
 			}
 		}
@@ -270,7 +270,7 @@
 <style>
 	.pdf-panel {
 		isolation: isolate;
-		background: #1f1e1d;
+		background: var(--color-black);
 	}
 
 	.pdf-panel::before {
@@ -281,7 +281,7 @@
 		height: 74.375rem;
 		width: 74.375rem;
 		border-radius: 999px;
-		background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%);
+		background: linear-gradient(180deg, var(--color-white) 0%, var(--color-terracotta-deep) 100%);
 		filter: blur(99px);
 		opacity: 0.07;
 		content: '';
@@ -306,20 +306,20 @@
 	.viewer-frame {
 		position: relative;
 		z-index: 1;
-		box-shadow: inset 0 1px 0 rgba(244, 230, 212, 0.06);
+		box-shadow: inset 0 1px 0 oklch(from var(--color-offwhite) l c h / 0.06);
 		animation: viewer-enter 680ms cubic-bezier(0.32, 0.72, 0, 1) 80ms both;
 	}
 
 	.status-chip {
-		border: 1px solid rgba(244, 230, 212, 0.1);
+		border: 1px solid oklch(from var(--color-offwhite) l c h / 0.1);
 		border-radius: 999px;
-		background: rgba(244, 230, 212, 0.045);
+		background: oklch(from var(--color-offwhite) l c h / 0.045);
 		padding: 0.2rem 0.45rem;
 		font-size: 0.625rem;
 		line-height: 1;
 		letter-spacing: 0.08em;
 		white-space: nowrap;
-		color: rgba(244, 230, 212, 0.52);
+		color: oklch(from var(--color-offwhite) l c h / 0.52);
 	}
 
 	.warning-note {
@@ -327,12 +327,12 @@
 	}
 
 	.panel-header:hover .warning-note {
-		color: #eab08c;
+		color: var(--color-terracotta);
 	}
 
 	:global(.close-button) {
-		border: 1px solid rgba(244, 230, 212, 0.08);
-		background: rgba(244, 230, 212, 0.04);
+		border: 1px solid oklch(from var(--color-offwhite) l c h / 0.08);
+		background: oklch(from var(--color-offwhite) l c h / 0.04);
 		transition:
 			background-color 500ms cubic-bezier(0.32, 0.72, 0, 1),
 			color 500ms cubic-bezier(0.32, 0.72, 0, 1),
@@ -357,7 +357,7 @@
 		height: 0.28rem;
 		width: 2.5rem;
 		border-radius: 999px;
-		background: rgba(244, 230, 212, 0.25);
+		background: oklch(from var(--color-offwhite) l c h / 0.25);
 		transition:
 			background-color 200ms cubic-bezier(0.32, 0.72, 0, 1),
 			width 200ms cubic-bezier(0.32, 0.72, 0, 1),
@@ -365,7 +365,7 @@
 	}
 
 	.sheet-handle-active {
-		background: rgba(219, 143, 94, 0.85);
+		background: oklch(from var(--color-terracotta) l c h / 0.85);
 		width: 3.25rem;
 		transform: scale(1.05);
 	}

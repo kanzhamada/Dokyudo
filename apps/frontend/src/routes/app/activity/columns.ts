@@ -24,7 +24,7 @@ function getActionConfig(action: string): { label: string; dotColor: string } {
 		'auth.logout': { label: 'Logout', dotColor: 'bg-white/40' },
 		'auth.password_reset': { label: 'Password Reset', dotColor: 'bg-amber-400' },
 		'tenant.name_updated': { label: 'Tenant Updated', dotColor: 'bg-sky-400' },
-		'document.uploaded': { label: 'Document Uploaded', dotColor: 'bg-[#DB8F5E]' },
+		'document.uploaded': { label: 'Document Uploaded', dotColor: 'bg-terracotta' },
 		'document.deleted': { label: 'Document Deleted', dotColor: 'bg-red-400' },
 		'document.failed': { label: 'Document Failed', dotColor: 'bg-red-400' },
 		'document.quota_exhausted': { label: 'Quota Exhausted', dotColor: 'bg-amber-400' },

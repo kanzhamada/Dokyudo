@@ -109,7 +109,7 @@
 		resize();
 		window.addEventListener('resize', resize);
 
-		const colors = ['#DB8F5E', '#F0D9C7', '#FFFFFF', '#8C6250'];
+		const colors = ['#db8f5e', '#f4e6d4', '#ffffff', '#8f5d4d'];
 		const pieces = Array.from({ length: 72 }, (_, index) => ({
 			x: window.innerWidth / 2 + (Math.random() - 0.5) * 180,
 			y: window.innerHeight * 0.32,
@@ -282,7 +282,7 @@
 		height: 100%;
 		width: 100%;
 		overflow-y: auto;
-		color: #f4f1ed;
+		color: var(--color-offwhite);
 		padding: 2.5rem 1.5rem 4rem;
 	}
 	.billing-shell {
@@ -294,16 +294,16 @@
 		align-items: center;
 		gap: 0.55rem;
 		margin-bottom: 3.5rem;
-		color: #c9c2bb;
+		color: var(--color-warm-gray);
 		font-size: 0.875rem;
 		font-weight: 600;
 	}
 	.billing-brand :global(svg) {
-		color: #db8f5e;
+		color: var(--color-terracotta);
 	}
 	.billing-summary {
-		border-top: 1px solid #514a45;
-		border-bottom: 1px solid #514a45;
+		border-top: 1px solid var(--color-graphite);
+		border-bottom: 1px solid var(--color-graphite);
 		padding: 2.25rem 0 2rem;
 		text-align: left;
 		animation: billing-enter 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -315,24 +315,24 @@
 		width: 3.5rem;
 		height: 3.5rem;
 		margin-bottom: 1.5rem;
-		border: 1px solid #756052;
+		border: 1px solid var(--color-graphite);
 		border-radius: 0.75rem;
 	}
 	.billing-status-icon--success {
-		background: #db8f5e;
-		border-color: #db8f5e;
-		color: #1f1e1d;
+		background: var(--color-terracotta);
+		border-color: var(--color-terracotta);
+		color: var(--color-black);
 	}
 	.billing-status-icon--pending {
-		color: #db8f5e;
+		color: var(--color-terracotta);
 	}
 	.billing-status-icon--error {
-		color: #e0a48a;
-		border-color: #8f5d4d;
+		color: var(--color-c-amber);
+		border-color: var(--color-terracotta-deep);
 	}
 	.billing-kicker {
 		margin: 0 0 0.5rem;
-		color: #a59b93;
+		color: var(--color-warm-gray);
 		font-size: 0.6875rem;
 		font-weight: 700;
 		letter-spacing: 0.14em;
@@ -341,7 +341,7 @@
 	.billing-heading {
 		max-width: 12ch;
 		margin: 0;
-		color: #f4f1ed;
+		color: var(--color-offwhite);
 		font-size: clamp(2.5rem, 7vw, 4.75rem);
 		font-weight: 600;
 		letter-spacing: -0.065em;
@@ -350,12 +350,12 @@
 	.billing-copy {
 		max-width: 42rem;
 		margin: 1.25rem 0 0;
-		color: #b8afa8;
+		color: var(--color-warm-gray);
 		font-size: 0.9375rem;
 		line-height: 1.7;
 	}
 	.billing-copy strong {
-		color: #f4f1ed;
+		color: var(--color-offwhite);
 		font-weight: 600;
 	}
 	.billing-progress {
@@ -363,13 +363,13 @@
 		max-width: 18rem;
 		margin-top: 2rem;
 		overflow: hidden;
-		background: #3a3532;
+		background: var(--color-graphite);
 	}
 	.billing-progress span {
 		display: block;
 		width: 62%;
 		height: 100%;
-		background: #db8f5e;
+		background: var(--color-terracotta);
 		animation: billing-progress 1.4s ease-in-out infinite alternate;
 	}
 	.billing-plan-summary {
@@ -378,8 +378,8 @@
 		gap: 1.5rem;
 		margin-top: 2.5rem;
 		padding: 1.5rem 0;
-		border-top: 1px solid #514a45;
-		border-bottom: 1px solid #514a45;
+		border-top: 1px solid var(--color-graphite);
+		border-bottom: 1px solid var(--color-graphite);
 	}
 	.billing-plan-summary > div,
 	.billing-metadata-item {
@@ -389,7 +389,7 @@
 	}
 	.billing-plan-summary span,
 	.billing-metadata-item span {
-		color: #918880;
+		color: var(--color-gray);
 		font-size: 0.6875rem;
 		font-weight: 600;
 		letter-spacing: 0.1em;
@@ -397,7 +397,7 @@
 	}
 	.billing-plan-summary strong,
 	.billing-metadata-item strong {
-		color: #f4f1ed;
+		color: var(--color-offwhite);
 		font-size: 0.9375rem;
 		font-weight: 600;
 		line-height: 1.4;
@@ -419,10 +419,10 @@
 		gap: 0.5rem;
 		min-height: 2.75rem;
 		padding: 0.75rem 1.25rem;
-		border: 1px solid #db8f5e;
+		border: 1px solid var(--color-terracotta);
 		border-radius: 0.625rem;
-		background: #db8f5e;
-		color: #1f1e1d;
+		background: var(--color-terracotta);
+		color: var(--color-black);
 		font-size: 0.8125rem;
 		font-weight: 700;
 		cursor: pointer;
@@ -431,13 +431,13 @@
 			transform 180ms ease;
 	}
 	.billing-primary-action:hover {
-		background: #e5a06f;
+		background: var(--color-terracotta-deep);
 	}
 	.billing-primary-action:active {
 		transform: translateY(1px);
 	}
 	.billing-primary-action:focus-visible {
-		outline: 2px solid #f0d9c7;
+		outline: 2px solid var(--color-offwhite);
 		outline-offset: 3px;
 	}
 	@keyframes billing-enter {

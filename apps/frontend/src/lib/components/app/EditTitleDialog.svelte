@@ -42,7 +42,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md">
+	<Dialog.Content class="border-white/10 bg-offblack/[0.85] text-white backdrop-blur-[42px] sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title class="text-lg font-semibold text-white">Edit conversation title</Dialog.Title>
 			<Dialog.Description class="text-sm text-white/45">
@@ -56,7 +56,7 @@
 				placeholder="Conversation title"
 				maxlength={100}
 				disabled={isSaving}
-				class="border-white/15 bg-black/20 text-white placeholder:text-white/25 focus-visible:border-[#DB8F5E]/60 focus-visible:ring-[#DB8F5E]/20"
+				class="border-white/15 bg-black/20 text-white placeholder:text-white/25 focus-visible:border-terracotta/60 focus-visible:ring-terracotta/20"
 			/>
 			<Dialog.Footer class="mt-1 flex gap-2 sm:justify-end">
 				<Button
@@ -70,7 +70,7 @@
 				</Button>
 				<Button
 					type="submit"
-					class="cursor-pointer bg-[#DB8F5E] text-black hover:bg-[#E59C6D] disabled:opacity-50"
+					class="cursor-pointer bg-terracotta text-black hover:bg-terracotta-deep disabled:opacity-50"
 					disabled={!titleDraft.trim() || isSaving}
 				>
 					{#if isSaving}

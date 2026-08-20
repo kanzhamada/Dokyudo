@@ -130,13 +130,13 @@
 <div class="flex h-full w-full flex-col gap-6 overflow-y-auto px-6 py-6 font-sans md:px-10 md:py-8">
 	<!-- Breadcrumb -->
 	<Breadcrumb.Root class="mt-16 md:mt-0">
-		<Breadcrumb.List class="text-sm text-[#767676]">
+		<Breadcrumb.List class="text-sm text-warm-gray">
 			<Breadcrumb.Item>
-				<Breadcrumb.Link href="/app/dashboard" class="text-[#767676] hover:text-white/70">
+				<Breadcrumb.Link href="/app/dashboard" class="text-warm-gray hover:text-white/70">
 					Home
 				</Breadcrumb.Link>
 			</Breadcrumb.Item>
-			<Breadcrumb.Separator class="text-[#767676]" />
+			<Breadcrumb.Separator class="text-warm-gray" />
 			<Breadcrumb.Item>
 				<Breadcrumb.Page class="font-medium text-white">Activity Log</Breadcrumb.Page>
 			</Breadcrumb.Item>
@@ -146,14 +146,14 @@
 	<!-- Header -->
 	<div>
 		<h1 class="text-3xl font-semibold text-white md:text-4xl">Activity Log</h1>
-		<p class="mt-1 text-sm font-normal text-[#767676] md:text-base">
+		<p class="mt-1 text-sm font-normal text-warm-gray md:text-base">
 			Audit trail of all account events, logins, and document operations.
 		</p>
 	</div>
 
 	<!-- Controls & Filters Toolbar -->
 	<div
-		class="grid gap-2.5 rounded-xl border border-white/10 bg-[#242424]/90 p-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.12)] lg:grid-cols-[minmax(220px,1fr)_auto] xl:grid-cols-[minmax(220px,0.8fr)_auto_auto]"
+		class="grid gap-2.5 rounded-xl border border-white/10 bg-offblack/90 p-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.12)] lg:grid-cols-[minmax(220px,1fr)_auto] xl:grid-cols-[minmax(220px,0.8fr)_auto_auto]"
 	>
 		<!-- Search -->
 		<div class="relative min-w-0">
@@ -166,7 +166,7 @@
 				id="activity-search"
 				type="text"
 				placeholder="Search activity, IP, or metadata"
-				class="h-9 border-white/10 bg-[#151515] pl-9 text-[13px] text-[#F2F2F2] placeholder:text-[#8D8D8D] focus-visible:border-white/30 focus-visible:ring-2 focus-visible:ring-white/10"
+				class="h-9 border-white/10 bg-black/40 pl-9 text-[13px] text-white placeholder:text-warm-gray/60 focus-visible:border-white/30 focus-visible:ring-2 focus-visible:ring-white/10"
 				bind:value={searchQuery}
 				oninput={handleSearchInput}
 			/>
@@ -174,7 +174,7 @@
 
 		<!-- Category Segmented Control -->
 		<div
-			class="flex min-w-0 [scrollbar-width:none] items-center gap-0.5 overflow-x-auto rounded-lg border border-white/10 bg-[#151515] p-1 [&::-webkit-scrollbar]:hidden"
+			class="flex min-w-0 [scrollbar-width:none] items-center gap-0.5 overflow-x-auto rounded-lg border border-white/10 bg-black/40 p-1 [&::-webkit-scrollbar]:hidden"
 			role="group"
 			aria-label="Filter by category"
 		>
@@ -184,8 +184,8 @@
 					aria-pressed={selectedCategory === cat.id}
 					class="h-7 shrink-0 cursor-pointer select-none rounded-md px-2.5 text-[11px] font-medium transition-all duration-150 active:scale-[0.96] {selectedCategory ===
 					cat.id
-						? 'bg-[#E8E8E8] text-[#181818] shadow-[0_2px_8px_rgba(255,255,255,0.12)]'
-						: 'text-[#969696] hover:bg-white/[0.06] hover:text-[#F2F2F2]'}"
+						? 'bg-offwhite text-black shadow-[0_2px_8px_rgba(255,255,255,0.12)]'
+						: 'text-warm-gray hover:bg-white/[0.06] hover:text-white'}"
 					onclick={() => handleCategorySelect(cat.id)}
 				>
 					{cat.label}
@@ -195,25 +195,25 @@
 
 		<!-- Date Range & Reset -->
 		<div class="flex min-w-0 items-center gap-2 lg:col-span-2 lg:justify-self-end xl:col-span-1">
-			<div class="flex min-w-0 flex-1 items-center gap-1.5 text-[11px] text-[#9B938E] sm:flex-none">
+			<div class="flex min-w-0 flex-1 items-center gap-1.5 text-[11px] text-warm-gray sm:flex-none">
 				<Calendar class="hidden size-4 shrink-0 text-white/55 sm:block" strokeWidth={1.8} />
 				<label for="activity-start-date" class="sr-only">Start date</label>
 				<input
 					id="activity-start-date"
 					type="date"
 					aria-label="Start date"
-					class="h-9 min-w-0 flex-1 rounded-lg border border-white/10 bg-[#151515] px-2.5 text-[11px] text-[#F2F2F2] transition-colors outline-none focus:border-white/30 focus:ring-2 focus:ring-white/10 sm:w-[132px] sm:flex-none"
+					class="h-9 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-2.5 text-[11px] text-white transition-colors outline-none focus:border-white/30 focus:ring-2 focus:ring-white/10 sm:w-[132px] sm:flex-none"
 					style="color-scheme: dark"
 					bind:value={startDate}
 					onchange={handleDateChange}
 				/>
-				<span class="shrink-0 text-[#6F6864]">to</span>
+				<span class="shrink-0 text-gray">to</span>
 				<label for="activity-end-date" class="sr-only">End date</label>
 				<input
 					id="activity-end-date"
 					type="date"
 					aria-label="End date"
-					class="h-9 min-w-0 flex-1 rounded-lg border border-white/10 bg-[#151515] px-2.5 text-[11px] text-[#F2F2F2] transition-colors outline-none focus:border-white/30 focus:ring-2 focus:ring-white/10 sm:w-[132px] sm:flex-none"
+					class="h-9 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-2.5 text-[11px] text-white transition-colors outline-none focus:border-white/30 focus:ring-2 focus:ring-white/10 sm:w-[132px] sm:flex-none"
 					style="color-scheme: dark"
 					bind:value={endDate}
 					onchange={handleDateChange}
@@ -223,7 +223,7 @@
 			<Button
 				variant="ghost"
 				size="sm"
-				class="h-9 shrink-0 cursor-pointer select-none gap-1.5 rounded-lg px-2.5 text-[11px] text-[#969696] transition-all duration-150 hover:bg-white/[0.06] hover:text-[#F2F2F2] active:scale-[0.94] disabled:opacity-40"
+				class="h-9 shrink-0 cursor-pointer select-none gap-1.5 rounded-lg px-2.5 text-[11px] text-warm-gray transition-all duration-150 hover:bg-white/[0.06] hover:text-white active:scale-[0.94] disabled:opacity-40"
 				onclick={resetFilters}
 				disabled={!hasActiveFilters}
 				aria-label="Reset filters"
@@ -232,7 +232,7 @@
 				<span>Reset</span>
 				{#if hasActiveFilters}
 					<span
-						class="flex size-4 items-center justify-center rounded-full bg-white/10 text-[10px] font-semibold text-[#D4D4D4]"
+						class="flex size-4 items-center justify-center rounded-full bg-white/10 text-[10px] font-semibold text-offwhite"
 					>
 						{activeFilterCount}
 					</span>

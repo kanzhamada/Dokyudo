@@ -27,8 +27,8 @@
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content
-			class="border-white/[0.16] bg-[#3E3E3E] text-white"
-			arrowClasses="bg-[#3E3E3E] border-none"
+			class="border-white/[0.16] bg-graphite text-white"
+			arrowClasses="bg-graphite border-none"
 		>
 			{tooltipText}</Tooltip.Content
 		>

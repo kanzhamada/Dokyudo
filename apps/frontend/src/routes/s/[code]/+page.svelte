@@ -234,11 +234,11 @@
 	<meta name="twitter:image" content={ogImageUrl} />
 </svelte:head>
 
-<div class="relative flex h-svh w-full flex-col overflow-hidden bg-[#1F1E1D]">
+<div class="relative flex h-svh w-full flex-col overflow-hidden bg-black">
 	<!-- Ambient Background Glow Circle (Matching App Shell Layout) -->
 	<div
 		class="pointer-events-none absolute -top-[318px] -left-[295px] z-0 h-[1190px] w-[1190px] rounded-full opacity-[0.07]"
-		style="background: linear-gradient(180deg, #ffffff 0%, #4b3117 100%); filter: blur(99px);"
+		style="background: linear-gradient(180deg, var(--color-white) 0%, var(--color-terracotta-deep) 100%); filter: blur(99px);"
 	></div>
 
 	<!-- ================= Mobile Header (reusable MobileHeader capsule) ================= -->
@@ -299,7 +299,7 @@
 
 	<!-- ================= Desktop Header (Gradient Bar — same as chat page) ================= -->
 	<div
-		class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-28 bg-gradient-to-b from-[#1F1E1D] via-[#1F1E1D]/95 via-65% to-transparent md:block"
+		class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-28 bg-gradient-to-b from-black via-black/95 via-65% to-transparent md:block"
 	>
 		<div class="pointer-events-auto grid h-16 w-full grid-cols-3 items-center px-4 md:px-8">
 			<div class="flex justify-start">
@@ -440,7 +440,7 @@
 								/>
 							{/if}
 							<div
-								class="w-fit rounded-2xl border border-white/15 bg-[#2B2A29] px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md"
+								class="w-fit rounded-2xl border border-white/15 bg-offblack px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md"
 							>
 								<p class="leading-relaxed whitespace-pre-wrap">
 									{#each splitMentionSegments(turn.question) as seg}
@@ -561,19 +561,19 @@
 	<!-- ================= Floating Bottom Bar (same capsule style as the chat composer) ================= -->
 	{#if share && !isLoading}
 		<div
-			class="pointer-events-none absolute right-0 bottom-0 left-0 z-30 flex flex-col items-center justify-end bg-gradient-to-t from-[#1F1E1D] via-[#1F1E1D]/90 to-transparent pt-6 pb-4"
+			class="pointer-events-none absolute right-0 bottom-0 left-0 z-30 flex flex-col items-center justify-end bg-gradient-to-t from-black via-black/90 to-transparent pt-6 pb-4"
 			style="font-family: 'Inter', sans-serif;"
 		>
 			<div class="pointer-events-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4">
 				<div
-					class="flex w-full items-center justify-between gap-3 rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.85] px-4 py-2.5 shadow-2xl backdrop-blur-[42px] transition-all"
+					class="flex w-full items-center justify-between gap-3 rounded-[24px] border border-white/[0.16] bg-offblack/[0.85] px-4 py-2.5 shadow-2xl backdrop-blur-[42px] transition-all"
 				>
 					<div class="flex min-w-0 flex-col gap-0.5">
 						<p class="truncate text-xs text-white/60">Shared read-only via Dokyudo.</p>
 						<p class="truncate text-[11px] text-white/40">{footerHint}</p>
 					</div>
 					<Button
-						class="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-[#DB8F5E] px-4 text-sm font-medium text-black hover:bg-[#E39B6D] disabled:cursor-not-allowed disabled:opacity-40"
+						class="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-terracotta px-4 text-sm font-medium text-black hover:bg-terracotta-deep disabled:cursor-not-allowed disabled:opacity-40"
 						disabled={isContinuing}
 						onclick={handleContinue}
 					>

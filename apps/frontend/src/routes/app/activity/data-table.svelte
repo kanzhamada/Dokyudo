@@ -100,7 +100,7 @@
 				aria-label={allIpsVisible ? 'Hide all IP addresses' : 'Show all IP addresses'}
 				title={allIpsVisible ? 'Hide all IP addresses' : 'Show all IP addresses'}
 				onclick={toggleAllIps}
-				class="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 bg-[#151515] px-2.5 text-xs text-[#969696] transition-colors select-none hover:border-white/20 hover:bg-white/[0.06] hover:text-[#F2F2F2] focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:outline-none"
+				class="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 bg-black/40 px-2.5 text-xs text-warm-gray transition-colors select-none hover:border-white/20 hover:bg-white/[0.06] hover:text-white focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:outline-none"
 			>
 				{#if allIpsVisible}
 					<EyeOff class="size-3.5" strokeWidth={1.8} />
@@ -113,14 +113,14 @@
 		</div>
 
 		<!-- Table -->
-		<div class="overflow-hidden rounded-xl border border-[#302F2F]">
+		<div class="overflow-hidden rounded-xl border border-white/10">
 			<Table.Root class="w-full">
-				<Table.Header class="[&_tr]:border-[#302F2F]">
+				<Table.Header class="[&_tr]:border-white/10">
 					{#each table.getHeaderGroups() as headerGroup}
-						<Table.Row class="border-[#302F2F] hover:bg-transparent">
+						<Table.Row class="border-white/10 hover:bg-transparent">
 							{#each headerGroup.headers as header}
 								<Table.Head
-									class="h-11 px-4 text-xs font-medium tracking-wide text-[#767676] uppercase"
+									class="h-11 px-4 text-xs font-medium tracking-wide text-warm-gray uppercase"
 								>
 									{#if !header.isPlaceholder}
 										<FlexRender
@@ -133,10 +133,10 @@
 						</Table.Row>
 					{/each}
 				</Table.Header>
-				<Table.Body class="[&_tr]:border-[#302F2F]">
+				<Table.Body class="[&_tr]:border-white/10">
 					{#if isLoading}
 						{#each Array(8) as _}
-							<Table.Row class="border-[#302F2F] hover:bg-transparent">
+							<Table.Row class="border-white/10 hover:bg-transparent">
 								{#each columns as _col}
 									<Table.Cell class="px-4 py-3">
 										<Skeleton class="h-4 w-full rounded bg-white/5" />
@@ -145,9 +145,9 @@
 							</Table.Row>
 						{/each}
 					{:else if data.length === 0}
-						<Table.Row class="border-[#302F2F] hover:bg-transparent">
+						<Table.Row class="border-white/10 hover:bg-transparent">
 							<Table.Cell colspan={columns.length} class="h-32 text-center">
-								<div class="flex flex-col items-center gap-2 text-[#767676]">
+								<div class="flex flex-col items-center gap-2 text-warm-gray">
 									<p class="text-sm">No activity recorded yet.</p>
 									<p class="text-xs">Actions like logins and document uploads will appear here.</p>
 								</div>
@@ -155,7 +155,7 @@
 						</Table.Row>
 					{:else}
 						{#each table.getRowModel().rows as row (row.id)}
-							<Table.Row class="border-[#302F2F] transition-colors hover:bg-white/[0.02]">
+							<Table.Row class="border-white/10 transition-colors hover:bg-white/[0.02]">
 								{#each row.getVisibleCells() as cell (cell.id)}
 									<Table.Cell class="px-4 py-3">
 										{@const value = cell.getValue()}
@@ -177,7 +177,7 @@
 													</div>
 													{#if cellData.description}
 														<span
-															class="ml-[22px] max-w-[240px] truncate text-xs text-[#959595]"
+															class="ml-[22px] max-w-[240px] truncate text-xs text-warm-gray"
 															title={String(cellData.description)}
 														>
 															{cellData.description}
@@ -198,7 +198,7 @@
 													<Tooltip.Root>
 														<Tooltip.Trigger>
 															{#snippet child({ props })}
-																<span {...props} class="cursor-default text-sm text-[#959595]">
+																<span {...props} class="cursor-default text-sm text-warm-gray">
 																	{cellData.display}
 																</span>
 															{/snippet}
@@ -210,17 +210,17 @@
 														</Tooltip.Content>
 													</Tooltip.Root>
 												{:else}
-													<span class="text-sm text-[#959595]">
+													<span class="text-sm text-warm-gray">
 														{cellData.display}
 													</span>
 												{/if}
 											{:else}
-												<span class="text-sm text-[#959595]">--</span>
+												<span class="text-sm text-warm-gray">--</span>
 											{/if}
 										{:else if cell.column.id === 'ipAddress'}
 											{#if value}
 												<div class="flex items-center gap-2">
-													<span class="text-sm text-[#959595]">
+													<span class="text-sm text-warm-gray">
 														{isIpVisible(row.original.id) ? value : '••••••••'}
 													</span>
 													<button
@@ -235,7 +235,7 @@
 															event.stopPropagation();
 															toggleIp(row.original.id);
 														}}
-														class="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-[#767676] transition-colors hover:bg-white/[0.06] hover:text-[#F2F2F2] focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:outline-none"
+														class="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-warm-gray transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:outline-none"
 													>
 														{#if isIpVisible(row.original.id)}
 															<EyeOff class="size-3.5" strokeWidth={1.8} />
@@ -245,7 +245,7 @@
 													</button>
 												</div>
 											{:else}
-												<span class="text-sm text-[#959595]">--</span>
+												<span class="text-sm text-warm-gray">--</span>
 											{/if}
 										{:else if cell.column.id === 'createdAt'}
 											{@const cellData = cell.column.columnDef.cell
@@ -257,7 +257,7 @@
 												<Tooltip.Root>
 													<Tooltip.Trigger>
 														{#snippet child({ props })}
-															<span {...props} class="cursor-default text-sm text-[#959595]">
+															<span {...props} class="cursor-default text-sm text-warm-gray">
 																{cellData.relative}
 															</span>
 														{/snippet}
@@ -269,10 +269,10 @@
 													</Tooltip.Content>
 												</Tooltip.Root>
 											{:else}
-												<span class="text-sm text-[#959595]">{value}</span>
+												<span class="text-sm text-warm-gray">{value}</span>
 											{/if}
 										{:else}
-											<span class="text-sm text-[#959595]">
+											<span class="text-sm text-warm-gray">
 												{#if value === null || value === undefined || value === ''}
 													--
 												{:else}
@@ -292,7 +292,7 @@
 		<!-- Pagination -->
 		{#if meta.total != null && meta.total > 0}
 			<div class="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
-				<p class="text-xs text-[#767676]">
+				<p class="text-xs text-warm-gray">
 					{(meta.page - 1) * meta.limit + 1}–{Math.min(meta.page * meta.limit, meta.total)} of {meta.total}
 					{meta.total === 1 ? 'event' : 'events'}
 				</p>

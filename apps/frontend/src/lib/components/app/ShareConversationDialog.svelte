@@ -293,7 +293,7 @@
 >
 	<Dialog.Content
 		showCloseButton={true}
-		class="custom-scrollbar max-h-[min(720px,calc(100vh-2rem))] gap-0 overflow-y-auto rounded-[18px] border border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-[520px]"
+		class="custom-scrollbar max-h-[min(720px,calc(100vh-2rem))] gap-0 overflow-y-auto rounded-[18px] border border-white/[0.1] bg-offblack/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-[520px]"
 	>
 		<Dialog.Header class="border-b border-white/[0.09] px-5 py-4 pr-14">
 			<Dialog.Title
@@ -429,7 +429,7 @@
 						/>
 					</div>
 					<Button
-						class="h-10 shrink-0 bg-[#f1eee9] px-4 text-[13px] font-medium text-[#242322] hover:bg-white disabled:opacity-60"
+						class="h-10 shrink-0 bg-terracotta px-4 text-[13px] font-medium text-black hover:bg-terracotta-deep disabled:opacity-60"
 						disabled={isCreating}
 						onclick={handleCreate}
 					>
@@ -556,7 +556,7 @@
 						<input
 							type="checkbox"
 							bind:checked={notifyRecipients}
-							class="size-3.5 rounded border-white/20 bg-transparent text-[#f1eee9] accent-[#f1eee9] focus:ring-1 focus:ring-white/30"
+							class="size-3.5 rounded border-white/20 bg-transparent text-terracotta accent-terracotta focus:ring-1 focus:ring-terracotta/30"
 						/>
 						Notify people by email
 					</label>

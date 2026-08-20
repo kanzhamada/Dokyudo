@@ -20,7 +20,7 @@
 
 <Dialog.Root {open}>
 	<Dialog.Content
-		class="border-white/10 bg-[#232323]/[0.85] text-white backdrop-blur-[42px] sm:max-w-md"
+		class="border-white/10 bg-offblack/[0.85] text-white backdrop-blur-[42px] sm:max-w-md"
 		showCloseButton={false}
 		escapeKeydownBehavior="ignore"
 		interactOutsideBehavior="ignore"

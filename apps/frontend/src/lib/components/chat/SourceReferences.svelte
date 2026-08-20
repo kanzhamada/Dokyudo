@@ -38,8 +38,8 @@
 				<Tooltip.Provider delayDuration={100}>
 					<Tooltip.Root>
 						<Tooltip.Trigger
-							class="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#2B2A29] px-3 py-1 text-xs text-white/80 {interactive
-								? 'cursor-pointer transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white'
+							class="flex items-center gap-1.5 rounded-full border border-white/15 bg-offblack px-3 py-1 text-xs text-white/80 {interactive
+								? 'cursor-pointer transition-colors hover:border-white/30 hover:bg-graphite hover:text-white'
 								: ''}"
 							onclick={interactive ? () => onPreview?.(ref) : undefined}
 						>

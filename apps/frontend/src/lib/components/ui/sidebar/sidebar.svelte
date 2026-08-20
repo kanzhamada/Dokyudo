@@ -51,7 +51,7 @@
 			<div
 				data-sidebar="sidebar"
 				data-slot="sidebar-inner"
-				class="flex h-full w-[280px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.1] bg-[#242322]/[0.92] text-white shadow-2xl shadow-black/50 backdrop-blur-[42px] sm:rounded-[18px]"
+				class="flex h-full w-[280px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-white/[0.1] bg-offblack/[0.92] text-white shadow-2xl shadow-black/50 backdrop-blur-[42px] sm:rounded-[18px]"
 			>
 				{@render children?.()}
 			</div>
@@ -100,7 +100,7 @@
 				class={cn(
 					'flex size-full flex-col',
 					variant === 'floating'
-						? 'overflow-hidden rounded-2xl sm:rounded-[18px] border border-white/[0.1] bg-[#242322]/[0.85] shadow-2xl shadow-black/40 backdrop-blur-[42px]'
+						? 'overflow-hidden rounded-2xl sm:rounded-[18px] border border-white/[0.1] bg-offblack/[0.85] shadow-2xl shadow-black/40 backdrop-blur-[42px]'
 						: 'bg-sidebar'
 				)}
 			>
