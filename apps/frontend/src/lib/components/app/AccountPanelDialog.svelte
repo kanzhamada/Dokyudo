@@ -816,7 +816,9 @@
 			</nav>
 
 			<!-- Panel content -->
-			<div class="min-h-0 w-full max-w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+			<div
+				class="custom-scrollbar min-h-0 w-full max-w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto"
+			>
 				{#if accountPanel.tab === 'settings'}
 					<div class="space-y-5 p-4 sm:p-5">
 						<section aria-labelledby="profile-details-title">

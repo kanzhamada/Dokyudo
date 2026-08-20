@@ -12,6 +12,8 @@
 
 	let { children } = $props();
 
+	let isViewTransitioning = $state(false);
+
 	// SvelteKit View Transitions — scoped strictly to SUBMIT navigations from
 	// the landing page:
 	// - chat submit: /app/chat → /app/chat/<id> via goto (type === 'goto')
@@ -33,11 +35,17 @@
 		if (!isScopedNavigation) return;
 		if (typeof document === 'undefined' || !('startViewTransition' in document)) return;
 
+		isViewTransitioning = true;
 		return new Promise<void>((resolve) => {
-			document.startViewTransition(async () => {
+			const transition = document.startViewTransition(async () => {
 				resolve();
 				await navigation.complete?.catch(() => {});
 			});
+			transition.finished
+				.catch(() => {})
+				.finally(() => {
+					isViewTransitioning = false;
+				});
 		});
 	});
 
@@ -82,7 +90,7 @@
 	<Sidebar.Provider class="relative z-10 size-full min-h-svh bg-transparent">
 		<AppSidebar />
 		<main
-			style="view-transition-name: app-main;"
+			style={isViewTransitioning ? 'view-transition-name: app-main;' : ''}
 			class="relative flex h-full max-h-svh w-full min-w-0 flex-1 flex-col overflow-hidden bg-transparent"
 		>
 			<div class="relative z-10 flex h-full min-h-0 flex-1 flex-col overflow-hidden">

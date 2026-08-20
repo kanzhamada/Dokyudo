@@ -293,7 +293,7 @@
 >
 	<Dialog.Content
 		showCloseButton={true}
-		class="max-h-[min(720px,calc(100vh-2rem))] gap-0 overflow-y-auto rounded-[18px] border border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-[520px]"
+		class="custom-scrollbar max-h-[min(720px,calc(100vh-2rem))] gap-0 overflow-y-auto rounded-[18px] border border-white/[0.1] bg-[#242322]/[0.85] p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-[42px] sm:max-w-[520px]"
 	>
 		<Dialog.Header class="border-b border-white/[0.09] px-5 py-4 pr-14">
 			<Dialog.Title

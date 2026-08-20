@@ -226,12 +226,76 @@
 		@apply border-border outline-ring/50;
 	}
 
-	body {
-		@apply bg-background text-foreground;
-	}
-
 	html {
 		@apply font-sans;
+		color-scheme: dark;
+	}
+
+	body {
+		@apply bg-background text-foreground;
+		color-scheme: dark;
+	}
+}
+
+@utility custom-scrollbar {
+	color-scheme: dark;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+
+	&::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+	&::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	&::-webkit-scrollbar-thumb {
+		background: rgba(255, 255, 255, 0.16);
+		border-radius: 9999px;
+	}
+	&::-webkit-scrollbar-thumb:hover {
+		background: rgba(255, 255, 255, 0.28);
+	}
+	&::-webkit-scrollbar-thumb:active {
+		background: rgba(255, 255, 255, 0.4);
+	}
+	&::-webkit-scrollbar-corner {
+		background: transparent;
+	}
+}
+
+@utility scrollbar-thin {
+	color-scheme: dark;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+
+	&::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+	&::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	&::-webkit-scrollbar-thumb {
+		background: rgba(255, 255, 255, 0.16);
+		border-radius: 9999px;
+	}
+	&::-webkit-scrollbar-thumb:hover {
+		background: rgba(255, 255, 255, 0.28);
+	}
+	&::-webkit-scrollbar-thumb:active {
+		background: rgba(255, 255, 255, 0.4);
+	}
+	&::-webkit-scrollbar-corner {
+		background: transparent;
+	}
+}
+
+@utility no-scrollbar {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+	&::-webkit-scrollbar {
+		display: none;
 	}
 }
 

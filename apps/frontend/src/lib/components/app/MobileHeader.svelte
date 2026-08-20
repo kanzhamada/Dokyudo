@@ -23,7 +23,7 @@
 </script>
 
 <header
-	class="fixed inset-x-4 top-4 z-50 flex animate-slide-down flex-col justify-center overflow-hidden rounded-[24px] border shadow-lg backdrop-blur-[42px] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] md:hidden {mobileHeaderState.type ===
+	class="absolute inset-x-4 top-4 z-50 flex flex-col justify-center overflow-hidden rounded-[24px] border shadow-lg backdrop-blur-[42px] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] md:hidden {mobileHeaderState.type ===
 	'error'
 		? 'h-auto min-h-14 border-red-500/50 bg-red-950/[0.60] px-4 py-3'
 		: mobileHeaderState.type === 'success'
@@ -31,7 +31,7 @@
 			: mobileHeaderState.type === 'info'
 				? 'h-auto min-h-14 border-blue-500/50 bg-blue-950/[0.60] px-4 py-3'
 				: bottom
-					? 'h-auto min-h-14 border-white/[0.16] bg-[#232323]/[0.85] px-3'
+					? 'h-auto min-h-14 border-white/[0.16] bg-[#232323]/[0.40] px-3'
 					: 'h-14 border-white/[0.16] bg-[#232323]/[0.40] px-4'} {className}"
 >
 	{#if mobileHeaderState.type === 'error'}
