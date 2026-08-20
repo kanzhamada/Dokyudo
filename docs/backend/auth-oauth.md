@@ -1,6 +1,6 @@
 # Standalone OAuth 2.0 Module (`/api/oauth`)
 
-**Completion Timestamp:** 2026-08-19T13:45:34+07:00
+**Completion Timestamp:** 2026-08-20T15:12:00+07:00
 
 ## Core Logic
 
@@ -31,13 +31,15 @@ This decoupling ensures that authentication mechanisms remain modular: the stand
 sequenceDiagram
     autonumber
     actor Browser as User Browser
+    participant Puzzle as Crypto Puzzle Middleware
     participant Router as API Gateway (/api/oauth)
     participant OAuthService as OAuth Service
     participant Supabase as Supabase Auth (PKCE)
     participant DB as Postgres (Users / Tenants)
     participant Frontend as Frontend (/oauth-callback)
 
-    Browser->>Router: GET /api/oauth/google
+    Browser->>Puzzle: GET /api/oauth/google (Full-Page Browser Navigation)
+    Puzzle-->>Router: Bypass (Exempt from X-Dokyudo-Puzzle Header)
     Router->>OAuthService: initiateOAuth("google")
     OAuthService->>Supabase: signInWithOAuth("google", PKCE)
     Supabase-->>OAuthService: Authorization URL
@@ -47,7 +49,8 @@ sequenceDiagram
     Google-->>Supabase: Auth code
     Supabase-->>Browser: 302 Redirect to /api/oauth/google/callback?code=xxx
 
-    Browser->>Router: GET /api/oauth/google/callback?code=xxx
+    Browser->>Puzzle: GET /api/oauth/google/callback?code=xxx (Top-Level Redirect)
+    Puzzle-->>Router: Bypass (Exempt from X-Dokyudo-Puzzle Header)
     Router->>OAuthService: handleOAuthCallback("google", code)
     OAuthService->>Supabase: exchangeCodeForSession(code)
     Supabase-->>OAuthService: Session & User Claims
@@ -71,6 +74,8 @@ sequenceDiagram
 | `apps/backend/src/modules/oauth/oauth.schema.ts` | Zod schemas and inferred types for query parameters and responses. |
 | `apps/backend/src/modules/oauth/oauth.routes.test.ts` | Integration tests for OAuth initiate and callback endpoints. |
 | `apps/backend/src/modules/oauth/oauth.service.test.ts` | Isolated unit tests for OAuth service functions. |
+| `apps/backend/src/shared/middlewares/crypto_puzzle.middleware.ts` | Exempted `/api/oauth` routes from the browser WASM PoW requirement. |
+| `apps/backend/src/shared/middlewares/crypto_puzzle.middleware.test.ts` | Regression unit tests verifying `/api/oauth` endpoints succeed without `X-Dokyudo-Puzzle`. |
 | `apps/backend/src/shared/utils/user_provision.util.ts` | Shared idempotent tenant, user, and subscription provisioning helper. |
 | `apps/backend/src/api/router.ts` | Mounted `oauthRoutes` at `/oauth` and added route bypass for public callback. |
 | `apps/backend/src/main.ts` | Whitelisted `/api/oauth` in CSRF protection middleware. |
@@ -83,6 +88,7 @@ sequenceDiagram
 ## Connections
 
 - **Server Gateway**: `router.ts` mounts `oauthRoutes` at `/oauth`. `/api/oauth` paths are added to public route whitelist so unauthenticated users can initiate logins and receive redirects.
+- **Crypto Puzzle Exemption**: `crypto_puzzle.middleware.ts` explicitly bypasses Proof-of-Work header checks for `/api/oauth/*` because full-page browser URL navigations cannot supply custom HTTP headers.
 - **CSRF Whitelist**: `main.ts` skips CSRF origin validation on `/api/oauth` to handle direct browser navigations and third-party callback redirects.
 - **Shared Provisioning**: `user_provision.util.ts` centralizes tenant and user creation with race-condition handling (`onConflictDoNothing`), used by both email registration and OAuth logins.
 
@@ -91,5 +97,6 @@ sequenceDiagram
 ## Architectural Decisions
 
 1. **Modular Monolith Decoupling**: Extracting `/api/oauth` from `/api/auth` allows OAuth and credential auth to be toggled, refactored, or audited independently.
-2. **Shared User Provisioning Helper**: Centralizing the DB provisioning logic into `shared/utils/user_provision.util.ts` eliminates code duplication across auth and oauth modules.
-3. **Server-Side PKCE**: Continues leveraging Supabase Server-Side PKCE for secure code verification without exposing client secrets in the backend.
+2. **Proof-of-Work (PoW) Bypass for Browser Redirects**: Standard API requests made via `fetch` attach the computed `X-Dokyudo-Puzzle` header. Browser address bar navigations (such as clicking an OAuth button that sets `window.location.href`) and provider redirects (Google/GitHub redirecting to `/api/oauth/:provider/callback`) cannot attach custom HTTP headers. Therefore, `/api/oauth` is exempted alongside `/api/auth` and `/api/payments/webhook`.
+3. **Shared User Provisioning Helper**: Centralizing the DB provisioning logic into `shared/utils/user_provision.util.ts` eliminates code duplication across auth and oauth modules.
+4. **Server-Side PKCE**: Continues leveraging Supabase Server-Side PKCE for secure code verification without exposing client secrets in the backend.

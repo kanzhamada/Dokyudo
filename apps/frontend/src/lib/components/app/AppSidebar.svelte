@@ -531,6 +531,20 @@
 					</Sidebar.Menu>
 				</div>
 			</Sidebar.Group>
+
+			<!-- Empty Area Expand Trigger (Visible only when collapsed) -->
+			<button
+				type="button"
+				class="hidden group-data-[collapsible=icon]:flex min-h-0 flex-1 w-full cursor-expand items-center justify-center border-none bg-transparent outline-none select-none transition-colors"
+				onclick={(e) => {
+					e.preventDefault();
+					sidebar.toggle();
+				}}
+				aria-label="Expand Sidebar (Ctrl + B)"
+				title="Expand Sidebar (Ctrl + B)"
+			>
+				<span class="sr-only">Expand Sidebar</span>
+			</button>
 		</Sidebar.Content>
 	</div>
 
@@ -631,6 +645,7 @@
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Footer>
+	<Sidebar.Rail />
 </Sidebar.Root>
 
 {#snippet navItem(item: (typeof navItems)[0])}
@@ -877,6 +892,11 @@
 />
 
 <style>
+	:global(.cursor-expand),
+	.cursor-expand {
+		cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='%23242322' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'/%3E%3Cpath d='M9 3v18'/%3E%3Cpath d='m14 9 3 3-3 3'/%3E%3C/svg%3E") 11 11, e-resize;
+	}
+
 	:global([data-slot="sidebar"] button),
 	:global([data-slot="sidebar"] a),
 	:global([data-slot="sidebar"] [data-slot="sidebar-menu-button"]),

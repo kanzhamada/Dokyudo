@@ -2358,38 +2358,21 @@
 
 		<!-- Desktop Conversation Header -->
 		<div
-			class="pointer-events-none absolute top-4 inset-x-4 md:inset-x-6 lg:inset-x-8 z-20 hidden md:block"
+			class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-28 bg-gradient-to-b from-[#1F1E1D] via-[#1F1E1D]/95 via-65% to-transparent md:block"
 		>
-			<div
-				class="pointer-events-auto grid h-14 w-full grid-cols-3 items-center rounded-[24px] border border-white/[0.16] bg-[#232323]/[0.40] px-4 shadow-lg backdrop-blur-[42px] transition-all"
-			>
+			<div class="pointer-events-auto grid h-16 w-full grid-cols-3 items-center px-4 md:px-8">
 				<div class="flex justify-start">
-					<Tooltip.Provider delayDuration={100}>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<button
-										{...props}
-										type="button"
-										class="flex cursor-pointer select-none items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-sm text-white/[0.60] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-[0.94]"
-										onclick={() => {
-											triggerHaptic(15);
-											goto('/app/chat');
-										}}
-									>
-										<Plus class="size-4" />
-										<span>New chat</span>
-									</button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content
-								class="border-white/[0.16] bg-[#232323] text-white"
-								arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
-							>
-								<p>Start New Chat</p>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
+					<button
+						type="button"
+						class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+						onclick={() => {
+							triggerHaptic(15);
+							goto('/app/chat');
+						}}
+					>
+						<Plus class="size-4" />
+						<span>New chat</span>
+					</button>
 				</div>
 
 				<div class="flex min-w-0 justify-center">
@@ -2401,7 +2384,7 @@
 										<button
 											{...props}
 											type="button"
-											class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-sm text-white/[0.80] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] focus:outline-none active:scale-[0.97]"
+											class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
 											onclick={openTitleMenu}
 										>
 											{#if isPinned}
@@ -2417,8 +2400,7 @@
 									{/snippet}
 								</Tooltip.Trigger>
 								<Tooltip.Content
-									class="max-w-xs border-white/[0.16] bg-[#232323] text-white"
-									arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+									class="max-w-xs rounded-md border-0 bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 								>
 									<p>{conversationTitle}</p>
 								</Tooltip.Content>
@@ -2427,7 +2409,7 @@
 					{:else}
 						<button
 							type="button"
-							class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-sm text-white/[0.80] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] focus:outline-none active:scale-[0.97]"
+							class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
 							onclick={openTitleMenu}
 						>
 							{#if isPinned}
@@ -2441,7 +2423,7 @@
 					{/if}
 				</div>
 
-				<div class="flex justify-end gap-1.5">
+				<div class="flex justify-end gap-1">
 					<Tooltip.Provider delayDuration={100}>
 						<Tooltip.Root>
 							<Tooltip.Trigger>
@@ -2449,7 +2431,7 @@
 									<button
 										{...props}
 										type="button"
-										class="flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-transparent text-white/[0.60] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-[0.90] disabled:cursor-not-allowed disabled:opacity-40"
+										class="flex size-8 cursor-pointer select-none items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
 										onclick={() => {
 											triggerHaptic(15);
 											shareConversation();
@@ -2462,8 +2444,7 @@
 								{/snippet}
 							</Tooltip.Trigger>
 							<Tooltip.Content
-								class="border-white/[0.16] bg-[#232323] text-white"
-								arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+								class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 							>
 								<p>Share Conversation</p>
 							</Tooltip.Content>
@@ -2471,45 +2452,22 @@
 					</Tooltip.Provider>
 
 					<DropdownMenu.Root>
-						<Tooltip.Provider delayDuration={100}>
-							<Tooltip.Root>
-								<Tooltip.Trigger>
-									{#snippet child({ props: tooltipProps })}
-										<DropdownMenu.Trigger>
-											{#snippet child({ props: dropdownProps })}
-												<button
-													{...tooltipProps}
-													{...dropdownProps}
-													type="button"
-													onclick={() => triggerHaptic(15)}
-													class="relative flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-transparent text-white/[0.60] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-[#B8B5B5]/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] focus:outline-none active:scale-[0.90]"
-													aria-label="Conversation references"
-												>
-													<MxIcon name="document-outline" class="size-4" />
-													{#if conversationReferences.length > 0}
-														<span
-															class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
-														>
-															{conversationReferences.length}
-														</span>
-													{/if}
-												</button>
-											{/snippet}
-										</DropdownMenu.Trigger>
-									{/snippet}
-								</Tooltip.Trigger>
-								<Tooltip.Content
-									class="border-white/[0.16] bg-[#232323] text-white"
-									arrowClasses="bg-[#232323] border-white/[0.16] border-b border-r"
+						<DropdownMenu.Trigger
+							class="relative flex size-8 cursor-pointer select-none items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/10 hover:text-white focus:outline-none"
+							aria-label="Conversation references"
+						>
+							<MxIcon name="document-outline" class="size-4" />
+							{#if conversationReferences.length > 0}
+								<span
+									class="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-[#DB8F5E] text-[9px] font-semibold text-black"
 								>
-									<p>Conversation References</p>
-								</Tooltip.Content>
-							</Tooltip.Root>
-						</Tooltip.Provider>
-
+									{conversationReferences.length}
+								</span>
+							{/if}
+						</DropdownMenu.Trigger>
 						<DropdownMenu.Content
 							align="end"
-							class="w-72 border border-white/[0.16] bg-[#232323]/[0.40] p-1 text-white backdrop-blur-[42px]"
+							class="w-72 border-white/10 bg-[#232323] p-1 text-white"
 						>
 							<div class="px-2.5 py-2 text-xs font-medium text-white/45">
 								Conversation references
@@ -2521,7 +2479,7 @@
 							{:else}
 								{#each conversationReferences as reference (reference.id)}
 									<DropdownMenu.Item
-										class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/75 transition-all duration-150 hover:bg-white/[0.12] hover:text-white focus:bg-white/[0.16] focus:text-white active:scale-[0.98]"
+										class="flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-2 text-xs text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98]"
 										onclick={() => {
 											triggerHaptic(15);
 											openCitationPreview(reference.id, reference.name, reference.pages ?? []);

@@ -31,6 +31,11 @@ describe("CryptoPuzzle Middleware", () => {
         app.use("*", cryptoPuzzleMiddleware);
         
         app.get("/protected", (c) => c.json({ success: true }));
+        app.get("/api/auth/login", (c) => c.json({ success: true }));
+        app.get("/api/oauth/google", (c) => c.json({ success: true }));
+        app.get("/api/oauth/github", (c) => c.json({ success: true }));
+        app.get("/api/oauth/google/callback", (c) => c.json({ success: true }));
+        app.post("/api/payments/webhook", (c) => c.json({ success: true }));
         app.get("/api/rag/shares/abc123", (c) => c.json({ code: "abc123" }));
         app.get("/api/rag/shares/abc123/continue", (c) => c.json({ success: true }));
     });
@@ -110,6 +115,32 @@ describe("CryptoPuzzle Middleware", () => {
         assertEquals(res.status, 200);
         const json = await res.json();
         assertEquals(json.code, "abc123");
+    });
+
+    it("positive: allows oauth routes without puzzle header (browser redirect flow)", async () => {
+        const googleReq = new Request("http://localhost/api/oauth/google");
+        const googleRes = await app.fetch(googleReq);
+        assertEquals(googleRes.status, 200);
+
+        const githubReq = new Request("http://localhost/api/oauth/github");
+        const githubRes = await app.fetch(githubReq);
+        assertEquals(githubRes.status, 200);
+
+        const callbackReq = new Request("http://localhost/api/oauth/google/callback");
+        const callbackRes = await app.fetch(callbackReq);
+        assertEquals(callbackRes.status, 200);
+    });
+
+    it("positive: allows auth routes and webhooks without puzzle header", async () => {
+        const authReq = new Request("http://localhost/api/auth/login");
+        const authRes = await app.fetch(authReq);
+        assertEquals(authRes.status, 200);
+
+        const webhookReq = new Request("http://localhost/api/payments/webhook", {
+            method: "POST",
+        });
+        const webhookRes = await app.fetch(webhookReq);
+        assertEquals(webhookRes.status, 200);
     });
 
     it("negative: still requires puzzle for share mutations and invite reads", async () => {

@@ -23,5 +23,5 @@ docs {
   then redirects to {FRONTEND_URL}/app/chat (or {FRONTEND_URL}/login?oauth_error=... on failure).
   Email verification gate: rejects and logs out unverified email profiles immediately.
   NOTE: This endpoint is normally called by the browser redirect from GitHub, not directly.
-  Internal classification: PUBLIC (no auth token required).
+  Internal classification: PUBLIC (no auth token or X-Dokyudo-Puzzle header required; top-level browser redirect).
 }

@@ -24,7 +24,9 @@ export async function cryptoPuzzleMiddleware(c: Context, next: Next) {
   // Auth routes and the payments webhook are exempt: they are triggered by
   // top-level browser navigations (OAuth redirect/callback) or by Stripe,
   // none of which can solve the browser PoW puzzle.
-  const isAuthRoute = c.req.path.startsWith("/api/auth");
+  const isAuthRoute =
+    c.req.path.startsWith("/api/auth") ||
+    c.req.path.startsWith("/api/oauth");
   const isWebhook = c.req.path === "/api/payments/webhook";
   if (isAuthRoute || isWebhook) {
     return await next();
