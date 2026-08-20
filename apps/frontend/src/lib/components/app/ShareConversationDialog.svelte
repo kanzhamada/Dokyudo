@@ -4,11 +4,6 @@
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Input } from '$lib/components/ui/input';
 	import {
-		Check,
-		Copy,
-		Globe2,
-		Link2,
-		LockKeyhole,
 		Mail,
 		UserRound,
 		X
@@ -364,7 +359,7 @@
 							: 'text-white/45 hover:bg-white/[0.05] hover:text-white/75'}"
 						onclick={() => setShareMode('public')}
 					>
-						<Globe2 class="size-3.5" strokeWidth={1.8} />
+						<MxIcon name="global-outline" class="size-3.5" />
 						Public
 					</button>
 					<button
@@ -376,7 +371,7 @@
 							: 'text-white/45 hover:bg-white/[0.05] hover:text-white/75'}"
 						onclick={() => setShareMode('private')}
 					>
-						<LockKeyhole class="size-3.5" strokeWidth={1.8} />
+						<MxIcon name="lock-keyhole-minimalistic-outline" class="size-3.5" />
 						Private
 					</button>
 				</div>
@@ -417,9 +412,9 @@
 
 				<div class="flex items-center gap-2">
 					<div class="relative min-w-0 flex-1">
-						<Link2
+						<MxIcon
+							name="text-formatting-link-outline"
 							class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/35"
-							strokeWidth={1.8}
 						/>
 						<Input
 							bind:value={customCode}
@@ -461,10 +456,10 @@
 							onclick={() => copyText(lastCreatedUrl!, 'created')}
 						>
 							{#if copiedCode === 'created'}
-								<Check class="size-3.5 text-emerald-300" strokeWidth={2} />
+								<MxIcon name="check-square-outline" class="size-3.5 text-emerald-300" />
 								Copied
 							{:else}
-								<Copy class="size-3.5" strokeWidth={1.8} />
+								<MxIcon name="copy-outline" class="size-3.5" />
 								Copy
 							{/if}
 						</button>

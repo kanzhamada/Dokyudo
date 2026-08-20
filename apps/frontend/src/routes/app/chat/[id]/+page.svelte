@@ -5,16 +5,10 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
-		ChevronDown,
-		ChevronLeft,
-		ChevronRight,
 		X,
 		Sparkles,
-		Copy,
-		Check,
 		ThumbsUp,
 		ThumbsDown,
-		GitBranch,
 		Volume2,
 		RotateCw,
 		Square,
@@ -2224,7 +2218,8 @@
 						<span class="truncate text-sm font-semibold tracking-tight text-white">
 							{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
 						</span>
-						<ChevronDown
+						<MxIcon
+							name="alt-arrow-down-outline"
 							class="size-3.5 shrink-0 text-white/45 transition-transform duration-200 {isMobileTitleActionsOpen
 								? 'rotate-180'
 								: ''}"
@@ -2418,7 +2413,7 @@
 													? 'New Conversation'
 													: conversationTitle || 'New Conversation'}
 											</span>
-											<ChevronDown class="size-3.5 shrink-0 text-white/45" />
+											<MxIcon name="alt-arrow-down-outline" class="size-3.5 shrink-0 text-white/45" />
 										</button>
 									{/snippet}
 								</Tooltip.Trigger>
@@ -2442,7 +2437,7 @@
 							<span class="max-w-56 truncate font-medium">
 								{isTitleLoading ? 'New Conversation' : conversationTitle || 'New Conversation'}
 							</span>
-							<ChevronDown class="size-3.5 shrink-0 text-white/45" />
+							<MxIcon name="alt-arrow-down-outline" class="size-3.5 shrink-0 text-white/45" />
 						</button>
 					{/if}
 				</div>
@@ -2717,9 +2712,9 @@
 															aria-label="Copy question"
 														>
 															{#if copiedMessageId === msg.id}
-																<Check class="size-3 text-green-400" />
+																<MxIcon name="check-square-outline" class="size-3 text-green-400" />
 															{:else}
-																<Copy class="size-3" />
+																<MxIcon name="copy-outline" class="size-3" />
 															{/if}
 														</Button>
 													{/snippet}
@@ -3159,9 +3154,9 @@
 																aria-label="Copy response"
 															>
 																{#if copiedMessageId === msg.id}
-																	<Check class="size-3.5 text-green-400" />
+																	<MxIcon name="check-square-outline" class="size-3.5 text-green-400" />
 																{:else}
-																	<Copy class="size-3.5" />
+																	<MxIcon name="copy-outline" class="size-3.5" />
 																{/if}
 															</Button>
 														{/snippet}
@@ -3308,7 +3303,7 @@
 													disabled={isGenerating || (msg.variantIndex ?? 0) <= 0}
 													aria-label="Previous response"
 												>
-													<ChevronLeft class="size-3" />
+													<MxIcon name="alt-arrow-left-outline" class="size-3" />
 												</button>
 												<span class="px-1.5 text-xs tabular-nums"
 													>{(msg.variantIndex ?? 0) + 1} / {(msg.variants?.length ?? 0) + 1}</span
@@ -3321,7 +3316,7 @@
 														(msg.variantIndex ?? 0) >= (msg.variants?.length ?? 0)}
 													aria-label="Next response"
 												>
-													<ChevronRight class="size-3" />
+													<MxIcon name="alt-arrow-right-outline" class="size-3" />
 												</button>
 											</div>
 										{/if}
@@ -3333,7 +3328,7 @@
 					{#if msg.role === 'assistant' && msg.branchedFromTurnId}
 						<div class="flex items-center justify-center gap-2 py-2 text-[11px] text-white/40">
 							<div class="h-px flex-1 bg-white/10"></div>
-							<GitBranch class="size-3 shrink-0" />
+							<MxIcon name="branching-paths-down-outline" class="size-3 shrink-0" />
 							<span class="flex items-center gap-1">
 								Branched from
 								{#if branchOfTitle}
@@ -3553,7 +3548,7 @@
 				branchFromMessage(activeResponseMenuMsgIndex!);
 			}}
 		>
-			<GitBranch class="size-3.5 text-white/70" />
+			<MxIcon name="branching-paths-down-outline" class="size-3.5 text-white/70" />
 			<span>Branch in new chat</span>
 		</button>
 		<button

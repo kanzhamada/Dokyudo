@@ -188,6 +188,18 @@ Note: `mxBoldName` in the data file is hand-maintained logic (it rewrites the `o
 | Warning | `danger-triangle-outline` / `danger-triangle-bold` | |
 | Enterprise / global | `global-outline` / `global-bold` | |
 | Logout | `logout3-bold` / `logout3-outline` | note `logout3` |
+| Calendar | `calendar2-outline` / `calendar2-bold` | |
+| Check / confirm | `check-square-outline` / `check-square-bold` | |
+| ChevronDown | `alt-arrow-down-outline` / `alt-arrow-down-bold` | |
+| ChevronLeft | `alt-arrow-left-outline` / `alt-arrow-left-bold` | |
+| ChevronRight | `alt-arrow-right-outline` / `alt-arrow-right-bold` | |
+| Code / code block | `it-code-outline` / `it-code-bold` | |
+| Copy | `copy-outline` / `copy-bold` | |
+| Git branch | `branching-paths-down-outline` / `branching-paths-down-bold` | |
+| Key | `key-minimalistic-outline` / `key-minimalistic-bold` | |
+| Link | `text-formatting-link-outline` / `text-formatting-link-bold` | |
+| Lock | `lock1-outline` / `lock1-bold` | |
+| Lock keyhole | `lock-keyhole-minimalistic-outline` / `lock-keyhole-minimalistic-bold` | |
 
 ### Variant conventions
 

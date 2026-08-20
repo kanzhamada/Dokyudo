@@ -5,18 +5,12 @@
 	import { Spinner } from '$lib/components/ui/spinner';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import {
-		CalendarClock,
-		Check,
-		Copy,
 		CreditCard,
 		ExternalLink,
 		Eye,
 		EyeOff,
 		FileText,
 		HardDrive,
-		KeyRound,
-		Link2,
-		LockKeyhole,
 		MessageCircle,
 		RefreshCw,
 		RotateCw,
@@ -24,6 +18,7 @@
 		Settings2,
 		UserRound
 	} from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
@@ -53,7 +48,6 @@
 	import { sessionStore } from '$lib/state/session.store.svelte';
 	import type { UserProfileResponse, UserUsageResponse } from '$lib/types/auth.types';
 	import type { ShareListItem } from '$lib/types/rag.types';
-	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
 	import geminiIcon from '$lib/assets/llm/gemini.svg';
 	import mistralIcon from '$lib/assets/llm/mistral.svg';
@@ -769,9 +763,9 @@
 				{:else if accountPanel.tab === 'billing'}
 					<CreditCard class="size-[15px] text-white/55" strokeWidth={1.8} />
 				{:else if accountPanel.tab === 'byok'}
-					<KeyRound class="size-[15px] text-white/55" strokeWidth={1.8} />
+					<MxIcon name="key-minimalistic-outline" class="size-[15px] text-white/55" />
 				{:else}
-					<Link2 class="size-[15px] text-white/55" strokeWidth={1.8} />
+					<MxIcon name="text-formatting-link-outline" class="size-[15px] text-white/55" />
 				{/if}
 				{activeTab.label}
 			</Dialog.Title>
@@ -806,9 +800,9 @@
 						{:else if item.id === 'billing'}
 							<CreditCard class="size-3.5 shrink-0 sm:size-4" strokeWidth={1.8} />
 						{:else if item.id === 'byok'}
-							<KeyRound class="size-3.5 shrink-0 sm:size-4" strokeWidth={1.8} />
+							<MxIcon name="key-minimalistic-outline" class="size-3.5 shrink-0 sm:size-4" />
 						{:else}
-							<Link2 class="size-3.5 shrink-0 sm:size-4" strokeWidth={1.8} />
+							<MxIcon name="text-formatting-link-outline" class="size-3.5 shrink-0 sm:size-4" />
 						{/if}
 						<span class="whitespace-nowrap">{item.label}</span>
 					</button>
@@ -883,7 +877,7 @@
 								<div
 									class="flex size-7 shrink-0 items-center justify-center rounded-md bg-white/[0.07]"
 								>
-									<KeyRound class="size-3.5 text-white/45" strokeWidth={1.8} />
+									<MxIcon name="key-minimalistic-outline" class="size-3.5 text-white/45" />
 								</div>
 								<div>
 									<h2 id="password-title" class="text-sm font-medium text-white/80">
@@ -1165,7 +1159,7 @@
 									<div
 										class="mt-3 flex items-center gap-2.5 rounded-lg border border-white/[0.1] bg-white/[0.025] p-2.5 sm:p-3"
 									>
-										<CalendarClock class="size-4 shrink-0 text-white/40" strokeWidth={1.8} />
+										<MxIcon name="calendar2-outline" class="size-4 shrink-0 text-white/40" />
 										<div>
 											<p class="text-xs text-white/60">Monthly reset</p>
 											<p class="mt-0.5 text-[11px] text-white/35">
@@ -1178,7 +1172,7 @@
 										class="mt-3 flex flex-col gap-3 rounded-lg border border-white/[0.1] bg-white/[0.025] p-3 sm:flex-row sm:items-center sm:justify-between"
 									>
 										<div class="flex items-center gap-2.5">
-											<CalendarClock class="size-4 shrink-0 text-white/40" strokeWidth={1.8} />
+											<MxIcon name="calendar2-outline" class="size-4 shrink-0 text-white/40" />
 											<div>
 												<p class="text-xs text-white/60">Subscription</p>
 												<p class="mt-0.5 text-[11px] text-white/35">
@@ -1254,7 +1248,7 @@
 										<div class="mt-3 space-y-1.5 border-t border-white/[0.08] pt-3">
 											{#each plan.limits as limit}
 												<div class="flex items-start gap-1.5 text-[10px] text-white/55">
-													<Check class="mt-0.5 size-3 shrink-0 text-white/40" strokeWidth={2} />
+													<MxIcon name="check-square-outline" class="mt-0.5 size-3 shrink-0 text-white/40" />
 													<span>{limit}</span>
 												</div>
 											{/each}
@@ -1267,7 +1261,7 @@
 											</p>
 											{#each plan.features as feature}
 												<div class="flex items-start gap-1.5 text-[10px] leading-4 text-white/45">
-													<Check class="mt-0.5 size-3 shrink-0 text-white/30" strokeWidth={2} />
+													<MxIcon name="check-square-outline" class="mt-0.5 size-3 shrink-0 text-white/30" />
 													<span>{feature}</span>
 												</div>
 											{/each}
@@ -1302,7 +1296,7 @@
 												<span
 													class="absolute inset-0 flex items-center justify-center bg-offblack/70"
 												>
-													<LockKeyhole class="size-3.5 text-white/55" strokeWidth={1.8} />
+													<MxIcon name="lock-keyhole-minimalistic-outline" class="size-3.5 text-white/55" />
 												</span>
 											</button>
 										{:else}
@@ -1358,7 +1352,7 @@
 										{BYOK_PROVIDER_OPTIONS.find((item) => item.id === provider)?.description}
 									</p>
 								</div>
-								<KeyRound class="size-4 shrink-0 text-white/35" />
+								<MxIcon name="key-minimalistic-outline" class="size-4 shrink-0 text-white/35" />
 							</div>
 
 							{#if keyMasks[provider]}
@@ -1366,7 +1360,7 @@
 									class="flex flex-col gap-2 rounded-lg border border-white/15 bg-black/20 p-2.5 sm:h-10 sm:flex-row sm:items-center sm:justify-between sm:px-3 sm:py-0"
 								>
 									<div class="flex items-center gap-2 text-xs text-white/75 sm:text-sm">
-										<Check class="size-4 shrink-0 text-white/60" />
+										<MxIcon name="check-square-bold" class="size-4 shrink-0 text-white/60" />
 										<span>API Key Configured</span>
 									</div>
 									<button
@@ -1541,7 +1535,7 @@
 							</div>
 						{:else if shares.length === 0}
 							<div class="flex flex-col items-center gap-2 py-16 text-center">
-								<Link2 class="size-6 text-white/20" strokeWidth={1.5} />
+								<MxIcon name="text-formatting-link-outline" class="size-6 text-white/20" />
 								<p class="text-sm text-white/60">No active shared links</p>
 								<p class="max-w-xs text-xs leading-5 text-white/35">
 									Links you create from a conversation will appear here.
@@ -1600,7 +1594,7 @@
 													<div
 														class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]"
 													>
-														<Link2 class="size-3.5 text-white/45" strokeWidth={1.8} />
+														<MxIcon name="text-formatting-link-outline" class="size-3.5 text-white/45" />
 													</div>
 													<div class="min-w-0 flex-1">
 														<div class="flex items-center gap-2">
@@ -1611,7 +1605,7 @@
 																<span
 																	class="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-white/55 uppercase"
 																>
-																	<LockKeyhole class="size-2.5" strokeWidth={1.8} />
+																	<MxIcon name="lock-keyhole-minimalistic-outline" class="size-2.5" />
 																	Private
 																</span>
 															{/if}
@@ -1646,9 +1640,9 @@
 															}}
 														>
 															{#if copiedCode === share.code}
-																<Check class="size-3.5 text-emerald-300" strokeWidth={2} />
+																<MxIcon name="check-square-outline" class="size-3.5 text-emerald-300" />
 															{:else}
-																<Copy class="size-3.5" strokeWidth={1.8} />
+																<MxIcon name="copy-outline" class="size-3.5" />
 															{/if}
 														</button>
 														<button

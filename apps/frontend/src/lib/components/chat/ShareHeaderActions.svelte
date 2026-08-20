@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Check } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { toast } from 'svelte-sonner';
@@ -43,8 +42,8 @@
 					aria-label="Copy share link"
 				>
 					{#if copied}
-						<Check class="size-4 text-green-400" />
-					{:else}
+					<MxIcon name="check-square-outline" class="size-4 text-green-400" />
+				{:else}
 						<MxIcon name="share-outline" class="size-4" />
 					{/if}
 				</button>

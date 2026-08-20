@@ -341,7 +341,7 @@
 			<source src="/videos/_ _project_metadata_.mp4" type="video/mp4" />
 		</video>
 		<!-- Dark overlay for readability: solid black at 69% opacity -->
-		<div class="absolute inset-0 bg-black/42"></div>
+		<div class="absolute inset-0 bg-black/22"></div>
 	</div>
 
 	<!-- Chat Interface Container -->

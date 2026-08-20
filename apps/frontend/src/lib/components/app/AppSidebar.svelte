@@ -17,7 +17,6 @@
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import PanelLeft from '@lucide/svelte/icons/panel-left';
 	import Share from '@lucide/svelte/icons/share';
-	import Link2 from '@lucide/svelte/icons/link-2';
 
 	// Brand Logo
 	import favicon from '$lib/assets/favicon.svg?raw';
@@ -626,7 +625,7 @@
 								openAccountPanel('shared-links');
 							}}
 						>
-							<Link2 class="size-3.5 text-white/60" />
+							<MxIcon name="text-formatting-link-outline" class="size-3.5 text-white/60" />
 							<span>Shared links</span>
 						</DropdownMenu.Item>
 						<div class="my-1 h-px bg-white/[0.09]"></div>

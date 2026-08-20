@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { toast } from 'svelte-sonner';
-	import { Calendar, RotateCcw } from 'lucide-svelte';
+	import { RotateCcw } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -196,7 +196,7 @@
 		<!-- Date Range & Reset -->
 		<div class="flex min-w-0 items-center gap-2 lg:col-span-2 lg:justify-self-end xl:col-span-1">
 			<div class="flex min-w-0 flex-1 items-center gap-1.5 text-[11px] text-warm-gray sm:flex-none">
-				<Calendar class="hidden size-4 shrink-0 text-white/55 sm:block" strokeWidth={1.8} />
+				<MxIcon name="calendar2-outline" class="hidden size-4 shrink-0 text-white/55 sm:block" />
 				<label for="activity-start-date" class="sr-only">Start date</label>
 				<input
 					id="activity-start-date"

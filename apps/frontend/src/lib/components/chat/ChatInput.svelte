@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronDown, X, Square, Check, Loader2, Sparkles } from 'lucide-svelte';
+	import { X, Square, Loader2, Sparkles } from 'lucide-svelte';
 	import { fly } from 'svelte/transition';
 	import { cubicOut, cubicIn } from 'svelte/easing';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
@@ -720,7 +720,7 @@
 								class="size-5 opacity-40 brightness-0 invert transition-opacity group-focus-within/model:opacity-[0.69] group-hover/model:opacity-[0.69]"
 							/>
 							<span class="hidden text-sm sm:inline">{selectedModel.name}</span>
-							<ChevronDown class="size-4" />
+							<MxIcon name="alt-arrow-down-outline" class="size-4" />
 						</DropdownMenu.Trigger>
 
 						{#if onconfigure}
@@ -756,7 +756,7 @@
 												/>
 												<span class="min-w-0 flex-1 truncate">{option.name}</span>
 												{#if selectedModel.provider === option.provider && selectedModel.model === option.model}
-													<Check class="size-3.5 text-terracotta" />
+													<MxIcon name="check-square-outline" class="size-3.5 text-terracotta" />
 												{/if}
 											</DropdownMenu.Item>
 										{/each}

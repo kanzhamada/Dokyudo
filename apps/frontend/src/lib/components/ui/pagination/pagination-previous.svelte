@@ -2,7 +2,7 @@
 	import { Pagination as PaginationPrimitive } from "bits-ui";
 	import { cn } from "$lib/utils.js";
 	import { buttonVariants } from "$lib/components/ui/button/index.js";
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
 	let {
 		ref = $bindable(null),
@@ -21,5 +21,5 @@
 	)}
 	{...restProps}
 >
-	<ChevronLeftIcon data-icon="inline-start" />
+	<MxIcon name="alt-arrow-left-outline" data-icon="inline-start" />
 </PaginationPrimitive.PrevButton>

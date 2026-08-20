@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { cn, type WithElementRef } from "$lib/utils.js";
 	import type { HTMLLiAttributes } from "svelte/elements";
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
 	let {
 		ref = $bindable(null),
@@ -22,6 +22,6 @@
 	{#if children}
 		{@render children?.()}
 	{:else}
-		<ChevronRightIcon  />
+		<MxIcon name="alt-arrow-right-outline" />
 	{/if}
 </li>

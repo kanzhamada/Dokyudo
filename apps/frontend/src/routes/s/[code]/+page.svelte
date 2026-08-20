@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { Copy, Check, Lock } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Spinner } from '$lib/components/ui/spinner';
@@ -280,7 +279,7 @@
 								aria-label="Copy share link"
 							>
 								{#if copiedLink}
-									<Check class="size-4 text-green-400" />
+									<MxIcon name="check-square-outline" class="size-4 text-green-400" />
 								{:else}
 									<MxIcon name="share-outline" class="size-4" />
 								{/if}
@@ -355,7 +354,7 @@
 									aria-label="Copy share link"
 								>
 									{#if copiedLink}
-										<Check class="size-4 text-green-400" />
+										<MxIcon name="check-square-outline" class="size-4 text-green-400" />
 									{:else}
 										<MxIcon name="share-outline" class="size-4" />
 									{/if}
@@ -384,7 +383,7 @@
 				</div>
 			{:else if isPrivateLocked}
 				<div class="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
-					<Lock class="size-8 text-white/25" />
+					<MxIcon name="lock1-outline" class="size-8 text-white/25" />
 					<h1 class="text-lg font-semibold text-white">This link is private</h1>
 					<p class="max-w-sm text-sm text-white/45">
 						Only people invited by the owner can view this conversation.
@@ -417,7 +416,7 @@
 						<span
 							class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/50"
 						>
-							<Lock class="size-3" />
+							<MxIcon name="lock1-outline" class="size-3" />
 							<span>{share.isPrivate ? 'Private share' : 'Read-only share'}</span>
 						</span>
 						<span class="text-xs text-white/40">
@@ -473,9 +472,9 @@
 													aria-label="Copy question"
 												>
 													{#if copiedMessageId === `q-${i}`}
-														<Check class="size-3 text-green-400" />
+														<MxIcon name="check-square-outline" class="size-3 text-green-400" />
 													{:else}
-														<Copy class="size-3" />
+														<MxIcon name="copy-outline" class="size-3" />
 													{/if}
 												</Button>
 											{/snippet}
@@ -535,9 +534,9 @@
 														aria-label="Copy response"
 													>
 														{#if copiedMessageId === `a-${i}`}
-															<Check class="size-3.5 text-green-400" />
+															<MxIcon name="check-square-outline" class="size-3.5 text-green-400" />
 														{:else}
-															<Copy class="size-3.5" />
+															<MxIcon name="copy-outline" class="size-3.5" />
 														{/if}
 													</Button>
 												{/snippet}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Copy, Check, Workflow, Code2, FileCode } from 'lucide-svelte';
+	import { Workflow, FileCode } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
 	import { toast } from 'svelte-sonner';
@@ -87,7 +87,7 @@
 				<Workflow class="size-3.5 text-terracotta" />
 				<span>Mermaid Diagram</span>
 			{:else}
-				<Code2 class="size-3.5 text-white/50" />
+				<MxIcon name="it-code-outline" class="size-3.5 text-white/50" />
 				<span>{language || 'code'}</span>
 			{/if}
 		</div>
@@ -125,10 +125,10 @@
 			onclick={handleCopy}
 		>
 			{#if isCopied}
-				<Check class="size-3.5 text-green-400" />
+				<MxIcon name="check-square-outline" class="size-3.5 text-green-400" />
 				<span class="text-green-400">Copied!</span>
 			{:else}
-				<Copy class="size-3.5 text-white/60" />
+				<MxIcon name="copy-outline" class="size-3.5 text-white/60" />
 				<span>Copy</span>
 			{/if}
 		</button>

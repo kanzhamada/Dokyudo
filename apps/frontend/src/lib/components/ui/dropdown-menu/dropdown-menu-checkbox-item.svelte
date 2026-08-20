@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { DropdownMenu as DropdownMenuPrimitive } from 'bits-ui';
 	import MinusIcon from '@lucide/svelte/icons/minus';
-	import CheckIcon from '@lucide/svelte/icons/check';
-	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+import MxIcon from '$lib/components/icons/MxIcon.svelte';
+import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
 
 	let {
@@ -36,7 +36,7 @@
 			{#if indeterminate}
 				<MinusIcon />
 			{:else if checked}
-				<CheckIcon />
+				<MxIcon name="check-square-bold" />
 			{/if}
 		</span>
 		{@render childrenProp?.()}

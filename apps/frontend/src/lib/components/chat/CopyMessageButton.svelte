@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Copy, Check } from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { toast } from 'svelte-sonner';
@@ -49,10 +49,10 @@
 					aria-label={label}
 				>
 					{#if copied}
-						<Check class="{iconSize} text-green-400" />
-					{:else}
-						<Copy class={iconSize} />
-					{/if}
+					<MxIcon name="check-square-outline" class="{iconSize} text-green-400" />
+				{:else}
+					<MxIcon name="copy-outline" class={iconSize} />
+				{/if}
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>

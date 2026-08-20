@@ -32,18 +32,14 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
+import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
 	import ChevronLastIcon from '@lucide/svelte/icons/chevron-last';
-	import CheckSquareIcon from '@lucide/svelte/icons/check-square';
-	import CheckIcon from '@lucide/svelte/icons/check';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import FilesIcon from '@lucide/svelte/icons/files';
 	import FileStackIcon from '@lucide/svelte/icons/file-stack';
 	import ArrowDownAZIcon from '@lucide/svelte/icons/arrow-down-a-z';
-	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
-	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 	import ListIcon from '@lucide/svelte/icons/list';
 	import ListXIcon from '@lucide/svelte/icons/list-x';
@@ -1213,7 +1209,7 @@
 							<FileTextIcon class="size-3.5 text-white/60" />
 							<span>PDF Documents</span>
 							{#if filterPdf}
-								<CheckIcon class="ml-auto size-3.5 text-white/60" />
+								<MxIcon name="check-square-outline" class="ml-auto size-3.5 text-white/60" />
 							{/if}
 						</button>
 						<button
@@ -1224,7 +1220,7 @@
 							<FilesIcon class="size-3.5 text-white/60" />
 							<span>Word Documents (.docx)</span>
 							{#if filterDocx}
-								<CheckIcon class="ml-auto size-3.5 text-white/60" />
+								<MxIcon name="check-square-outline" class="ml-auto size-3.5 text-white/60" />
 							{/if}
 						</button>
 						<button
@@ -1235,7 +1231,7 @@
 							<FileStackIcon class="size-3.5 text-white/60" />
 							<span>Text Files (.txt)</span>
 							{#if filterTxt}
-								<CheckIcon class="ml-auto size-3.5 text-white/60" />
+								<MxIcon name="check-square-outline" class="ml-auto size-3.5 text-white/60" />
 							{/if}
 						</button>
 					</div>
@@ -1297,7 +1293,7 @@
 							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => handleSort('uploadedAt')}
 						>
-							<CalendarDaysIcon class="size-3.5 text-white/60" />
+							<MxIcon name="calendar2-outline" class="size-3.5 text-white/60" />
 							<span>Date Uploaded</span>
 							{#if table.getColumn('uploadedAt')?.getIsSorted() === 'asc'}
 								<ArrowUpIcon class="ml-auto size-3.5 text-white/60" />
@@ -1336,7 +1332,7 @@
 								aria-haspopup="menu"
 								aria-expanded={selectMenuOpen}
 							>
-								<CheckSquareIcon class="size-4" />
+								<MxIcon name="check-square-outline" class="size-4" />
 								{#if selectedCount > 0}
 									<span class="ml-1.5 text-xs font-semibold">{selectedCount}</span>
 								{/if}
@@ -1603,13 +1599,13 @@
 										</span>
 										<span class="semantic-match-action">
 											<span>{expandedDocs.includes(doc.id) ? 'Show less' : 'Read more'}</span>
-											<ChevronDownIcon
+											<MxIcon
+												name="alt-arrow-down-outline"
 												class="size-3.5 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] {expandedDocs.includes(
 													doc.id
 												)
 													? 'rotate-180'
 													: ''}"
-												strokeWidth={1.8}
 											/>
 										</span>
 									</button>

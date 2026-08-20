@@ -2,7 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	import { Check, CreditCard, LoaderCircle, ArrowRight, AlertCircle } from 'lucide-svelte';
+	import { CreditCard, LoaderCircle, ArrowRight, AlertCircle } from 'lucide-svelte';
+	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { getMeUsage } from '$lib/api/me';
 	import { seo } from '$lib/seo';
 	import type { UserUsageResponse } from '$lib/types/auth.types';
@@ -188,7 +189,7 @@
 				</div>
 			{:else if paymentState === 'success'}
 				<div class="billing-status-icon billing-status-icon--success">
-					<Check class="size-7" strokeWidth={1.8} />
+					<MxIcon name="check-square-bold" class="size-7" />
 				</div>
 				<p class="billing-kicker">Payment status</p>
 				<h1 class="billing-heading">Payment successful</h1>
