@@ -6,19 +6,24 @@
 
 	let {
 		id,
+		onAskInChat,
 		onPreview,
 		onDownload,
 		onRename,
 		onDelete,
+		/** Ask in Chat unavailable while the file is still being processed */
+		askDisabled = false,
 		/** Preview unavailable while the file is still being processed —
 		 * only non-PDF files are disabled; PDFs render from the raw file. */
 		previewDisabled = false
 	}: {
 		id: string;
+		onAskInChat?: () => void;
 		onPreview?: () => void;
 		onDownload?: () => void;
 		onRename?: () => void;
 		onDelete?: () => void;
+		askDisabled?: boolean;
 		previewDisabled?: boolean;
 	} = $props();
 
@@ -43,7 +48,7 @@
 		}
 		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 		const width = 160;
-		const height = 210;
+		const height = 240;
 		const padding = 12;
 		const maxX = Math.max(padding, window.innerWidth - width - padding);
 		const x = Math.min(Math.max(rect.right - width, padding), maxX);
@@ -109,6 +114,22 @@
 		style={`position: fixed; top: ${menuPos.y}px; left: ${menuPos.x}px;`}
 		class="z-50 w-40 rounded-xl border border-white/15 bg-offblack/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 	>
+		<button
+			type="button"
+			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
+			disabled={askDisabled}
+			onclick={() => {
+				triggerHaptic(15);
+				closeMenu();
+				onAskInChat?.();
+			}}
+		>
+			<MxIcon name="chat-round-line-linear" class="size-3.5 text-white/60" />
+			<span>Ask in Chat</span>
+			{#if askDisabled}
+				<span class="ml-auto shrink-0 text-[10px] text-white/30">Preparing…</span>
+			{/if}
+		</button>
 		<button
 			type="button"
 			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"

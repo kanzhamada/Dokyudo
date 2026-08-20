@@ -6,6 +6,7 @@
 	import * as Tabs from '$lib/components/ui/tabs';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { getMeUsageCached } from '$lib/state/me-cache.store.svelte';
@@ -15,7 +16,7 @@
 	import { documentsStore } from '$lib/state/documents.store.svelte';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { accountPanel, openAccountPanel } from '$lib/state/account-panel.store.svelte';
-	import { mentionStrippedLength } from '$lib/utils/doc-mentions';
+	import { mentionStrippedLength, mentionToken } from '$lib/utils/doc-mentions';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
@@ -106,6 +107,20 @@
 		// Warm the document mention cache — idempotent, and the `@` popover also
 		// ensures it lazily, so this only makes the first mention instant.
 		documentsStore.ensureLoaded();
+
+		// Check for incoming document mention (e.g. from Documents page "Ask in Chat")
+		const docId = page.url.searchParams.get('docId') || page.url.searchParams.get('mentionDocId');
+		const docTitle = page.url.searchParams.get('docTitle') || page.url.searchParams.get('mentionDocTitle');
+
+		if (docId && docTitle) {
+			inputValue = `${mentionToken(docTitle, docId)} `;
+		} else if (docId) {
+			await documentsStore.ensureLoaded();
+			const found = documentsStore.list.find((d) => d.id === docId);
+			if (found) {
+				inputValue = `${mentionToken(found.title, found.id)} `;
+			}
+		}
 
 		try {
 			const res = await getMeUsageCached();

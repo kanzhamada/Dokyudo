@@ -141,7 +141,18 @@
 	// Focus on mount, and re-focus whenever the caller asks (refocusKey changes)
 	$effect(() => {
 		refocusKey;
-		setTimeout(() => editorEl?.focus(), 0);
+		setTimeout(() => {
+			if (!editorEl) return;
+			editorEl.focus();
+			const sel = window.getSelection();
+			if (sel && editorEl.childNodes.length > 0) {
+				const range = document.createRange();
+				range.selectNodeContents(editorEl);
+				range.collapse(false);
+				sel.removeAllRanges();
+				sel.addRange(range);
+			}
+		}, 0);
 	});
 
 	// Sync DOM when `value` changes externally (e.g. cleared `value = ''` after send)
@@ -150,6 +161,16 @@
 		const currentText = serializeEditor(editorEl);
 		if (value !== currentText) {
 			renderMarkdownToEditor(value);
+			if (document.activeElement === editorEl) {
+				const sel = window.getSelection();
+				if (sel) {
+					const range = document.createRange();
+					range.selectNodeContents(editorEl);
+					range.collapse(false);
+					sel.removeAllRanges();
+					sel.addRange(range);
+				}
+			}
 		}
 	});
 

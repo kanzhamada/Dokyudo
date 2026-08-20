@@ -2,6 +2,7 @@
 	import { untrack, onMount } from 'svelte';
 	import { scale } from 'svelte/transition';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import {
 		type ColumnFiltersState,
 		type PaginationState,
@@ -96,6 +97,12 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 
 	function isPdfDocument(doc: Document): boolean {
 		return doc.name.toLowerCase().endsWith('.pdf');
+	}
+
+	function handleAskInChat(doc: Document) {
+		console.log('[Document Action] Asking in chat about document:', doc.id, doc.name);
+		triggerHaptic(20);
+		goto(`/app/chat?docId=${encodeURIComponent(doc.id)}&docTitle=${encodeURIComponent(doc.name)}`);
 	}
 
 	async function handlePreview(doc: Document) {
@@ -1526,7 +1533,9 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 									{/if}
 									<DocumentCardActions
 										id={doc.id}
+										askDisabled={isVectorizing(doc)}
 										previewDisabled={isVectorizing(doc) && !isPdfDocument(doc)}
+										onAskInChat={() => handleAskInChat(doc)}
 										onPreview={() => handlePreview(doc)}
 										onDownload={() => handleDownload(doc)}
 										onRename={() => promptRename(doc)}
