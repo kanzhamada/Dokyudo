@@ -82,13 +82,13 @@
 					size="icon"
 					data-doc-id={id}
 					aria-controls={menuOpen ? `doc-actions-menu-${id}` : undefined}
-					class="relative size-11 cursor-pointer rounded-full text-white/60 transition-all duration-150 select-none hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white active:scale-[0.88] aria-expanded:bg-white/10 aria-expanded:text-white md:size-8"
+					class="relative size-11 cursor-pointer rounded-full border border-transparent text-white/60 transition-all duration-150 select-none hover:border-white/25 hover:bg-white/[0.12] hover:text-white focus-visible:border-white/35 focus-visible:bg-white/[0.12] focus-visible:text-white focus-visible:ring-2 focus-visible:ring-white/20 active:scale-[0.88] active:bg-white/20 aria-expanded:border-white/35 aria-expanded:bg-white/[0.18] aria-expanded:text-white md:size-8"
 					onclick={toggleMenu}
 					aria-haspopup="menu"
 					aria-expanded={menuOpen}
 				>
 					<span class="sr-only">Open menu</span>
-					<MxIcon name="menu-dots-outline" class="rotate-90" />
+					<MxIcon name="menu-dots-outline" class="size-4 rotate-90 transition-transform duration-150" />
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>
@@ -119,7 +119,7 @@
 	>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
+			class="group flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
 			disabled={askDisabled}
 			onclick={() => {
 				triggerHaptic(15);
@@ -127,7 +127,7 @@
 				onAskInChat?.();
 			}}
 		>
-			<MxIcon name="chat-round-line-linear" class="size-3.5 text-white/60" />
+			<MxIcon name="chat-round-line-linear" class="size-3.5 text-white/60 transition-colors duration-150 group-hover:text-white group-disabled:text-white/30" />
 			<span>Ask in Chat</span>
 			{#if askDisabled}
 				<span class="ml-auto shrink-0 text-[10px] text-white/30">Preparing…</span>
@@ -135,7 +135,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
+			class="group flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
 			disabled={previewDisabled}
 			onclick={() => {
 				triggerHaptic(15);
@@ -143,7 +143,7 @@
 				onPreview?.();
 			}}
 		>
-			<MxIcon name="security-eye-outline" class="size-3.5 text-white/60" />
+			<MxIcon name="security-eye-outline" class="size-3.5 text-white/60 transition-colors duration-150 group-hover:text-white group-disabled:text-white/30" />
 			<span>Preview</span>
 			{#if previewDisabled}
 				<span class="ml-auto shrink-0 text-[10px] text-white/30">Preparing…</span>
@@ -151,39 +151,39 @@
 		</button>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+			class="group flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 			onclick={() => {
 				triggerHaptic(15);
 				closeMenu();
 				onDownload?.();
 			}}
 		>
-			<MxIcon name="arrows-action-import-outline" class="size-3.5 text-white/60" />
+			<MxIcon name="arrows-action-import-outline" class="size-3.5 text-white/60 transition-colors duration-150 group-hover:text-white" />
 			<span>Download</span>
 		</button>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+			class="group flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 			onclick={() => {
 				triggerHaptic(15);
 				closeMenu();
 				onRename?.();
 			}}
 		>
-			<MxIcon name="edit2-outline" class="size-3.5 text-white/60" />
+			<MxIcon name="edit2-outline" class="size-3.5 text-white/60 transition-colors duration-150 group-hover:text-white" />
 			<span>Rename</span>
 		</button>
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15 md:min-h-0"
+			class="group flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15 md:min-h-0"
 			onclick={() => {
 				triggerHaptic(15);
 				closeMenu();
 				onDelete?.();
 			}}
 		>
-			<MxIcon name="trash-bin-minimalistic-outline" class="size-3.5 shrink-0 text-red-400" />
+			<MxIcon name="trash-bin-minimalistic-outline" class="size-3.5 shrink-0 text-red-400 transition-colors duration-150 group-hover:text-red-300" />
 			<span>Delete</span>
 		</button>
 	</div>

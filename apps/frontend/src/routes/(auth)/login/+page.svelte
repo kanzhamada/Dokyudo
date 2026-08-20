@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client as zodClient } from 'sveltekit-superforms/adapters';
+	import { resolve } from '$app/paths';
 	import { loginSchema } from '$lib/schemas/auth.schema';
 	import { seo } from '$lib/seo';
 	import { authLogin } from '$lib/api/auth';
@@ -67,6 +68,7 @@
 				if (result.ok) {
 					sessionStore.set(result.data.user);
 					localStorage.removeItem('dokyudo_login_lockout');
+					/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 					await goto(redirectPath);
 				} else {
 					if (result.error.code === 'RATE_LIMIT_EXCEEDED' && result.error.retryAfter) {
@@ -112,6 +114,7 @@
 </script>
 
 <svelte:head>
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html seo({ title: `${data.title} | Dokyudo`, description: data.description })}
 </svelte:head>
 
@@ -174,7 +177,7 @@
 
 		<div class="flex justify-end">
 			<a
-				href="/forget-password"
+				href={resolve('/forget-password')}
 				class="font-geist text-xs text-[#B9B9B9] underline-offset-3 hover:text-white"
 			>
 				Forgot password?
@@ -197,7 +200,7 @@
 			<Tooltip.Root>
 				<Tooltip.Trigger>
 					{#snippet child({ props })}
-						<a {...props} href="/register">Register</a>
+						<a {...props} href={resolve('/register')}>Register</a>
 					{/snippet}
 				</Tooltip.Trigger>
 				<Tooltip.Content class="bg-[#3E3E3E]" arrowClasses="bg-[#3E3E3E]"

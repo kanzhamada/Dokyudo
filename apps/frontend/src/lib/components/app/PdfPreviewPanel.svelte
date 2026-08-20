@@ -192,7 +192,7 @@
 
 	<!-- Header: document name + close button -->
 	<div
-		class="panel-header relative mt-6 mb-3 flex items-start justify-between gap-3 md:mt-0"
+		class="panel-header relative z-10 mt-6 mb-3 flex items-start justify-between gap-3 md:mt-0"
 		ontouchstart={handleTouchStart}
 		ontouchmove={handleTouchMove}
 		ontouchend={handleTouchEnd}
@@ -229,7 +229,7 @@
 							<button
 								{...props}
 								type="button"
-								class="close-button cursor-pointer select-none rounded-full text-dk-muted-gray transition-all duration-150 hover:bg-white/10 hover:text-dk-light active:scale-90"
+								class="close-button flex size-7 shrink-0 cursor-pointer items-center justify-center select-none rounded-full text-dk-muted-gray transition-all duration-150 hover:bg-white/10 hover:text-dk-light active:scale-90"
 								onclick={() => {
 									triggerHaptic(15);
 									onclose?.();
@@ -351,6 +351,13 @@
 		z-index: 20;
 		cursor: grab;
 		touch-action: none;
+	}
+
+	@media (min-width: 768px) {
+		.sheet-handle-zone {
+			display: none;
+			pointer-events: none;
+		}
 	}
 
 	.sheet-handle {

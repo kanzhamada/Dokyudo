@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client as zodClient } from 'sveltekit-superforms/adapters';
+	import { resolve } from '$app/paths';
 	import { updatePasswordSchema } from '$lib/schemas/auth.schema';
 	import { seo } from '$lib/seo';
 	import { authResetPassword } from '$lib/api/auth';
@@ -77,6 +78,7 @@
 </script>
 
 <svelte:head>
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html seo({ title: `${data.title} | Dokyudo`, description: data.description })}
 </svelte:head>
 
@@ -118,13 +120,13 @@
 									aria-invalid={$errors.otp ? 'true' : undefined}
 								>
 									<InputOTP.Group>
-										{#each cells as cell}
+										{#each cells as cell, i (i)}
 											<InputOTP.Slot {cell} class="auth-otp-slot" />
 										{/each}
 									</InputOTP.Group>
 
 									<div class="pointer-events-none absolute inset-0 flex">
-										{#each cells as cell, index}
+										{#each cells as cell, index (index)}
 											<div class="auth-otp-placeholder flex items-center justify-center">
 												{#if !cell.char && '01234567'[index]}
 													{'01234567'[index]}
@@ -190,7 +192,7 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<a {...props} href="/login">Sign in</a>
+							<a {...props} href={resolve('/login')}>Sign in</a>
 						{/snippet}
 					</Tooltip.Trigger>
 					<Tooltip.Content class="bg-[#3E3E3E]" arrowClasses="bg-[#3E3E3E]"

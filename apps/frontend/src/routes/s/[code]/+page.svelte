@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Spinner } from '$lib/components/ui/spinner';
@@ -133,14 +134,6 @@
 		}
 	}
 
-	function showInfo(title: string, msg: string = '') {
-		if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
-			mobileHeaderState.showInfo(title, msg);
-		} else {
-			toast.info(title, { description: msg || undefined });
-		}
-	}
-
 	async function copyToClipboard(text: string, id: string) {
 		// Strip inline citation tags ([Doc N: Page X]) and document mention tokens (e.g. @[title](id))
 		// so copied questions or answers don't carry source reference markers or mention tokens.
@@ -174,6 +167,7 @@
 	async function handleContinue() {
 		if (isContinuing || !share) return;
 		if (!sessionStore.authenticated) {
+			/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 			await goto(`/login?redirect=/s/${share.code}`);
 			return;
 		}
@@ -181,9 +175,11 @@
 		try {
 			const result = await continueShare(share.code);
 			if (result.ok) {
+				/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 				await goto(`/app/chat/${result.data.id}`);
 			} else if (result.error.code === 'UNAUTHORIZED') {
 				// Stale session — send the viewer through login again.
+				/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 				await goto(`/login?redirect=/s/${share.code}`);
 			} else {
 				notFound = true;
@@ -194,17 +190,6 @@
 		} finally {
 			isContinuing = false;
 		}
-	}
-
-	function formatExpiry(expiresAt: string | null): string {
-		if (!expiresAt) return 'No expiry';
-		return `Expires ${new Date(expiresAt).toLocaleString('en-US', {
-			day: 'numeric',
-			month: 'short',
-			year: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit'
-		})}`;
 	}
 
 	function formatSharedDate(iso: string): string {
@@ -244,11 +229,12 @@
 	<MobileHeader>
 		{#snippet leading()}
 			<a
-				href="/"
+				href={resolve('/')}
 				class="flex shrink-0 items-center gap-0.5 rounded-lg text-white transition-opacity hover:opacity-85"
 				aria-label="Dokyudo home"
 			>
 				<div class="flex items-center [&_path]:fill-white [&>svg]:size-6">
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html faviconRaw}
 				</div>
 				<span class="font-geist text-lg font-bold tracking-tight text-white">okyudo</span>
@@ -303,7 +289,7 @@
 		<div class="pointer-events-auto grid h-16 w-full grid-cols-3 items-center px-4 md:px-8">
 			<div class="flex justify-start">
 				<a
-					href="/"
+					href={resolve('/')}
 					class="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white"
 				>
 					<img src={favicon} alt="Dokyudo" class="h-5 w-auto" />
@@ -374,7 +360,7 @@
 
 	<!-- ================= Main Content ================= -->
 	<main
-		class="relative z-10 flex min-h-0 flex-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
+		class="relative z-10 flex scrollbar-thin min-h-0 flex-1 scrollbar-thumb-white/10 scrollbar-track-transparent flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
 	>
 		<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-32">
 			{#if isLoading}
@@ -390,7 +376,7 @@
 					</p>
 					<Button
 						class="mt-2 cursor-pointer bg-amber-500 text-black hover:bg-amber-400"
-						onclick={() => goto('/')}
+						onclick={() => void goto(resolve('/'))}
 					>
 						Go to home
 					</Button>
@@ -404,7 +390,7 @@
 					</p>
 					<Button
 						class="mt-2 cursor-pointer bg-amber-500 text-black hover:bg-amber-400"
-						onclick={() => goto('/')}
+						onclick={() => void goto(resolve('/'))}
 					>
 						Go to home
 					</Button>
@@ -442,7 +428,7 @@
 								class="w-fit rounded-2xl border border-white/15 bg-offblack px-4 py-3 text-sm text-white/90 shadow-md backdrop-blur-md"
 							>
 								<p class="leading-relaxed whitespace-pre-wrap">
-									{#each splitMentionSegments(turn.question) as seg}
+									{#each splitMentionSegments(turn.question) as seg, segIdx (segIdx)}
 										{#if seg.type === 'mention'}
 											<span
 												class="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 align-baseline text-[11px] leading-none font-medium text-white/80"

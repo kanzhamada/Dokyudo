@@ -41,6 +41,7 @@
 </script>
 
 <svelte:head>
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html seo({
 		title: 'Verifying Email | Dokyudo',
 		description: 'Confirming your email address to activate your Dokyudo account.'
@@ -79,7 +80,8 @@
 				>
 			</div>
 			<h1 class="auth-heading auth-state-heading">Verification failed.</h1>
-			<a href="/login" class="auth-btn-primary block w-full max-w-xs text-center">Back to sign in</a
+			<a href={resolve('/login')} class="auth-btn-primary block w-full max-w-xs text-center"
+				>Back to sign in</a
 			>
 		</div>
 	{/if}

@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client as zodClient } from 'sveltekit-superforms/adapters';
+	import { resolve } from '$app/paths';
 	import { registerSchema } from '$lib/schemas/auth.schema';
 	import { seo } from '$lib/seo';
 	import { authRegister } from '$lib/api/auth';
@@ -71,7 +73,6 @@
 
 	const { form: formData, enhance } = form;
 
-	import { onMount } from 'svelte';
 	onMount(() => {
 		loadRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY);
 
@@ -88,6 +89,7 @@
 </script>
 
 <svelte:head>
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html seo({ title: `${data.title} | Dokyudo`, description: data.description })}
 </svelte:head>
 
@@ -178,7 +180,7 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<a {...props} href="/login">Sign in</a>
+							<a {...props} href={resolve('/login')}>Sign in</a>
 						{/snippet}
 					</Tooltip.Trigger>
 					<Tooltip.Content class="bg-[#3E3E3E]" arrowClasses="bg-[#3E3E3E]"
