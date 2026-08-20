@@ -81,11 +81,6 @@
 </script>
 
 <div class="relative flex h-svh max-h-svh w-full min-w-0 overflow-hidden bg-black/96 text-white">
-	<!-- Decorative Background Circle (Clean monochrome ambient glow) -->
-	<!-- <div
-		class="pointer-events-none absolute z-0 rounded-full"
-		style="width: 1190px; height: 1190px; left: -295px; top: -318px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0) 100%); filter: blur(99px); opacity: 0.06;"
-	></div> -->
 
 	<Sidebar.Provider class="relative z-10 size-full min-h-svh bg-transparent">
 		<AppSidebar />

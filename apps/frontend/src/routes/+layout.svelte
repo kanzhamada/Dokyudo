@@ -8,5 +8,5 @@
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
-<Toaster position="top-center" theme="dark" expand={true} />
+<Toaster position="bottom-right" theme="dark" expand={true} />
 {@render children()}

@@ -6,28 +6,29 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 
-	let { ...restProps }: SonnerProps = $props();
+	let { position = 'bottom-right', ...restProps }: SonnerProps = $props();
 </script>
 
 <Sonner
 	theme={mode.current}
 	class="toaster group"
-	style="--normal-bg: var(--color-popover); --normal-text: var(--color-popover-foreground); --normal-border: var(--color-border);"
+	{position}
+	style="--normal-bg: var(--color-offblack); --normal-text: var(--color-white); --normal-border: rgba(255, 255, 255, 0.15);"
 	{...restProps}
 >
 	{#snippet loadingIcon()}
-		<Loader2Icon class="size-5 animate-spin" />
+		<Loader2Icon class="size-5 animate-spin text-warm-gray" />
 	{/snippet}
 	{#snippet successIcon()}
-		<MxIcon name="check-circle-outline" class="size-5 text-green-400" />
+		<MxIcon name="check-circle-outline" class="size-5 text-c-lime" />
 	{/snippet}
 	{#snippet errorIcon()}
-		<TriangleAlertIcon class="size-5 text-red-400" />
+		<TriangleAlertIcon class="size-5 text-c-lavender" />
 	{/snippet}
 	{#snippet infoIcon()}
-		<InfoIcon class="size-5" />
+		<InfoIcon class="size-5 text-c-periwinkle" />
 	{/snippet}
 	{#snippet warningIcon()}
-		<TriangleAlertIcon class="size-5" />
+		<TriangleAlertIcon class="size-5 text-c-yellow" />
 	{/snippet}
 </Sonner>

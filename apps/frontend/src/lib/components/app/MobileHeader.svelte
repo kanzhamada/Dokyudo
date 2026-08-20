@@ -25,42 +25,42 @@
 <header
 	class="absolute inset-x-4 top-4 z-50 flex flex-col justify-center overflow-hidden rounded-[24px] border shadow-lg backdrop-blur-[42px] transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] md:hidden {mobileHeaderState.type ===
 	'error'
-		? 'h-auto min-h-14 border-red-500/50 bg-red-950/[0.60] px-4 py-3'
+		? 'h-auto min-h-14 border-c-lavender/45 bg-c-purple/55 px-4 py-3'
 		: mobileHeaderState.type === 'success'
-			? 'h-auto min-h-14 border-green-500/50 bg-green-950/[0.60] px-4 py-3'
+			? 'h-auto min-h-14 border-c-lime/45 bg-c-olive/55 px-4 py-3'
 			: mobileHeaderState.type === 'info'
-				? 'h-auto min-h-14 border-blue-500/50 bg-blue-950/[0.60] px-4 py-3'
+				? 'h-auto min-h-14 border-c-periwinkle/45 bg-c-navy/55 px-4 py-3'
 				: bottom
 					? 'h-auto min-h-14 border-white/[0.16] bg-offblack/[0.40] px-3'
 					: 'h-14 border-white/[0.16] bg-offblack/[0.40] px-4'} {className}"
 >
 	{#if mobileHeaderState.type === 'error'}
 		<div class="flex w-full items-center gap-3">
-			<MxIcon name="danger-triangle-outline" class="size-5 shrink-0 text-red-400" />
+			<MxIcon name="danger-triangle-outline" class="size-5 shrink-0 text-c-lavender" />
 			<div class="flex min-w-0 flex-col">
 				<span class="truncate text-sm font-semibold text-white">{mobileHeaderState.title || 'Error'}</span>
 				{#if mobileHeaderState.message}
-					<span class="truncate text-xs leading-snug text-red-200/90">{mobileHeaderState.message}</span>
+					<span class="truncate text-xs leading-snug text-white/80">{mobileHeaderState.message}</span>
 				{/if}
 			</div>
 		</div>
 	{:else if mobileHeaderState.type === 'success'}
 		<div class="flex w-full items-center gap-3">
-			<MxIcon name="check-circle-outline" class="size-5 shrink-0 text-green-400" />
+			<MxIcon name="check-circle-outline" class="size-5 shrink-0 text-c-lime" />
 			<div class="flex min-w-0 flex-col">
 				<span class="truncate text-sm font-semibold text-white">{mobileHeaderState.title || 'Success'}</span>
 				{#if mobileHeaderState.message}
-					<span class="truncate text-xs leading-snug text-green-200/90">{mobileHeaderState.message}</span>
+					<span class="truncate text-xs leading-snug text-white/80">{mobileHeaderState.message}</span>
 				{/if}
 			</div>
 		</div>
 	{:else if mobileHeaderState.type === 'info'}
 		<div class="flex w-full items-center gap-3">
-			<Info class="size-5 shrink-0 text-blue-400" />
+			<Info class="size-5 shrink-0 text-c-periwinkle" />
 			<div class="flex min-w-0 flex-col">
 				<span class="truncate text-sm font-semibold text-white">{mobileHeaderState.title || 'Info'}</span>
 				{#if mobileHeaderState.message}
-					<span class="truncate text-xs leading-snug text-blue-200/90">{mobileHeaderState.message}</span>
+					<span class="truncate text-xs leading-snug text-white/80">{mobileHeaderState.message}</span>
 				{/if}
 			</div>
 		</div>
