@@ -2349,9 +2349,13 @@
 		</MobileHeader>
 
 		<!-- Desktop Conversation Header -->
-		<div
-			class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-24 bg-gradient-to-b from-black via-black/85 via-50% to-transparent md:block"
-		>
+		<div class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-24 md:block">
+			<!-- Full-width linear gradient overlay spanning behind sidebar -->
+			<div
+				class="pointer-events-none fixed inset-x-0 top-0 -z-10 h-24 bg-gradient-to-b from-black via-black/85 via-50% to-transparent"
+				aria-hidden="true"
+			></div>
+
 			<div class="pointer-events-auto grid h-16 w-full grid-cols-3 items-center px-4 md:px-8">
 				<div class="flex justify-start">
 					<Tooltip.Provider delayDuration={100}>
