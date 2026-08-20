@@ -28,13 +28,13 @@
 
 	/* ── Icons ── */
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
+	import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
 	import ChevronLastIcon from '@lucide/svelte/icons/chevron-last';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import FilesIcon from '@lucide/svelte/icons/files';
 	import FileStackIcon from '@lucide/svelte/icons/file-stack';
 	import ArrowDownAZIcon from '@lucide/svelte/icons/arrow-down-a-z';
-import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 	import ListIcon from '@lucide/svelte/icons/list';
 	import ListXIcon from '@lucide/svelte/icons/list-x';
@@ -45,7 +45,6 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
 
 	/* ── Third-party ── */
-	import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
 	import { toast } from 'svelte-sonner';
 
 	/* ── Local modules ── */
@@ -56,7 +55,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { documentsStore } from '$lib/state/documents.store.svelte';
 	import { columns } from './columns.js';
-	import type { Document } from './data.js';
+	import type { BackendDocument, Document, SemanticSearchResult } from './data.js';
 	import DocumentCardActions from './document-card-actions.svelte';
 	import UploadDocumentDialog from './UploadDocumentDialog.svelte';
 	import ConfirmDeleteDialog from '$lib/components/app/ConfirmDeleteDialog.svelte';
@@ -99,10 +98,14 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 		return doc.name.toLowerCase().endsWith('.pdf');
 	}
 
-	function handleAskInChat(doc: Document) {
+	async function handleAskInChat(doc: Document) {
 		console.log('[Document Action] Asking in chat about document:', doc.id, doc.name);
 		triggerHaptic(20);
-		goto(`/app/chat?docId=${encodeURIComponent(doc.id)}&docTitle=${encodeURIComponent(doc.name)}`);
+		/* eslint-disable svelte/no-navigation-without-resolve */
+		await goto(
+			`/app/chat?docId=${encodeURIComponent(doc.id)}&docTitle=${encodeURIComponent(doc.name)}`
+		);
+		/* eslint-enable svelte/no-navigation-without-resolve */
 	}
 
 	async function handlePreview(doc: Document) {
@@ -304,18 +307,14 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	}
 
 	async function refreshDocuments(): Promise<boolean> {
-		const res = await apiRequest<{ documents: any[] }>('/api/documents');
+		const res = await apiRequest<{ documents: BackendDocument[] }>('/api/documents');
 		if (!res.ok) return false;
 
 		totalDocumentCount = res.data.documents.length;
-		documentsList = res.data.documents.map((doc) => {
-			let sizeStr = '';
+		documentsList = res.data.documents.map((doc: BackendDocument) => {
 			const sizeKB = doc.sizeBytes / 1024;
-			if (sizeKB > 1024) {
-				sizeStr = (sizeKB / 1024).toFixed(1) + ' MB';
-			} else {
-				sizeStr = sizeKB.toFixed(0) + ' KB';
-			}
+			const sizeStr =
+				sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + ' MB' : sizeKB.toFixed(0) + ' KB';
 
 			return {
 				id: doc.id,
@@ -467,8 +466,11 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	});
 
 	$effect(() => {
-		documentsList = data.documents;
-		totalDocumentCount = data.documents.length;
+		const docs = data.documents;
+		untrack(() => {
+			documentsList = docs;
+			totalDocumentCount = docs.length;
+		});
 	});
 
 	/* ── TanStack Table State ── */
@@ -571,7 +573,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 
 				showSuccess('ZIP Downloaded', `Successfully archived ${zipFiles.length} files`);
 			}
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error('[Batch Download Error]:', err);
 			showError('An error occurred during download.');
 		} finally {
@@ -738,7 +740,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 			return;
 		}
 		isSemanticSearching = true;
-		const res = await apiRequest<{ data: any[] }>(
+		const res = await apiRequest<{ data: SemanticSearchResult[] }>(
 			`/api/search?query=${encodeURIComponent(semanticSearchQuery)}&limit=10`
 		);
 		isSemanticSearching = false;
@@ -747,8 +749,8 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 			const searchResults = res.data.data || [];
 
 			// Replace documentsList with mapped semantic search results
-			documentsList = searchResults.map((resultDoc: any) => {
-				const originalDoc = data.documents.find((d: any) => d.id === resultDoc.documentId);
+			documentsList = searchResults.map((resultDoc: SemanticSearchResult) => {
+				const originalDoc = data.documents.find((d) => d.id === resultDoc.documentId);
 
 				return {
 					id: resultDoc.documentId,
@@ -799,13 +801,16 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	let activeSearchQuery = $derived(searchMode === 'semantic' ? semanticSearchQuery : globalFilter);
 
 	$effect(() => {
-		if (searchMode === 'keyword') {
-			// Restore list from latest payload or re-fetch
-			refreshDocuments();
-			semanticSearchQuery = '';
-		} else {
-			globalFilter = '';
-		}
+		const mode = searchMode;
+		untrack(() => {
+			if (mode === 'keyword') {
+				// Restore list from latest payload or re-fetch
+				refreshDocuments();
+				semanticSearchQuery = '';
+			} else {
+				globalFilter = '';
+			}
+		});
 	});
 
 	/* ── Filter state ── */
@@ -868,9 +873,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 		const maxX = Math.max(padding, window.innerWidth - width - padding);
 		const x = Math.min(Math.max(rect.right - width, padding), maxX);
 		const opensBelow = rect.bottom + 4 + height <= window.innerHeight - padding;
-		const y = opensBelow
-			? rect.bottom + 4
-			: Math.max(padding, rect.top - height - 4);
+		const y = opensBelow ? rect.bottom + 4 : Math.max(padding, rect.top - height - 4);
 
 		return { x, y };
 	}
@@ -930,7 +933,12 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 </script>
 
 <svelte:head>
-	{@html seo({ title: 'Documents | Dokyudo', description: 'Manage and search your documents in Dokyudo.', noindex: true })}
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html seo({
+		title: 'Documents | Dokyudo',
+		description: 'Manage and search your documents in Dokyudo.',
+		noindex: true
+	})}
 </svelte:head>
 
 {#snippet mainList()}
@@ -955,7 +963,9 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 			</Breadcrumb.Root>
 
 			<!-- Row 2: Header & Primary Action -->
-			<div class="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start md:gap-4">
+			<div
+				class="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start md:gap-4"
+			>
 				<div>
 					<h1 class="text-[28px] leading-tight font-semibold text-white md:text-4xl">
 						Document Library
@@ -979,9 +989,12 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 										triggerHaptic(15);
 										refreshPage();
 									}}
-									class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:cursor-wait disabled:opacity-60 md:size-9"
+									class="size-11 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 text-white transition-all duration-150 select-none hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:cursor-wait disabled:opacity-60 md:size-9"
 								>
-									<MxIcon name="arrows-refresh-outline" class="size-4 {isRefreshing ? 'animate-spin' : ''}" />
+									<MxIcon
+										name="arrows-refresh-outline"
+										class="size-4 {isRefreshing ? 'animate-spin' : ''}"
+									/>
 								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
@@ -993,7 +1006,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 					</Tooltip.Root>
 
 					<Button
-						class="group h-11 flex-1 cursor-pointer select-none rounded-full bg-terracotta px-4 font-normal text-black transition-all duration-150 hover:bg-terracotta-deep active:scale-[0.96] sm:flex-none md:h-9"
+						class="group h-11 flex-1 cursor-pointer rounded-full bg-terracotta px-4 font-normal text-black transition-all duration-150 select-none hover:bg-terracotta-deep active:scale-[0.96] sm:flex-none md:h-9"
 						onclick={() => {
 							triggerHaptic(20);
 							uploadDialogOpen = true;
@@ -1032,7 +1045,9 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 					<p class="mt-1 text-xs text-white/40">Reset in {uploadResetCountdown}</p>
 				</div>
 
-				<div class="col-span-1 rounded-2xl border border-white/10 bg-offblack/[0.53] p-3.5 min-[380px]:col-span-2 md:p-4 sm:col-span-1">
+				<div
+					class="col-span-1 rounded-2xl border border-white/10 bg-offblack/[0.53] p-3.5 min-[380px]:col-span-2 sm:col-span-1 md:p-4"
+				>
 					<div class="flex items-center gap-2 text-xs font-medium text-warm-gray">
 						<HardDriveIcon class="size-4 text-white/60" />
 						<span>Total Storage</span>
@@ -1078,7 +1093,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 								value="keyword"
 								aria-label="Toggle keyword search"
 								onclick={() => triggerHaptic(15)}
-								class="flex h-7 w-7 cursor-pointer select-none items-center justify-center !rounded-l-full text-white/50 transition-all duration-150 hover:bg-white/[0.05] hover:text-white/70 active:scale-[0.90] data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
+								class="flex h-7 w-7 cursor-pointer items-center justify-center !rounded-l-full text-white/50 transition-all duration-150 select-none hover:bg-white/[0.05] hover:text-white/70 active:scale-[0.90] data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
 							>
 								<Tooltip.Root>
 									<Tooltip.Trigger>
@@ -1099,7 +1114,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 								value="semantic"
 								aria-label="Toggle semantic search"
 								onclick={() => triggerHaptic(15)}
-								class="flex h-7 w-7 cursor-pointer select-none items-center justify-center !rounded-r-full text-white/50 transition-all duration-150 hover:bg-white/[0.05] hover:text-white/70 active:scale-[0.90] data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
+								class="flex h-7 w-7 cursor-pointer items-center justify-center !rounded-r-full text-white/50 transition-all duration-150 select-none hover:bg-white/[0.05] hover:text-white/70 active:scale-[0.90] data-[state=on]:bg-white/[0.10] data-[state=on]:text-white"
 							>
 								<Tooltip.Root>
 									<Tooltip.Trigger>
@@ -1155,7 +1170,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 										refreshDocuments();
 									}
 								}}
-								class="flex size-5 cursor-pointer select-none items-center justify-center rounded-full text-white/50 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90"
+								class="flex size-5 cursor-pointer items-center justify-center rounded-full text-white/50 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90"
 								aria-label="Clear search"
 							>
 								<MxIcon name="close-circle-linear" class="size-3.5" />
@@ -1172,7 +1187,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-warm-gray/[0.40] aria-expanded:text-white md:size-9"
+								class="size-11 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 select-none hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-warm-gray/[0.40] aria-expanded:text-white md:size-9"
 								onclick={toggleFilterMenu}
 								aria-haspopup="menu"
 								aria-expanded={filterMenuOpen}
@@ -1204,7 +1219,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 					>
 						<button
 							type="button"
-							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+							class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => toggleFilter('pdf')}
 						>
 							<FileTextIcon class="size-3.5 text-white/60" />
@@ -1215,7 +1230,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 						</button>
 						<button
 							type="button"
-							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+							class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => toggleFilter('docx')}
 						>
 							<FilesIcon class="size-3.5 text-white/60" />
@@ -1226,7 +1241,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 						</button>
 						<button
 							type="button"
-							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+							class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => toggleFilter('txt')}
 						>
 							<FileStackIcon class="size-3.5 text-white/60" />
@@ -1246,7 +1261,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 								{...props}
 								variant="ghost"
 								disabled={searchMode === 'semantic'}
-								class="size-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-warm-gray/[0.40] aria-expanded:text-white md:size-9"
+								class="size-11 cursor-pointer rounded-full border border-white/[0.16] bg-transparent p-0 font-normal text-white transition-all duration-150 select-none hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] disabled:opacity-50 aria-expanded:border-white/[0.80] aria-expanded:bg-warm-gray/[0.40] aria-expanded:text-white md:size-9"
 								onclick={toggleSortMenu}
 								aria-haspopup="menu"
 								aria-expanded={sortMenuOpen}
@@ -1278,7 +1293,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 					>
 						<button
 							type="button"
-							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+							class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => handleSort('name')}
 						>
 							<ArrowDownAZIcon class="size-3.5 text-white/60" />
@@ -1291,7 +1306,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 						</button>
 						<button
 							type="button"
-							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+							class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => handleSort('uploadedAt')}
 						>
 							<MxIcon name="calendar2-outline" class="size-3.5 text-white/60" />
@@ -1304,7 +1319,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 						</button>
 						<button
 							type="button"
-							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+							class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => handleSort('size')}
 						>
 							<HardDriveIcon class="size-3.5 text-white/60" />
@@ -1325,7 +1340,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 							<Button
 								{...props}
 								variant="ghost"
-								class="h-11 cursor-pointer select-none rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-all duration-150 hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] aria-expanded:border-white/[0.80] aria-expanded:bg-warm-gray/[0.40] aria-expanded:text-white md:h-9 {selectedCount >
+								class="h-11 cursor-pointer rounded-full border border-white/[0.16] bg-transparent font-normal text-white transition-all duration-150 select-none hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white active:scale-[0.90] aria-expanded:border-white/[0.80] aria-expanded:bg-warm-gray/[0.40] aria-expanded:text-white md:h-9 {selectedCount >
 								0
 									? 'border-white/[0.80] bg-warm-gray/[0.40] px-2.5'
 									: 'flex w-11 items-center justify-center p-0 md:w-9'}"
@@ -1365,7 +1380,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 					>
 						<button
 							type="button"
-							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+							class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => {
 								triggerHaptic(15);
 								selectAllPageDocuments();
@@ -1377,7 +1392,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 						</button>
 						<button
 							type="button"
-							class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+							class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 							onclick={() => {
 								triggerHaptic(15);
 								selectAllTotalDocuments();
@@ -1390,7 +1405,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 						{#if selectedCount > 0}
 							<button
 								type="button"
-								class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+								class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 								onclick={() => {
 									triggerHaptic(15);
 									clearSelection();
@@ -1403,7 +1418,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 							<div class="my-1 h-px bg-white/10"></div>
 							<button
 								type="button"
-								class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:opacity-40 md:min-h-0"
+								class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:opacity-40 md:min-h-0"
 								disabled={isBatchDownloading}
 								onclick={() => {
 									triggerHaptic(15);
@@ -1420,7 +1435,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 							</button>
 							<button
 								type="button"
-								class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15 md:min-h-0"
+								class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15 md:min-h-0"
 								onclick={() => {
 									triggerHaptic(15);
 									closeMenus();
@@ -1486,7 +1501,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 							tabindex="0"
 							onclick={() => toggleSelectDoc(doc.id)}
 							onkeydown={(e) => e.key === 'Enter' && toggleSelectDoc(doc.id)}
-							class="group relative cursor-pointer select-none overflow-hidden rounded-2xl border p-3.5 transition-all duration-150 active:scale-[0.985] md:p-5 {isSelected
+							class="group relative cursor-pointer overflow-hidden rounded-2xl border p-3.5 transition-all duration-150 select-none active:scale-[0.985] md:p-5 {isSelected
 								? 'selected-card-glass border-white/45 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] ring-1 ring-white/10'
 								: 'border-white/10 bg-offblack/[0.53] hover:border-white/20 hover:bg-offblack/80'} {deselectedCardIds.includes(
 								doc.id
@@ -1501,7 +1516,10 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 									<span
 										class="min-w-0 flex-1 truncate text-sm font-medium text-white md:text-base"
 										title={doc.name}
-									>{@html highlightMatch(doc.name, activeSearchQuery)}</span>
+									>
+										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+										{@html highlightMatch(doc.name, activeSearchQuery)}
+									</span>
 								</div>
 								<div
 									class="flex shrink-0 items-center gap-3"
@@ -1565,6 +1583,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 										? ''
 										: 'line-clamp-2'}"
 								>
+									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 									{@html highlightMatch(doc.description, activeSearchQuery)}
 								</p>
 							{/if}
@@ -1573,7 +1592,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 								<div class="semantic-match-panel">
 									<button
 										type="button"
-										class="semantic-match-trigger select-none transition-all duration-150 active:scale-[0.99]"
+										class="semantic-match-trigger transition-all duration-150 select-none active:scale-[0.99]"
 										onclick={(e) => {
 											triggerHaptic(15);
 											e.stopPropagation();
@@ -1619,6 +1638,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 											? 'semantic-match-copy-expanded'
 											: 'semantic-match-copy-collapsed'}"
 									>
+										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html highlightMatch(doc.semanticContent, activeSearchQuery)}
 									</div>
 								</div>
@@ -1668,7 +1688,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 											{#snippet child({ props })}
 												<div
 													{...props}
-													class="inline-flex cursor-help select-none items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300"
+													class="inline-flex cursor-help items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2.5 py-0.5 text-xs font-medium text-amber-300 select-none"
 												>
 													<MxIcon name="clock-outline" class="size-3.5 text-amber-400" />
 													<span class="font-medium tracking-wide">Resuming Tomorrow</span>
@@ -1683,14 +1703,14 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 									</Tooltip.Root>
 								{:else if doc.status === 'failed_vectorizing'}
 									<div
-										class="inline-flex select-none items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
+										class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400 select-none"
 									>
 										<MxIcon name="close-circle-linear" class="size-3.5 text-red-400" />
 										<span class="font-medium tracking-wide">Failed Vectorizing</span>
 									</div>
 								{:else if doc.status === 'failed'}
 									<div
-										class="inline-flex select-none items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400"
+										class="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/40 px-2.5 py-0.5 text-xs font-medium text-red-400 select-none"
 									>
 										<MxIcon name="close-circle-linear" class="size-3.5 text-red-400" />
 										<span class="font-medium tracking-wide">Processing Failed</span>
@@ -1733,7 +1753,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 												title="First page"
 												disabled={currentPage === 1}
 												onclick={() => goToPage(1)}
-												class="flex size-9 cursor-pointer select-none items-center justify-center rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
+												class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
 											>
 												<ChevronFirstIcon class="size-4" />
 											</button>
@@ -1745,7 +1765,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 													triggerHaptic(15);
 													keepDocumentsAtBottom();
 												}}
-												class="cursor-pointer select-none rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
+												class="cursor-pointer rounded-full text-white transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
 											/>
 										</Pagination.Item>
 
@@ -1763,7 +1783,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 															triggerHaptic(15);
 															keepDocumentsAtBottom();
 														}}
-														class="cursor-pointer select-none rounded-full text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 data-[active=true]:border-white/45 data-[active=true]:bg-white/10 data-[active=true]:text-white"
+														class="cursor-pointer rounded-full text-white/75 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 data-[active=true]:border-white/45 data-[active=true]:bg-white/10 data-[active=true]:text-white"
 													>
 														{page.value}
 													</Pagination.Link>
@@ -1777,7 +1797,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 													triggerHaptic(15);
 													keepDocumentsAtBottom();
 												}}
-												class="cursor-pointer select-none rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
+												class="cursor-pointer rounded-full text-white transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:text-white/20"
 											/>
 										</Pagination.Item>
 
@@ -1788,7 +1808,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 												title="Last page"
 												disabled={currentPage === totalPages}
 												onclick={() => goToPage(totalPages)}
-												class="flex size-9 cursor-pointer select-none items-center justify-center rounded-full text-white transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
+												class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-90 disabled:pointer-events-none disabled:text-white/20"
 											>
 												<ChevronLastIcon class="size-4" />
 											</button>
@@ -1908,7 +1928,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 					renameDialogOpen = false;
 				}}
 				disabled={isRenaming}
-				class="cursor-pointer select-none text-sm text-white transition-all duration-150 hover:bg-white/10 active:scale-[0.96]"
+				class="cursor-pointer text-sm text-white transition-all duration-150 select-none hover:bg-white/10 active:scale-[0.96]"
 			>
 				Cancel
 			</Button>
@@ -1919,7 +1939,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 					confirmRename();
 				}}
 				disabled={isRenaming}
-				class="cursor-pointer select-none bg-terracotta text-black transition-all duration-150 hover:bg-terracotta-deep active:scale-[0.96] disabled:opacity-50"
+				class="cursor-pointer bg-terracotta text-black transition-all duration-150 select-none hover:bg-terracotta-deep active:scale-[0.96] disabled:opacity-50"
 			>
 				{#if isRenaming}
 					<Loader2Icon class="mr-2 size-4 animate-spin" />
@@ -1957,7 +1977,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 					showBatchDeleteModal = false;
 				}}
 				disabled={isBatchDeleting}
-				class="cursor-pointer select-none text-sm text-white transition-all duration-150 hover:bg-white/10 active:scale-[0.96]"
+				class="cursor-pointer text-sm text-white transition-all duration-150 select-none hover:bg-white/10 active:scale-[0.96]"
 			>
 				Cancel
 			</Button>
@@ -1968,7 +1988,7 @@ import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 					executeBatchDelete();
 				}}
 				disabled={isBatchDeleting}
-				class="cursor-pointer select-none border border-red-500/40 bg-red-950/60 font-medium text-red-400 transition-all duration-150 hover:bg-red-900/80 hover:text-red-300 active:scale-[0.96] disabled:opacity-50"
+				class="cursor-pointer border border-red-500/40 bg-red-950/60 font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-900/80 hover:text-red-300 active:scale-[0.96] disabled:opacity-50"
 			>
 				{#if isBatchDeleting}
 					<Loader2Icon class="mr-2 size-4 animate-spin" />

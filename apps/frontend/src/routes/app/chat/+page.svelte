@@ -57,7 +57,7 @@
 
 	let activeMode = $state('chat');
 	let inputValue = $state('');
-	let selectedModel: LlmOption = $state(llmOptions[0]);
+	let selectedModel: LlmOption = $state(INITIAL_LLM_OPTIONS[0]);
 	let attachedFiles: File[] = $state([]);
 	let isUploading = $state(false);
 	/** Sparkles toggle state (menggantikan tombol attach di input landing) —
@@ -110,7 +110,8 @@
 
 		// Check for incoming document mention (e.g. from Documents page "Ask in Chat")
 		const docId = page.url.searchParams.get('docId') || page.url.searchParams.get('mentionDocId');
-		const docTitle = page.url.searchParams.get('docTitle') || page.url.searchParams.get('mentionDocTitle');
+		const docTitle =
+			page.url.searchParams.get('docTitle') || page.url.searchParams.get('mentionDocTitle');
 
 		if (docId && docTitle) {
 			inputValue = `${mentionToken(docTitle, docId)} `;
@@ -224,7 +225,8 @@
 
 			const newId = crypto.randomUUID();
 			// NOTE: the initial question is deliberately NOT logged (privacy).
-			goto(`/app/chat/${newId}`, {
+			/* eslint-disable-next-line svelte/no-navigation-without-resolve */
+			void goto(`/app/chat/${newId}`, {
 				state: {
 					initialQuestion: inputValue.trim(),
 					selectedModel: $state.snapshot(selectedModel),
@@ -239,13 +241,19 @@
 			const query = inputValue.trim();
 			if (!query) return;
 			const mode = aiSearchEnabled ? 'semantic' : 'keyword';
-			goto(`/app/documents?q=${encodeURIComponent(query)}&mode=${mode}`);
+			/* eslint-disable-next-line svelte/no-navigation-without-resolve */
+			void goto(`/app/documents?q=${encodeURIComponent(query)}&mode=${mode}`);
 		}
 	}
 </script>
 
 <svelte:head>
-	{@html seo({ title: 'Chat | Dokyudo', description: 'Ask questions and get answers powered by your documents.', noindex: true })}
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html seo({
+		title: 'Chat | Dokyudo',
+		description: 'Ask questions and get answers powered by your documents.',
+		noindex: true
+	})}
 </svelte:head>
 
 <div class="relative flex h-full w-full items-center justify-center overflow-hidden p-4">
@@ -343,7 +351,10 @@
 	{/snippet}
 
 	<!-- Background Video (Local static video, full-screen cover including behind sidebar) -->
-	<div class="pointer-events-none fixed inset-0 z-0 h-screen w-screen overflow-hidden" aria-hidden="true">
+	<div
+		class="pointer-events-none fixed inset-0 z-0 h-screen w-screen overflow-hidden"
+		aria-hidden="true"
+	>
 		<video
 			class="h-full w-full object-cover object-center"
 			autoplay
@@ -405,7 +416,7 @@
 											{...props}
 											value="chat"
 											onclick={() => triggerHaptic(20)}
-											class="flex cursor-pointer select-none items-center gap-2 rounded-full px-4 py-1.5 transition-all duration-150 active:scale-[0.96]
+											class="flex cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 transition-all duration-150 select-none active:scale-[0.96]
 												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-warm-gray/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
 												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-offblack/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-warm-gray/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
 										>
@@ -435,7 +446,7 @@
 											{...props}
 											value="search"
 											onclick={() => triggerHaptic(20)}
-											class="flex cursor-pointer select-none items-center gap-2 rounded-full px-4 py-1.5 transition-all duration-150 active:scale-[0.96]
+											class="flex cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 transition-all duration-150 select-none active:scale-[0.96]
 												data-[state=active]:border-[0.74px] data-[state=active]:border-white/[0.80] data-[state=active]:bg-warm-gray/[0.40] data-[state=active]:text-white/[0.80] data-[state=active]:shadow-none data-[state=active]:backdrop-blur-[31.16px]
 												data-[state=inactive]:border data-[state=inactive]:border-white/[0.16] data-[state=inactive]:bg-offblack/[0.40] data-[state=inactive]:text-white/[0.40] data-[state=inactive]:backdrop-blur-[42px] hover:data-[state=inactive]:border-[0.74px] hover:data-[state=inactive]:border-white/[0.80] hover:data-[state=inactive]:bg-warm-gray/[0.40] hover:data-[state=inactive]:text-white/[0.80] hover:data-[state=inactive]:backdrop-blur-[31.16px]"
 										>
@@ -464,7 +475,7 @@
 			<div class="flex items-center gap-2 @3xl:gap-3">
 				<!-- Character Count Indicator Capsule -->
 				<div
-					class="flex shrink-0 select-none items-center gap-1.5 rounded-full border border-white/[0.16] bg-offblack/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {mentionStrippedLength(
+					class="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.16] bg-offblack/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors select-none {mentionStrippedLength(
 						inputValue
 					) >= 690
 						? 'text-red-400'
@@ -479,7 +490,7 @@
 
 				<!-- Usage Info Capsule (Desktop) -->
 				<div
-					class="hidden shrink-0 select-none items-center gap-4 rounded-full border border-white/[0.16] bg-offblack/[0.40] px-4 py-1.5 text-xs text-white/[0.40] backdrop-blur-[42px] transition-colors @3xl:flex"
+					class="hidden shrink-0 items-center gap-4 rounded-full border border-white/[0.16] bg-offblack/[0.40] px-4 py-1.5 text-xs text-white/[0.40] backdrop-blur-[42px] transition-colors select-none @3xl:flex"
 				>
 					{@render desktopUsageMetric(
 						'document-upload-outline',
@@ -516,7 +527,7 @@
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger
 							onclick={() => triggerHaptic(15)}
-							class="flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-white/[0.16] bg-offblack/[0.40] text-white/[0.40] backdrop-blur-[42px] transition-all duration-150 hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] active:scale-[0.90] focus:outline-none"
+							class="flex size-8 cursor-pointer items-center justify-center rounded-full border border-white/[0.16] bg-offblack/[0.40] text-white/[0.40] backdrop-blur-[42px] transition-all duration-150 select-none hover:border-[0.74px] hover:border-white/[0.80] hover:bg-warm-gray/[0.40] hover:text-white/[0.80] hover:backdrop-blur-[31.16px] focus:outline-none active:scale-[0.90]"
 						>
 							<MxIcon name="diagram-up-bold" class="size-4" />
 						</DropdownMenu.Trigger>
@@ -524,8 +535,7 @@
 							class="w-56 border border-white/[0.16] bg-offblack/40 p-3 text-white backdrop-blur-[42px]"
 							align="end"
 						>
-							align="end"
-						>
+							align="end" >
 							<div class="mb-3 text-xs font-medium text-white/[0.69]">Usage Information</div>
 							<div class="flex flex-col gap-3">
 								{@render mobileUsageMetric(

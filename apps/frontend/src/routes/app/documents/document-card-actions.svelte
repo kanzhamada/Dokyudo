@@ -53,9 +53,7 @@
 		const maxX = Math.max(padding, window.innerWidth - width - padding);
 		const x = Math.min(Math.max(rect.right - width, padding), maxX);
 		const opensBelow = rect.bottom + 4 + height <= window.innerHeight - padding;
-		const y = opensBelow
-			? rect.bottom + 4
-			: Math.max(padding, rect.top - height - 4);
+		const y = opensBelow ? rect.bottom + 4 : Math.max(padding, rect.top - height - 4);
 		menuPos = { x, y };
 		menuOpen = true;
 	}
@@ -82,7 +80,9 @@
 					{...props}
 					variant="ghost"
 					size="icon"
-					class="relative size-11 cursor-pointer select-none rounded-full text-white/60 transition-all duration-150 hover:bg-white/10 active:scale-[0.88] focus-visible:bg-white/10 focus-visible:text-white aria-expanded:bg-white/10 aria-expanded:text-white md:size-8"
+					data-doc-id={id}
+					aria-controls={menuOpen ? `doc-actions-menu-${id}` : undefined}
+					class="relative size-11 cursor-pointer rounded-full text-white/60 transition-all duration-150 select-none hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white active:scale-[0.88] aria-expanded:bg-white/10 aria-expanded:text-white md:size-8"
 					onclick={toggleMenu}
 					aria-haspopup="menu"
 					aria-expanded={menuOpen}
@@ -110,13 +110,16 @@
 	></div>
 	<div
 		use:teleport
+		id={`doc-actions-menu-${id}`}
+		role="menu"
+		tabindex="-1"
 		transition:scale={{ duration: 150, start: 0.95 }}
 		style={`position: fixed; top: ${menuPos.y}px; left: ${menuPos.x}px;`}
 		class="z-50 w-40 rounded-xl border border-white/15 bg-offblack/95 p-1 text-white shadow-2xl backdrop-blur-2xl"
 	>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
+			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
 			disabled={askDisabled}
 			onclick={() => {
 				triggerHaptic(15);
@@ -132,7 +135,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
+			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent md:min-h-0"
 			disabled={previewDisabled}
 			onclick={() => {
 				triggerHaptic(15);
@@ -148,7 +151,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 			onclick={() => {
 				triggerHaptic(15);
 				closeMenu();
@@ -160,7 +163,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
+			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.98] md:min-h-0"
 			onclick={() => {
 				triggerHaptic(15);
 				closeMenu();
@@ -173,7 +176,7 @@
 		<div class="my-1 h-px bg-white/10"></div>
 		<button
 			type="button"
-			class="flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15 md:min-h-0"
+			class="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15 md:min-h-0"
 			onclick={() => {
 				triggerHaptic(15);
 				closeMenu();

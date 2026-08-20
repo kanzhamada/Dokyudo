@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
+	import { SvelteDate, SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { RotateCcw } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
@@ -41,14 +42,14 @@
 	async function fetchActivities(queryPage: number = 1) {
 		isLoading = true;
 
-		const params = new URLSearchParams();
+		const params = new SvelteURLSearchParams();
 		params.set('page', String(queryPage));
 		params.set('limit', String(meta.limit));
 
 		if (selectedCategory) params.set('category', selectedCategory);
-		if (startDate) params.set('startDate', new Date(startDate).toISOString());
+		if (startDate) params.set('startDate', new SvelteDate(startDate).toISOString());
 		if (endDate) {
-			const end = new Date(endDate);
+			const end = new SvelteDate(endDate);
 			end.setHours(23, 59, 59, 999);
 			params.set('endDate', end.toISOString());
 		}
@@ -112,19 +113,24 @@
 	);
 
 	onMount(() => {
-		const urlParams = $page.url.searchParams;
+		const urlParams = page.url.searchParams;
 		searchQuery = urlParams.get('search') || '';
 		selectedCategory = urlParams.get('category') || '';
 		startDate = urlParams.get('startDate') || '';
 		endDate = urlParams.get('endDate') || '';
-		const initialPage = parseInt(urlParams.get('page') || '1');
+		const initialPage = parseInt(urlParams.get('page') || '1', 10);
 
 		fetchActivities(initialPage);
 	});
 </script>
 
 <svelte:head>
-	{@html seo({ title: 'Activity Log | Dokyudo', description: 'Activity log for your Dokyudo workspace.', noindex: true })}
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html seo({
+		title: 'Activity Log | Dokyudo',
+		description: 'Activity log for your Dokyudo workspace.',
+		noindex: true
+	})}
 </svelte:head>
 
 <div class="flex h-full w-full flex-col gap-6 overflow-y-auto px-6 py-6 font-sans md:px-10 md:py-8">
@@ -178,11 +184,11 @@
 			role="group"
 			aria-label="Filter by category"
 		>
-			{#each [{ id: '', label: 'All' }, { id: 'auth', label: 'Auth' }, { id: 'document', label: 'Documents' }, { id: 'billing', label: 'Billing' }, { id: 'tenant', label: 'Workspace' }] as cat}
+			{#each [{ id: '', label: 'All' }, { id: 'auth', label: 'Auth' }, { id: 'document', label: 'Documents' }, { id: 'billing', label: 'Billing' }, { id: 'tenant', label: 'Workspace' }] as cat (cat.id)}
 				<button
 					type="button"
 					aria-pressed={selectedCategory === cat.id}
-					class="h-7 shrink-0 cursor-pointer select-none rounded-md px-2.5 text-[11px] font-medium transition-all duration-150 active:scale-[0.96] {selectedCategory ===
+					class="h-7 shrink-0 cursor-pointer rounded-md px-2.5 text-[11px] font-medium transition-all duration-150 select-none active:scale-[0.96] {selectedCategory ===
 					cat.id
 						? 'bg-offwhite text-black shadow-[0_2px_8px_rgba(255,255,255,0.12)]'
 						: 'text-warm-gray hover:bg-white/[0.06] hover:text-white'}"
@@ -223,7 +229,7 @@
 			<Button
 				variant="ghost"
 				size="sm"
-				class="h-9 shrink-0 cursor-pointer select-none gap-1.5 rounded-lg px-2.5 text-[11px] text-warm-gray transition-all duration-150 hover:bg-white/[0.06] hover:text-white active:scale-[0.94] disabled:opacity-40"
+				class="h-9 shrink-0 cursor-pointer gap-1.5 rounded-lg px-2.5 text-[11px] text-warm-gray transition-all duration-150 select-none hover:bg-white/[0.06] hover:text-white active:scale-[0.94] disabled:opacity-40"
 				onclick={resetFilters}
 				disabled={!hasActiveFilters}
 				aria-label="Reset filters"

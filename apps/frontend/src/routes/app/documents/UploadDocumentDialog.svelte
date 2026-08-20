@@ -86,7 +86,8 @@
 		| 'text/markdown' {
 		const ext = filename.split('.').pop()?.toLowerCase();
 		if (ext === 'txt') return 'text/plain';
-		if (ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+		if (ext === 'docx')
+			return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 		if (ext === 'md') return 'text/markdown';
 		return 'application/pdf';
 	}
@@ -374,14 +375,19 @@
 	<Dialog.Content
 		class="flex max-h-[calc(100dvh-1rem)] max-w-[calc(100%-1rem)] flex-col overflow-hidden rounded-[16px] border-white/10 bg-offblack/[0.85] p-0 text-white backdrop-blur-[42px] sm:max-w-4xl sm:rounded-[22px]"
 	>
-		<div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-5 sm:gap-5 sm:p-8 sm:pb-0 md:p-10 md:pb-0">
+		<div
+			class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-5 sm:gap-5 sm:p-8 sm:pb-0 md:p-10 md:pb-0"
+		>
 			<!-- Header Section -->
 			<div class="flex min-w-0 flex-col gap-2 text-center">
 				<Dialog.Title class="text-[28px] leading-tight font-semibold text-white md:text-4xl">
 					Upload Documents
 				</Dialog.Title>
-				<Dialog.Description class="mx-auto max-w-full px-2 text-sm leading-relaxed font-normal text-warm-gray md:text-base">
-					Add important project documents. Supported types: PDF, TXT, DOCX, and MD. (keep files under 25MB)
+				<Dialog.Description
+					class="mx-auto max-w-full px-2 text-sm leading-relaxed font-normal text-warm-gray md:text-base"
+				>
+					Add important project documents. Supported types: PDF, TXT, DOCX, and MD. (keep files
+					under 25MB)
 				</Dialog.Description>
 			</div>
 
@@ -397,7 +403,9 @@
 					: 'border-white/20 bg-graphite/40 hover:bg-graphite/60'}"
 			>
 				<!-- Illustrative Composition -->
-				<div class="relative mb-4 flex h-20 w-28 items-center justify-center sm:mb-6 sm:h-24 sm:w-32">
+				<div
+					class="relative mb-4 flex h-20 w-28 items-center justify-center sm:mb-6 sm:h-24 sm:w-32"
+				>
 					<!-- TXT Icon (Back Right) -->
 					<div
 						class="absolute top-2 right-2 flex h-16 w-12 rotate-6 transform items-center justify-center opacity-80 shadow-lg"
@@ -554,7 +562,7 @@
 						triggerHaptic(15);
 						fileInputEl?.click();
 					}}
-					class="relative cursor-pointer select-none overflow-hidden rounded-[8px] border-t border-white/20 bg-graphite px-8 font-medium text-white shadow-[0_2px_4px_rgba(0,0,0,0.4)] transition-all duration-150 hover:bg-graphite/80 active:scale-[0.96]"
+					class="relative cursor-pointer overflow-hidden rounded-[8px] border-t border-white/20 bg-graphite px-8 font-medium text-white shadow-[0_2px_4px_rgba(0,0,0,0.4)] transition-all duration-150 select-none hover:bg-graphite/80 active:scale-[0.96]"
 				>
 					Browse files...
 				</Button>
@@ -576,8 +584,10 @@
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
-										<div class="min-w-0 flex flex-col">
-											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
+										<div class="flex min-w-0 flex-col">
+											<span class="block truncate text-sm font-bold text-white" title={item.name}
+												>{item.name}</span
+											>
 											<span class="text-xs text-warm-gray"
 												>{item.sizeFormatted} -
 												<span class="text-white/60">ready to upload</span></span
@@ -596,7 +606,7 @@
 																triggerHaptic(15);
 																removeItem(item);
 															}}
-															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
+															class="cursor-pointer text-warm-gray transition-all duration-150 select-none hover:text-white active:scale-90"
 														>
 															<MxIcon name="close-circle-linear" class="size-5" />
 														</button>
@@ -622,8 +632,10 @@
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
-										<div class="min-w-0 flex flex-col">
-											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
+										<div class="flex min-w-0 flex-col">
+											<span class="block truncate text-sm font-bold text-white" title={item.name}
+												>{item.name}</span
+											>
 											<span class="text-xs text-warm-gray"
 												>{item.sizeFormatted} -
 												<span class="text-emerald-400">successful upload</span></span
@@ -644,7 +656,7 @@
 																triggerHaptic(15);
 																removeItem(item);
 															}}
-															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-red-400 active:scale-90"
+															class="cursor-pointer text-warm-gray transition-all duration-150 select-none hover:text-red-400 active:scale-90"
 														>
 															<MxIcon name="trash-bin-minimalistic-outline" class="size-5" />
 														</button>
@@ -670,8 +682,10 @@
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
-										<div class="min-w-0 flex flex-col">
-											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
+										<div class="flex min-w-0 flex-col">
+											<span class="block truncate text-sm font-bold text-white" title={item.name}
+												>{item.name}</span
+											>
 											<span class="text-xs text-warm-gray"
 												>{item.sizeFormatted} -
 												<span class="font-bold text-red-400"
@@ -693,7 +707,7 @@
 																triggerHaptic(15);
 																retryItem(item);
 															}}
-															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
+															class="cursor-pointer text-warm-gray transition-all duration-150 select-none hover:text-white active:scale-90"
 														>
 															<RotateCcwIcon class="size-5" />
 														</button>
@@ -717,7 +731,7 @@
 																triggerHaptic(15);
 																removeItem(item);
 															}}
-															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
+															class="cursor-pointer text-warm-gray transition-all duration-150 select-none hover:text-white active:scale-90"
 														>
 															<MxIcon name="close-circle-linear" class="size-5" />
 														</button>
@@ -743,8 +757,10 @@
 										>
 											<MxIcon name="document-outline" class="size-5" />
 										</div>
-										<div class="min-w-0 flex flex-col">
-											<span class="block truncate text-sm font-bold text-white" title={item.name}>{item.name}</span>
+										<div class="flex min-w-0 flex-col">
+											<span class="block truncate text-sm font-bold text-white" title={item.name}
+												>{item.name}</span
+											>
 											<span class="text-xs text-warm-gray"
 												>{item.sizeFormatted} -
 												<span class="font-medium text-white/80">
@@ -776,7 +792,7 @@
 																triggerHaptic(15);
 																removeItem(item);
 															}}
-															class="cursor-pointer select-none text-warm-gray transition-all duration-150 hover:text-white active:scale-90"
+															class="cursor-pointer text-warm-gray transition-all duration-150 select-none hover:text-white active:scale-90"
 														>
 															<MxIcon name="close-circle-linear" class="size-5" />
 														</button>
@@ -822,7 +838,7 @@
 
 		<!-- Footer Section -->
 		<div
-			class="flex shrink-0 flex-col gap-3 border-t border-white/10 bg-black px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-5 sm:rounded-b-[22px]"
+			class="flex shrink-0 flex-col gap-3 border-t border-white/10 bg-black px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:rounded-b-[22px] sm:px-8 sm:py-5"
 		>
 			<div class="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-3">
 				{#if hasFailedUploads}
@@ -835,7 +851,7 @@
 							retryAllFailed();
 						}}
 						disabled={isAnyUploading}
-						class="cursor-pointer select-none border border-terracotta/40 bg-terracotta/10 text-sm font-medium text-terracotta transition-all duration-150 hover:bg-terracotta/20 hover:text-white active:scale-[0.96] disabled:opacity-40"
+						class="cursor-pointer border border-terracotta/40 bg-terracotta/10 text-sm font-medium text-terracotta transition-all duration-150 select-none hover:bg-terracotta/20 hover:text-white active:scale-[0.96] disabled:opacity-40"
 					>
 						<RotateCcwIcon class="mr-2 size-4" />
 						Retry Failed ({failedCount})
@@ -852,7 +868,7 @@
 							cancelAllBackendUploads();
 						}}
 						disabled={isCleaningUp}
-						class="cursor-pointer select-none border border-red-500/30 bg-red-950/30 text-sm font-medium text-red-400 transition-all duration-150 hover:bg-red-900/50 hover:text-red-300 active:scale-[0.96] disabled:opacity-40"
+						class="cursor-pointer border border-red-500/30 bg-red-950/30 text-sm font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-900/50 hover:text-red-300 active:scale-[0.96] disabled:opacity-40"
 					>
 						{#if isCleaningUp}
 							<Loader2Icon class="mr-2 size-4 animate-spin" />
@@ -871,7 +887,7 @@
 							discardLocalStagedFiles();
 						}}
 						disabled={uploadFiles.length === 0}
-						class="cursor-pointer select-none text-sm font-medium text-white transition-all duration-150 hover:bg-white/10 active:scale-[0.96] disabled:opacity-40"
+						class="cursor-pointer text-sm font-medium text-white transition-all duration-150 select-none hover:bg-white/10 active:scale-[0.96] disabled:opacity-40"
 					>
 						Discard All
 					</Button>
@@ -894,7 +910,7 @@
 											}
 										}}
 										disabled={uploadFiles.length === 0 || isAnyUploading || hasFailedUploads}
-										class="relative max-w-full cursor-pointer select-none bg-terracotta font-medium text-black transition-all duration-150 hover:bg-terracotta-deep active:scale-[0.96] disabled:bg-terracotta/40 disabled:text-black/50 disabled:opacity-100"
+										class="relative max-w-full cursor-pointer bg-terracotta font-medium text-black transition-all duration-150 select-none hover:bg-terracotta-deep active:scale-[0.96] disabled:bg-terracotta/40 disabled:text-black/50 disabled:opacity-100"
 									>
 										{#if isAnyUploading}
 											<Loader2Icon class="mr-2 size-4 animate-spin" />

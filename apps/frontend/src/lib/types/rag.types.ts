@@ -59,6 +59,7 @@ export interface ContextReference {
 	index?: number;
 	title?: string;
 	pages: number[];
+	snippet?: string | null;
 }
 
 /** A document attached to a turn — id + display title. */

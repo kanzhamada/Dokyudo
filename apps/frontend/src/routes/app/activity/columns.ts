@@ -1,5 +1,4 @@
 import type { ColumnDef } from '@tanstack/table-core';
-import { renderComponent, renderSnippet } from '$lib/components/ui/data-table/index.js';
 
 /**
  * Activity log entry shape matching the backend API response.

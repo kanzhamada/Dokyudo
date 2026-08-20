@@ -1,33 +1,17 @@
 export const ssr = false;
 import type { PageLoad } from './$types.js';
 import { apiRequest } from '$lib/api/client.js';
-
-interface BackendDocument {
-	id: string;
-	title: string;
-	description: string;
-	storagePath: string;
-	sizeBytes: number;
-	status: string;
-	createdAt: string;
-}
-
-import type { Document } from './data.js';
+import type { BackendDocument, Document } from './data.js';
 
 export const load: PageLoad = async () => {
 	const result = await apiRequest<{ documents: BackendDocument[] }>('/api/documents');
 	let documents: Document[] = [];
 
-
 	if (result.ok) {
 		documents = result.data.documents.map((doc) => {
-			let sizeStr = '';
 			const sizeKB = doc.sizeBytes / 1024;
-			if (sizeKB > 1024) {
-				sizeStr = (sizeKB / 1024).toFixed(1) + ' MB';
-			} else {
-				sizeStr = sizeKB.toFixed(0) + ' KB';
-			}
+			const sizeStr =
+				sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + ' MB' : sizeKB.toFixed(0) + ' KB';
 
 			return {
 				id: doc.id,

@@ -81,7 +81,6 @@
 </script>
 
 <div class="relative flex h-svh max-h-svh w-full min-w-0 overflow-hidden bg-black/96 text-white">
-
 	<Sidebar.Provider class="relative z-10 size-full min-h-svh bg-transparent">
 		<AppSidebar />
 		<main

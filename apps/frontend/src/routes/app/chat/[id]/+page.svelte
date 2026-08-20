@@ -4,6 +4,8 @@
 	import { backOut } from 'svelte/easing';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -13,13 +15,9 @@
 	import ShareConversationDialog from '$lib/components/app/ShareConversationDialog.svelte';
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Resizable from '$lib/components/ui/resizable';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
-	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
 	import { Spinner } from '$lib/components/ui/spinner';
-	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
 	import { mobileHeaderState } from '$lib/state/mobile-header.svelte.js';
 	import { getMeUsageCached } from '$lib/state/me-cache.store.svelte';
@@ -37,6 +35,7 @@
 		updateConversation,
 		updateTurnFeedback
 	} from '$lib/api/rag';
+	import type { ContextReference } from '$lib/types/rag.types';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import { PUBLIC_API_URL } from '$env/static/public';
 	import { dokyudoFetch } from '$lib/apiClient';
@@ -182,7 +181,6 @@
 	let activeTurnWriteTargetId: string | null = null;
 	const sidebar = useSidebar();
 	let isTitleEditDialogOpen = $state(false);
-	let titleDraft = $state('');
 	let isTitleSaving = $state(false);
 	let isDeleteConversationDialogOpen = $state(false);
 	let isConversationDeleting = $state(false);
@@ -269,7 +267,7 @@
 	// LRU cache for presigned document URLs — max 4 docs, evicts oldest on overflow.
 	// Map preserves insertion order, so first key = Least Recently Used.
 	const MAX_CACHED_DOCS = 4;
-	const docUrlCache = new Map<string, string>();
+	const docUrlCache = new SvelteMap<string, string>();
 
 	function cacheGet(documentId: string): string | null {
 		const url = docUrlCache.get(documentId);
@@ -546,10 +544,6 @@
 	let baseStorage = $state(0);
 	let maxStorage = $state(100 * 1024 * 1024);
 	let maxFileSizeBytes = $state(10 * 1024 * 1024);
-	let searchesCount = $state(0);
-	let maxSearches = $state(100);
-	let qaCount = $state(0);
-	let maxQa = $state(50);
 
 	function applyConversationData(data: GetConversationResponse) {
 		if (data.title) conversationTitle = data.title;
@@ -592,7 +586,7 @@
 						hour: '2-digit',
 						minute: '2-digit'
 					}),
-					references: turn.contextReferences?.map((r: any) => ({
+					references: turn.contextReferences?.map((r) => ({
 						id: r.documentId,
 						index: r.index || 1,
 						name: r.title || r.documentId,
@@ -601,7 +595,7 @@
 					})),
 					variants: (turn.alternatives ?? []).map((alt) => ({
 						...alt,
-						references: alt.contextReferences?.map((r: any) => ({
+						references: alt.contextReferences?.map((r) => ({
 							id: r.documentId,
 							index: r.index || 1,
 							name: r.title || r.documentId,
@@ -618,6 +612,12 @@
 		}
 	}
 
+	interface NavigationChatState {
+		initialQuestion?: string;
+		selectedModel?: LlmOption;
+		attachmentDocuments?: ChatAttachment[];
+	}
+
 	async function loadConversation(id: string) {
 		const requestId = ++conversationRequestId;
 		cancelActiveStream?.();
@@ -630,22 +630,28 @@
 		inputValue = '';
 		attachedFiles = [];
 
-		const stateObj =
-			((page as any)?.state as any) || (history.state as any)?.usr || (history.state as any);
+		const pageState = page.state as NavigationChatState | undefined;
+		const historyUsr =
+			typeof history !== 'undefined' &&
+			history.state &&
+			typeof history.state === 'object' &&
+			'usr' in history.state
+				? (history.state as { usr?: NavigationChatState }).usr
+				: undefined;
+		const stateObj = pageState?.initialQuestion ? pageState : historyUsr;
 
 		// If navigating with an initial question (new room submission), skip fetching DB history
 		// to avoid a 404 HTTP request before the conversation record is created by SSE.
 		if (requestId === conversationRequestId && stateObj?.initialQuestion) {
 			console.log(`[Chat Detail] Initializing new conversation for ID: ${id}`);
 			isTitleLoading = true;
-			const initialQ = stateObj.initialQuestion as string;
-			const initialModel = (stateObj.selectedModel as LlmOption) || selectedModel;
+			const initialQ = stateObj.initialQuestion;
+			const initialModel = stateObj.selectedModel || selectedModel;
 			// Files were uploaded on /app/chat before navigation — their
 			// document ids travel through navigation state. `@`-mention tokens
 			// live inside the question text and are parsed on send.
-			const stateAttachments =
-				(stateObj?.attachmentDocuments as ChatAttachment[] | undefined) ?? undefined;
-			if (stateObj.selectedModel) selectedModel = stateObj.selectedModel as LlmOption;
+			const stateAttachments = stateObj?.attachmentDocuments;
+			if (stateObj.selectedModel) selectedModel = stateObj.selectedModel;
 			streamChatTurn(initialQ, initialModel, { attachments: stateAttachments });
 			scrollToBottom();
 			return;
@@ -669,6 +675,7 @@
 					`[Chat Detail] Conversation ID ${id} not found in DB. Redirecting to /app/chat`
 				);
 				showError('Conversation not found');
+				/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 				await goto('/app/chat');
 				return;
 			}
@@ -733,7 +740,6 @@
 	});
 
 	function openTitleEditDialog() {
-		titleDraft = conversationTitle === 'New Conversation' ? '' : conversationTitle;
 		isTitleEditDialogOpen = true;
 	}
 
@@ -818,6 +824,7 @@
 			conversationsStore.remove(chatId);
 			isDeleteConversationDialogOpen = false;
 			showSuccess('Conversation deleted', '');
+			/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 			await goto('/app/chat');
 		} catch (err) {
 			console.error('[Chat Detail] Failed to delete conversation:', err);
@@ -919,16 +926,12 @@
 			if (res.ok) {
 				baseUploads = res.data.uploadsCount;
 				baseStorage = res.data.storageUsedBytes;
-				searchesCount = res.data.searchesCount;
-				qaCount = res.data.qaCount;
 
 				const userTier: TierType = (res.data.tier as TierType) ?? 'FREE';
 				const limits = TIER_LIMITS[userTier] ?? TIER_LIMITS.FREE;
 				maxUploads = limits.maxUploadsPerMonth;
 				maxStorage = limits.maxStorageBytes;
 				maxFileSizeBytes = limits.maxFileSizeBytes;
-				maxSearches = limits.maxSearchesPerMonth;
-				maxQa = limits.maxQnaPerMonth;
 			}
 		} catch (err) {
 			console.error('[Chat Detail] Failed to fetch usage metrics:', err);
@@ -997,7 +1000,7 @@
 					asst.content = turn.answer;
 					asst.modelName = turn.modelUsed ?? asst.modelName;
 					asst.references =
-						turn.contextReferences?.map((r: any) => ({
+						turn.contextReferences?.map((r) => ({
 							id: r.documentId,
 							index: r.index || 1,
 							name: r.title || r.documentId,
@@ -1117,7 +1120,7 @@
 		// `@[title](id)` mention tokens live in the question text itself — the
 		// backend parses them for retrieval scoping and strips them from the
 		// LLM prompts. The payload only carries FILE attachments here.
-		const bodyPayload: Record<string, any> = {
+		const bodyPayload: Record<string, unknown> = {
 			question: questionText,
 			conversation_id: chatId,
 			useByok
@@ -1146,14 +1149,13 @@
 
 		// Retry mode targets the latest assistant message — no new messages are
 		// pushed; the streamed answer lands in a new variant of that message.
-		let retryVariant: ChatVariant | null = null;
 		let prevLatestAsstMsg: ChatMessage | null = null;
 		let userMsg: ChatMessage | null = null;
 
 		if (isRetryMode) {
 			const targetMsg = messages[messages.length - 1];
 			if (!targetMsg || targetMsg.role !== 'assistant' || !opts.retryTurnId) return;
-			retryVariant = {
+			const retryVariant: ChatVariant = {
 				id: `variant-${Date.now()}`,
 				answer: '',
 				status: 'processing',
@@ -1306,7 +1308,7 @@
 						if (isNegativeAnswer || citationMatches.length === 0) {
 							writeDisplayedRefs([]);
 						} else {
-							const citedPagesMap = new Map<number, Set<number>>();
+							const citedPagesMap = new SvelteMap<number, Set<number>>();
 							for (const match of citationMatches) {
 								const docIdx = Number(match[1]);
 								const pagesStr = match[2];
@@ -1477,7 +1479,7 @@
 					if (onAbort) abortController.signal.removeEventListener('abort', onAbort);
 					value = result.value;
 					done = result.done;
-				} catch (_err) {
+				} catch {
 					// Abort won the race → exit the loop cleanly.
 					// Absorb the orphaned readPromise rejection (it rejects with AbortError too).
 					readPromise.catch(() => {});
@@ -1530,7 +1532,8 @@
 								// Assign references immediately so inline citations render file names
 								// while the answer is still typing. The Source References block below
 								// the message is only shown once the stream is fully done.
-								const mappedRefs = parsed.references.map((r: any, idx: number) => ({
+								const referencesList = parsed.references as ContextReference[];
+								const mappedRefs = referencesList.map((r, idx) => ({
 									id: r.documentId,
 									index: r.index || idx + 1,
 									name: r.title || r.documentId,
@@ -1545,16 +1548,16 @@
 					} else if (eventName === 'awaiting_indexing' && dataStr) {
 						try {
 							const parsed = JSON.parse(dataStr);
-							// Attachment mode: the server returns immediately and
-							// completes the turn in the background sweep. Mark the
-							// message so the UI shows the waiting state and the
-							// conversation poll takes over.
-							messages[asstIndex].status = 'awaiting_indexing';
-							if (Array.isArray(parsed.attachmentDocumentIds)) {
-								const ids: string[] = parsed.attachmentDocumentIds;
-								messages[asstIndex].attachmentDocumentIds = ids;
-								if (userMsg) userMsg.attachmentDocumentIds = ids;
+							const pendingTurnId = parsed.turnId as string | undefined;
+							if (pendingTurnId) {
+								if (userMsg) userMsg.turnId = pendingTurnId;
+								messages[asstIndex].turnId = pendingTurnId;
+								activeTurnWriteTargetId = pendingTurnId;
 							}
+							messages[asstIndex].status = 'awaiting_indexing';
+							messages[asstIndex].content = '';
+							isStreamDone = true;
+							stopThinkingTimer();
 						} catch (e) {
 							console.error('[Chat Detail] Failed to parse awaiting_indexing event:', e);
 						}
@@ -1622,7 +1625,7 @@
 							const parsed = JSON.parse(dataStr);
 							showError(parsed.message || 'Stream error');
 							console.error('[Chat Detail] Backend Response Stream Error:', parsed);
-						} catch (e) {
+						} catch {
 							showError('Stream error');
 						}
 						streamHadError = true;
@@ -1633,10 +1636,11 @@
 					}
 				}
 			}
-		} catch (err: any) {
-			if (err?.name !== 'AbortError') {
+		} catch (err: unknown) {
+			const errorObj = err instanceof Error ? err : null;
+			if (!errorObj || errorObj.name !== 'AbortError') {
 				console.error('[Chat Detail] Stream Catch Error:', err);
-				showError(err.message || 'Network error streaming chat');
+				showError(errorObj?.message || 'Network error streaming chat');
 			}
 			isStreamDone = true;
 		} finally {
@@ -1789,13 +1793,6 @@
 		});
 	}
 
-	function handleKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && !e.shiftKey) {
-			e.preventDefault();
-			handleSendMessage();
-		}
-	}
-
 	function copyToClipboard(text: string, msgId: string) {
 		triggerHaptic(25);
 		const cleanText = text.replace(/\s*\[Doc [^\]]+\]/gi, '').trim();
@@ -1847,6 +1844,7 @@
 		// Push the new branch to the top of the sidebar before navigating.
 		conversationsStore.addOrUpdate(result.data.id, result.data.title);
 		showSuccess('Branch created', '');
+		/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 		await goto(`/app/chat/${result.data.id}`);
 	}
 
@@ -2098,6 +2096,7 @@
 </script>
 
 <svelte:head>
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html seo({
 		title:
 			conversationTitle && conversationTitle !== 'New Conversation'
@@ -2180,7 +2179,10 @@
 									{...props}
 									type="button"
 									class="flex size-9 cursor-pointer items-center justify-center rounded-full text-white/55 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90 active:bg-white/20 active:text-white"
-									onclick={() => goto('/app/chat')}
+									onclick={() => {
+										/* eslint-disable-next-line svelte/no-navigation-without-resolve */
+										void goto('/app/chat');
+									}}
 									aria-label="New chat"
 								>
 									<MxIcon name="add-outline" class="size-5" />
@@ -2200,8 +2202,8 @@
 				<div class="flex items-center gap-1">
 					<button
 						type="button"
-						class="flex min-w-0 max-w-[200px] cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 transition-all duration-150 hover:bg-white/10 active:scale-95 sm:max-w-xs"
-						onclick={() => (isMobileTitleActionsOpen = !isMobileTitleActionsOpen)}
+						class="flex max-w-[200px] min-w-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 transition-all duration-150 hover:bg-white/10 active:scale-95 sm:max-w-xs"
+						onclick={toggleMobileTitleActions}
 					>
 						{#if isPinned}
 							<MxIcon name="pin-bold" class="size-3.5 shrink-0 rotate-45 text-white/60" />
@@ -2365,10 +2367,11 @@
 									<button
 										{...props}
 										type="button"
-										class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.94]"
+										class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/55 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.94]"
 										onclick={() => {
 											triggerHaptic(15);
-											goto('/app/chat');
+											/* eslint-disable-next-line svelte/no-navigation-without-resolve */
+											void goto('/app/chat');
 										}}
 									>
 										<MxIcon name="add-outline" class="size-4" />
@@ -2394,7 +2397,7 @@
 										<button
 											{...props}
 											type="button"
-											class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.97]"
+											class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.97]"
 											onclick={openTitleMenu}
 										>
 											{#if isPinned}
@@ -2405,7 +2408,10 @@
 													? 'New Conversation'
 													: conversationTitle || 'New Conversation'}
 											</span>
-											<MxIcon name="alt-arrow-down-outline" class="size-3.5 shrink-0 text-white/45" />
+											<MxIcon
+												name="alt-arrow-down-outline"
+												class="size-3.5 shrink-0 text-white/45"
+											/>
 										</button>
 									{/snippet}
 								</Tooltip.Trigger>
@@ -2419,7 +2425,7 @@
 					{:else}
 						<button
 							type="button"
-							class="flex max-w-full cursor-pointer select-none items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.97]"
+							class="flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-white/75 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.97]"
 							onclick={openTitleMenu}
 						>
 							{#if isPinned}
@@ -2441,7 +2447,7 @@
 									<button
 										{...props}
 										type="button"
-										class="flex size-8 cursor-pointer select-none items-center justify-center rounded-lg text-white/45 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-[0.90] disabled:cursor-not-allowed disabled:opacity-40"
+										class="flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-all duration-150 select-none hover:bg-white/10 hover:text-white active:scale-[0.90] disabled:cursor-not-allowed disabled:opacity-40"
 										onclick={() => {
 											triggerHaptic(15);
 											shareConversation();
@@ -2473,7 +2479,7 @@
 													{...dropdownProps}
 													type="button"
 													onclick={() => triggerHaptic(15)}
-													class="relative flex size-8 cursor-pointer select-none items-center justify-center rounded-lg text-white/45 transition-all duration-150 hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.90]"
+													class="relative flex size-8 cursor-pointer items-center justify-center rounded-lg text-white/45 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:outline-none active:scale-[0.90]"
 													aria-label="Conversation references"
 												>
 													<MxIcon name="document-outline" class="size-4" />
@@ -2511,7 +2517,7 @@
 							{:else}
 								{#each conversationReferences as reference (reference.id)}
 									<DropdownMenu.Item
-										class="flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-2 text-xs text-white/75 transition-all duration-150 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98]"
+										class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-xs text-white/75 transition-all duration-150 select-none hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white active:scale-[0.98]"
 										onclick={() => {
 											triggerHaptic(15);
 											openCitationPreview(reference.id, reference.name, reference.pages ?? []);
@@ -2586,7 +2592,7 @@
 		<div
 			bind:this={chatContainer}
 			onscroll={updateActiveCheckpoint}
-			class="relative z-10 flex min-h-0 flex-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
+			class="relative z-10 flex scrollbar-thin min-h-0 flex-1 scrollbar-thumb-white/10 scrollbar-track-transparent flex-col overflow-y-auto px-4 pt-24 md:px-8 md:pt-28"
 		>
 			<div class="mx-auto flex w-full max-w-4xl flex-col space-y-6 pb-28">
 				{#each messages as msg, msgIndex (msg.id)}
@@ -2663,7 +2669,7 @@
 										</div>
 									{:else}
 										<p class="leading-relaxed whitespace-pre-wrap">
-											{#each splitMentionSegments(msg.content) as seg, i}
+											{#each splitMentionSegments(msg.content) as seg, segIdx (segIdx)}
 												{#if seg.type === 'mention' && seg.id}
 													<button
 														type="button"
@@ -2766,6 +2772,7 @@
 									onkeydown={() => {}}
 								>
 									{#if displayedContentOf(msg)}
+										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html renderMarkdown(displayedContentOf(msg), displayedRefsOf(msg))}
 									{:else if msg.status === 'awaiting_indexing'}
 										<div
@@ -3102,7 +3109,10 @@
 									<div
 										class="mt-2 inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 py-1 pr-1.5 pl-3"
 									>
-										<MxIcon name="volume-high-outline" class="size-3.5 shrink-0 animate-pulse text-white/60" />
+										<MxIcon
+											name="volume-high-outline"
+											class="size-3.5 shrink-0 animate-pulse text-white/60"
+										/>
 										<span class="text-xs font-medium text-white/60">Reading aloud…</span>
 										<button
 											type="button"
@@ -3143,7 +3153,10 @@
 																aria-label="Copy response"
 															>
 																{#if copiedMessageId === msg.id}
-																	<MxIcon name="check-square-outline" class="size-3.5 text-green-400" />
+																	<MxIcon
+																		name="check-square-outline"
+																		class="size-3.5 text-green-400"
+																	/>
 																{:else}
 																	<MxIcon name="copy-outline" class="size-3.5" />
 																{/if}
@@ -3245,7 +3258,7 @@
 														class="w-36 border border-white/[0.16] bg-offblack/[0.40] p-1 text-white backdrop-blur-[42px]"
 													>
 														<DropdownMenu.Item
-															class="flex cursor-pointer select-none items-center gap-2 rounded-md text-xs text-white/80 transition-all duration-150 hover:bg-white/[0.12] hover:text-white focus:bg-white/[0.16] focus:text-white focus:outline-none active:scale-[0.98]"
+															class="flex cursor-pointer items-center gap-2 rounded-md text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/[0.12] hover:text-white focus:bg-white/[0.16] focus:text-white focus:outline-none active:scale-[0.98]"
 															onclick={() => {
 																triggerHaptic(20);
 																retryMessage(msg, messages[msgIndex - 1]);
@@ -3322,7 +3335,7 @@
 								Branched from
 								{#if branchOfTitle}
 									<a
-										href={`/app/chat/${branchOfId ?? ''}`}
+										href={resolve('/app/chat/[id]', { id: branchOfId ?? '' })}
 										class="cursor-pointer underline decoration-white/30 underline-offset-2 hover:text-white hover:decoration-white/70"
 										>{branchOfTitle}</a
 									>
@@ -3382,7 +3395,7 @@
 
 					<!-- Keyboard length counter -->
 					<div
-						class="flex shrink-0 select-none items-center gap-1.5 rounded-full border border-white/[0.16] bg-offblack/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors {mentionStrippedLength(
+						class="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.16] bg-offblack/[0.40] px-3 py-1.5 text-xs backdrop-blur-[42px] transition-colors select-none {mentionStrippedLength(
 							inputValue
 						) >= 690
 							? 'text-red-400'
@@ -3480,7 +3493,7 @@
 	>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/[0.12] hover:text-white active:scale-[0.98]"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/[0.12] hover:text-white active:scale-[0.98]"
 			onclick={() => {
 				triggerHaptic(15);
 				isTitleMenuOpen = false;
@@ -3492,7 +3505,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/[0.12] hover:text-white active:scale-[0.98]"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/[0.12] hover:text-white active:scale-[0.98]"
 			onclick={() => {
 				triggerHaptic(15);
 				togglePinConversation();
@@ -3509,7 +3522,7 @@
 		<div class="my-1 h-px bg-white/[0.16]"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
 			onclick={() => {
 				triggerHaptic(15);
 				isTitleMenuOpen = false;
@@ -3539,7 +3552,7 @@
 	>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/[0.12] hover:text-white active:scale-[0.98]"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/[0.12] hover:text-white active:scale-[0.98]"
 			onclick={() => {
 				triggerHaptic(15);
 				branchFromMessage(activeResponseMenuMsgIndex!);
@@ -3550,7 +3563,7 @@
 		</button>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 hover:bg-white/[0.12] hover:text-white active:scale-[0.98]"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-white/80 transition-all duration-150 select-none hover:bg-white/[0.12] hover:text-white active:scale-[0.98]"
 			onclick={() => {
 				triggerHaptic(15);
 				const msgIndex = activeResponseMenuMsgIndex;
@@ -3568,7 +3581,7 @@
 		<div class="my-1 h-px bg-white/[0.16]"></div>
 		<button
 			type="button"
-			class="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
+			class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-400 transition-all duration-150 select-none hover:bg-red-500/10 hover:text-red-300 focus:bg-red-500/10 focus:text-red-300 focus:outline-none active:scale-[0.98] active:bg-red-500/15"
 			disabled={messages[activeResponseMenuMsgIndex]?.isStreaming}
 			onclick={() => {
 				triggerHaptic(15);

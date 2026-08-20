@@ -116,9 +116,9 @@
 		<div class="overflow-hidden rounded-xl border border-white/10">
 			<Table.Root class="w-full">
 				<Table.Header class="[&_tr]:border-white/10">
-					{#each table.getHeaderGroups() as headerGroup}
+					{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
 						<Table.Row class="border-white/10 hover:bg-transparent">
-							{#each headerGroup.headers as header}
+							{#each headerGroup.headers as header (header.id)}
 								<Table.Head
 									class="h-11 px-4 text-xs font-medium tracking-wide text-warm-gray uppercase"
 								>
@@ -135,9 +135,9 @@
 				</Table.Header>
 				<Table.Body class="[&_tr]:border-white/10">
 					{#if isLoading}
-						{#each Array(8) as _}
+						{#each { length: 8 }, i (i)}
 							<Table.Row class="border-white/10 hover:bg-transparent">
-								{#each columns as _col}
+								{#each columns as col, colIdx (col.id ?? colIdx)}
 									<Table.Cell class="px-4 py-3">
 										<Skeleton class="h-4 w-full rounded bg-white/5" />
 									</Table.Cell>

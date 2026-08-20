@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { CreditCard, LoaderCircle, ArrowRight, AlertCircle } from 'lucide-svelte';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
@@ -39,13 +39,14 @@
 			if (redirectIn <= 0) {
 				if (redirectTimer !== null) window.clearInterval(redirectTimer);
 				redirectTimer = null;
+				/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 				void goto('/app?billing=open');
 			}
 		}, 1000);
 	}
 
 	async function confirmPayment() {
-		sessionId = $page.url.searchParams.get('session_id') || '';
+		sessionId = page.url.searchParams.get('session_id') || '';
 		if (!sessionId) {
 			paymentState = 'error';
 			errorMessage = 'The payment session could not be identified.';
@@ -163,7 +164,12 @@
 </script>
 
 <svelte:head>
-	{@html seo({ title: 'Payment status | Dokyudo', description: 'Your Dokyudo payment status and subscription activation.', noindex: true })}
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html seo({
+		title: 'Payment status | Dokyudo',
+		description: 'Your Dokyudo payment status and subscription activation.',
+		noindex: true
+	})}
 </svelte:head>
 
 <main class="billing-page">
@@ -230,7 +236,10 @@
 					<button
 						type="button"
 						class="billing-primary-action"
-						onclick={() => goto('/app?billing=open')}
+						onclick={() => {
+							/* eslint-disable-next-line svelte/no-navigation-without-resolve */
+							void goto('/app?billing=open');
+						}}
 					>
 						Open billing
 						<ArrowRight class="size-4" strokeWidth={1.8} />
@@ -267,7 +276,10 @@
 					<button
 						type="button"
 						class="billing-primary-action"
-						onclick={() => goto('/app?billing=open')}
+						onclick={() => {
+							/* eslint-disable-next-line svelte/no-navigation-without-resolve */
+							void goto('/app?billing=open');
+						}}
 					>
 						Open app
 						<ArrowRight class="size-4" strokeWidth={1.8} />

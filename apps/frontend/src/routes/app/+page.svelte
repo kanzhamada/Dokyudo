@@ -3,7 +3,12 @@
 </script>
 
 <svelte:head>
-	{@html seo({ title: 'Dashboard | Dokyudo', description: 'Your workspace overview.', noindex: true })}
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html seo({
+		title: 'Dashboard | Dokyudo',
+		description: 'Your workspace overview.',
+		noindex: true
+	})}
 </svelte:head>
 
 <div class="flex h-full w-full items-start px-6 py-8 font-sans md:px-10 md:py-10">
