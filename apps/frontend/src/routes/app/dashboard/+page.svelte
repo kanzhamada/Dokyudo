@@ -7,5 +7,5 @@
 </svelte:head>
 
 <h1>
-    Dashboard
+    Coming Soon
 </h1>

@@ -88,7 +88,7 @@
 		<Tooltip.Content
 			side="right"
 			align="center"
-			class="text-black"
+			class="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md"
 			hidden={sidebar.state !== 'collapsed' || sidebar.isMobile}
 			{...tooltipContentProps}
 		>

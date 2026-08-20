@@ -707,7 +707,7 @@
 									>
 								{/snippet}
 							</Tooltip.Trigger>
-							<Tooltip.Content side="right" class="max-w-xs break-words text-black">
+							<Tooltip.Content side="right" class="max-w-xs break-words rounded-md bg-white px-2.5 py-1 text-xs font-medium text-black shadow-md">
 								<p>{item.title}</p>
 							</Tooltip.Content>
 						</Tooltip.Root>

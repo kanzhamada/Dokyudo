@@ -34,6 +34,9 @@ import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
 	import FileStackIcon from '@lucide/svelte/icons/file-stack';
 	import ArrowDownAZIcon from '@lucide/svelte/icons/arrow-down-a-z';
 import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+	import ListIcon from '@lucide/svelte/icons/list';
+	import ListXIcon from '@lucide/svelte/icons/list-x';
 	import MxIcon from '$lib/components/icons/MxIcon.svelte';
 	import { createZipArchive } from '$lib/utils/zip';
 

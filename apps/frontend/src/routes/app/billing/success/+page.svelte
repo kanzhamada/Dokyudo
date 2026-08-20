@@ -328,8 +328,8 @@
 		color: var(--color-terracotta);
 	}
 	.billing-status-icon--error {
-		color: var(--color-c-amber);
-		border-color: var(--color-terracotta-deep);
+		color: var(--destructive);
+		border-color: color-mix(in oklch, var(--destructive) 40%, transparent);
 	}
 	.billing-kicker {
 		margin: 0 0 0.5rem;

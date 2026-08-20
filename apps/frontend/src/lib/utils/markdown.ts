@@ -109,8 +109,8 @@ function transformCitationTags(
 				? ` data-doc-id="${escapeHtml(docId)}" data-doc-title="${escapeHtml(docFullName)}" data-snippet="${escapeHtml(snippet)}" data-pages="${escapeHtml(pageFormatted)}"`
 				: '';
 			const chipClass = interactive
-				? 'relative inline-flex cursor-pointer items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-[#383736] hover:text-white mx-0.5 my-0.5 whitespace-nowrap'
-				: 'relative inline-flex items-center align-middle gap-1 rounded-full border border-white/15 bg-[#2B2A29] px-2.5 py-0.5 text-[11px] font-medium text-white/80 mx-0.5 my-0.5 whitespace-nowrap';
+				? 'relative inline-flex cursor-pointer items-center align-middle gap-1 rounded-full border border-white/15 bg-offblack px-2.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-graphite hover:text-white mx-0.5 my-0.5 whitespace-nowrap'
+				: 'relative inline-flex items-center align-middle gap-1 rounded-full border border-white/15 bg-offblack px-2.5 py-0.5 text-[11px] font-medium text-white/80 mx-0.5 my-0.5 whitespace-nowrap';
 
 			return `<span${dataAttrs} class="${chipClass}">${label}</span>`;
 		}

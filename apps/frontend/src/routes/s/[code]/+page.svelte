@@ -236,8 +236,8 @@
 <div class="relative flex h-svh w-full flex-col overflow-hidden bg-black">
 	<!-- Ambient Background Glow Circle (Matching App Shell Layout) -->
 	<div
-		class="pointer-events-none absolute -top-[318px] -left-[295px] z-0 h-[1190px] w-[1190px] rounded-full opacity-[0.07]"
-		style="background: linear-gradient(180deg, var(--color-white) 0%, var(--color-terracotta-deep) 100%); filter: blur(99px);"
+		class="pointer-events-none absolute -top-[318px] -left-[295px] z-0 h-[1190px] w-[1190px] rounded-full opacity-[0.06]"
+		style="background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0) 100%); filter: blur(99px);"
 	></div>
 
 	<!-- ================= Mobile Header (reusable MobileHeader capsule) ================= -->

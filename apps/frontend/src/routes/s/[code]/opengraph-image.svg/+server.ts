@@ -9,7 +9,7 @@ interface ShareMetadata {
 
 const logoPaths = (faviconSvg.match(/<path\b[^>]*\/\s*>/g) ?? [])
 	.join('')
-	.replaceAll('fill="white"', 'fill="#F4E6D4"');
+	.replaceAll('fill="white"', 'fill="#ffffff"');
 
 function escapeXml(value: string): string {
 	return value.replace(/[&<>"']/g, (character) => {
@@ -67,7 +67,7 @@ function renderImage(metadata: ShareMetadata): string {
 <defs>
   <linearGradient id="ambient" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#ffffff"/>
-    <stop offset="1" stop-color="#8f5d4d"/>
+    <stop offset="1" stop-color="#000000"/>
   </linearGradient>
   <filter id="ambientBlur" x="-30%" y="-30%" width="160%" height="160%">
     <feGaussianBlur stdDeviation="58"/>
@@ -78,20 +78,20 @@ function renderImage(metadata: ShareMetadata): string {
     <stop offset="1" stop-color="#db8f5e" stop-opacity="0"/>
   </linearGradient>
 </defs>
-<rect width="1200" height="630" fill="#171615"/>
+<rect width="1200" height="630" fill="#121212"/>
 <circle cx="245" cy="-20" r="575" fill="url(#ambient)" opacity="0.07" filter="url(#ambientBlur)"/>
 <path d="M1010 0C1110 90 1120 185 1060 268C1004 345 1008 424 1116 512" fill="none" stroke="url(#line)" stroke-width="1.5" opacity="0.6"/>
 <path d="M1046 0C1142 95 1152 187 1093 270" fill="none" stroke="#db8f5e" stroke-width="1" opacity="0.2"/>
 <rect x="1018" y="474" width="34" height="34" rx="4" fill="none" stroke="#db8f5e" stroke-width="1" opacity="0.55" transform="rotate(12 1035 491)"/>
 <circle cx="1098" cy="534" r="4" fill="#db8f5e" opacity="0.8"/>
 <svg x="92" y="66" width="34" height="39" viewBox="0 0 476 537" aria-hidden="true">${logoPaths}</svg>
-<text x="142" y="94" fill="#f4e6d4" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="4">DOKYUDO</text>
+<text x="142" y="94" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="4">DOKYUDO</text>
 <text x="92" y="246" fill="#db8f5e" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600" letter-spacing="3">SHARED CONVERSATION</text>
-<text x="92" y="320" fill="#f4e6d4" font-family="Inter, Arial, sans-serif" font-size="56" font-weight="500" letter-spacing="-1.8">${titleLines}</text>
-<line x1="92" y1="503" x2="1108" y2="503" stroke="#f4e6d4" stroke-opacity="0.16"/>
-<text x="92" y="548" fill="#f4e6d4" fill-opacity="0.72" font-family="Inter, Arial, sans-serif" font-size="17">By ${author}</text>
-<circle cx="263" cy="542" r="2.5" fill="#f4e6d4" fill-opacity="0.36"/>
-<text x="282" y="548" fill="#f4e6d4" fill-opacity="0.48" font-family="Inter, Arial, sans-serif" font-size="17">${publishedDate}</text>
+<text x="92" y="320" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="56" font-weight="500" letter-spacing="-1.8">${titleLines}</text>
+<line x1="92" y1="503" x2="1108" y2="503" stroke="#ffffff" stroke-opacity="0.16"/>
+<text x="92" y="548" fill="#ffffff" fill-opacity="0.72" font-family="Inter, Arial, sans-serif" font-size="17">By ${author}</text>
+<circle cx="263" cy="542" r="2.5" fill="#ffffff" fill-opacity="0.36"/>
+<text x="282" y="548" fill="#ffffff" fill-opacity="0.48" font-family="Inter, Arial, sans-serif" font-size="17">${publishedDate}</text>
 </svg>`;
 }
 
