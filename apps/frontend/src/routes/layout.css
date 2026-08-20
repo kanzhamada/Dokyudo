@@ -751,21 +751,21 @@
 	--normal-bg: transparent;
 	--normal-border: transparent;
 	font-family: 'Inter', sans-serif;
-	border-radius: 24px;
-	border: 1px solid rgba(255, 255, 255, 0.16);
-	background: color-mix(in oklch, var(--color-offblack) 75%, transparent);
-	backdrop-filter: blur(42px);
-	-webkit-backdrop-filter: blur(42px);
-	color: var(--color-white);
-	padding: 12px 16px;
-	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+	border-radius: 28px !important;
+	border: 1px solid rgba(255, 255, 255, 0.14) !important;
+	background: color-mix(in oklch, var(--color-black) 60%, transparent) !important;
+	backdrop-filter: blur(42px) saturate(180%) !important;
+	-webkit-backdrop-filter: blur(42px) saturate(180%) !important;
+	color: var(--color-white) !important;
+	padding: 14px 18px;
+	box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 	gap: 12px;
 }
 
-/* Error toast: Lavender / Purple accent (layout.css L38-39) */
+/* Error toast: Lavender / Purple accent with low-opacity black frosted glass */
 [data-sonner-toaster] [data-sonner-toast][data-type='error'] {
-	border-color: color-mix(in oklch, var(--c-lavender) 45%, transparent);
-	background: color-mix(in oklch, var(--c-purple) 55%, var(--color-offblack));
+	border-color: color-mix(in oklch, var(--c-lavender) 50%, transparent) !important;
+	background: color-mix(in oklch, var(--color-black) 60%, transparent) !important;
 }
 
 [data-sonner-toaster] [data-sonner-toast][data-type='error'] [data-title] {
@@ -780,10 +780,10 @@
 	line-height: 1.4;
 }
 
-/* Success toast: Lime / Olive accent (layout.css L42-43) */
+/* Success toast: Lime / Olive accent with low-opacity black frosted glass */
 [data-sonner-toaster] [data-sonner-toast][data-type='success'] {
-	border-color: color-mix(in oklch, var(--c-lime) 45%, transparent);
-	background: color-mix(in oklch, var(--c-olive) 55%, var(--color-offblack));
+	border-color: color-mix(in oklch, var(--c-lime) 50%, transparent) !important;
+	background: color-mix(in oklch, var(--color-black) 60%, transparent) !important;
 }
 
 [data-sonner-toaster] [data-sonner-toast][data-type='success'] [data-title] {
@@ -798,10 +798,10 @@
 	line-height: 1.4;
 }
 
-/* Warning toast: Yellow / Amber accent (layout.css L36-37) */
+/* Warning toast: Yellow / Amber accent with low-opacity black frosted glass */
 [data-sonner-toaster] [data-sonner-toast][data-type='warning'] {
-	border-color: color-mix(in oklch, var(--c-yellow) 45%, transparent);
-	background: color-mix(in oklch, var(--c-amber) 55%, var(--color-offblack));
+	border-color: color-mix(in oklch, var(--c-yellow) 50%, transparent) !important;
+	background: color-mix(in oklch, var(--color-black) 60%, transparent) !important;
 }
 
 [data-sonner-toaster] [data-sonner-toast][data-type='warning'] [data-title],
@@ -811,10 +811,10 @@
 	line-height: 1.4;
 }
 
-/* Info toast: Periwinkle / Navy accent (layout.css L40-41) */
+/* Info toast: Periwinkle / Navy accent with low-opacity black frosted glass */
 [data-sonner-toaster] [data-sonner-toast][data-type='info'] {
-	border-color: color-mix(in oklch, var(--c-periwinkle) 45%, transparent);
-	background: color-mix(in oklch, var(--c-navy) 55%, var(--color-offblack));
+	border-color: color-mix(in oklch, var(--c-periwinkle) 50%, transparent) !important;
+	background: color-mix(in oklch, var(--color-black) 60%, transparent) !important;
 }
 
 [data-sonner-toaster] [data-sonner-toast][data-type='info'] [data-title],

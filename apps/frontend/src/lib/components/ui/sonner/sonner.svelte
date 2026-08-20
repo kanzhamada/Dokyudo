@@ -13,7 +13,7 @@
 	theme={mode.current}
 	class="toaster group"
 	{position}
-	style="--normal-bg: var(--color-offblack); --normal-text: var(--color-white); --normal-border: rgba(255, 255, 255, 0.15);"
+	style="--normal-bg: color-mix(in oklch, var(--color-black) 60%, transparent); --normal-text: var(--color-white); --normal-border: rgba(255, 255, 255, 0.14);"
 	{...restProps}
 >
 	{#snippet loadingIcon()}
