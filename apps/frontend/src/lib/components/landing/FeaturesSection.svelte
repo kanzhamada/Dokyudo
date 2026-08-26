@@ -84,7 +84,7 @@
 							<span class="rdot" style="left:43%;top:73%"></span>
 
 							<span class="rnode" style="left:26%;top:24%">
-								<span class="rnode__dot rnode__dot--navy"><svg class="ic" aria-hidden="true"><use href="#i-vector"/></svg></span>
+								<span class="rnode__dot rnode__dot--terracotta"><svg class="ic" aria-hidden="true"><use href="#i-vector"/></svg></span>
 								<span class="rnode__lbl">Vector / BGE-M3</span>
 							</span>
 							<span class="rnode" style="left:80%;top:40%">
@@ -108,7 +108,7 @@
 						</div>
 					</div>
 
-					<!-- 1: stacked chunk cards + navy block -->
+					<!-- 1: stacked chunk cards + terracotta block -->
 					<div class="cap-stage" data-stage="1">
 						<div class="stack">
 							<article class="scard">
@@ -154,7 +154,7 @@
 							<div class="pipe">
 								<span class="pipe__line" aria-hidden="true"><i class="pipe__spark" style="--sd:0s"></i><i class="pipe__spark" style="--sd:1.3s"></i></span>
 								<span class="pnode">
-									<span class="pnode__dot pnode__dot--navy"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg></span>
+									<span class="pnode__dot pnode__dot--terracotta"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg></span>
 									<span class="pnode__lbl"><b>Paste</b><span>BYOK Key</span></span>
 								</span>
 								<span class="pnode">
@@ -179,41 +179,100 @@
 						</div>
 					</div>
 
-					<!-- 3: $0 routing tree -->
+					<!-- 3: $0 routing tree (SVG Architecture Diagram) -->
 					<div class="cap-stage" data-stage="3">
-						<div class="tree">
-							<svg class="cw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-								<line class="cw" x1="50" y1="12" x2="50" y2="31"/>
-								<line class="cw" x1="50" y1="31" x2="50" y2="45"/>
-								<line class="cw" x1="30" y1="45" x2="70" y2="45"/>
-								<line class="cw" x1="30" y1="45" x2="30" y2="57"/>
-								<line class="cw" x1="70" y1="45" x2="70" y2="57"/>
-								<line class="cw" x1="30" y1="57" x2="30" y2="81"/>
-								<line class="cw" x1="70" y1="57" x2="70" y2="81"/>
-							</svg>
-							<span class="tjoint" style="left:30%;top:45%"></span>
-							<span class="tjoint" style="left:70%;top:45%"></span>
+						<svg class="tree-svg" viewBox="0 0 440 300" preserveAspectRatio="xMidYMid meet" aria-label="Sovereign $0 Edge and Model Routing Architecture">
+							<defs>
+								<linearGradient id="t-terracotta-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+									<stop offset="0%" stop-color="var(--color-terracotta)"/>
+									<stop offset="100%" stop-color="var(--color-terracotta-deep)"/>
+								</linearGradient>
+								<filter id="t-card-shadow" x="-8%" y="-10%" width="120%" height="130%">
+									<feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.06)"/>
+								</filter>
+								<filter id="t-pill-shadow" x="-10%" y="-15%" width="125%" height="145%">
+									<feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="rgba(240,78,35,0.28)"/>
+								</filter>
+							</defs>
 
-							<span class="tnode-brand" aria-hidden="true"><svg class="ic"><use href="#i-node"/></svg></span>
-							<span class="tpill"><b>$0 / mo</b><span>Sovereign Cloud Stack</span></span>
+							<!-- Circuit Routing Lines -->
+							<line x1="220" y1="36" x2="220" y2="64" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>
+							<line x1="220" y1="98" x2="220" y2="122" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>
+							<line x1="110" y1="122" x2="330" y2="122" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>
+							<line x1="110" y1="122" x2="110" y2="274" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>
+							<line x1="330" y1="122" x2="330" y2="274" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>
 
-							<article class="tcard" style="left:30%;top:57%">
-								<div class="tcard__head"><span class="tcard__chk"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span><p class="tcard__t">Multi-Provider Pools</p></div>
-								<div class="tcard__foot"><b>3 tiers</b><span>· 5 LLM providers</span></div>
-							</article>
-							<article class="tcard" style="left:70%;top:57%">
-								<div class="tcard__head"><span class="tcard__chk"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span><p class="tcard__t">On-Prem Sovereign Node</p></div>
-								<div class="tcard__foot"><b>ARM64</b><span>STB + MinIO S3</span></div>
-							</article>
-							<article class="tcard" style="left:30%;top:81%">
-								<div class="tcard__head"><span class="tcard__chk"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span><p class="tcard__t">Redis Circuit Breakers</p></div>
-								<div class="tcard__foot"><b>5 fails</b><span>· 30s open fallback</span></div>
-							</article>
-							<article class="tcard" style="left:70%;top:81%">
-								<div class="tcard__head"><span class="tcard__chk"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span><p class="tcard__t">Event-Driven Ingest</p></div>
-								<div class="tcard__foot"><b>pg_net</b><span>push → STB worker</span></div>
-							</article>
-						</div>
+							<!-- Junction Joints -->
+							<circle cx="110" cy="122" r="3.5" fill="var(--color-ash)" stroke="#ffffff" stroke-width="1.5"/>
+							<circle cx="330" cy="122" r="3.5" fill="var(--color-ash)" stroke="#ffffff" stroke-width="1.5"/>
+
+							<!-- Top Root Brand Node -->
+							<circle cx="220" cy="36" r="19" fill="var(--color-white)" filter="url(#t-card-shadow)"/>
+							<g transform="translate(210, 26)">
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-terracotta)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+									<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+									<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+								</svg>
+							</g>
+
+							<!-- Sovereign $0 Pill -->
+							<rect x="135" y="64" width="170" height="34" rx="17" fill="url(#t-terracotta-grad)" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" filter="url(#t-pill-shadow)"/>
+							<text x="220" y="80" text-anchor="middle" font-family="var(--font-body)" font-weight="600" font-size="14" fill="#ffffff">$0 / mo</text>
+							<text x="220" y="91" text-anchor="middle" font-family="var(--font-interface)" font-weight="600" font-size="7" letter-spacing="0.1em" fill="rgba(255,255,255,0.92)">SOVEREIGN CLOUD STACK</text>
+
+							<!-- Card 1: Multi-Provider Pools (Top Left) -->
+							<g transform="translate(20, 140)" filter="url(#t-card-shadow)">
+								<rect width="180" height="58" rx="0" fill="var(--color-white)" stroke="var(--border-fade)" stroke-width="1"/>
+								<circle cx="16" cy="17" r="7.5" fill="var(--color-terracotta)"/>
+								<path d="M12.5 17L15 19.5L19.5 14.5" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+								<text x="30" y="21" font-family="var(--font-body)" font-weight="600" font-size="11.5" fill="var(--color-black)" letter-spacing="-0.02em">Multi-Provider Pools</text>
+								<line x1="10" y1="32" x2="170" y2="32" stroke="var(--border-fade)" stroke-width="1"/>
+								<text x="10" y="47" font-family="var(--font-body)" font-size="11" letter-spacing="-0.02em">
+									<tspan font-weight="600" fill="var(--color-black)">3 tiers</tspan>
+									<tspan font-weight="400" fill="var(--color-gray)"> · 5 LLM providers</tspan>
+								</text>
+							</g>
+
+							<!-- Card 2: On-Prem Storage Node (Top Right) -->
+							<g transform="translate(240, 140)" filter="url(#t-card-shadow)">
+								<rect width="180" height="58" rx="0" fill="var(--color-white)" stroke="var(--border-fade)" stroke-width="1"/>
+								<circle cx="16" cy="17" r="7.5" fill="var(--color-terracotta)"/>
+								<path d="M12.5 17L15 19.5L19.5 14.5" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+								<text x="30" y="21" font-family="var(--font-body)" font-weight="600" font-size="11.5" fill="var(--color-black)" letter-spacing="-0.02em">On-Prem Storage Node</text>
+								<line x1="10" y1="32" x2="170" y2="32" stroke="var(--border-fade)" stroke-width="1"/>
+								<text x="10" y="47" font-family="var(--font-body)" font-size="11" letter-spacing="-0.02em">
+									<tspan font-weight="600" fill="var(--color-black)">ARM64</tspan>
+									<tspan font-weight="400" fill="var(--color-gray)"> · STB + MinIO S3</tspan>
+								</text>
+							</g>
+
+							<!-- Card 3: Redis Circuit Breakers (Bottom Left) -->
+							<g transform="translate(20, 216)" filter="url(#t-card-shadow)">
+								<rect width="180" height="58" rx="0" fill="var(--color-white)" stroke="var(--border-fade)" stroke-width="1"/>
+								<circle cx="16" cy="17" r="7.5" fill="var(--color-terracotta)"/>
+								<path d="M12.5 17L15 19.5L19.5 14.5" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+								<text x="30" y="21" font-family="var(--font-body)" font-weight="600" font-size="11.5" fill="var(--color-black)" letter-spacing="-0.02em">Redis Circuit Breakers</text>
+								<line x1="10" y1="32" x2="170" y2="32" stroke="var(--border-fade)" stroke-width="1"/>
+								<text x="10" y="47" font-family="var(--font-body)" font-size="11" letter-spacing="-0.02em">
+									<tspan font-weight="600" fill="var(--color-black)">5 fails</tspan>
+									<tspan font-weight="400" fill="var(--color-gray)"> · 30s open fallback</tspan>
+								</text>
+							</g>
+
+							<!-- Card 4: Event-Driven Ingestion (Bottom Right) -->
+							<g transform="translate(240, 216)" filter="url(#t-card-shadow)">
+								<rect width="180" height="58" rx="0" fill="var(--color-white)" stroke="var(--border-fade)" stroke-width="1"/>
+								<circle cx="16" cy="17" r="7.5" fill="var(--color-terracotta)"/>
+								<path d="M12.5 17L15 19.5L19.5 14.5" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+								<text x="30" y="21" font-family="var(--font-body)" font-weight="600" font-size="11.5" fill="var(--color-black)" letter-spacing="-0.02em">Event-Driven Ingest</text>
+								<line x1="10" y1="32" x2="170" y2="32" stroke="var(--border-fade)" stroke-width="1"/>
+								<text x="10" y="47" font-family="var(--font-body)" font-size="11" letter-spacing="-0.02em">
+									<tspan font-weight="600" fill="var(--color-black)">pg_net</tspan>
+									<tspan font-weight="400" fill="var(--color-gray)"> · push → STB worker</tspan>
+								</text>
+							</g>
+						</svg>
 					</div>
 
 				</div>

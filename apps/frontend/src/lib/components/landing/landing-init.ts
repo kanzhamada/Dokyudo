@@ -909,11 +909,12 @@ export function initLanding(): () => void {
 	(function capSwitcher() {
 		const grid = $('#capGrid');
 		const list = $('#capList');
+		const panel = $('#capPanel');
 		const section = $('#features');
 		if (!grid || !list || !section) return;
 
 		const items = $$('.cap-item', list);
-		const stages = $$('.cap-stage', $('#capPanel') || root);
+		const stages = $$('.cap-stage', panel || root);
 		const fills = items.map((it) => $('.cap-bar__fill', it));
 		const DURATION = 5200;
 
@@ -921,7 +922,6 @@ export function initLanding(): () => void {
 		let raf = 0;
 		let t0 = 0;
 		let acc = 0;
-		let hover = false;
 		let inView = false;
 
 		const setBar = (i: number, p: number) => {
@@ -932,6 +932,7 @@ export function initLanding(): () => void {
 				const onNow = k === i;
 				it.classList.toggle('is-on', onNow);
 				it.setAttribute('aria-expanded', String(onNow));
+				if (!onNow) setBar(k, 0);
 			});
 			stages.forEach((st, k) => st.classList.toggle('is-on', k === i));
 		};
@@ -953,17 +954,14 @@ export function initLanding(): () => void {
 			cancelFrame(raf);
 			acc += performance.now() - t0;
 		};
-		const recompute = () => {
-			if (REDUCED) return;
-			if (inView && !hover) run();
-			else freeze();
-		};
 		const advance = () => {
 			setBar(idx, 0);
 			idx = (idx + 1) % items.length;
 			show(idx);
 			acc = 0;
-			recompute();
+			if (!REDUCED && inView) {
+				run();
+			}
 		};
 		const select = (i: number) => {
 			if (i === idx) return;
@@ -971,29 +969,14 @@ export function initLanding(): () => void {
 			idx = i;
 			show(idx);
 			acc = 0;
-			if (!hover && !REDUCED) run();
-			else setBar(idx, 0);
+			if (!REDUCED) {
+				run();
+			} else {
+				setBar(idx, 1);
+			}
 		};
 
 		items.forEach((it, i) => on(it, 'click', () => select(i)));
-
-		// pause while the user is looking at / tabbing through the panel or list
-		on(grid, 'mouseenter', () => {
-			hover = true;
-			freeze();
-		});
-		on(grid, 'mouseleave', () => {
-			hover = false;
-			recompute();
-		});
-		on(grid, 'focusin', () => {
-			hover = true;
-			freeze();
-		});
-		on(grid, 'focusout', () => {
-			hover = false;
-			recompute();
-		});
 
 		// only run the auto-advance while the section is on screen
 		if ('IntersectionObserver' in window && !REDUCED) {
@@ -1001,12 +984,13 @@ export function initLanding(): () => void {
 				new IntersectionObserver(
 					(entries) => {
 						inView = entries[0].isIntersecting;
-						if (inView && !hover) {
-							acc = 0;
+						if (inView) {
 							run();
-						} else freeze();
+						} else {
+							freeze();
+						}
 					},
-					{ threshold: 0.3 }
+					{ threshold: 0.1 }
 				)
 			);
 			cio.observe(section);
@@ -1016,7 +1000,10 @@ export function initLanding(): () => void {
 
 		show(0);
 		setBar(0, 0);
-		if (!REDUCED && inView && !hover) run();
+		if (!REDUCED) {
+			inView = true;
+			run();
+		}
 	})();
 
 	/* ---------- footer email capture (local-only confirmation) ---------- */
