@@ -326,12 +326,12 @@ export function initLanding(): () => void {
 	const chunkCards = $$('.chunkcard', consoleEl);
 
 	const ANSWER =
-		'Q3 EBITDA totaled $48.2M, up 12.4% year over year. Operating income ' +
-		'contributed $41.7M, with depreciation and amortization adding $6.5M. ' +
-		'Per Section 4.2, North America delivered $29.1M and EMEA $19.1M, ' +
-		'partially offset by $2.9M in unallocated corporate costs.';
+		'Q3 EBITDA totaled $48.2M, representing a 12.4% YoY increase [Doc 1: Page 47]. ' +
+		'Operating income contributed $41.7M with D&A add-back of $6.5M [Doc 2: Page 12]. ' +
+		'Regionally, North America delivered $29.1M and EMEA $19.1M, offset by $2.9M ' +
+		'in unallocated corporate overhead [Doc 3: Page 18].';
 
-	const CHUNK_REVEAL_AT = [10, 26, 42]; // word indices
+	const CHUNK_REVEAL_AT = [9, 22, 41]; // word indices for [Doc N: Page X] citations
 	let streamTimers: number[] = [];
 
 	function clearStream() {
@@ -371,7 +371,7 @@ export function initLanding(): () => void {
 			return;
 		}
 
-		setStatus('stream', 'streaming / sse');
+		setStatus('stream', 'turn_started / streaming sse');
 		if (runLabel) runLabel.textContent = 'Streaming…';
 		runBtn?.setAttribute('aria-busy', 'true');
 
@@ -385,13 +385,13 @@ export function initLanding(): () => void {
 					chunkCards[revealIdx].classList.add('show');
 				}
 				i += 1;
-				streamTimers.push(later(step, 26 + Math.random() * 30));
+				streamTimers.push(later(step, 24 + Math.random() * 26));
 			} else {
 				chunkCards.forEach((c) => c.classList.add('show'));
-				streamTimers.push(later(finishDemo, 220));
+				streamTimers.push(later(finishDemo, 200));
 			}
 		};
-		streamTimers.push(later(step, 420)); // simulated scatter-gather latency
+		streamTimers.push(later(step, 380)); // simulated scatter-gather latency
 	}
 
 	if (runBtn) {
@@ -420,8 +420,8 @@ export function initLanding(): () => void {
 			consoleEl?.classList.toggle('byok-on', state);
 			if (routeLine) {
 				routeLine.textContent = state
-					? 'your key / openai gpt-4o-mini / decrypted in-memory only'
-					: 'platform gateway / groq → gemini → cohere fallback';
+					? 'your key / openai gpt-4o-mini / decrypted in RAM only'
+					: 'platform gateway / groq → gemini → cohere (LIGHT / MEDIUM / HEAVY tiers)';
 			}
 		});
 	}
