@@ -1501,7 +1501,7 @@
 							tabindex="0"
 							onclick={() => toggleSelectDoc(doc.id)}
 							onkeydown={(e) => e.key === 'Enter' && toggleSelectDoc(doc.id)}
-							class="group relative cursor-pointer overflow-hidden rounded-2xl border p-3.5 transition-all duration-150 select-none active:scale-[0.985] md:p-5 {isSelected
+							class="group relative cursor-pointer overflow-hidden rounded-2xl border p-3.5 transition-all duration-150 select-none md:p-5 {isSelected
 								? 'selected-card-glass border-white/45 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] ring-1 ring-white/10'
 								: 'border-white/10 bg-offblack/[0.53] hover:border-white/20 hover:bg-offblack/80'} {deselectedCardIds.includes(
 								doc.id

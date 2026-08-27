@@ -838,7 +838,7 @@
 
 		<!-- Footer Section -->
 		<div
-			class="flex shrink-0 flex-col gap-3 border-t border-white/10 bg-black px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:rounded-b-[22px] sm:px-8 sm:py-5"
+			class="flex shrink-0 flex-col gap-3 border-t border-white/10 bg-white/[0.06] px-4 py-4 backdrop-blur-[32px] sm:flex-row sm:items-center sm:justify-end sm:rounded-b-[22px] sm:px-8 sm:py-5"
 		>
 			<div class="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-3">
 				{#if hasFailedUploads}
