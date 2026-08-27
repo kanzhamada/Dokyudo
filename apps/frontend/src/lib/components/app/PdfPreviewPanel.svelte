@@ -80,30 +80,58 @@
 		}
 	}
 
-	// Scroll plugin reference — captured once on viewer ready
-	let scrollCap: any = null;
-	let isFirstLayoutReady = true;
+	// Scroll plugin reference and layout state
+	let scrollCap = $state<any>(null);
+	let isLayoutReady = $state(false);
+
+	function jumpToPage(page: number, instant = true) {
+		if (!scrollCap || !page || page <= 0) return;
+		const performScroll = () => {
+			try {
+				scrollCap.scrollToPage({
+					pageNumber: page,
+					behavior: instant ? 'instant' : 'smooth',
+					alignY: 0
+				});
+			} catch {
+				// Viewer layout might still be loading
+			}
+		};
+
+		// Run in animation frame and settle pass to ensure container dimensions are final
+		requestAnimationFrame(() => {
+			performScroll();
+			setTimeout(performScroll, 120);
+		});
+	}
 
 	function handleReady(registry: any) {
 		const scrollPlugin = registry.getPlugin('scroll');
 		if (!scrollPlugin?.provides) return;
 
-		scrollCap = scrollPlugin.provides();
-		scrollCap.onLayoutReady((event: any) => {
-			if (event.isInitial && initialPages.length > 0) {
-				scrollCap.scrollToPage({ pageNumber: initialPages[0] });
+		const cap = scrollPlugin.provides();
+		scrollCap = cap;
+
+		cap.onLayoutReady((event: any) => {
+			isLayoutReady = true;
+			const targetPage = initialPages[0];
+			if (targetPage) {
+				jumpToPage(targetPage, true);
 			}
 		});
 	}
 
-	// When initialPages changes after first load, scroll to the new page
+	// Reset layout state when src changes
+	$effect(() => {
+		const _ = src;
+		isLayoutReady = false;
+	});
+
+	// When initialPages changes or layout becomes ready, scroll to the target page
 	$effect(() => {
 		const page = initialPages[0];
-		if (!page || !scrollCap || isFirstLayoutReady) {
-			isFirstLayoutReady = false;
-			return;
-		}
-		scrollCap.scrollToPage({ pageNumber: page });
+		if (!page || !scrollCap || !isLayoutReady) return;
+		jumpToPage(page, true);
 	});
 
 	// Dokyudo dark-mode theme tokens shared across all PDF viewer instances
