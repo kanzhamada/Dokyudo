@@ -2352,9 +2352,9 @@
 
 		<!-- Desktop Conversation Header -->
 		<div class="pointer-events-none absolute top-0 right-0 left-0 z-20 hidden h-24 md:block">
-			<!-- Full-width linear gradient overlay spanning behind sidebar -->
+			<!-- Linear gradient overlay for header -->
 			<div
-				class="pointer-events-none fixed inset-x-0 top-0 -z-10 h-24 bg-gradient-to-b from-black via-black/85 via-50% to-transparent"
+				class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-24 bg-gradient-to-b from-black via-black/85 via-50% to-transparent"
 				aria-hidden="true"
 			></div>
 
@@ -3356,9 +3356,9 @@
 			class="pointer-events-none absolute right-0 bottom-0 left-0 z-30 flex flex-col items-center justify-end pt-10 pb-4"
 			style="font-family: 'Inter', sans-serif;"
 		>
-			<!-- Full-width linear gradient overlay spanning behind sidebar -->
+			<!-- Linear gradient overlay for bottom area -->
 			<div
-				class="pointer-events-none fixed inset-x-0 bottom-0 -z-10 bg-gradient-to-t from-black via-black/85 via-50% to-transparent"
+				class="pointer-events-none absolute inset-x-0 bottom-0 -z-10 bg-gradient-to-t from-black via-black/85 via-50% to-transparent"
 				style="height: {bottomAreaHeight ? `${bottomAreaHeight}px` : '180px'};"
 				aria-hidden="true"
 			></div>
