@@ -9,7 +9,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
-	import { getMeUsageCached } from '$lib/state/me-cache.store.svelte';
+	import { getMeCached, getMeUsageCached } from '$lib/state/me-cache.store.svelte';
 	import { seo } from '$lib/seo';
 	import { getKeys } from '$lib/api/keys';
 	import { uploadFilesAsDocuments, type ChatAttachment } from '$lib/api/documents';
@@ -19,6 +19,7 @@
 	import { mentionStrippedLength, mentionToken } from '$lib/utils/doc-mentions';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
 	import UploadDocumentDialog from '../documents/UploadDocumentDialog.svelte';
+	import WelcomeIntroOverlay from '$lib/components/app/WelcomeIntroOverlay.svelte';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
 	import cohereIcon from '$lib/assets/llm/cohere.svg';
@@ -62,6 +63,8 @@
 	let attachedFiles: File[] = $state([]);
 	let isUploading = $state(false);
 	let showUploadDialog = $state(false);
+	let showWelcomeIntro = $state(false);
+	let userDisplayName = $state('User');
 	/** Sparkles toggle state (menggantikan tombol attach di input landing) —
 	 * search bar ini akan terhubung dengan search bar Documents nanti. */
 	let aiSearchEnabled = $state(false);
@@ -114,17 +117,32 @@
 		});
 	}
 
+	function handleWelcomeIntroComplete() {
+		showWelcomeIntro = false;
+		localStorage.setItem(ONBOARDING_UPLOAD_KEY, 'true');
+		showUploadDialog = true;
+	}
+
 	onMount(async () => {
 		// Warm the document mention cache — idempotent, and the `@` popover also
 		// ensures it lazily, so this only makes the first mention instant.
 		await documentsStore.ensureLoaded();
 
-		// First-run onboarding: Prompt user to upload document if they have 0 documents
+		// First-run onboarding: Show Welcome Intro overlay for fresh accounts with 0 documents
 		if (typeof window !== 'undefined') {
 			const hasSeenOnboarding = localStorage.getItem(ONBOARDING_UPLOAD_KEY);
 			if (!hasSeenOnboarding && documentsStore.list.length === 0) {
-				showUploadDialog = true;
-				localStorage.setItem(ONBOARDING_UPLOAD_KEY, 'true');
+				try {
+					const profileRes = await getMeCached();
+					if (profileRes.ok) {
+						userDisplayName =
+							profileRes.data.tenant?.name ||
+							(profileRes.data.user?.email ? profileRes.data.user.email.split('@')[0] : 'User');
+					}
+				} catch {
+					// Fallback to default
+				}
+				showWelcomeIntro = true;
 			}
 		}
 
@@ -595,6 +613,10 @@
 </div>
 
 <UploadDocumentDialog bind:open={showUploadDialog} onSuccess={handleUploadSuccess} />
+
+{#if showWelcomeIntro}
+	<WelcomeIntroOverlay displayName={userDisplayName} onComplete={handleWelcomeIntroComplete} />
+{/if}
 
 <style>
 	:global(button),

@@ -22,6 +22,7 @@
 	let isSubmitting = $state(false);
 	let successMessage = $state('');
 	let apiError = $state('');
+	let showPassword = $state(false);
 
 	const form = superForm(data.form, {
 		validators: zodClient(updatePasswordSchema),
@@ -161,6 +162,7 @@
 							placeholder="Enter a new password"
 							disabled={isSubmitting}
 							bind:value={$formData.password}
+							bind:showPassword
 						/>
 					{/snippet}
 				</Form.Control>
@@ -177,6 +179,7 @@
 							placeholder="Re-enter your new password"
 							disabled={isSubmitting}
 							bind:value={$formData.confirmPassword}
+							bind:showPassword
 						/>
 					{/snippet}
 				</Form.Control>

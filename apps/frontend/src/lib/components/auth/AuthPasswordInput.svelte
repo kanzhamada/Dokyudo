@@ -3,22 +3,21 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 
-	// We accept the bound value, a placeholder, disabled state, and pass through any other attributes (like those from Form.Control snippet props)
 	let {
 		value = $bindable(),
 		placeholder = 'Password',
 		disabled = false,
 		autofocus = false,
+		showPassword = $bindable(false),
 		...rest
 	}: {
 		value: string;
 		placeholder?: string;
 		disabled?: boolean;
 		autofocus?: boolean;
+		showPassword?: boolean;
 		[key: string]: any;
 	} = $props();
-
-	let showPassword = $state(false);
 </script>
 
 <div class="relative">

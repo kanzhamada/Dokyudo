@@ -25,6 +25,7 @@
 	let apiError = $state('');
 	let isSubmitting = $state(false);
 	let registrationSuccess = $state(false);
+	let showPassword = $state(false);
 
 	let lockoutEndTime = $state<number | null>(null);
 
@@ -132,6 +133,7 @@
 							{...props}
 							id="register-password"
 							bind:value={$formData.password}
+							bind:showPassword
 							disabled={isSubmitting || lockoutEndTime !== null}
 						/>
 					{/snippet}
@@ -148,6 +150,7 @@
 							id="confirm-password"
 							placeholder="Re-enter your password"
 							bind:value={$formData.confirmPassword}
+							bind:showPassword
 							disabled={isSubmitting || lockoutEndTime !== null}
 						/>
 					{/snippet}
@@ -183,7 +186,8 @@
 							<a {...props} href={resolve('/login')}>Sign in</a>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content class="bg-[#3E3E3E]" arrowClasses="bg-[#3E3E3E]"
+					<Tooltip.Content class="border-white/[0.16] bg-graphite text-white"
+								arrowClasses="bg-graphite border-none"
 						>Login to your account</Tooltip.Content
 					>
 				</Tooltip.Root>
