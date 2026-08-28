@@ -5,18 +5,44 @@ import {
     sendRecoveryEmail,
     sendPaymentSuccessEmail,
     sendWelcomeEmailOnce,
+    sendAccountDeletedEmail,
 } from "./email.util.ts";
 import { resend } from "../../config/resend.ts";
 import { redis } from "../../config/redis.ts";
+import { Redis } from "@upstash/redis";
 import { AppError } from "./errors.util.ts";
 
 describe("Email Utility", () => {
     let originalResendSend: any;
+    let originalProtoSet: any;
+    let originalProtoDel: any;
+    const redisStore = new Map<string, string>();
     let lastSendPayload: any;
     let mockError: Error | null = null;
 
     beforeAll(() => {
         originalResendSend = resend.emails.send;
+        originalProtoSet = Redis.prototype.set;
+        originalProtoDel = Redis.prototype.del;
+
+        // @ts-ignore - Mock Redis.prototype.set with NX support for isolated unit tests
+        Redis.prototype.set = async function (key: string, value: string, options?: any) {
+            if (options?.nx && redisStore.has(key)) {
+                return null;
+            }
+            redisStore.set(key, value);
+            return "OK";
+        };
+
+        // @ts-ignore - Mock Redis.prototype.del for isolated unit tests
+        Redis.prototype.del = async function (...keys: string[]) {
+            let count = 0;
+            for (const key of keys) {
+                if (redisStore.delete(key)) count++;
+            }
+            return count;
+        };
+
         // Mock resend.emails.send
         // @ts-ignore - Bypass strict Resend types for mocking
         resend.emails.send = async (payload: any, options: any) => {
@@ -30,6 +56,8 @@ describe("Email Utility", () => {
 
     afterAll(() => {
         resend.emails.send = originalResendSend;
+        Redis.prototype.set = originalProtoSet;
+        Redis.prototype.del = originalProtoDel;
     });
 
     async function withProductionEnv(fn: () => Promise<void>) {
@@ -245,6 +273,40 @@ describe("Email Utility", () => {
             assertEquals(retried, true);
             assertEquals(lastSendPayload.payload.to, ["fail@example.com"]);
             await redis.del(failMarkerKey);
+        });
+    });
+
+    describe("sendAccountDeletedEmail", () => {
+        it("positive: sends account deleted email with reference ID and idempotency key", async () => {
+            mockError = null;
+            lastSendPayload = null;
+
+            await sendAccountDeletedEmail({
+                email: "deleted-user@example.com",
+                jobId: "job-del-12345",
+            });
+
+            assertEquals(lastSendPayload.payload.to, ["deleted-user@example.com"]);
+            assertEquals(lastSendPayload.payload.subject.includes("deleted"), true);
+            assertEquals(lastSendPayload.payload.html.includes("job-del-12345"), true);
+            assertEquals(lastSendPayload.payload.html.includes("deleted-user@example.com"), true);
+            assertEquals(lastSendPayload.options.idempotencyKey, "account-deleted/job-del-12345");
+        });
+
+        it("negative: throws AppError in production if Resend API fails", async () => {
+            mockError = new Error("Resend server down");
+
+            await withProductionEnv(async () => {
+                await assertRejects(
+                    () =>
+                        sendAccountDeletedEmail({
+                            email: "deleted-user@example.com",
+                            jobId: "job-del-12345",
+                        }),
+                    AppError,
+                    "Failed to send account deletion confirmation email",
+                );
+            });
         });
     });
 });

@@ -391,3 +391,57 @@ export async function sendPaymentSuccessEmail(params: {
         });
     }
 }
+
+export async function sendAccountDeletedEmail(params: {
+    email: string;
+    jobId: string;
+    logContext?: Record<string, any>;
+}) {
+    const { email, jobId, logContext } = params;
+
+    const { error } = await resend.emails.send(
+        {
+            from: "Dokyudo <team@dokyudo.my.id>",
+            to: [email],
+            subject: "Your Dokyudo account has been deleted",
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #1F1E1D; margin-bottom: 8px;">Account Successfully Deleted</h2>
+                    <p style="color: #444; font-size: 14px; line-height: 1.6;">
+                        Your Dokyudo account associated with <strong>${escapeHtml(email)}</strong> has been permanently deleted as requested.
+                    </p>
+                    <p style="color: #444; font-size: 14px; line-height: 1.6;">
+                        All your documents, conversations, search history, API keys, and active subscriptions have been completely removed from our systems.
+                    </p>
+                    <div style="background-color: #f7f4ef; border: 1px solid #e5ddd2; border-radius: 8px; padding: 14px 16px; margin: 20px 0;">
+                        <p style="margin: 0; color: #666; font-size: 13px;">
+                            Deletion Reference ID: <strong style="color: #1F1E1D;">${escapeHtml(jobId)}</strong>
+                        </p>
+                    </div>
+                    <p style="color: #666; font-size: 13px; margin-top: 24px;">
+                        Thank you for using Dokyudo. If you decide to return in the future, you are always welcome to register a new account.
+                    </p>
+                    <p style="color: #888; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+                        This is an automated confirmation — please do not reply to this email. If you did not request this deletion, please contact support immediately.
+                    </p>
+                </div>
+            `,
+        },
+        {
+            // One email per account deletion job — cron retries never double-send.
+            idempotencyKey: `account-deleted/${jobId}`,
+        },
+    );
+
+    if (error) {
+        if (logContext) logContext.emailError = error.message;
+        if (Deno.env.get("NODE_ENV") === "test" || Deno.env.get("NODE_ENV") === "dev") {
+            return;
+        }
+        throw new AppError({
+            code: "INTERNAL_ERROR",
+            message: "Failed to send account deletion confirmation email.",
+            status: 500,
+        });
+    }
+}

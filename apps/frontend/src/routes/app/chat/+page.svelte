@@ -18,6 +18,7 @@
 	import { accountPanel, openAccountPanel } from '$lib/state/account-panel.store.svelte';
 	import { mentionStrippedLength, mentionToken } from '$lib/utils/doc-mentions';
 	import { TIER_LIMITS, type TierType } from '$lib/constants/tiers.constant';
+	import UploadDocumentDialog from '../documents/UploadDocumentDialog.svelte';
 
 	import claudeIcon from '$lib/assets/llm/claude.svg';
 	import cohereIcon from '$lib/assets/llm/cohere.svg';
@@ -60,9 +61,12 @@
 	let selectedModel: LlmOption = $state(INITIAL_LLM_OPTIONS[0]);
 	let attachedFiles: File[] = $state([]);
 	let isUploading = $state(false);
+	let showUploadDialog = $state(false);
 	/** Sparkles toggle state (menggantikan tombol attach di input landing) —
 	 * search bar ini akan terhubung dengan search bar Documents nanti. */
 	let aiSearchEnabled = $state(false);
+
+	const ONBOARDING_UPLOAD_KEY = 'dokyudo_onboarding_upload_seen';
 
 	// Global Usage Constraints (Dynamic based on Tenant Tier)
 	let baseUploads = $state(0);
@@ -103,10 +107,26 @@
 		}
 	}
 
+	function handleUploadSuccess() {
+		documentsStore.invalidate();
+		toast.success('Document uploaded', {
+			description: 'You can now ask questions or search across your documents.'
+		});
+	}
+
 	onMount(async () => {
 		// Warm the document mention cache — idempotent, and the `@` popover also
 		// ensures it lazily, so this only makes the first mention instant.
-		documentsStore.ensureLoaded();
+		await documentsStore.ensureLoaded();
+
+		// First-run onboarding: Prompt user to upload document if they have 0 documents
+		if (typeof window !== 'undefined') {
+			const hasSeenOnboarding = localStorage.getItem(ONBOARDING_UPLOAD_KEY);
+			if (!hasSeenOnboarding && documentsStore.list.length === 0) {
+				showUploadDialog = true;
+				localStorage.setItem(ONBOARDING_UPLOAD_KEY, 'true');
+			}
+		}
 
 		// Check for incoming document mention (e.g. from Documents page "Ask in Chat")
 		const docId = page.url.searchParams.get('docId') || page.url.searchParams.get('mentionDocId');
@@ -116,7 +136,6 @@
 		if (docId && docTitle) {
 			inputValue = `${mentionToken(docTitle, docId)} `;
 		} else if (docId) {
-			await documentsStore.ensureLoaded();
 			const found = documentsStore.list.find((d) => d.id === docId);
 			if (found) {
 				inputValue = `${mentionToken(found.title, found.id)} `;
@@ -574,6 +593,8 @@
 		</div>
 	</div>
 </div>
+
+<UploadDocumentDialog bind:open={showUploadDialog} onSuccess={handleUploadSuccess} />
 
 <style>
 	:global(button),

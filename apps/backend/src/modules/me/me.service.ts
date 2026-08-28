@@ -6,6 +6,7 @@ import { stripe } from "../../config/stripe.ts";
 import { vectorIndex } from "../../config/vector.ts";
 import { deleteObject } from "../../shared/utils/s3.util.ts";
 import { logActivity } from "../../shared/utils/activity.util.ts";
+import { sendAccountDeletedEmail } from "../../shared/utils/email.util.ts";
 import {
   accountDeletionJobs,
   chatShares,
@@ -502,6 +503,8 @@ export class MeService {
       .select({ email: users.email })
       .from(users)
       .where(eq(users.id, userId));
+    const rawEmail =
+      user?.email && !user.email.startsWith("deleted:") ? user.email : null;
 
     await db.transaction(async (tx) => {
       await tx.delete(chatShares).where(eq(chatShares.tenantId, tenantId));
@@ -574,7 +577,19 @@ export class MeService {
       // The auth user may already be gone — terminal state is already set.
     }
 
-    // ── 8. Audit the completion ────────────────────────────────────────
+    // ── 8. Send confirmation email (best-effort, idempotent via jobId) ──
+    if (rawEmail) {
+      try {
+        await sendAccountDeletedEmail({
+          email: rawEmail,
+          jobId,
+        });
+      } catch {
+        // Non-fatal: email failure must not prevent job from completing
+      }
+    }
+
+    // ── 9. Audit the completion ────────────────────────────────────────
     await logActivity({
       tenantId,
       userId,
