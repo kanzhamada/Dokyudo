@@ -6,6 +6,7 @@ import { db } from "../../config/drizzle.ts";
 import { users, loginAttempts, tenants, tenantSubscriptions } from "../../shared/models/db.model.ts";
 import { eq } from "drizzle-orm";
 import { getSupabaseAdmin } from "../../config/supabase.ts";
+import { provisionTenantForUser } from "../../shared/utils/user_provision.util.ts";
 
 describe("AuthService Isolated Tests", () => {
     const TEST_EMAIL = `isolated_test_${crypto.randomUUID()}@example.com`;
@@ -34,7 +35,17 @@ describe("AuthService Isolated Tests", () => {
 
         // Cleanup
         await db.delete(loginAttempts).where(eq(loginAttempts.emailAttempted, TEST_EMAIL));
-        await db.delete(users).where(eq(users.email, TEST_EMAIL));
+        const [existingUser] = await db
+            .select({ tenantId: users.tenantId })
+            .from(users)
+            .where(eq(users.email, TEST_EMAIL));
+        if (existingUser?.tenantId) {
+            await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, existingUser.tenantId));
+            await db.delete(users).where(eq(users.email, TEST_EMAIL));
+            await db.delete(tenants).where(eq(tenants.id, existingUser.tenantId));
+        } else {
+            await db.delete(users).where(eq(users.email, TEST_EMAIL));
+        }
 
         const { data } = await supabase.auth.admin.listUsers();
         // @ts-ignore - Supabase type mismatch
@@ -117,14 +128,37 @@ describe("AuthService Isolated Tests", () => {
     });
 
     describe("forgetPassword", () => {
-        it("positive: processes recovery for existing user", async () => {
+        it("negative: silently skips recovery for unverified user (not in public.users)", async () => {
             const logContext: any = {};
             await AuthService.forgetPassword({
                 email: TEST_EMAIL,
                 clientIp: TEST_IP,
                 requestId: crypto.randomUUID(),
                 userAgent: "TestAgent",
-                logContext
+                logContext,
+            });
+
+            assertEquals(logContext.authEvent, "forget_password_user_not_found");
+        });
+
+        it("positive: processes recovery for verified and active user in public.users", async () => {
+            const { data } = await supabase.auth.admin.listUsers();
+            // @ts-ignore - Supabase type mismatch
+            const user = data.users.find((u: any) => u.email === TEST_EMAIL);
+            if (user) {
+                await provisionTenantForUser({
+                    userId: user.id,
+                    email: TEST_EMAIL,
+                });
+            }
+
+            const logContext: any = {};
+            await AuthService.forgetPassword({
+                email: TEST_EMAIL,
+                clientIp: TEST_IP,
+                requestId: crypto.randomUUID(),
+                userAgent: "TestAgent",
+                logContext,
             });
 
             assertEquals(logContext.authEvent, "forget_password_success");
@@ -137,7 +171,7 @@ describe("AuthService Isolated Tests", () => {
                 clientIp: TEST_IP,
                 requestId: crypto.randomUUID(),
                 userAgent: "TestAgent",
-                logContext
+                logContext,
             });
 
             assertEquals(logContext.authEvent, "forget_password_user_not_found");

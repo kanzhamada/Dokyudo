@@ -254,23 +254,6 @@ export class AuthService {
             });
         }
 
-        // Step G: Welcome notification — purely informational, never blocks
-        // registration (the Redis NX claim guarantees one welcome per user).
-        try {
-            await sendWelcomeEmailOnce({
-                email: params.email,
-                userId: linkData.user.id,
-                requestId: params.requestId,
-                provider: "email",
-                logContext: params.logContext,
-            });
-        } catch (welcomeErr: any) {
-            if (params.logContext) {
-                params.logContext.authWarning =
-                    "Welcome email failed (non-fatal): " + welcomeErr.message;
-            }
-        }
-
         if (params.logContext) {
             params.logContext.authEvent = "user_registered";
             params.logContext.authEmail = params.email;
@@ -334,6 +317,24 @@ export class AuthService {
                 userAgent: params.userAgent,
                 requestId: params.requestId,
             }, params.logContext);
+        }
+
+        // Send Welcome notification upon successful first-time email verification
+        if (user.email) {
+            try {
+                await sendWelcomeEmailOnce({
+                    email: user.email,
+                    userId: user.id,
+                    requestId: params.requestId,
+                    provider: "email",
+                    logContext: params.logContext,
+                });
+            } catch (welcomeErr: any) {
+                if (params.logContext) {
+                    params.logContext.authWarning =
+                        "Welcome email failed (non-fatal): " + welcomeErr.message;
+                }
+            }
         }
 
         return { session, user };
@@ -753,7 +754,45 @@ export class AuthService {
             }
         }
 
-        // Step C: Generate Recovery Link via Supabase Admin API
+        // Step C: Verify that an active, verified user exists in the database.
+        // In Dokyudo, accounts only exist in public.users once verified with a tenant.
+        // If the user does not exist or is unverified/deleted, exit silently to prevent email enumeration.
+        let existingUser: { id: string } | undefined;
+        try {
+            const [userRecord] = await db
+                .select({ id: users.id })
+                .from(users)
+                .where(
+                    and(
+                        eq(users.email, params.email),
+                        eq(users.deletionStatus, "active"),
+                    ),
+                )
+                .limit(1);
+            existingUser = userRecord;
+        } catch (dbErr: any) {
+            if (params.logContext) {
+                params.logContext.authEvent = "forget_password_db_error";
+                params.logContext.authError = dbErr.message;
+            }
+            throw new AppError({
+                code: "INTERNAL_ERROR",
+                message:
+                    "Failed to process password recovery. Please try again later.",
+                status: 500,
+            });
+        }
+
+        if (!existingUser) {
+            if (params.logContext) {
+                params.logContext.authEvent =
+                    "forget_password_user_not_found";
+                params.logContext.authEmail = params.email;
+            }
+            return; // Return silently to prevent email enumeration
+        }
+
+        // Step D: Generate Recovery Link via Supabase Admin API
         const { data: linkData, error: recoveryError } =
             await supabase.auth.admin.generateLink({
                 type: "recovery",
@@ -763,7 +802,7 @@ export class AuthService {
                 },
             });
 
-        // Step D: Log attempt
+        // Step E: Log attempt
         await AuthService.logLoginAttempt({
             email: params.email,
             ipAddress: params.clientIp,
@@ -794,7 +833,7 @@ export class AuthService {
             });
         }
 
-        // Step E: Send Email
+        // Step F: Send Email
         if (linkData && linkData.properties) {
             const recoveryUrl = linkData.properties.hashed_token
                 ? `${getEnv("FRONTEND_URL")}/forget-password/update-password?token_hash=${linkData.properties.hashed_token}&email=${encodeURIComponent(params.email)}`

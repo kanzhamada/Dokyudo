@@ -33,15 +33,22 @@
 			isSubmitting = true;
 			apiError = '';
 
+			console.log('[Auth Forgot Password] Form Submitted:', {
+				email: f.data.email
+			});
+
 			try {
 				const token = await executeRecaptcha(PUBLIC_RECAPTCHA_SITE_KEY, 'forgot_password');
-				await authForgotPassword({ email: f.data.email, recaptchaToken: token });
+				const result = await authForgotPassword({ email: f.data.email, recaptchaToken: token });
+
+				console.log('[Auth Forgot Password] Backend Response:', result);
 
 				localStorage.setItem('dokyudo_reset_email', f.data.email);
 
 				// Always show success to prevent email enumeration — backend does the same
 				successMessage = 'If an account exists, a reset link has been sent to that email.';
-			} catch {
+			} catch (err) {
+				console.log('[Auth Forgot Password] Catch Error:', err);
 				apiError = 'Something went wrong. Please try again.';
 			} finally {
 				isSubmitting = false;

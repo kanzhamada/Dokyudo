@@ -12,10 +12,11 @@ import { AppError } from "./errors.util.ts";
 const WELCOME_EMAIL_MARKER_TTL_SECONDS = 60 * 60 * 24 * 365;
 
 /**
- * Sends the one-time welcome email ("your account is registered") for a
- * newly created user. Returns false when the welcome was already sent for
- * this user; true when it was sent (or skipped in non-prod after a Resend
- * error). Never throws on marker/redis failures — the marker is best-effort.
+ * Sends the one-time welcome email ("your account is ready") for a
+ * newly verified user (upon email verification link/OTP or first-time OAuth login).
+ * Returns false when the welcome was already sent for this user; true when it
+ * was sent (or skipped in non-prod after a Resend error). Never throws on
+ * marker/redis failures — the marker is best-effort.
  */
 export async function sendWelcomeEmailOnce(params: {
     email: string;
@@ -51,7 +52,7 @@ export async function sendWelcomeEmailOnce(params: {
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                     <h2>Welcome to Dokyudo!</h2>
-                    <p>Thanks for joining Dokyudo — your account has been registered successfully.${providerLine}</p>
+                    <p>Thanks for joining Dokyudo — your account has been verified successfully.${providerLine}</p>
                     <p>You can now:</p>
                     <ul style="color: #444; font-size: 14px; line-height: 1.7;">
                         <li>Upload documents (PDF, DOCX, TXT) to your library</li>
