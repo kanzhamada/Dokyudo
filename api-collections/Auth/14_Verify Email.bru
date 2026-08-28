@@ -22,5 +22,5 @@ body:json {
 }
 
 docs {
-  Verifies a user's email address using the token_hash passed from the custom verification link sent to their inbox. On success the response sets the session cookies (dokyudo_access_token + dokyudo_refresh_token) and returns only the user object — no tokens in the body.
+  Verifies a user's email address using the token_hash passed from the custom verification link sent to their inbox. On success, provisions the tenant and user records, triggers the one-time welcome email, sets session cookies (dokyudo_access_token + dokyudo_refresh_token), and returns the user object.
 }

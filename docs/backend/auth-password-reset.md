@@ -1,37 +1,44 @@
 # Password Reset & Update (dky-007)
 
-**Completion Timestamp:** 2026-07-23 15:42:00 UTC+7
+**Completion Timestamp:** 2026-08-28 13:25:00 UTC+7
 
 ## Core Logic
 
-Fitur pemulihan kata sandi (Password Reset) dan pembaruan kata sandi (Password Update) diimplementasikan untuk mengakomodasi dua mode UX di sisi frontend: **Magic Link Click** (authenticated) dan **Manual OTP Entry** (unauthenticated). 
+The Password Reset and Password Update feature accommodates two frontend UX flows: **Magic Link Click** (authenticated) and **Manual OTP Entry** (unauthenticated).
 
 1. **`POST /api/auth/forget-password`**: 
-   Menerima email dan reCAPTCHA token. Dilindungi oleh Rate Limiting per-IP (maks 5 request per 15 menit). Menggunakan `supabase.auth.admin.generateLink({ type: "recovery" })` untuk mendapatkan `action_link` dan `email_otp`. Link dan OTP ini kemudian dikirimkan melalui Resend API menggunakan `sendRecoveryEmail`. Error user-not-found ditangkap secara diam-diam (silent ignore) untuk mencegah *email enumeration attack*.
+   Receives email and reCAPTCHA v3 token. Protected by per-IP rate limiting (max 5 requests per 15 minutes). Queries `public.users` to ensure an active, verified user row exists (`deletion_status = 'active'`). 
+   - If the user does not exist or is unverified, the request exits silently returning HTTP 200 (`"If an account exists, a recovery email has been sent."`) to prevent email enumeration attacks without generating unnecessary tokens or sending emails.
+   - If the user exists and is active, it calls `supabase.auth.admin.generateLink({ type: "recovery" })` and sends the link and OTP via Resend API using `sendRecoveryEmail`.
 
 2. **`POST /api/auth/reset-password`**: 
-   Menerima `email`, `otp` (8-digit code atau magic token_hash), dan `newPassword`. Menggunakan `supabase.auth.verifyOtp({ email, token: params.otp, type: 'recovery' })` (atau `token_hash` jika panjang token > 20) untuk memvalidasi OTP di Supabase Auth. Setelah validasi sukses, kata sandi diperbarui menggunakan Supabase Admin API (`admin.updateUserById`), lalu semua sesi dihancurkan (`signOut` global) untuk memaksa re-login dengan kata sandi baru.
+   Receives `email`, `otp` (8-digit code or magic token_hash), and `newPassword`. Uses `supabase.auth.verifyOtp({ email, token: params.otp, type: 'recovery' })` (or `token_hash` when length > 20) to validate the recovery OTP in Supabase Auth. Once verified, updates the user password via Supabase Admin API (`admin.updateUserById`) and invalidates all active sessions globally (`signOut(..., 'global')`).
 
 3. **`PUT /api/auth/update-password`**: 
-   Digunakan saat Frontend sudah terotentikasi (Misalnya user mengganti password dari halaman profil). Endpoint ini memvalidasi token JWT (`Bearer`), mengambil profil user yang bersangkutan, dan mengganti password mereka menggunakan Admin API. Sama seperti *reset*, seluruh sesi akan diputus secara global.
+   Used when the client is already authenticated (e.g. from the user settings/profile page). Validates the Bearer JWT, updates the password using Admin API, and globally revokes prior sessions.
 
 ## Flow Diagram
 
 ```mermaid
 sequenceDiagram
-    participant Client
+    participant Client as Frontend
     participant GW as API Gateway
-    participant DB as PostgreSQL (Rate Limit)
-    participant Supabase
-    participant Resend
+    participant DB as PostgreSQL (users & login_attempts)
+    participant Supabase as Supabase Auth
+    participant Resend as Resend API
 
     %% Forget Password Flow
     Client->>GW: POST /forget-password (email, recaptcha)
     GW->>DB: Check login_attempts (IP rate limit)
-    GW->>Supabase: admin.generateLink(type: recovery)
-    Supabase-->>GW: action_link & email_otp
-    GW->>Resend: sendRecoveryEmail(email, link, otp)
-    GW-->>Client: 200 OK (Email sent if exists)
+    GW->>DB: Check public.users (email & deletion_status = active)
+    alt User not found or unverified
+        GW-->>Client: 200 OK (Silent generic response)
+    else User exists and active
+        GW->>Supabase: admin.generateLink(type: recovery)
+        Supabase-->>GW: action_link & email_otp
+        GW->>Resend: sendRecoveryEmail(email, link, otp)
+        GW-->>Client: 200 OK (If account exists, email sent)
+    end
 
     %% Reset via OTP (Manual Entry)
     Client->>GW: POST /reset-password (email, otp, newPassword)
@@ -56,24 +63,19 @@ sequenceDiagram
 
 ## File Mapping
 
-- **[MODIFY]** `apps/backend/src/modules/auth/auth.schema.ts`: Memperbarui `ResetPasswordBodySchema` ({ email, otp, newPassword }) dan `LoginAttemptParamsSchema` (`authProvider` enum).
-- **[MODIFY]** `apps/backend/src/modules/auth/auth.service.ts`: Memperbarui `resetPassword` untuk memanggil `supabase.auth.verifyOtp` dengan dukungan `email` + `token` maupun `token_hash`.
-- **[MODIFY]** `apps/backend/src/modules/auth/auth.controller.ts`: Memperbarui `handleResetPassword` untuk mengekstrak `email`, `otp`, dan `newPassword`.
-- **[MODIFY]** `apps/backend/src/modules/auth/auth.routes.ts`: Memperbarui OpenAPI schema `POST /reset-password`.
-- **[MODIFY]** `apps/backend/src/modules/auth/auth.routes.test.ts`: Memperbarui test payload `reset-password`.
-- **[MODIFY]** `api-collections/Auth/11_Reset Password.bru`: Memperbarui Bruno JSON body (`email`, `otp`, `newPassword`).
-- **[MODIFY]** `apps/frontend/src/lib/types/auth.types.ts`: Memperbarui `ResetPasswordRequestPayload`.
-- **[MODIFY]** `apps/frontend/src/lib/schemas/auth.schema.ts`: Memperbarui `updatePasswordSchema`.
-- **[MODIFY]** `apps/frontend/src/routes/(auth)/forget-password/update-password/+page.svelte`: Memperbarui superForm submission payload dengan email otomatis dari URL/localStorage, menata ulang InputOTP slot (`h-12`, `bg-auth-input`, `border-white/10`, `rounded-md`, `text-white text-base font-medium font-sans`).
+- **[MODIFY]** `apps/backend/src/modules/auth/auth.service.ts`: Added database guard to check `public.users` before calling Supabase recovery API.
+- **[MODIFY]** `apps/backend/src/modules/auth/auth.service.test.ts`: Added unit tests for unverified silent ignore and verified recovery.
+- **[MODIFY]** `apps/frontend/src/routes/(auth)/forget-password/+page.svelte`: Added client-side trace logs per frontend logging policy.
+- **[MODIFY]** `api-collections/Auth/10_Forget Password.bru`: Updated documentation with anti-enumeration database guard details.
 
 ## Connections
 
-- **API Gateway → Supabase Auth**: Menggunakan Admin API (`generateLink` & `updateUserById`) dan Auth API (`verifyOtp` & `getUser`).
-- **API Gateway → PostgreSQL**: Query ke tabel `public.login_attempts` untuk proteksi bruteforce spam IP di endpoint `/forget-password`.
-- **API Gateway → Resend**: Mengirimkan transactional email via REST API (`resend.emails.send`) menggunakan `idempotencyKey: recovery-email/{email}-{requestId}`.
+- **API Gateway → PostgreSQL**: Queries `public.users` for active verified status and `public.login_attempts` for IP rate limiting.
+- **API Gateway → Supabase Auth**: Admin API (`generateLink`, `updateUserById`, `signOut`) and Auth API (`verifyOtp`, `getUser`).
+- **API Gateway → Resend**: Dispatches recovery email with idempotency key (`recovery-email/{email}-{requestId}`).
 
 ## Architectural Decisions
 
-1. **Supabase `verifyOtp` Signature Alignment**: Supabase JS SDK mewajibkan parameter `email` saat memverifikasi 8-digit OTP code (`{ email, token, type: 'recovery' }`). Frontend mengekstrak email dari URL query string / `localStorage` dan menyimpannya secara otomatis di *hidden form field* agar tidak mengganggu kebersihan visual UI.
-2. **Global Session Invalidation**: Segera setelah kata sandi diubah, baik via OTP maupun Bearer Token, backend memanggil `signOut(token, 'global')` untuk memaksa pembatalan sesi (*force re-login*) di semua perangkat (laptop, HP, tablet) guna mencegah peretas yang masih memiliki JWT lama agar tidak bisa terus mengakses sistem.
-3. **Anti-Enumeration Defense**: Endpoint `/forget-password` selalu mengembalikan status HTTP 200 dengan pesan sukses ("If an account exists..."), meskipun email tidak terdaftar di database. Ini merupakan praktik keamanan yang kuat (*secure-by-default*) untuk mencegah *Attacker* menebak database user.
+1. **Anti-Enumeration Database Guard**: The endpoint `/forget-password` always returns HTTP 200 with the message `"If an account exists, a recovery email has been sent."` regardless of whether the account exists or is verified. The backend silently drops requests for non-existent or unverified users without generating Supabase recovery tokens.
+2. **Global Session Invalidation**: Immediately following password resets or updates, `signOut(token, 'global')` invalidates all existing sessions across devices.
+3. **Supabase `verifyOtp` Signature Alignment**: Supports both 8-digit OTP code verification (`{ email, token, type: 'recovery' }`) and direct token hash verification (`{ token_hash, type: 'recovery' }`).
