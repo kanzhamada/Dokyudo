@@ -22,7 +22,7 @@ import {
   turnAlternatives,
   users,
 } from "../../shared/models/db.model.ts";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, lt, ne, or, sql } from "drizzle-orm";
 import { AppError } from "../../shared/utils/errors.util.ts";
 import * as MeParams from "./me.schema.ts";
 import {
@@ -345,29 +345,40 @@ export class MeService {
    * authoritative state change, and it is executed last.
    */
   static async processJob(jobId: string): Promise<void> {
-    const [job] = await db
-      .select()
-      .from(accountDeletionJobs)
-      .where(eq(accountDeletionJobs.id, jobId));
-    if (!job || job.status === "completed") return;
+    // 5 minutes lock threshold for reclaiming abandoned jobs in 'purging'
+    const staleLockThreshold = new Date(Date.now() - 5 * 60 * 1000);
 
-    const attempt = job.attemptCount + 1;
-
-    await db
+    // Atomically claim the job. If another worker/cron instance is currently
+    // processing this job, this update matches 0 rows and returns undefined.
+    const [claimedJob] = await db
       .update(accountDeletionJobs)
       .set({
         status: "purging",
-        attemptCount: attempt,
+        attemptCount: sql`${accountDeletionJobs.attemptCount} + 1`,
         lastError: null,
         updatedAt: new Date(),
       })
-      .where(eq(accountDeletionJobs.id, jobId));
+      .where(
+        and(
+          eq(accountDeletionJobs.id, jobId),
+          or(
+            eq(accountDeletionJobs.status, "pending"),
+            and(
+              eq(accountDeletionJobs.status, "purging"),
+              lt(accountDeletionJobs.updatedAt, staleLockThreshold),
+            ),
+          ),
+        ),
+      )
+      .returning();
+
+    if (!claimedJob) return;
 
     try {
       await MeService.purgeTenant({
         jobId,
-        userId: job.userId,
-        tenantId: job.tenantId,
+        userId: claimedJob.userId,
+        tenantId: claimedJob.tenantId,
       });
       await db
         .update(accountDeletionJobs)
@@ -379,7 +390,8 @@ export class MeService {
         .where(eq(accountDeletionJobs.id, jobId));
     } catch (err: any) {
       const lastError = err instanceof Error ? err.message : String(err);
-      const status = attempt >= MAX_JOB_ATTEMPTS ? "failed" : "purging";
+      const status =
+        claimedJob.attemptCount >= MAX_JOB_ATTEMPTS ? "failed" : "purging";
       await db
         .update(accountDeletionJobs)
         .set({
