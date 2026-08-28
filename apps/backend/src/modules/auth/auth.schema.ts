@@ -180,10 +180,14 @@ export const ResetPasswordBodySchema = z
       description: "User email address",
       example: "user@example.com",
     }),
-    otp: z.string().length(8, "OTP must be exactly 8 digits").openapi({
-      description: "8-digit OTP received via email",
-      example: "12345678",
-    }),
+    otp: z
+      .string()
+      .min(8, "OTP must be at least 8 characters")
+      .max(64, "OTP is too long")
+      .openapi({
+        description: "8-digit OTP or recovery token received via email",
+        example: "12345678",
+      }),
     newPassword: z
       .string()
       .min(8, "Password must be at least 8 characters")

@@ -164,7 +164,7 @@ export async function sendRecoveryEmail(
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                     <h2>Password Reset Request</h2>
-                    <p>We received a request to reset your password. You can either use the 6-digit OTP below or click the magic link to reset it.</p>
+                    <p>We received a request to reset your password. You can either use the 8-digit OTP below or click the magic link to reset it.</p>
 
                     <div style="background-color: #f4f4f4; padding: 15px; border-radius: 6px; text-align: center; margin: 20px 0;">
                         <h3 style="margin: 0; color: #333;">Your OTP</h3>

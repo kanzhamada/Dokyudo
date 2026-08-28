@@ -835,7 +835,9 @@ export class AuthService {
 
         // Step F: Send Email
         if (linkData && linkData.properties) {
-            const recoveryUrl = linkData.properties.hashed_token
+            const recoveryUrl = linkData.properties.email_otp
+                ? `${getEnv("FRONTEND_URL")}/forget-password/update-password?otp=${linkData.properties.email_otp}&email=${encodeURIComponent(params.email)}`
+                : linkData.properties.hashed_token
                 ? `${getEnv("FRONTEND_URL")}/forget-password/update-password?token_hash=${linkData.properties.hashed_token}&email=${encodeURIComponent(params.email)}`
                 : linkData.properties.action_link;
 

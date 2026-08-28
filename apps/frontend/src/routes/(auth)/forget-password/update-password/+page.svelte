@@ -32,12 +32,20 @@
 			isSubmitting = true;
 			apiError = '';
 
+			console.log('[Auth Update Password] Form Submitted:', {
+				email: f.data.email,
+				otp: f.data.otp,
+				password: f.data.password
+			});
+
 			try {
 				const result = await authResetPassword({
 					email: f.data.email,
 					otp: f.data.otp,
 					newPassword: f.data.password
 				});
+
+				console.log('[Auth Update Password] Backend Response:', result);
 
 				if (result.ok) {
 					successMessage = 'Your password has been successfully updated.';
@@ -48,7 +56,8 @@
 				} else {
 					apiError = result.error.message;
 				}
-			} catch {
+			} catch (err) {
+				console.log('[Auth Update Password] Catch Error:', err);
 				apiError = 'Something went wrong. Please try again.';
 			} finally {
 				isSubmitting = false;
@@ -61,15 +70,15 @@
 
 	onMount(() => {
 		const urlParams = new URLSearchParams(window.location.search);
-		const tokenHash =
-			urlParams.get('token_hash') ||
-			urlParams.get('token') ||
+		const otpParam =
+			urlParams.get('otp') ||
 			urlParams.get('code') ||
-			urlParams.get('otp');
+			urlParams.get('token_hash') ||
+			urlParams.get('token');
 		const emailParam = urlParams.get('email') || localStorage.getItem('dokyudo_reset_email') || '';
 
-		if (tokenHash) {
-			$formData.otp = tokenHash;
+		if (otpParam) {
+			$formData.otp = otpParam;
 		}
 		if (emailParam) {
 			$formData.email = emailParam;
