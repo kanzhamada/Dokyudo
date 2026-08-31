@@ -45,9 +45,10 @@
 				<a class="btn btn--primary btn--full" href="#demo">Start Free</a>
 			</article>
 
-			<!-- PRO INVESTOR (featured / halo) -->
-			<article class="card tier tier--feat" data-reveal style="--rd:90ms">
+			<!-- PRO INVESTOR (locked) -->
+			<article class="card tier tier--feat" id="investorCard" data-reveal style="--rd:90ms">
 				<div class="tier__head">
+					<span class="badge badge--locked" id="investorLock"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg>Locked</span>
 					<h3 class="tier__name t-h3">Pro Investor</h3>
 					<p class="tier__tag t-b2">The portfolio showcase that unlocks the full platform.</p>
 				</div>
@@ -57,7 +58,7 @@
 				</div>
 				<div class="tier__pills">
 					<span class="pill pill--mute">Sandbox invoice</span>
-					<span class="pill pill--hl">Unlocks all</span>
+					<span class="pill pill--hl">Portfolio showcase</span>
 				</div>
 				<div class="tier-spec">
 					<span class="medal medal--sm" aria-hidden="true"><svg class="ic"><use href="#i-node"/></svg></span>
@@ -77,8 +78,9 @@
 						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Unlocks PRO REAL platform-wide</li>
 					</ul>
 				</div>
-				<button class="btn btn--investor btn--full js-investor" id="investorBtn" type="button">
-					<span class="js-investor-label">Unlock Investor Tier</span>
+				<button class="btn btn--ghost btn--full" id="investorBtn" type="button" disabled>
+					<svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg>
+					<span id="investorBtnLabel">Locked</span>
 				</button>
 			</article>
 
@@ -132,7 +134,9 @@
 					<span class="tier__num" style="font-size: 1.35rem;">Rp 11,100</span>
 					<span class="tier__was t-tag">trial 1 day</span>
 				</div>
-				<button class="btn btn--ink" id="simBtn" type="button">Generate 24h Code</button>
+				<button class="btn btn--investor" id="simBtn" type="button">
+					<span>Generate 24h Code</span>
+				</button>
 				<p class="sim-code t-tag" id="simCode" hidden>code <b></b> <span>expires in 24h</span></p>
 			</div>
 

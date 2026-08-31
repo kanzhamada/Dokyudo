@@ -434,7 +434,7 @@ export function initLanding(): () => void {
 			simCode.hidden = false;
 			simBtn.textContent = 'Code generated';
 			simBtn.disabled = true;
-			simBtn.classList.remove('btn--ink');
+			simBtn.classList.remove('btn--ink', 'btn--investor');
 			simBtn.classList.add('btn--ghost');
 		});
 	}

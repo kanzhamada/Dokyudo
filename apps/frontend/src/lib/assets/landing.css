@@ -3431,13 +3431,23 @@
 .landing-root .js-investor.btn--ghost {
 	background: transparent;
 	color: var(--color-black);
-	border: 1px solid var(--color-black);
+	border: 1px solid var(--border-fade);
+}
+
+.landing-root .js-investor.btn--ghost:hover:not([disabled]) {
+	border-color: var(--color-black);
 }
 
 .landing-root
 	.section--dark
 	.js-investor.btn--ghost:not(.tier--feat .js-investor):not(.c-feat .js-investor) {
 	color: var(--color-offwhite);
+	border-color: var(--border-fade);
+}
+
+.landing-root
+	.section--dark
+	.js-investor.btn--ghost:not(.tier--feat .js-investor):not(.c-feat .js-investor):hover:not([disabled]) {
 	border-color: var(--color-offwhite);
 }
 

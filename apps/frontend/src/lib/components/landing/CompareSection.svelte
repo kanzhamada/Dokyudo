@@ -35,6 +35,7 @@
 								<span class="cmp-price t-tag">Rp 0 / forever</span>
 							</th>
 							<th class="c-plan c-feat" scope="col">
+								<span class="badge badge--locked js-investor-lock"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg>Locked</span>
 								<span class="cmp-name">Pro Investor</span>
 								<span class="cmp-price t-tag">Rp 19,000,000 / once</span>
 							</th>
@@ -205,17 +206,22 @@
 							<th class="c-label" scope="row"><span class="t-tag cmp-foot-label">Start</span></th>
 							<td class="c-cta"><a class="btn btn--primary cmp-cta-full" href="#demo">Start Free</a></td>
 							<td class="c-cta c-feat">
-								<button class="btn btn--investor cmp-cta-full js-investor" type="button">
-									<span class="js-investor-label">Unlock Investor Tier</span>
+								<button class="cmp-cta cmp-cta-full js-investor is-locked" type="button" aria-disabled="true" disabled>
+									<svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg>
+									<span class="js-investor-label">Locked</span>
 								</button>
 							</td>
 							<td class="c-cta">
-								<button class="cmp-cta cmp-cta-full js-real is-locked" type="button" aria-disabled="true">
+								<button class="cmp-cta cmp-cta-full js-real is-locked" type="button" aria-disabled="true" disabled>
 									<svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg>
 									<span class="js-real-label">Locked</span>
 								</button>
 							</td>
-							<td class="c-cta"><a class="btn btn--ink cmp-cta-full" href="#tiers">Generate 24h Code</a></td>
+							<td class="c-cta">
+								<a class="btn btn--investor cmp-cta-full" href="#tiers">
+									<span>Generate 24h Code</span>
+								</a>
+							</td>
 						</tr>
 					</tfoot>
 
