@@ -2,7 +2,7 @@
    Dokyudo landing page interactive wiring.
 
    This module powers the landing page's simulations and
-   interactions: the retrieval console demo, the architecture
+	 interactions: the architecture
    flow routing + inspector, the model-fallback cylinder, the
    tier-unlock flow, the testimonial switcher, the FAQ
    accordion, and the scroll reveals.
@@ -16,7 +16,8 @@
    - Every listener / observer / timer / rAF is tracked so the
      returned cleanup function can tear everything down on
      unmount.
-   All simulations run locally: no network calls are made.
+	 The retrieval demo is a Svelte component; the remaining simulations run
+	 locally and make no network calls.
    ========================================================== */
 
 type ObserverLike = { disconnect: () => void };
@@ -311,119 +312,6 @@ export function initLanding(): () => void {
 			)
 		);
 		revealEls.forEach((el) => io.observe(el));
-	}
-
-	/* ---------- simulated RAG demo ---------- */
-	const consoleEl = $('#console');
-	const answerText = $('#answerText');
-	const answerSummary = $('#answerSummary');
-	const stPill = $('#stPill');
-	const stText = $('#stText');
-	const runBtn = $('#runBtn');
-	const runLabel = $('#runLabel');
-	const byokSwitch = $('#byokSwitch');
-	const routeLine = $('#routeLine');
-	const chunkCards = $$('.chunkcard', consoleEl);
-
-	const ANSWER =
-		'Q3 EBITDA totaled $48.2M, representing a 12.4% YoY increase [Doc 1: Page 47]. ' +
-		'Operating income contributed $41.7M with D&A add-back of $6.5M [Doc 2: Page 12]. ' +
-		'Regionally, North America delivered $29.1M and EMEA $19.1M, offset by $2.9M ' +
-		'in unallocated corporate overhead [Doc 3: Page 18].';
-
-	const CHUNK_REVEAL_AT = [9, 22, 41]; // word indices for [Doc N: Page X] citations
-	let streamTimers: number[] = [];
-
-	function clearStream() {
-		streamTimers.forEach((t) => clearLater(t));
-		streamTimers = [];
-	}
-
-	function setStatus(mode: 'stream' | 'done', text: string) {
-		stPill?.classList.remove('st--stream', 'st--done');
-		if (mode === 'stream') stPill?.classList.add('st--stream');
-		if (mode === 'done') stPill?.classList.add('st--done');
-		if (stText) stText.textContent = text;
-	}
-
-	function resetDemo() {
-		clearStream();
-		if (answerText) answerText.textContent = '';
-		if (answerSummary) answerSummary.textContent = '';
-		consoleEl?.classList.remove('done');
-		chunkCards.forEach((c) => c.classList.remove('show'));
-	}
-
-	function finishDemo() {
-		consoleEl?.classList.add('done');
-		setStatus('done', 'complete / 3 sources cited');
-		if (runLabel) runLabel.textContent = 'Run Query';
-		runBtn?.setAttribute('aria-busy', 'false');
-		if (answerSummary) answerSummary.textContent = 'Answer complete. ' + ANSWER;
-	}
-
-	function runDemo() {
-		resetDemo();
-		if (REDUCED) {
-			if (answerText) answerText.textContent = ANSWER;
-			chunkCards.forEach((c) => c.classList.add('show'));
-			finishDemo();
-			return;
-		}
-
-		setStatus('stream', 'turn_started / streaming sse');
-		if (runLabel) runLabel.textContent = 'Streaming…';
-		runBtn?.setAttribute('aria-busy', 'true');
-
-		const words = ANSWER.split(' ');
-		let i = 0;
-		const step = () => {
-			if (i < words.length) {
-				if (answerText) answerText.textContent += (i === 0 ? '' : ' ') + words[i];
-				const revealIdx = CHUNK_REVEAL_AT.indexOf(i);
-				if (revealIdx > -1 && chunkCards[revealIdx]) {
-					chunkCards[revealIdx].classList.add('show');
-				}
-				i += 1;
-				streamTimers.push(later(step, 24 + Math.random() * 26));
-			} else {
-				chunkCards.forEach((c) => c.classList.add('show'));
-				streamTimers.push(later(finishDemo, 200));
-			}
-		};
-		streamTimers.push(later(step, 380)); // simulated scatter-gather latency
-	}
-
-	if (runBtn) {
-		on(runBtn, 'click', runDemo);
-		// run once when the console scrolls into view
-		if ('IntersectionObserver' in window && consoleEl) {
-			const dio = observe(
-				new IntersectionObserver(
-					(entries) => {
-						if (entries[0].isIntersecting) {
-							runDemo();
-							dio.disconnect();
-						}
-					},
-					{ threshold: 0.35 }
-				)
-			);
-			dio.observe(consoleEl);
-		}
-	}
-
-	if (byokSwitch) {
-		on(byokSwitch, 'click', () => {
-			const state = byokSwitch.getAttribute('aria-checked') !== 'true';
-			byokSwitch.setAttribute('aria-checked', String(state));
-			consoleEl?.classList.toggle('byok-on', state);
-			if (routeLine) {
-				routeLine.textContent = state
-					? 'your key / openai gpt-4o-mini / decrypted in RAM only'
-					: 'platform gateway / groq → gemini → cohere (LIGHT / MEDIUM / HEAVY tiers)';
-			}
-		});
 	}
 
 	/* ---------- architecture topology flow routing & inspector ---------- */

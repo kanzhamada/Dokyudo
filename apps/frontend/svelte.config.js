@@ -58,6 +58,16 @@ const config = {
 					'connect-src': [
 						'self',
 						'https://api.dokyudo.my.id',
+						// Local dev / preview — backend runs on :8000, frontend on :5173/:8080
+						// Wildcard port form is CSP3-compliant; explicit ports kept for older parsers.
+						'http://localhost:*',
+						'http://127.0.0.1:*',
+						'http://localhost:8000',
+						'http://localhost:8080',
+						'http://127.0.0.1:8000',
+						'http://127.0.0.1:8080',
+						'ws://localhost:*',
+						'ws://127.0.0.1:*',
 						'https://*.supabase.co',
 						'wss://*.supabase.co',
 						'https://fonts.googleapis.com',

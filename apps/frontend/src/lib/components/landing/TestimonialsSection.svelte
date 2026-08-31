@@ -32,7 +32,7 @@
 					</span>
 					<strong class="vp-person__name">Myoui Mina</strong>
 					<em class="vp-person__role">Senior Credit Analyst</em>
-					<span class="vp-person__quote" hidden>I asked for the Q3 EBITDA bridge and got the exact footnote, cited to page 47. Forty minutes of Ctrl+F became a single query.</span>
+					<span class="vp-person__quote" hidden>I asked for the Q3 EBITDA bridge and got the footnote verbatim — [Doc 1: Page 47] linked via Source References to the exact page. Forty minutes of Ctrl+F became one citable query.</span>
 				</button>
 
 				<button class="vp-person" type="button" aria-pressed="false"
@@ -43,7 +43,7 @@
 					</span>
 					<strong class="vp-person__name">Kendrick Lamar</strong>
 					<em class="vp-person__role">Staff Systems Engineer</em>
-					<span class="vp-person__quote" hidden>The scatter-gather RRF path is the cleanest retrieval I have audited. ID-only fetch, lazy hydration, and a circuit breaker on every external call.</span>
+					<span class="vp-person__quote" hidden>Application-layer scatter-gather RRF in Deno — parallel Upstash Vector + Postgres FTS, in-memory RRF 1/(60+rank), dedup by documentId with JSONB page hydration. Redis circuit breaker on every external call.</span>
 				</button>
 
 				<button class="vp-person" type="button" aria-pressed="false"
@@ -54,7 +54,7 @@
 					</span>
 					<strong class="vp-person__name">Sabrina Carpenter</strong>
 					<em class="vp-person__role">Portfolio Operations Lead</em>
-					<span class="vp-person__quote" hidden>Our keys never sit in plaintext, and the teardown cron wipes the sandbox on schedule. The first zero-dollar demo that behaved like production.</span>
+					<span class="vp-person__quote" hidden>BYOK keys are AES-256-GCM sealed with BYOK_MASTER_KEY and decrypted only in RAM — UI shows sk-*******************1234. Stripe sandbox + lazy downgrade on GET /api/me keeps the $0 demo behaving like production.</span>
 				</button>
 
 				<button class="vp-person" type="button" aria-pressed="false"
@@ -65,7 +65,7 @@
 					</span>
 					<strong class="vp-person__name">Richarlison de Andrade</strong>
 					<em class="vp-person__role">Quantitative Researcher</em>
-					<span class="vp-person__quote" hidden>Dense balance sheets stay whole through the chunker, so the model never hallucinates a split row. The citations are trustworthy enough to drop into a memo.</span>
+					<span class="vp-person__quote" hidden>1,000-token window, 150 overlap via tiktoken cl100k_base, OMML→LaTeX through LibreOffice and rare 25-char n-gram page alignment — 1,024-dim BGE-M3 chunks never split a balance-sheet row.</span>
 				</button>
 
 			</div>
@@ -88,7 +88,7 @@
 					<span class="voices-quote__rate t-tag" id="voicesRate" aria-label="Rated 4.9 out of 5">
 						<svg class="ic" aria-hidden="true"><use href="#i-star"/></svg><b>4.9</b>
 					</span>
-					<p class="voices-quote__body t-b1" id="voicesBody">I asked for the Q3 EBITDA bridge and got the exact footnote, cited to page 47. Forty minutes of Ctrl+F became a single query.</p>
+					<p class="voices-quote__body t-b1" id="voicesBody">I asked for the Q3 EBITDA bridge and got the footnote verbatim — [Doc 1: Page 47] linked via Source References to the exact page. Forty minutes of Ctrl+F became one citable query.</p>
 					<footer class="voices-quote__foot">
 						<span class="voices-quote__brand" aria-hidden="true"><svg class="ic"><use href="#i-brand-mina"/></svg></span>
 						<cite id="voicesCite">Myoui Mina</cite>
