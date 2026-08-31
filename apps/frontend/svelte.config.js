@@ -29,17 +29,19 @@ const config = {
 					'default-src': ['self'],
 					// 'wasm-unsafe-eval' is required for the anti-bot WASM puzzle
 					// (vite-plugin-wasm + WebAssembly.instantiate).
-					// 'blob:' enables @embedpdf's PDF viewer, which boots its
-					// pdfium worker from a Blob URL (worker-src blob: is also set
-					// below). Trade-off: blob scripts are a common XSS escalation
-					// sink — acceptable here, remove if the viewer is swapped.
+					// 'https://cdn.jsdelivr.net' lets @embedpdf's pdfium worker
+					// execute — the worker itself loads from jsdelivr
+					// (worker-src) and its internal module imports are governed
+					// by script-src. Allowing a public CDN in script-src is a
+					// trade-off; self-hosting the embedpdf assets would let us
+					// drop it (and connect-src/worker-src entries) entirely.
 					'script-src': [
 						'self',
 						"'wasm-unsafe-eval'",
-						'blob:',
 						'https://www.google.com',
 						'https://www.gstatic.com',
-						'https://static.cloudflareinsights.com'
+						'https://static.cloudflareinsights.com',
+						'https://cdn.jsdelivr.net'
 					],
 					// 'unsafe-inline' for styles is needed by Svelte's inline style
 					// attribute in app.html and runtime style injection
@@ -68,7 +70,9 @@ const config = {
 					'base-uri': ['self'],
 					'form-action': ['self'],
 					'object-src': ['none'],
-					'worker-src': ['self', 'blob:']
+					// @embedpdf boots its pdfium worker from cdn.jsdelivr.net
+					// (and auxiliary relay workers from blob: URLs).
+					'worker-src': ['self', 'blob:', 'https://cdn.jsdelivr.net']
 				}
 			}
 		})

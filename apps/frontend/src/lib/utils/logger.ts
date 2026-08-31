@@ -1,5 +1,3 @@
-import { dev } from '$app/environment';
-
 /**
  * Console logging guard.
  *
@@ -18,10 +16,15 @@ const MUTED_LEVELS = ['debug', 'log', 'info'] as const;
 type ConsoleLevel = 'debug' | 'log' | 'info' | 'warn' | 'error';
 
 /**
- * Statically replaced at build time: `false` during `npm run dev`, `true` once
- * the app is built for production (`vite build`).
+ * Vite replaces `import.meta.env.PROD` with a literal at build time: `true`
+ * on `vite build` (mode production), `false` on `vite dev`.
+ *
+ * This intentionally avoids `dev` from `$app/environment`, which re-exports
+ * an esm-env constant that some build pipelines fold to dev values even for
+ * production client bundles (observed on this project's deployed site) —
+ * that silently disabled this patch.
  */
-const isProductionBuild = !dev;
+const isProductionBuild = import.meta.env.PROD;
 
 // NOTE: intentionally NOT using `browser` from `$app/environment` — it is a
 // build-time constant from `esm-env` that some pipelines fold to `false` even
