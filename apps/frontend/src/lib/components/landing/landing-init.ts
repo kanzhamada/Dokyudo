@@ -275,7 +275,7 @@ export function initLanding(): () => void {
 
 	autoRevealSelectors.forEach((sel) => {
 		$$(sel).forEach((el) => {
-			if (!el.hasAttribute('data-reveal')) {
+			if (!el.hasAttribute('data-reveal') && !el.closest('.acc, .acc-panel')) {
 				el.setAttribute('data-reveal', '');
 			}
 		});

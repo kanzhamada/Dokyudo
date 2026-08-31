@@ -5,11 +5,9 @@
 <section class="section section--dark sec-tiers" id="tiers">
 	<div class="container">
 		<div class="shead" data-reveal>
-			<h2 class="t-h2">Three tiers. One honest ledger.</h2>
-			<p class="t-b1 shead__lead shead__lead--dark">Sandbox billing only: dummy credentials, no real charges. Monthly counters reset on the 1st at 00:00 UTC. Storage is cumulative and never resets.</p>
+			<h2 class="t-h2">Four tiers. One honest ledger.</h2>
+			<p class="t-b1 shead__lead shead__lead--dark">Monthly counters reset on the 1st at 00:00 UTC. Storage is cumulative and never resets.</p>
 		</div>
-
-		<p class="flag-line t-tag" data-reveal>global flag <span>/</span> pro_real_unlocked = <span id="flagVal">false</span></p>
 
 		<div class="tier-grid">
 
@@ -30,10 +28,10 @@
 					<span class="medal medal--sm" aria-hidden="true"><svg class="ic"><use href="#i-node"/></svg></span>
 					<ul class="tier-spec__list">
 						<li>10 MB max file</li>
-						<li>5 uploads / mo</li>
-						<li>50 searches / mo</li>
-						<li>10 Q&amp;A / mo</li>
-						<li class="tier-spec__sum">= 500 MB storage</li>
+						<li>10 uploads / mo</li>
+						<li>100 searches / mo</li>
+						<li>50 Q&amp;A / mo</li>
+						<li class="tier-spec__sum">= 100 MB storage</li>
 					</ul>
 				</div>
 				<div class="tier-feat">
@@ -51,11 +49,11 @@
 			<article class="card tier tier--feat" data-reveal style="--rd:90ms">
 				<div class="tier__head">
 					<h3 class="tier__name t-h3">Pro Investor</h3>
-					<p class="tier__tag t-b2">The portfolio showcase that flips the global flag.</p>
+					<p class="tier__tag t-b2">The portfolio showcase that unlocks the full platform.</p>
 				</div>
 				<div class="tier__price">
-					<span class="tier__num">Rp 1,440,000</span>
-					<span class="tier__was t-tag">once</span>
+					<span class="tier__num">Rp 19,000,000</span>
+					<span class="tier__was t-tag">one-time</span>
 				</div>
 				<div class="tier__pills">
 					<span class="pill pill--mute">Sandbox invoice</span>
@@ -64,18 +62,18 @@
 				<div class="tier-spec">
 					<span class="medal medal--sm" aria-hidden="true"><svg class="ic"><use href="#i-node"/></svg></span>
 					<ul class="tier-spec__list">
-						<li>25 MB max file</li>
-						<li>Unlimited* uploads</li>
-						<li>Unlimited* searches</li>
+						<li>15 MB max file</li>
+						<li>25 uploads / mo</li>
+						<li>250 searches / mo</li>
 						<li>100 Q&amp;A / mo</li>
-						<li class="tier-spec__sum">= 40 GB storage</li>
+						<li class="tier-spec__sum">= 250 MB storage</li>
 					</ul>
 				</div>
 				<div class="tier-feat">
 					<span class="pill pill--mute tier-feat__label">Features</span>
 					<ul class="perks">
 						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>One-time sandbox invoice</li>
-						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>3 activation vouchers (Option B)</li>
+						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>3 activation vouchers</li>
 						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Unlocks PRO REAL platform-wide</li>
 					</ul>
 				</div>
@@ -89,11 +87,11 @@
 				<div class="tier__head">
 					<span class="badge badge--locked" id="realLock"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg>Locked</span>
 					<h3 class="tier__name t-h3">Pro Real</h3>
-					<p class="tier__tag t-b2">The commercial B2B tier, gated until the first invoice.</p>
+					<p class="tier__tag t-b2">The commercial B2B tier for recurring operations.</p>
 				</div>
 				<div class="tier__price">
-					<span class="tier__num tier__num--word">Recurring</span>
-					<span class="tier__was t-tag">auto-debit</span>
+					<span class="tier__num">Rp 58,000</span>
+					<span class="tier__was t-tag">/ month</span>
 				</div>
 				<div class="tier__pills">
 					<span class="pill pill--mute">Tokenized</span>
@@ -102,11 +100,11 @@
 				<div class="tier-spec">
 					<span class="medal medal--sm" aria-hidden="true"><svg class="ic"><use href="#i-node"/></svg></span>
 					<ul class="tier-spec__list">
-						<li>25 MB+ max file</li>
-						<li>Expanded uploads</li>
-						<li>Expanded searches</li>
-						<li>100+ Q&amp;A / mo</li>
-						<li class="tier-spec__sum">= 40 GB+ storage</li>
+						<li>15 MB max file</li>
+						<li>25 uploads / mo</li>
+						<li>250 searches / mo</li>
+						<li>100 Q&amp;A / mo</li>
+						<li class="tier-spec__sum">= 250 MB storage</li>
 					</ul>
 				</div>
 				<div class="tier-feat">
@@ -129,7 +127,11 @@
 
 			<div class="tier-wide__col tier-wide__lead">
 				<h3 class="tier__name t-h3">Sandbox &amp; Evaluation</h3>
-				<p class="tier__tag t-b2">PRO (SIMULATE): a 24-hour guided evaluation, no card required.</p>
+				<p class="tier__tag t-b2">A guided evaluation with no card and no real charges.</p>
+				<div class="tier__price" style="margin: 8px 0 12px;">
+					<span class="tier__num" style="font-size: 1.35rem;">Rp 11,100</span>
+					<span class="tier__was t-tag">trial 1 day</span>
+				</div>
 				<button class="btn btn--ink" id="simBtn" type="button">Generate 24h Code</button>
 				<p class="sim-code t-tag" id="simCode" hidden>code <b></b> <span>expires in 24h</span></p>
 			</div>
@@ -138,10 +140,11 @@
 				<div class="tier-spec">
 					<span class="medal medal--sm" aria-hidden="true"><svg class="ic"><use href="#i-node"/></svg></span>
 					<ul class="tier-spec__list">
-						<li>24-hour evaluation window</li>
-						<li>Dummy credentials only</li>
-						<li>Counters reset monthly</li>
-						<li class="tier-spec__sum">= self-destruct on expiry</li>
+						<li>15 MB max file</li>
+						<li>25 uploads / mo</li>
+						<li>250 searches / mo</li>
+						<li>100 Q&amp;A / mo</li>
+						<li class="tier-spec__sum">= 250 MB storage</li>
 					</ul>
 				</div>
 			</div>
@@ -150,15 +153,15 @@
 				<div class="tier-feat tier-feat--plain">
 					<span class="pill pill--mute tier-feat__label">Features</span>
 					<ul class="perks">
-						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>No real charges, ever</li>
-						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>8-char code emailed to you</li>
-						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Cascading teardown on expiry</li>
+						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Dummy credentials only</li>
+						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Counters reset monthly</li>
+						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Self-destruct on expiry</li>
 						<li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Downgrades back to Free</li>
 					</ul>
 				</div>
 			</div>
 		</div>
 
-		<p class="tier-foot t-b3" data-reveal>*Unlimited in the UI. Fair-use backend caps during sandbox: 50 documents, 500 searches, 2 GB. A PRO (SIMULATE) code grants 24-hour access and self-destructs on schedule.</p>
+		<p class="tier-foot t-b3" data-reveal>Monthly counters reset on the 1st of each month at 00:00 UTC. Storage is cumulative and never resets. A PRO (SIMULATE) code grants 24-hour access and self-destructs on schedule.</p>
 	</div>
 </section>

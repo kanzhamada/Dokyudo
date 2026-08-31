@@ -8,7 +8,7 @@
 		<div class="cmp-head" data-reveal>
 			<div class="cmp-head__copy">
 				<h2 class="t-h2">Every quota, side by side.</h2>
-				<p class="cmp-head__lead t-b1">The full feature matrix across all four tiers. Sandbox billing only, dummy credentials, and counters that reset on the first of each month.</p>
+				<p class="cmp-head__lead t-b1">The full feature matrix across all four tiers. Monthly counters reset on the 1st at 00:00 UTC, and storage is cumulative.</p>
 			</div>
 			<div class="cmp-legend" aria-hidden="false">
 				<span class="cmp-leg"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Included</span></span>Included</span>
@@ -36,16 +36,16 @@
 							</th>
 							<th class="c-plan c-feat" scope="col">
 								<span class="cmp-name">Pro Investor</span>
-								<span class="cmp-price t-tag">Rp 1,440,000 / once</span>
+								<span class="cmp-price t-tag">Rp 19,000,000 / once</span>
 							</th>
 							<th class="c-plan" scope="col">
 								<span class="badge badge--locked js-real-lock"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg>Locked</span>
 								<span class="cmp-name">Pro Real</span>
-								<span class="cmp-price t-tag">Recurring / auto-debit</span>
+								<span class="cmp-price t-tag">Rp 58,000 / mo</span>
 							</th>
 							<th class="c-plan" scope="col">
 								<span class="cmp-name">Sandbox</span>
-								<span class="cmp-price t-tag">24h eval code</span>
+								<span class="cmp-price t-tag">Rp 11,100 / 1-day trial</span>
 							</th>
 						</tr>
 					</thead>
@@ -63,37 +63,37 @@
 						<tr class="c-row">
 							<th class="c-label" scope="row">Max file size</th>
 							<td class="c-val"><span class="val">10 MB</span></td>
-							<td class="c-val c-feat"><span class="val">25 MB</span></td>
-							<td class="c-val"><span class="val">25 MB+</span></td>
-							<td class="c-val"><span class="val">25 MB</span></td>
+							<td class="c-val c-feat"><span class="val">15 MB</span></td>
+							<td class="c-val"><span class="val">15 MB</span></td>
+							<td class="c-val"><span class="val">15 MB</span></td>
 						</tr>
 						<tr class="c-row">
 							<th class="c-label" scope="row">Monthly uploads</th>
-							<td class="c-val"><span class="val">5</span></td>
-							<td class="c-val c-feat"><span class="val">Unlimited<span class="star">*</span></span></td>
-							<td class="c-val"><span class="val">Expanded</span></td>
-							<td class="c-val"><span class="val">Unlimited<span class="star">*</span></span></td>
+							<td class="c-val"><span class="val">10</span></td>
+							<td class="c-val c-feat"><span class="val">25</span></td>
+							<td class="c-val"><span class="val">25</span></td>
+							<td class="c-val"><span class="val">25</span></td>
 						</tr>
 						<tr class="c-row">
 							<th class="c-label" scope="row">Monthly searches</th>
-							<td class="c-val"><span class="val">50</span></td>
-							<td class="c-val c-feat"><span class="val">Unlimited<span class="star">*</span></span></td>
-							<td class="c-val"><span class="val">Expanded</span></td>
-							<td class="c-val"><span class="val">Unlimited<span class="star">*</span></span></td>
+							<td class="c-val"><span class="val">100</span></td>
+							<td class="c-val c-feat"><span class="val">250</span></td>
+							<td class="c-val"><span class="val">250</span></td>
+							<td class="c-val"><span class="val">250</span></td>
 						</tr>
 						<tr class="c-row">
 							<th class="c-label" scope="row">Monthly Q&amp;A</th>
-							<td class="c-val"><span class="val">10</span></td>
+							<td class="c-val"><span class="val">50</span></td>
 							<td class="c-val c-feat"><span class="val">100</span></td>
-							<td class="c-val"><span class="val">100+</span></td>
+							<td class="c-val"><span class="val">100</span></td>
 							<td class="c-val"><span class="val">100</span></td>
 						</tr>
 						<tr class="c-row">
 							<th class="c-label" scope="row">Cumulative storage</th>
-							<td class="c-val"><span class="val">500 MB</span></td>
-							<td class="c-val c-feat"><span class="val">40 GB<span class="star">*</span></span></td>
-							<td class="c-val"><span class="val">40 GB+</span></td>
-							<td class="c-val"><span class="val">2 GB</span></td>
+							<td class="c-val"><span class="val">100 MB</span></td>
+							<td class="c-val c-feat"><span class="val">250 MB</span></td>
+							<td class="c-val"><span class="val">250 MB</span></td>
+							<td class="c-val"><span class="val">250 MB</span></td>
 						</tr>
 
 						<!-- CLUSTER 2 -->
@@ -156,18 +156,25 @@
 							<td class="c-cluster-cell"></td>
 						</tr>
 						<tr class="c-row">
-							<th class="c-label" scope="row">One-time invoice, Rp 1,440,000</th>
+							<th class="c-label" scope="row">One-time invoice, Rp 19,000,000</th>
 							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
 							<td class="c-val c-feat"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Included</span></span></td>
 							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
 							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
 						</tr>
 						<tr class="c-row">
-							<th class="c-label" scope="row">Recurring auto-debit subscription</th>
+							<th class="c-label" scope="row">Recurring subscription, Rp 58,000/mo</th>
 							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
 							<td class="c-val c-feat"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
 							<td class="c-val"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Included</span></span></td>
 							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
+						</tr>
+						<tr class="c-row">
+							<th class="c-label" scope="row">1-day evaluation trial, Rp 11,100</th>
+							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
+							<td class="c-val c-feat"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
+							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
+							<td class="c-val"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Included</span></span></td>
 						</tr>
 						<tr class="c-row">
 							<th class="c-label" scope="row">Multi-seat activation vouchers</th>
@@ -182,13 +189,6 @@
 							<td class="c-val c-feat"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Included</span></span></td>
 							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
 							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
-						</tr>
-						<tr class="c-row">
-							<th class="c-label" scope="row">24-hour evaluation code</th>
-							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
-							<td class="c-val c-feat"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
-							<td class="c-val"><span class="no"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><span class="sr-only">Not available</span></span></td>
-							<td class="c-val"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Included</span></span></td>
 						</tr>
 						<tr class="c-row">
 							<th class="c-label" scope="row">Monthly counter reset, 1st 00:00 UTC</th>
@@ -223,7 +223,7 @@
 			</div>
 		</div>
 
-		<p class="cmp-foot t-b3" data-reveal>*Unlimited in the UI. Fair-use backend caps during sandbox: 50 documents, 500 searches, 2 GB. Storage is cumulative and never resets.</p>
+		<p class="cmp-foot t-b3" data-reveal>Monthly counters reset on the 1st of each month at 00:00 UTC. Storage is cumulative and never resets. Dummy credentials supported for sandbox evaluation.</p>
 
 	</div>
 </section>

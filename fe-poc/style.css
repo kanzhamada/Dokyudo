@@ -4432,7 +4432,7 @@ tfoot .c-feat {
     padding: 14px 15px;
     background: rgba(250, 250, 250, 0.04);
     border: 1px solid var(--border-dark);
-    border-radius: 0;
+    border-radius: var(--r-ctl);
     transition:
         background-color var(--dur) var(--ease),
         border-color var(--dur) var(--ease),
@@ -4526,7 +4526,7 @@ tfoot .c-feat {
     min-height: 440px;
     background: var(--color-black);
     border: 1px solid var(--border-dark);
-    border-radius: 0;
+    border-radius: var(--r-ctl);
     transition:
         opacity var(--dur) var(--ease),
         transform var(--dur) var(--ease);
@@ -4628,7 +4628,7 @@ tfoot .c-feat {
     padding: 30px 30px 26px;
     background: var(--color-offwhite);
     border: 1px solid var(--border-fade);
-    border-radius: 0;
+    border-radius: var(--r-ctl);
 }
 .voices-quote__swap {
     position: relative;
