@@ -15,7 +15,7 @@
 	const NODES: Record<string, NodeDetail> = {
 		client: {
 			zone: 'Browser client',
-			zoneColor: 'var(--c-periwinkle, #7b88d1)',
+			zoneColor: '#7b88d1',
 			title: 'Browser Client',
 			bullets: [
 				'SvelteKit sends Bearer JWT requests to the Deno gateway and keeps the session in the frontend store.',
@@ -28,7 +28,7 @@
 		},
 		gateway: {
 			zone: 'API boundary',
-			zoneColor: 'var(--color-terracotta, #c85a32)',
+			zoneColor: '#c85a32',
 			title: 'Deno + Hono Gateway',
 			bullets: [
 				'Validates Supabase HS256 JWTs, resolves tenant context, and applies explicit tenant predicates across the stack.',
@@ -41,7 +41,7 @@
 		},
 		redis: {
 			zone: 'Control plane',
-			zoneColor: 'var(--c-amber, #d99b26)',
+			zoneColor: '#d99b26',
 			title: 'Redis Gatekeeper',
 			bullets: [
 				'Applies global standard, strict, and block-tier rate limits before protected work proceeds.',
@@ -54,7 +54,7 @@
 		},
 		vector: {
 			zone: 'Semantic data plane',
-			zoneColor: 'var(--c-lavender, #a390c4)',
+			zoneColor: '#a390c4',
 			title: 'Semantic Index',
 			bullets: [
 				'Current production embeddings use Cloudflare Workers AI BGE-M3 at 1024 dimensions.',
@@ -67,7 +67,7 @@
 		},
 		postgres: {
 			zone: 'Relational data plane',
-			zoneColor: 'var(--c-olive, #7c9d60)',
+			zoneColor: '#7c9d60',
 			title: 'Relational Core',
 			bullets: [
 				'Source of truth for tenants, documents, chunks, conversations, subscriptions, activity, and turn state.',
@@ -80,7 +80,7 @@
 		},
 		fusion: {
 			zone: 'Search orchestration',
-			zoneColor: 'var(--c-purple, #9c6f9e)',
+			zoneColor: '#c85a32',
 			title: 'Hybrid Ranker',
 			bullets: [
 				'Runs Postgres FTS and semantic Vector search in parallel, then fuses ranked IDs in the Deno application layer.',
@@ -93,7 +93,7 @@
 		},
 		router: {
 			zone: 'Model orchestration',
-			zoneColor: 'var(--c-purple, #9c6f9e)',
+			zoneColor: '#9c6f9e',
 			title: 'Model Router',
 			bullets: [
 				'Classifies history depth, question length, and context complexity before the answer stream begins.',
@@ -106,7 +106,7 @@
 		},
 		minio: {
 			zone: 'Private storage',
-			zoneColor: 'var(--c-navy, #4a6572)',
+			zoneColor: '#4a6572',
 			title: 'Private MinIO Store',
 			bullets: [
 				'Private S3-compatible storage on the STB holds originals and worker-generated preview PDFs.',
@@ -119,7 +119,7 @@
 		},
 		worker: {
 			zone: 'On-premise worker',
-			zoneColor: 'var(--c-purple, #9c6f9e)',
+			zoneColor: '#9c6f9e',
 			title: 'FastAPI Ingestion Worker',
 			bullets: [
 				'FastAPI receives the pg_net webhook, downloads the confirmed object, and converts DOCX, TXT, or Markdown for preview.',
@@ -132,7 +132,7 @@
 		},
 		stream: {
 			zone: 'Response and sync plane',
-			zoneColor: 'var(--c-lime, #86af49)',
+			zoneColor: '#86af49',
 			title: 'Response and Progress Stream',
 			bullets: [
 				'RAG responses emit turn status, references, tokens, titles, and a final done event over SSE.',
@@ -171,14 +171,14 @@
 	const activeNode = $derived(NODES[activeKey] ?? NODES.gateway);
 
 	const readDiagram = `flowchart LR
-		client["<div class='m-node client' data-node-key='client'><span class='m-tag'>WEB</span><div class='m-head'><span class='m-num'>1</span><strong>Browser Client</strong></div><p class='m-sub'>Bearer JWT · SSE · Realtime</p></div>"]
-		gateway["<div class='m-node gateway' data-node-key='gateway'><span class='m-tag'>DENO · HONO</span><div class='m-head'><span class='m-num'>2</span><strong>API Gateway</strong></div><p class='m-sub'>JWT · tenant · quota gates</p></div>"]
-		redis["<div class='m-node redis' data-node-key='redis'><span class='m-tag'>GATE</span><div class='m-head'><span class='m-num'>3</span><strong>Redis Gatekeeper</strong></div><p class='m-sub'>Limits · quota · safety</p></div>"]
-		vector["<div class='m-node vector' data-node-key='vector'><span class='m-tag'>BGE-M3</span><div class='m-head'><span class='m-num'>4</span><strong>Semantic Index</strong></div><p class='m-sub'>BGE-M3 embeddings · 1024-d</p></div>"]
-		postgres["<div class='m-node postgres' data-node-key='postgres'><span class='m-tag'>POSTGRES · FTS</span><div class='m-head'><span class='m-num'>5</span><strong>Relational Search</strong></div><p class='m-sub'>FTS · tenant filter · hydrate</p></div>"]
-		fusion["<div class='m-node fusion' data-node-key='fusion'><span class='m-tag'>RRF</span><div class='m-head'><span class='m-num'>6</span><strong>Hybrid Ranker</strong></div><p class='m-sub'>FTS + vector · RRF in Deno</p></div>"]
-		router["<div class='m-node router' data-node-key='router'><span class='m-tag'>LLM</span><div class='m-head'><span class='m-num'>7</span><strong>Model Router</strong></div><p class='m-sub'>Tier fallback · BYOK</p></div>"]
-		stream["<div class='m-node stream' data-node-key='stream'><span class='m-tag'>SSE</span><div class='m-head'><span class='m-num'>8</span><strong>Response Stream</strong></div><p class='m-sub'>Tokens · citations · title</p></div>"]
+		client["<div class='m-node client' data-node-key='client'><span class='m-tag' style='color:#7b88d1;'>WEB</span><div class='m-head'><span class='m-num' style='background:rgba(123,136,209,0.2);color:#7b88d1;'>1</span><strong>Browser Client</strong></div><p class='m-sub'>Bearer JWT · SSE · Realtime</p></div>"]
+		gateway["<div class='m-node gateway' data-node-key='gateway'><span class='m-tag' style='color:#c85a32;'>DENO · HONO</span><div class='m-head'><span class='m-num' style='background:rgba(200,90,50,0.2);color:#c85a32;'>2</span><strong>API Gateway</strong></div><p class='m-sub'>JWT · tenant · quota gates</p></div>"]
+		redis["<div class='m-node redis' data-node-key='redis'><span class='m-tag' style='color:#d99b26;'>GATE</span><div class='m-head'><span class='m-num' style='background:rgba(217,155,38,0.2);color:#d99b26;'>3</span><strong>Redis Gatekeeper</strong></div><p class='m-sub'>Limits · quota · safety</p></div>"]
+		vector["<div class='m-node vector' data-node-key='vector'><span class='m-tag' style='color:#a390c4;'>BGE-M3</span><div class='m-head'><span class='m-num' style='background:rgba(163,144,196,0.2);color:#a390c4;'>4</span><strong>Semantic Index</strong></div><p class='m-sub'>BGE-M3 embeddings · 1024-d</p></div>"]
+		postgres["<div class='m-node postgres' data-node-key='postgres'><span class='m-tag' style='color:#7c9d60;'>POSTGRES · FTS</span><div class='m-head'><span class='m-num' style='background:rgba(124,157,96,0.2);color:#7c9d60;'>5</span><strong>Relational Search</strong></div><p class='m-sub'>FTS · tenant filter · hydrate</p></div>"]
+		fusion["<div class='m-node fusion' data-node-key='fusion'><span class='m-tag' style='color:#c85a32;'>RRF</span><div class='m-head'><span class='m-num' style='background:rgba(200,90,50,0.2);color:#c85a32;'>6</span><strong>Hybrid Ranker</strong></div><p class='m-sub'>FTS + vector · RRF in Deno</p></div>"]
+		router["<div class='m-node router' data-node-key='router'><span class='m-tag' style='color:#9c6f9e;'>LLM</span><div class='m-head'><span class='m-num' style='background:rgba(156,111,158,0.2);color:#9c6f9e;'>7</span><strong>Model Router</strong></div><p class='m-sub'>Tier fallback · BYOK</p></div>"]
+		stream["<div class='m-node stream' data-node-key='stream'><span class='m-tag' style='color:#86af49;'>SSE</span><div class='m-head'><span class='m-num' style='background:rgba(134,175,73,0.2);color:#86af49;'>8</span><strong>Response Stream</strong></div><p class='m-sub'>Tokens · citations · title</p></div>"]
 
 		client --> gateway
 		gateway --> redis
@@ -191,14 +191,14 @@
 	`;
 
 	const ingestDiagram = `flowchart LR
-		client["<div class='m-node client' data-node-key='client'><span class='m-tag'>UPLOAD</span><div class='m-head'><span class='m-num'>1</span><strong>Browser Client</strong></div><p class='m-sub'>Stage files · direct PUT</p></div>"]
-		gateway["<div class='m-node gateway' data-node-key='gateway'><span class='m-tag'>DENO · HONO</span><div class='m-head'><span class='m-num'>2</span><strong>API Gateway</strong></div><p class='m-sub'>JWT · quota · confirm</p></div>"]
-		redis["<div class='m-node redis' data-node-key='redis'><span class='m-tag'>GATE</span><div class='m-head'><span class='m-num'>3</span><strong>Redis Gatekeeper</strong></div><p class='m-sub'>Limits · quota · cancellation</p></div>"]
-		minio["<div class='m-node minio' data-node-key='minio'><span class='m-tag'>MINIO · S3</span><div class='m-head'><span class='m-num'>4</span><strong>Private Object Store</strong></div><p class='m-sub'>Raw files · signed URLs</p></div>"]
-		postgres["<div class='m-node postgres' data-node-key='postgres'><span class='m-tag'>META</span><div class='m-head'><span class='m-num'>5</span><strong>Relational Core</strong></div><p class='m-sub'>Pending → confirmed</p></div>"]
-		worker["<div class='m-node worker' data-node-key='worker'><span class='m-tag'>JOB</span><div class='m-head'><span class='m-num'>6</span><strong>FastAPI Worker</strong></div><p class='m-sub'>Extract · chunk · embed</p></div>"]
-		vector["<div class='m-node vector' data-node-key='vector'><span class='m-tag'>BGE-M3</span><div class='m-head'><span class='m-num'>7</span><strong>Vector Index</strong></div><p class='m-sub'>Upsert chunks · page data</p></div>"]
-		stream["<div class='m-node stream' data-node-key='stream'><span class='m-tag'>HOOK</span><div class='m-head'><span class='m-num'>8</span><strong>Progress Sync</strong></div><p class='m-sub'>pg_net · Realtime · poll</p></div>"]
+		client["<div class='m-node client' data-node-key='client'><span class='m-tag' style='color:#7b88d1;'>UPLOAD</span><div class='m-head'><span class='m-num' style='background:rgba(123,136,209,0.2);color:#7b88d1;'>1</span><strong>Browser Client</strong></div><p class='m-sub'>Stage files · direct PUT</p></div>"]
+		gateway["<div class='m-node gateway' data-node-key='gateway'><span class='m-tag' style='color:#c85a32;'>DENO · HONO</span><div class='m-head'><span class='m-num' style='background:rgba(200,90,50,0.2);color:#c85a32;'>2</span><strong>API Gateway</strong></div><p class='m-sub'>JWT · quota · confirm</p></div>"]
+		redis["<div class='m-node redis' data-node-key='redis'><span class='m-tag' style='color:#d99b26;'>GATE</span><div class='m-head'><span class='m-num' style='background:rgba(217,155,38,0.2);color:#d99b26;'>3</span><strong>Redis Gatekeeper</strong></div><p class='m-sub'>Limits · quota · cancellation</p></div>"]
+		minio["<div class='m-node minio' data-node-key='minio'><span class='m-tag' style='color:#4a6572;'>MINIO · S3</span><div class='m-head'><span class='m-num' style='background:rgba(74,101,114,0.2);color:#4a6572;'>4</span><strong>Private Object Store</strong></div><p class='m-sub'>Raw files · signed URLs</p></div>"]
+		postgres["<div class='m-node postgres' data-node-key='postgres'><span class='m-tag' style='color:#7c9d60;'>META</span><div class='m-head'><span class='m-num' style='background:rgba(124,157,96,0.2);color:#7c9d60;'>5</span><strong>Relational Core</strong></div><p class='m-sub'>Pending → confirmed</p></div>"]
+		worker["<div class='m-node worker' data-node-key='worker'><span class='m-tag' style='color:#9c6f9e;'>JOB</span><div class='m-head'><span class='m-num' style='background:rgba(156,111,158,0.2);color:#9c6f9e;'>6</span><strong>FastAPI Worker</strong></div><p class='m-sub'>Extract · chunk · embed</p></div>"]
+		vector["<div class='m-node vector' data-node-key='vector'><span class='m-tag' style='color:#a390c4;'>BGE-M3</span><div class='m-head'><span class='m-num' style='background:rgba(163,144,196,0.2);color:#a390c4;'>7</span><strong>Vector Index</strong></div><p class='m-sub'>Upsert chunks · page data</p></div>"]
+		stream["<div class='m-node stream' data-node-key='stream'><span class='m-tag' style='color:#86af49;'>HOOK</span><div class='m-head'><span class='m-num' style='background:rgba(134,175,73,0.2);color:#86af49;'>8</span><strong>Progress Sync</strong></div><p class='m-sub'>pg_net · Realtime · poll</p></div>"]
 
 		client --> gateway
 		gateway --> redis
@@ -542,24 +542,23 @@
 			</div>
 		</div>
 
-		<p class="arch__legend" data-reveal>
-			<b>terracotta</b> = selected path &nbsp;·&nbsp; <b>pulse</b> = live traffic &nbsp;·&nbsp; write
-			flow is event-driven: committed Postgres status changes trigger a pg_net webhook, while the browser
-			receives Realtime updates with polling fallback
-		</p>
-
-		<!-- inspector -->
+		<!-- inspector: seamlessly connected to the diagram preview panel above -->
 		<div
 			class="arch-detail"
 			class:swap={isSwapping}
 			id="archDetail"
 			data-reveal
 			tabindex="-1"
+			style="--active-zone-color: {activeNode.zoneColor};"
 		>
 			<div class="ad-head">
 				<span
 					class="ad-zone"
-					style="color: {activeNode.zoneColor}; border-color: {activeNode.zoneColor};"
+					style="
+						color: {activeNode.zoneColor};
+						border-color: {activeNode.zoneColor};
+						background: color-mix(in srgb, {activeNode.zoneColor} 14%, transparent);
+					"
 				>
 					{activeNode.zone}
 				</span>
@@ -595,11 +594,36 @@
 		overflow-y: hidden;
 		scrollbar-width: thin;
 		scrollbar-color: var(--color-gray-light, #444) transparent;
-		padding: 52px 20px 28px;
+		padding: 52px 20px 24px;
 		background: #0f0e0d;
 		border: 1px solid rgba(255, 255, 255, 0.08);
-		border-radius: 12px;
+		border-bottom: none;
+		border-radius: 12px 12px 0 0;
 		box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+	}
+
+	:global(.landing-root .arch-detail) {
+		margin-top: 0 !important;
+		background: #141312 !important;
+		border: 1px solid rgba(255, 255, 255, 0.08) !important;
+		border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+		border-radius: 0 0 12px 12px !important;
+		padding: 24px 28px !important;
+		box-shadow: none !important;
+		position: relative;
+	}
+
+	:global(.landing-root .ad-zone) {
+		box-shadow: none !important;
+		transition:
+			color 180ms ease,
+			border-color 180ms ease,
+			background-color 180ms ease;
+	}
+
+	:global(.landing-root .ad-bullets li::before) {
+		border-color: var(--active-zone-color, #c85a32) !important;
+		transition: border-color 180ms ease;
 	}
 
 	.flow-controls {
@@ -743,7 +767,7 @@
 	:global(.m-node.is-selected) {
 		background: #282522 !important;
 		border-color: var(--color-terracotta, #c85a32) !important;
-		box-shadow: 0 0 0 1px var(--color-terracotta, #c85a32), 0 8px 24px rgba(200, 90, 50, 0.3) !important;
+		box-shadow: 0 0 0 1px var(--color-terracotta, #c85a32) !important;
 	}
 
 	:global(.m-node.client) {
