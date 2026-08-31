@@ -38,6 +38,12 @@ const config = {
 					'script-src': [
 						'self',
 						"'wasm-unsafe-eval'",
+						// Inline console guard from app.html (static content,
+						// stable hash). Mutes console.debug/log/info before any
+						// app module runs — belt-and-suspenders for the
+						// layout-based suppressConsole(), which some deploys
+						// failed to include.
+						"'sha256-J/yX8DXf1UeNiAyCwisAjkaHAVEpw7zTkFOJUEb2/Do='",
 						'https://www.google.com',
 						'https://www.gstatic.com',
 						'https://static.cloudflareinsights.com',
