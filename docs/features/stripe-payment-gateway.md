@@ -120,8 +120,8 @@ sequenceDiagram
 **Email notifikasi pembayaran** (`apps/backend/src/shared/utils/email.util.ts` → `sendPaymentSuccessEmail`):
 - Dipicu dari webhook `checkout.session.completed` (jalur provisioning terverifikasi), satu email per session (`idempotencyKey: payment-success/{externalId}`).
 - Dari `Dokyudo <team@dokyudo.my.id>`, subject `Payment successful - {Plan} - Dokyudo`.
-- Isi: heading + summary box (Plan purchased / Amount paid / Date / Status Active) + CTA "Open Dokyudo" → `/app?billing=open`.
-- Amount mengikuti aturan minor unit Stripe: currency zero-decimal (IDR, JPY, VND, ...) tidak dibagi 100; sisanya dibagi 100; fallback aman untuk currency tak dikenal. Plan name di-escape HTML.
+- **2026-08-31 — Template `emailShell()`:** heading `Payment successful` (`kicker Payment confirmed`), summary table `FAFAFA` border `#E8E8E8` (label `11px uppercase #9C9996` / value `13px 600 #0E0E0E`, status pill `lime #E0E07B Active`), CTA `Open Dokyudo → dashboardUrl` (`#F04E23 on #0E0E0E 8px`), footer note transactional. Header/kicker/footer terpusat dari `landing.css` tokens.
+- Amount mengikuti aturan minor unit Stripe: currency zero-decimal (IDR, JPY, VND, ...) tidak dibagi 100; sisanya dibagi 100; fallback aman untuk currency tak dikenal. Plan name di-escape HTML via `escapeHtml()`.
 - Penerima: email user pemilik tenant (user pertama `users` by `tenantId`).
 - **Best-effort by design**: kegagalan email hanya di-log (`emailError` di logContext), tidak pernah menggagalkan ack webhook.
 

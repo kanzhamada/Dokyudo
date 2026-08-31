@@ -69,6 +69,18 @@ sequenceDiagram
 - **[MODIFY]** `apps/frontend/src/lib/types/auth.types.ts`: Added `VerifyEmailRequestPayload` and `VerifyEmailResponse`.
 - **[MODIFY]** `api-collections/Auth/14_Verify Email.bru`: Updated Bruno collection file for `POST /api/auth/verify-email`.
 
+## Update 2026-08-31 — Email Design System (`emailShell`)
+
+**Completion Timestamp:** 2026-08-31 16:00 UTC+7
+
+Semua email transaksional (`sendVerificationEmail`, `sendWelcomeEmailOnce`, `sendRecoveryEmail`, `sendShareInviteEmail`, `sendPaymentSuccessEmail`, `sendAccountDeletedEmail`) di-refactor ke layout terpusat `emailShell()` di `apps/backend/src/shared/utils/email.util.ts`:
+
+- **Design tokens dari `apps/frontend/src/lib/assets/landing.css` + `fe-poc/DESIGN.md`:** palette `black #0E0E0E` / `offblack #1A1616` / `offwhite #FAFAFA` / `white #FFFFFF` / `orange #F04E23` (primary action) / `graphite #3E3E3E` / `gray #676767` / `warm-gray #9C9996` / `ash #D9D9D9` / `border rgba(185,185,185,0.4) → #E8E8E8`; type `display Gambetta/Reckless → Georgia` / `interface Chillax/FG Futurist → Trebuchet` / `body Plus Jakarta Sans/Ease → Helvetica`; `card 0px / control 8px / pill 9999px`.
+- **Struktur email-safe:** table layout 600px, semua style inline, header dark `#0E0E0E` (wordmark + terracotta dot), kicker pill uppercase `0.14em`, `h1` 26px, divider 28×2px `#F04E23`, CTA `13px 700 #0E0E0E on #F04E23 8px`.
+- **Verifikasi (`sendVerificationEmail`):** `emailShell({kicker: 'Verify your email', title: 'Confirm your address', cta: 'Verify Email Address', fallbackUrl})` — idempotency `register-email/{userId}-{requestId}`.
+- **Welcome (`sendWelcomeEmailOnce`):** `kicker: 'Account ready'`, perk table 3 baris dengan check-circle `#F04E23`, CTA `Get Started → FRONTEND_URL`, idempotency `welcome-email/{userId}` + Redis NX marker `welcome_email:{userId}` 1 tahun.
+- File terkait: `apps/backend/src/shared/utils/email.util.ts` (`escapeHtml`, `emailShell`), `apps/backend/src/shared/utils/email.util.test.ts` (assert `Verify Email Address` + `https://verify.me` tetap hijau).
+
 ## Connections
 
 - **Deno API Gateway**: Exposes `POST /api/auth/verify-email`.

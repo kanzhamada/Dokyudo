@@ -100,3 +100,17 @@ sequenceDiagram
 2. **Proof-of-Work (PoW) Bypass for Browser Redirects**: Standard API requests made via `fetch` attach the computed `X-Dokyudo-Puzzle` header. Browser address bar navigations (such as clicking an OAuth button that sets `window.location.href`) and provider redirects (Google/GitHub redirecting to `/api/oauth/:provider/callback`) cannot attach custom HTTP headers. Therefore, `/api/oauth` is exempted alongside `/api/auth` and `/api/payments/webhook`.
 3. **Shared User Provisioning Helper**: Centralizing the DB provisioning logic into `shared/utils/user_provision.util.ts` eliminates code duplication across auth and oauth modules.
 4. **Server-Side PKCE**: Continues leveraging Supabase Server-Side PKCE for secure code verification without exposing client secrets in the backend.
+## Troubleshooting — Security Headers vs OAuth (2026-08-31, 15:41 +07:00)
+
+Insiden: setelah CSP pertama diterapkan (manual di `hooks.server.ts`, `script-src 'self'` tanpa hash), tombol "Sign in with Google/GitHub" mati total. **Root cause**: SvelteKit inline bootstrap script (`__sveltekit_*`) diblokir CSP → aplikasi tidak pernah hydrate → tidak ada event handler. Ini BUKAN masalah alur OAuth (navigasi top-level tidak diatur CSP).
+
+Fix: CSP via `kit.csp` `mode: 'hash'` — SvelteKit meng-hash inline bootstrap-nya sendiri (lihat `docs/frontend/security-headers.md`).
+
+Verifikasi yang terkonfirmasi sehat (probe production):
+
+- `GET /api/oauth/google|github` → 302 ke Supabase authorize dengan PKCE `code_challenge` dan `redirect_to = {API_URL}/api/oauth/{provider}/callback`.
+- Error-path callback (`?error=`/tanpa `code`) → 302 ke `{FRONTEND_URL}/login?oauth_error=...`; `FRONTEND_URL = https://dokyudo.my.id`.
+- `GET /api/auth/session` → `{"authenticated":false,"user":null}`.
+- Puzzle middleware mengecualikan `/api/oauth` dan `/api/auth`.
+
+Catatan runtime: PKCE `code_verifier` disimpan **in-memory di server** (`exchangeCodeForSession` membutuhkannya). Backend = single Docker container di STB via Cloudflare Tunnel. Restart/deploy antara initiate → callback akan memutus exchange (`OAuth code exchange failed. Please try again`) — sifatnya transient, bukan persisten.

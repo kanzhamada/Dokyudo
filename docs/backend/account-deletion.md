@@ -88,7 +88,7 @@ Retained data: `payment_transactions` (contains pseudonymized `user_email_hash` 
 
 - `apps/backend/src/modules/me/me.service.ts`: `requestAccountDeletion`, `processJob` (with CAS claim), `purgeTenant`, `sweepPendingJobs`, `isUserActive` (lives alongside `getProfile` / `getUsage` in `MeService`).
 - `apps/backend/src/modules/me/me.routes.ts` / `me.controller.ts` / `me.schema.ts`: `DELETE /api/me/account`.
-- `apps/backend/src/shared/utils/email.util.ts`: `sendAccountDeletedEmail` with Resend idempotency key.
+- `apps/backend/src/shared/utils/email.util.ts`: `sendAccountDeletedEmail` with Resend idempotency key — **2026-08-31:** rewrite ke `emailShell()` (kicker `Account deleted`, reference card `FAFAFA` + `jobId` mono, email penerima di-inline, footer `do not reply` terpusat).
 - `apps/backend/src/shared/utils/email.util.test.ts`: Unit tests for `sendAccountDeletedEmail`.
 - `apps/backend/src/modules/me/me.account-deletion.test.ts`: Comprehensive purge lifecycle, concurrency, and re-registration tests.
 - `apps/backend/src/modules/auth/auth.service.ts`: login guard, `email_not_confirmed` → clear 400, registration resend-verification path.
@@ -108,7 +108,7 @@ Retained data: `payment_transactions` (contains pseudonymized `user_email_hash` 
 4. **Optimistic CAS Job Claiming**: Prevents concurrent duplicate purges across multiple server nodes/cron ticks without requiring complex external distributed lock managers.
 5. **Cron sweep over inline execution**: the request returns 202 immediately (UX + Stripe webhook timeouts); the 1-minute sweep adds a bounded delay in exchange for crash-safe retries.
 6. **Checkout-vs-delete race**: the webhook skips provisioning for non-active tenants but records the billing reference; purge cancels **by customer**, catching subscriptions whose IDs were never stored.
-7. **Idempotent Deletion Confirmation Email**: Dispatched with `idempotencyKey: account-deleted/${jobId}` to guarantee a single notification delivery even if a retry occurs.
+7. **Idempotent Deletion Confirmation Email**: Dispatched with `idempotencyKey: account-deleted/${jobId}` to guarantee a single notification delivery even if a retry occurs. **2026-08-31:** template di-unifikasi ke `emailShell()` (dark header `#0E0E0E`, kicker `Account deleted`, reference card mono + divider `#E8E8E8`).
 
 ## Connections
 

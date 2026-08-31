@@ -42,8 +42,26 @@ flowchart TD
     N -- No --> Q[Throw 401 Unauthorized]
 ```
 
+## Update 2026-08-31 — CSP `connect-src` Localhost Allowance
+
+**Completion Timestamp:** 2026-08-31 16:30 UTC+7  
+**Commit:** `c8ef73a`
+
+Production `Content-Security-Policy` di `apps/frontend/svelte.config.js:58` sebelumnya hanya mengizinkan `https://api.dokyudo.my.id` + Supabase/Google/CDN/S3. Saat preview build production melawan backend lokal (`PUBLIC_API_URL=http://localhost:8000` — `apps/frontend/.env` ter-decrypt), `fetch` ke `http://localhost:8000/api/auth/session` & `.../forget-password` terblokir (`connect-src` violation — lihat `fetcher.js:67`, `+page.svelte:36`).
+
+Fix: `connect-src` sekarang menyertakan:
+
+```
+'http://localhost:*', 'http://127.0.0.1:*',
+'http://localhost:8000', 'http://localhost:8080',
+'http://127.0.0.1:8000', 'http://127.0.0.1:8080',
+'ws://localhost:*', 'ws://127.0.0.1:*'
+```
+
+Wildcard `:*` adalah CSP3-compliant; port eksplisit dipertahankan untuk parser lama. Tetap aman di prod (`localhost` dari browser pengguna = mesinnya sendiri, tidak menurunkan keamanan `dokyudo.my.id`). HMR `ws` juga tercakup. CSP sendiri hanya aktif di prod build (`isProduction` → `kit.csp mode: 'hash'` di `svelte.config.js:25` + `hooks.server.ts:17` untuk header hardening lainnya); rebuild frontend diperlukan (`pnpm --filter frontend build`).
+
 ## Completion Timestamp
-**Date**: 2026-06-20 00:21 (Local Time)
+**Date**: 2026-06-20 00:21 (Local Time) — diperbarui 2026-08-31 (CSP + emailShell)
 
 ## File Mapping
 - **`apps/backend/src/modules/auth/auth.service.ts`**: Contains the core correlation queries (using Drizzle ORM), anomaly detection, and DB locking logic.

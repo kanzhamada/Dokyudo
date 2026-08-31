@@ -50,3 +50,14 @@ flowchart TD
 3. **Dokyudo Themed PDF Viewer**: The `@embedpdf` viewer is customized deeply using its `ThemeColors` object mapping `#191919` app backgrounds, `#DB8F5E` primary accents, and subtle `rgba(255, 255, 255, 0.05)` borders to prevent visual dissonance in the dark mode UI.
 4. **Mobile Layout Constraints**: To preserve scroll state when jumping between the document list and the PDF viewer on mobile, the `md:hidden` container utilizes conditional CSS classes (`class:hidden`) rather than Svelte `{#if}` blocks, ensuring the DOM tree remains intact.
 5. **Tooltips Composition**: Because `shadcn-svelte` uses snippet blocks for triggers, the `Tooltip.Trigger` was organically wrapped around the existing `DropdownMenu.Trigger` using nested `{#snippet child({ props })}` structures to spread both event listeners accurately without DOM conflicts.
+## UPDATE (2026-08-31, 15:41 +07:00) — Persyaratan CSP untuk EmbedPDF/PDFium
+
+Viewer (`@embedpdf/svelte-pdf-viewer` + `@embedpdf/pdfium`) menarik aset saat runtime dari **`cdn.jsdelivr.net`** (URL ter-bake di paket): `pdfium.wasm`, manifest `default-stamps`, dan fonts. Persyaratan CSP (lihat `docs/frontend/security-headers.md`):
+
+- `connect-src https://cdn.jsdelivr.net` — fetch wasm / manifest / fonts.
+- `worker-src 'self' blob: https://cdn.jsdelivr.net` — real pdfium worker (`new Worker(workerUrl, {type:'module'})`, `@embedpdf/engines/.../worker-engine.js`) + blob relay workers.
+- `script-src https://cdn.jsdelivr.net` — impor modul internal worker diatur script-src.
+
+**Kritis:** jika worker dari CDN gagal dimulai (mis. `worker-src` belum diizinkan), embedpdf jatuh ke **"virtual worker"** di main thread yang menyuntik *inline script* dan memakai *eval* — keduanya diblokir CSP ketat → preview mati dengan error `script-src-elem` (hash `sha256-N2a9Wu...`) dan `eval` (`Missing 'unsafe-eval'`) di console. Fix yang benar: izinkan worker CDN; `blob:` di `script-src` TIDAK diperlukan (blob worker diatur `worker-src blob:`).
+
+Catatan: warning CSS "Error in parsing value for 'z-index'/'pointer-events'/..." dari style embedpdf adalah suara parser browser biasa (bukan CSP) dan tidak berbahaya.

@@ -73,6 +73,16 @@ sequenceDiagram
 - **[MODIFY]** `api-collections/Auth/10_Forget Password.bru`: Updated documentation with anti-enumeration database guard details.
 - **[MODIFY]** `api-collections/Auth/11_Reset Password.bru`: Updated sample payload and documentation to 8-digit OTP.
 
+## Update 2026-08-31 — Email Design System (`sendRecoveryEmail`)
+
+**Completion Timestamp:** 2026-08-31 16:00 UTC+7
+
+`sendRecoveryEmail` di `apps/backend/src/shared/utils/email.util.ts` kini memakai `emailShell()` yang sama:
+
+- `kicker: 'Password reset' / title: 'Reset your password'`, intro 1 kalimat, **OTP block** `FAFAFA` border `#E8E8E8` — label `10px uppercase #9C9996`, OTP `28px 700 6px #0E0E0E`, divider `#F04E23` 28×2px, expiry `11px #676767 (Expires in 15 minutes · One-time use)`.
+- CTA `Reset Password via Link → actionLink` + fallback box `Or copy & paste this link` (break-all, `#F04E23` underline) — memperbaiki deliverability vs div hitam polos sebelumnya.
+- Idempotency `recovery-email/{email}-{requestId}`; test `email.util.test.ts` tetap assert `123456` + `https://recover.me` ada di html.
+
 ## Connections
 
 - **API Gateway → PostgreSQL**: Queries `public.users` for active verified status and `public.login_attempts` for IP rate limiting.

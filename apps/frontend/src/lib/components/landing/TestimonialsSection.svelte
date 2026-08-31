@@ -32,7 +32,7 @@
 					</span>
 					<strong class="vp-person__name">Myoui Mina</strong>
 					<em class="vp-person__role">Senior Credit Analyst</em>
-					<span class="vp-person__quote" hidden>I asked for the Q3 EBITDA bridge and got the footnote verbatim — [Doc 1: Page 47] linked via Source References to the exact page. Forty minutes of Ctrl+F became one citable query.</span>
+					<span class="vp-person__quote" hidden>We review 200-page filings every week. Dokyudo finds the exact footnote I need in seconds and shows me the page — I can copy it into our memo and send it to the committee the same morning. What used to take an afternoon now takes ten minutes.</span>
 				</button>
 
 				<button class="vp-person" type="button" aria-pressed="false"
@@ -43,7 +43,7 @@
 					</span>
 					<strong class="vp-person__name">Kendrick Lamar</strong>
 					<em class="vp-person__role">Staff Systems Engineer</em>
-					<span class="vp-person__quote" hidden>Application-layer scatter-gather RRF in Deno — parallel Upstash Vector + Postgres FTS, in-memory RRF 1/(60+rank), dedup by documentId with JSONB page hydration. Redis circuit breaker on every external call.</span>
+					<span class="vp-person__quote" hidden>I set it up for our team in one afternoon — just upload the PDFs and ask. Now even the interns get answers in plain English with a link to the source. Sharing a client answer is one link, not a 40MB attachment.</span>
 				</button>
 
 				<button class="vp-person" type="button" aria-pressed="false"
@@ -54,7 +54,7 @@
 					</span>
 					<strong class="vp-person__name">Sabrina Carpenter</strong>
 					<em class="vp-person__role">Portfolio Operations Lead</em>
-					<span class="vp-person__quote" hidden>BYOK keys are AES-256-GCM sealed with BYOK_MASTER_KEY and decrypted only in RAM — UI shows sk-*******************1234. Stripe sandbox + lazy downgrade on GET /api/me keeps the $0 demo behaving like production.</span>
+					<span class="vp-person__quote" hidden>I oversee 30+ live deals. Having every offering memo searchable in one place saves us hours each week, and I can send a partner a read-only link instead of forwarding bulky files. It removed a whole step from our workflow.</span>
 				</button>
 
 				<button class="vp-person" type="button" aria-pressed="false"
@@ -65,7 +65,7 @@
 					</span>
 					<strong class="vp-person__name">Richarlison de Andrade</strong>
 					<em class="vp-person__role">Quantitative Researcher</em>
-					<span class="vp-person__quote" hidden>1,000-token window, 150 overlap via tiktoken cl100k_base, OMML→LaTeX through LibreOffice and rare 25-char n-gram page alignment — 1,024-dim BGE-M3 chunks never split a balance-sheet row.</span>
+					<span class="vp-person__quote" hidden>I compare years of reports to test ideas. Instead of skimming tables for hours, I just ask and get the right section back with the page to verify. Research that took a full day now takes an afternoon.</span>
 				</button>
 
 			</div>
@@ -88,7 +88,7 @@
 					<span class="voices-quote__rate t-tag" id="voicesRate" aria-label="Rated 4.9 out of 5">
 						<svg class="ic" aria-hidden="true"><use href="#i-star"/></svg><b>4.9</b>
 					</span>
-					<p class="voices-quote__body t-b1" id="voicesBody">I asked for the Q3 EBITDA bridge and got the footnote verbatim — [Doc 1: Page 47] linked via Source References to the exact page. Forty minutes of Ctrl+F became one citable query.</p>
+					<p class="voices-quote__body t-b1" id="voicesBody">We review 200-page filings every week. Dokyudo finds the exact footnote I need in seconds and shows me the page — I can copy it into our memo and send it to the committee the same morning. What used to take an afternoon now takes ten minutes.</p>
 					<footer class="voices-quote__foot">
 						<span class="voices-quote__brand" aria-hidden="true"><svg class="ic"><use href="#i-brand-mina"/></svg></span>
 						<cite id="voicesCite">Myoui Mina</cite>

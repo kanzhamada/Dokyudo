@@ -60,3 +60,23 @@ Jika klien memutuskan untuk membatalkan unggahan (*Partial Cancel* atau keseluru
 
 ## 6. Completion Timestamp
 **Completed At:** 2026-07-14T20:45:00+07:00 (WIB)
+## UPDATE (2026-08-31, 15:41 +07:00) — Persyaratan CSP & CORS dari sisi browser
+
+1. **CSP frontend**: origin presigned URL harus ada di `connect-src`. Host publik = **`https://s3.dokyudo.my.id`** (lihat `docs/backend/ci-cd-backend-server.md`), dikonfigurasi via `STORAGE_PUBLIC_URL` di `svelte.config.js` `kit.csp` (dibaca saat build, default statis `https://s3.dokyudo.my.id`). Berlaku untuk: PUT upload (`fetch` di `src/lib/api/documents.ts` dan XHR di `UploadDocumentDialog.svelte`) dan preview PDF (GET presigned yang di-fetch `@embedpdf`). Download via anchor (navigasi) tidak perlu CSP.
+2. **Bucket CORS di MinIO WAJIB** (terpisah dari CSP): PUT dengan header `Content-Type` bukan *simple request* → browser mengirim preflight `OPTIONS`; bucket harus menjawab CORS untuk origin `https://dokyudo.my.id`. Contoh rule (`mc cors` / `aws s3api put-bucket-cors`):
+
+   ```json
+   {
+     "CORSRules": [
+       {
+         "AllowedOrigins": ["https://dokyudo.my.id"],
+         "AllowedMethods": ["PUT", "GET", "HEAD"],
+         "AllowedHeaders": ["Content-Type"],
+         "ExposeHeaders": ["ETag"],
+         "MaxAgeSeconds": 3600
+       }
+     ]
+   }
+   ```
+
+   Jangan `AllowedOrigins: "*"` (presigned URL itu kredensial). Tambahkan origin dev (`http://localhost:5173`) untuk pengujian lokal.

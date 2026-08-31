@@ -133,9 +133,9 @@ const isPublicShareRead =
 
 ## Email (Resend)
 
-- `sendShareInviteEmail` di `apps/backend/src/shared/utils/email.util.ts`.
-- `from: "Dokyudo <team@dokyudo.my.id>"`, link `{FRONTEND_URL}/s/{code}?invite={token}` (FRONTEND_URL dari `getEnv`).
-- Idempotency key `share-invite/{code}/{email}`; `notified_at` di-update setelah sukses.
+- `sendShareInviteEmail` di `apps/backend/src/shared/utils/email.util.ts` — **2026-08-31:** rewrite ke `emailShell()` (kicker `Shared conversation`, card `FAFAFA` border-left `#F04E23`, CTA `View Conversation`).
+- `from: "Dokyudo <team@dokyudo.my.id>"`, link `{FRONTEND_URL}/s/{code}?invite={token}` (FRONTEND_URL dari `getEnv`), subject `{sharer} shared a conversation with you on Dokyudo`.
+- Idempotency key `share-invite/{code}/{email}`; `notified_at` di-update setelah sukses. Fallback box `Or copy & paste this link` (break-all, `#F04E23`) untuk deliverability.
 - Konfigurasi: `RESEND_API_KEY` (required env). Gagal kirim **tidak** membatalkan pembuatan share (logged).
 
 ## Frontend
