@@ -1,5 +1,11 @@
 import adapter from '@sveltejs/adapter-cloudflare';
 
+// Production-build detection. The app uses both conventions ('production'
+// from `vite build`, 'prod' in this team's env files), so accept either.
+// The CSP is only enabled for production builds — during `vite dev` the Vite
+// HMR client needs ws://localhost and dev-only inline scripts.
+const isProduction = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'prod';
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	compilerOptions: {
@@ -10,7 +16,54 @@ const config = {
 		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
 		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
 		// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-		adapter: adapter()
+		adapter: adapter(),
+		// Content-Security-Policy via SvelteKit's built-in mechanism (mode
+		// "hash") so SvelteKit hashes its own injected inline bootstrap script
+		// and appends the hashes to `script-src`. Doing this in hooks.server.ts
+		// instead would leave that inline script blocked and the app would
+		// never hydrate. Applied per SSR response, production only.
+		...(isProduction && {
+			csp: {
+				mode: 'hash',
+				directives: {
+					'default-src': ['self'],
+					// 'wasm-unsafe-eval' is required for the anti-bot WASM puzzle
+					// (vite-plugin-wasm + WebAssembly.instantiate).
+					'script-src': [
+						'self',
+						"'wasm-unsafe-eval'",
+						'https://www.google.com',
+						'https://www.gstatic.com',
+						'https://static.cloudflareinsights.com'
+					],
+					// 'unsafe-inline' for styles is needed by Svelte's inline style
+					// attribute in app.html and runtime style injection
+					// (mermaid/katex rendering).
+					'style-src': ['self', "'unsafe-inline'", 'https://fonts.googleapis.com'],
+					'font-src': ['self', 'data:', 'https://fonts.gstatic.com'],
+					'img-src': ['self', 'data:', 'blob:', 'https:'],
+					'connect-src': [
+						'self',
+						'https://api.dokyudo.my.id',
+						'https://*.supabase.co',
+						'wss://*.supabase.co',
+						'https://fonts.googleapis.com',
+						'https://fonts.gstatic.com',
+						'https://www.google.com',
+						'https://www.gstatic.com',
+						'https://static.cloudflareinsights.com',
+						// Presigned S3/MinIO uploads + PDF previews (see docs/backend).
+						process.env.STORAGE_PUBLIC_URL || 'https://s3.dokyudo.my.id'
+					],
+					'frame-src': ['self', 'https://www.google.com'],
+					'frame-ancestors': ['self'],
+					'base-uri': ['self'],
+					'form-action': ['self'],
+					'object-src': ['none'],
+					'worker-src': ['self', 'blob:']
+				}
+			}
+		})
 	}
 };
 
