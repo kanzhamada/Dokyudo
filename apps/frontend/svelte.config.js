@@ -29,9 +29,14 @@ const config = {
 					'default-src': ['self'],
 					// 'wasm-unsafe-eval' is required for the anti-bot WASM puzzle
 					// (vite-plugin-wasm + WebAssembly.instantiate).
+					// 'blob:' enables @embedpdf's PDF viewer, which boots its
+					// pdfium worker from a Blob URL (worker-src blob: is also set
+					// below). Trade-off: blob scripts are a common XSS escalation
+					// sink — acceptable here, remove if the viewer is swapped.
 					'script-src': [
 						'self',
 						"'wasm-unsafe-eval'",
+						'blob:',
 						'https://www.google.com',
 						'https://www.gstatic.com',
 						'https://static.cloudflareinsights.com'
@@ -52,6 +57,9 @@ const config = {
 						'https://www.google.com',
 						'https://www.gstatic.com',
 						'https://static.cloudflareinsights.com',
+						// @embedpdf fetches its pdfium.wasm + stamps manifest from
+						// cdn.jsdelivr.net at runtime (package-baked URLs).
+						'https://cdn.jsdelivr.net',
 						// Presigned S3/MinIO uploads + PDF previews (see docs/backend).
 						process.env.STORAGE_PUBLIC_URL || 'https://s3.dokyudo.my.id'
 					],

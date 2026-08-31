@@ -1,4 +1,4 @@
-import { browser, dev } from '$app/environment';
+import { dev } from '$app/environment';
 
 /**
  * Console logging guard.
@@ -22,6 +22,12 @@ type ConsoleLevel = 'debug' | 'log' | 'info' | 'warn' | 'error';
  * the app is built for production (`vite build`).
  */
 const isProductionBuild = !dev;
+
+// NOTE: intentionally NOT using `browser` from `$app/environment` — it is a
+// build-time constant from `esm-env` that some pipelines fold to `false` even
+// in the client bundle, which would silently disable the console patch.
+// A plain `typeof window` check is evaluated at runtime and cannot be folded.
+const isBrowser = typeof window !== 'undefined';
 
 const noop = (): void => {};
 
@@ -49,7 +55,7 @@ let consolePatched = false;
  * the root layout so every route is covered.
  */
 export function suppressConsole(): void {
-	if (consolePatched || !browser || !isProductionBuild) return;
+	if (consolePatched || !isBrowser || !isProductionBuild) return;
 	consolePatched = true;
 	for (const level of MUTED_LEVELS) {
 		console[level] = noop;
