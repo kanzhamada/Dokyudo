@@ -572,7 +572,6 @@
 							class="w-56 border border-white/[0.16] bg-offblack/40 p-3 text-white backdrop-blur-[42px]"
 							align="end"
 						>
-							align="end" >
 							<div class="mb-3 text-xs font-medium text-white/[0.69]">Usage Information</div>
 							<div class="flex flex-col gap-3">
 								{@render mobileUsageMetric(
