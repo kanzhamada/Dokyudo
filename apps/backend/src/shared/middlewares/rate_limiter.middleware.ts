@@ -27,7 +27,7 @@ export async function rateLimiterMiddleware(c: Context, next: Next) {
         return next();
     }
 
-    if (c.req.path.includes("/webhook")) {
+    if (c.req.path === "/health" || c.req.path === "/health/" || c.req.path.includes("/webhook")) {
         return next();
     }
 

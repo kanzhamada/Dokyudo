@@ -19,6 +19,7 @@ app.onError((err: any, c: any) => {
 app.use("/*", rateLimiterMiddleware);
 
 app.get("/ok", (c: any) => c.text("OK"));
+app.get("/health", (c: any) => c.json({ status: "ok" }));
 app.get("/api/rag/shares/abc123", (c: any) => c.json({ code: "abc123" }));
 app.get("/api/auth/login", (c: any) => {
     throw new AppError({
@@ -97,6 +98,21 @@ describe("RateLimiter Middleware", () => {
             headers: { "X-Forwarded-For": "9.9.9.9", "User-Agent": "curl/8.0" },
         })).json();
         assertEquals(json.code, "abc123");
+    });
+
+    it("Health check endpoint is exempt from rate limiting", async () => {
+        // Internal health probes (e.g. Docker healthcheck with curl User-Agent)
+        // must skip rate limiting to prevent delays if Redis is unreachable.
+        for (let i = 0; i < 25; i++) {
+            const res = await app.request("/health", {
+                headers: {
+                    "X-Forwarded-For": "0.0.0.0",
+                    "User-Agent": "curl/8.0",
+                },
+            });
+            assertEquals(res.status, 200);
+            assertEquals(res.headers.has("x-ratelimit-limit"), false);
+        }
     });
 
     it("Penalizes IP on auth-path 4xx but keeps normal traffic flowing", async () => {

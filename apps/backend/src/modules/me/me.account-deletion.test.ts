@@ -529,4 +529,19 @@ describe("MeService (account deletion)", () => {
       }
     });
   });
+
+  describe("sweepPendingJobs", () => {
+    it("runs gracefully without throwing", async () => {
+      await MeService.sweepPendingJobs();
+    });
+
+    it("resilience: handles database query errors gracefully without throwing", async () => {
+      using selectStub = stub(db, "select", () => {
+        throw new Error("Simulated database connection timeout");
+      });
+
+      // Must complete without throwing
+      await MeService.sweepPendingJobs();
+    });
+  });
 });

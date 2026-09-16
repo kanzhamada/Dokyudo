@@ -618,10 +618,16 @@ export class MeService {
    * processJob and never propagate.
    */
   static async sweepPendingJobs(): Promise<void> {
-    const jobs = await db
-      .select({ id: accountDeletionJobs.id })
-      .from(accountDeletionJobs)
-      .where(inArray(accountDeletionJobs.status, ["pending", "purging"]));
+    let jobs: Array<{ id: string }> = [];
+    try {
+      jobs = await db
+        .select({ id: accountDeletionJobs.id })
+        .from(accountDeletionJobs)
+        .where(inArray(accountDeletionJobs.status, ["pending", "purging"]));
+    } catch {
+      // Non-fatal: transient database connectivity/timeout errors should not throw into Deno.cron
+      return;
+    }
 
     for (const job of jobs) {
       await MeService.processJob(job.id);

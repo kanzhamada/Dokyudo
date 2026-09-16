@@ -122,7 +122,8 @@
 							<a {...props} href={resolve('/login')}>Sign in</a>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content class="bg-[#3E3E3E]" arrowClasses="bg-[#3E3E3E]"
+								<Tooltip.Content class="border-white/[0.16] bg-graphite text-white"
+								arrowClasses="bg-graphite border-none"
 						>Login to your account</Tooltip.Content
 					>
 				</Tooltip.Root>

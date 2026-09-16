@@ -143,12 +143,22 @@ if (import.meta.main) {
 
   // Background sweep for chat turns awaiting document ingestion
   Deno.cron("sweep-awaiting-turns", "* * * * *", async () => {
-    await RagService.sweepAwaitingTurns();
+    try {
+      await RagService.sweepAwaitingTurns();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`sweep-awaiting-turns failed: ${message}`);
+    }
   });
 
   // Background sweep for pending account deletions (idempotent, retries inside)
   Deno.cron("sweep-account-deletions", "* * * * *", async () => {
-    await MeService.sweepPendingJobs();
+    try {
+      await MeService.sweepPendingJobs();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`sweep-account-deletions failed: ${message}`);
+    }
   });
 
   console.log(`
